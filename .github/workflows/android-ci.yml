@@ -53,5 +53,29 @@ jobs:
       - name: Build Android debug variant
         run: ./gradlew --no-daemon --stacktrace :app:assembleDevDebug
 
+      - name: Build Android app, TV and Wear OS variants
+        run: ./gradlew --no-daemon --stacktrace :app:assembleDevDebug :tv:assembleDevDebug :wearos:assembleDevDebug
+
       - name: Run Android unit tests
         run: ./gradlew --no-daemon --stacktrace :app:testDevDebugUnitTest
+
+  desktop:
+    name: Desktop compile and tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+
+      - name: Compile desktop application
+        run: ./gradlew --no-daemon --stacktrace :desktopApp:compileKotlin
+
+      - name: Run desktop unit tests
+        run: ./gradlew --no-daemon --stacktrace :desktopApp:test
