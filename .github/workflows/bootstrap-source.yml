@@ -23,7 +23,7 @@ jobs:
         run: |
           set -euo pipefail
           git clone --depth 1 https://github.com/somilkhan/BitChord.git /tmp/bitchord
-          rsync -a --delete --exclude='.git' /tmp/bitchord/ ./
+          rsync -a --delete --exclude='.git' --exclude='.github/workflows/***' /tmp/bitchord/ ./
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
