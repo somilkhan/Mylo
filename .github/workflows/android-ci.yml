@@ -36,10 +36,10 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
-          packages: "platform-tools platforms;android-37 cmake;3.22.1"
+          packages: "platform-tools cmake;3.22.1"
 
-      - name: Accept Android SDK licenses
-        run: yes | sdkmanager --licenses >/dev/null || true
+      - name: Report installed Android platforms
+        run: sdkmanager --list | grep -E "platforms;android-|build-tools;" | head -30
 
       - name: Build Android debug variant
         run: ./gradlew --no-daemon --stacktrace :app:assembleDevDebug
