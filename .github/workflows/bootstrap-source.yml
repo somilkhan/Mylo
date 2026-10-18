@@ -4,13 +4,13 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
   import-source:
-    if: github.event.head_commit.message == 'Bootstrap MYLO repository import workflow'
     runs-on: ubuntu-latest
     steps:
       - name: Check out MYLO repository
