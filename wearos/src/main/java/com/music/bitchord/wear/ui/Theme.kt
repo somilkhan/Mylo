@@ -3,27 +3,15 @@ package com.music.bitchord.wear.ui
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material3.ColorScheme
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Typography
-import com.music.bitchord.wear.R
 
-/**
- * SF Pro Display, as on the phone — subset to Latin for the watch (the phone's
- * files are 2.3 MB a weight; these are ~50 KB). Anything outside the subset, a
- * Hindi or Japanese title, falls back to the system face glyph by glyph.
- */
-val SFPro = FontFamily(
-    Font(R.font.sf_pro_display_regular, FontWeight.W400),
-    Font(R.font.sf_pro_display_medium, FontWeight.W500),
-    Font(R.font.sf_pro_display_semibold, FontWeight.W600),
-    Font(R.font.sf_pro_display_bold, FontWeight.W700),
-)
-
+/** Use the platform sans-serif; do not redistribute Apple's proprietary font. */
+val SFPro = FontFamily.SansSerif
 /** The phone's AccentRed: Love, and nothing much else. */
 val AccentRed = Color(0xFFFA2D48)
 
