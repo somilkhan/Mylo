@@ -32,7 +32,7 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
-          packages: "platform-tools platforms;android-37.0 platforms;android-36 cmake;3.22.1"
+          packages: "platform-tools build-tools;36.0.0 platforms;android-37.0 platforms;android-36 cmake;3.22.1"
 
       - name: Add Android 37 SDK path expected by current AGP
         shell: bash
@@ -85,7 +85,7 @@ jobs:
             exit 1
           fi
           for apk in "${apks[@]}"; do
-            apksigner verify --verbose "$apk"
+            "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$apk"
             echo "Verified signature: $apk"
           done
 
