@@ -255,6 +255,7 @@ fun GlassNavBar(
                         )
                     },
                     onClick = onClick,
+                    accessibilityLabel = tab.label,
                 )
             }
         }
