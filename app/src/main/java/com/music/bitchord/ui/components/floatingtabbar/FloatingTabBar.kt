@@ -467,7 +467,7 @@ private fun SharedTransitionScope.InlineBar(
         if (standaloneTab != null) {
             InlineStandaloneTab(
                 standaloneTab = standaloneTab,
-                isSelected = selectedTabKey == null,
+                isSelected = selectedTabKey == standaloneTab.key,
                 shapes = shapes,
                 colors = colors,
                 elevations = elevations,
@@ -685,7 +685,7 @@ private fun SharedTransitionScope.ExpandedBar(
             if (standaloneTab != null) {
                 ExpandedStandaloneTab(
                     standaloneTab = standaloneTab,
-                    isSelected = selectedTabKey == null,
+                    isSelected = selectedTabKey == standaloneTab.key,
                     shapes = shapes,
                     colors = colors,
                     elevations = elevations,
