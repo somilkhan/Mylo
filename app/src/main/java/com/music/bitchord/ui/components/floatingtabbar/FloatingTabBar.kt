@@ -881,7 +881,7 @@ private fun SharedTransitionScope.ExpandedTabs(
                         .selectableGroup()
                         .onSizeChanged { rowSize = it }
                         .layerBackdrop(tabRow)
-                        .pointerInput(tabStepPx, tabCount, isRtl) {
+                        .pointerInput(Unit) {
                             if (currentSelectedTabIndex < 0 || tabStepPx <= 0f) return@pointerInput
 
                             // In tab order, whichever way the row runs.
