@@ -95,6 +95,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
@@ -387,7 +389,8 @@ interface FloatingTabBarScope {
         title: @Composable () -> Unit,
         icon: @Composable () -> Unit,
         onClick: () -> Unit,
-        indication: (@Composable () -> Indication)? = { LocalIndication.current }
+        indication: (@Composable () -> Indication)? = { LocalIndication.current },
+        accessibilityLabel: String? = null,
     )
 
     /**
@@ -518,6 +521,9 @@ private fun SharedTransitionScope.InlineTab(
             ) {
                 onInlineTabClick()
                 inlineTab.onClick()
+            }
+            .semantics {
+                inlineTab.accessibilityLabel?.let { contentDescription = it }
             }
             .padding(sizes.tabInlineContentPadding)
     ) {
@@ -1174,7 +1180,8 @@ private class FloatingTabBarScopeImpl : FloatingTabBarScope {
         title: @Composable () -> Unit,
         icon: @Composable () -> Unit,
         onClick: () -> Unit,
-        indication: (@Composable () -> Indication)?
+        indication: (@Composable () -> Indication)?,
+        accessibilityLabel: String?,
     ) {
         tabs.add(
             FloatingTabBarTab(
@@ -1182,7 +1189,8 @@ private class FloatingTabBarScopeImpl : FloatingTabBarScope {
                 title = title,
                 icon = icon,
                 onClick = onClick,
-                indication = indication
+                indication = indication,
+                accessibilityLabel = accessibilityLabel,
             )
         )
     }
@@ -1208,7 +1216,8 @@ private data class FloatingTabBarTab(
     val title: @Composable () -> Unit,
     val icon: @Composable () -> Unit,
     val onClick: () -> Unit,
-    val indication: (@Composable () -> Indication)?
+    val indication: (@Composable () -> Indication)?,
+    val accessibilityLabel: String? = null,
 )
 
 /**
