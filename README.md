@@ -2,7 +2,7 @@
 
 MYLO is an Android-first music player project being developed from an existing Kotlin/Compose music-player foundation. The repository currently contains Android, TV/Wear OS, desktop, and shared modules; the Android experience is the primary target for MYLO.
 
-> **Development status:** early fork/rebrand. The imported source has not yet been validated by a MYLO-specific build, automated test run, or device test. Do not treat this repository as a verified release.
+> **Development status:** early fork/rebrand. Automated build and unit-test checks are being established for the supported targets. Device-level playback, background-service, and installation testing is still required before calling this a release.
 
 ## Current codebase capabilities
 
@@ -38,7 +38,7 @@ The Android module is included when Gradle can locate an Android SDK through `lo
 
 ## CI
 
-The Android CI workflow builds `:app:assembleDevDebug` and runs `:app:testDevDebugUnitTest` on pushes to `main` and pull requests. Passing CI is necessary but does not replace playback, background-service, download, Bluetooth, or real-device testing.
+The CI workflow builds the Android phone, TV, and Wear OS development debug variants, runs Android unit tests, compiles the desktop app, and runs desktop unit tests on pushes to `main` and pull requests. Successful Android builds upload debug APKs as a 14-day workflow artifact. Passing CI is necessary but does not replace playback, background-service, download, Bluetooth, installation, or real-device testing.
 
 ## License and attribution
 

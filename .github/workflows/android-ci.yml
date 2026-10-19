@@ -51,10 +51,23 @@ jobs:
         run: sdkmanager --list | grep -E "platforms;android-|build-tools;" | head -30
 
       - name: Build Android app, TV and Wear OS variants
+        id: build_apks
         run: ./gradlew --no-daemon --stacktrace :app:assembleDevDebug :tv:assembleDevDebug :wearos:assembleDevDebug
 
       - name: Run Android unit tests
         run: ./gradlew --no-daemon --stacktrace :app:testDevDebugUnitTest
+
+      - name: Upload debug APKs
+        if: always() && steps.build_apks.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mylo-dev-debug-apks
+          path: |
+            app/build/outputs/apk/dev/debug/*.apk
+            tv/build/outputs/apk/dev/debug/*.apk
+            wearos/build/outputs/apk/dev/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
 
   desktop:
     name: Desktop compile and tests

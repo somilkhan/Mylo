@@ -1,6 +1,7 @@
 package com.music.bitchord
 
 import com.music.bitchord.ui.components.SUPPORTED_LANGUAGES
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -53,6 +54,15 @@ class LocaleStringsTest(private val tag: String) {
             translatableKeys(parse(File(resDir, "values/strings.xml")))
         }
 
+        private fun stringValue(doc: Document, key: String): String? {
+            val nodes = doc.getElementsByTagName("string")
+            for (i in 0 until nodes.length) {
+                val element = nodes.item(i) as Element
+                if (element.getAttribute("name") == key) return element.textContent
+            }
+            return null
+        }
+
         /**
          * App language tags are BCP-47 (`zh-CN` / `zh-TW`) while Android
          * resource directories use `-r` regions (`values-zh`, `values-zh-rTW`).
@@ -72,7 +82,10 @@ class LocaleStringsTest(private val tag: String) {
         val localeFile = File(resDir, "values-$qualifier/strings.xml")
         assertTrue("values-$qualifier/strings.xml must exist (for language tag $tag)", localeFile.exists())
 
-        val missingKeys = baseKeys - translatableKeys(parse(localeFile))
+        val localeDoc = parse(localeFile)
+        assertEquals("values-$qualifier/strings.xml must use MYLO as app_name", "MYLO", stringValue(localeDoc, "app_name"))
+
+        val missingKeys = baseKeys - translatableKeys(localeDoc)
         assertTrue(
             "values-$qualifier/strings.xml (language $tag) is missing ${missingKeys.size} keys from values/strings.xml: $missingKeys",
             missingKeys.isEmpty(),
