@@ -55,7 +55,7 @@ internal suspend fun renderLyricsShareCard(
     /** Pad out to the full 1080×1920 frame, the passage centred in the room. */
     story: Boolean = false,
 ): Bitmap = withContext(Dispatchers.Default) {
-    val type = Fonts(context)
+    val type = Fonts()
     val cover = card.artworkUrl?.let { loadBitmap(context, it) }
 
     // ── Sizing ──────────────────────────────────────────────────────────────
