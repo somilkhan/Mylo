@@ -510,14 +510,15 @@ private fun SharedTransitionScope.InlineTab(
             )
             .clip(shapes.tabBarShape)
             .then(tabBarContentModifier())
-            .clickable(
-                onClick = {
-                    onInlineTabClick()
-                    inlineTab.onClick()
-                },
+            .selectable(
+                selected = true,
+                role = Role.Tab,
                 indication = inlineTab.indication?.invoke(),
-                interactionSource = remember { MutableInteractionSource() }
-            )
+                interactionSource = remember { MutableInteractionSource() },
+            ) {
+                onInlineTabClick()
+                inlineTab.onClick()
+            }
             .padding(sizes.tabInlineContentPadding)
     ) {
         Tab(
