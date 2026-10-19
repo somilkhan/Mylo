@@ -32,7 +32,7 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
-          packages: "platform-tools platforms;android-37.0 platforms;android-36.0 cmake;3.22.1"
+          packages: "platform-tools platforms;android-37.0 platforms;android-36 cmake;3.22.1"
 
       - name: Add Android 37 SDK path expected by current AGP
         shell: bash
@@ -42,6 +42,7 @@ jobs:
             ln -s android-37.0 "$ANDROID_HOME/platforms/android-37"
           fi
           test -d "$ANDROID_HOME/platforms/android-37"
+          test -d "$ANDROID_HOME/platforms/android-36"
 
       - name: Restore release keystore from Actions secrets
         shell: bash
