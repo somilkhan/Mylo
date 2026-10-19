@@ -1,14 +1,5 @@
-<!-- MYLO notification mark. Android uses the opaque white silhouette for small icons. -->
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="24dp"
-    android:height="24dp"
-    android:viewportWidth="24"
-    android:viewportHeight="24">
-  <path
-      android:fillColor="#00000000"
-      android:strokeColor="#FFFFFFFF"
-      android:strokeWidth="2.1"
-      android:strokeLineCap="round"
-      android:strokeLineJoin="round"
-      android:pathData="M 4,18 L 4,6 L 12,13 L 20,6 L 20,18" />
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+  <path android:fillColor="#00000000" android:strokeColor="#FFFFFFFF" android:strokeWidth="1.8" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M6,12 V10 C6,6.7 8.7,4 12,4 C15.3,4 18,6.7 18,10 V12"/>
+  <path android:fillColor="#FFFFFFFF" android:pathData="M5.7,9.8 H6.3 C7.5,9.8 8.4,10.7 8.4,11.9 V15.3 C8.4,16.5 7.5,17.4 6.3,17.4 H5.7 C4.5,17.4 3.6,16.5 3.6,15.3 V11.9 C3.6,10.7 4.5,9.8 5.7,9.8 Z M17.7,9.8 H18.3 C19.5,9.8 20.4,10.7 20.4,11.9 V15.3 C20.4,16.5 19.5,17.4 18.3,17.4 H17.7 C16.5,17.4 15.6,16.5 15.6,15.3 V11.9 C15.6,10.7 16.5,9.8 17.7,9.8 Z"/>
+  <path android:fillColor="#FFFFFFFF" android:pathData="M10.1,10.5 L11.8,10.5 L11.8,16.7 C11.8,17.4 10.9,17.8 10.1,17.5 C9.2,17.2 9.1,16.3 10,15.8 C10.3,15.6 10.7,15.5 11,15.6 L11,10.5 Z M12.3,10.5 L13.9,10.5 L13.9,16.7 C13.9,17.4 14.8,17.8 15.6,17.5 C16.5,17.2 16.6,16.3 15.7,15.8 C15.4,15.6 15,15.5 14.7,15.6 L14.7,10.5 Z"/>
 </vector>
