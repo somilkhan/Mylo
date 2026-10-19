@@ -467,6 +467,7 @@ private fun SharedTransitionScope.InlineBar(
         if (standaloneTab != null) {
             InlineStandaloneTab(
                 standaloneTab = standaloneTab,
+                isSelected = selectedTabKey == null,
                 shapes = shapes,
                 colors = colors,
                 elevations = elevations,
@@ -540,6 +541,7 @@ private fun SharedTransitionScope.InlineTab(
 @Composable
 private fun SharedTransitionScope.InlineStandaloneTab(
     standaloneTab: FloatingTabBarTab,
+    isSelected: Boolean,
     shapes: FloatingTabBarShapes,
     colors: FloatingTabBarColors,
     elevations: FloatingTabBarElevations,
@@ -568,11 +570,12 @@ private fun SharedTransitionScope.InlineStandaloneTab(
             )
             .clip(shapes.standaloneTabShape)
             .then(tabBarContentModifier())
-            .clickable(
-                onClick = standaloneTab.onClick,
+            .selectable(
+                selected = isSelected,
+                role = Role.Tab,
                 indication = standaloneTab.indication?.invoke(),
-                interactionSource = remember { MutableInteractionSource() }
-            )
+                interactionSource = remember { MutableInteractionSource() },
+            ) { standaloneTab.onClick() }
     )
 }
 
@@ -682,6 +685,7 @@ private fun SharedTransitionScope.ExpandedBar(
             if (standaloneTab != null) {
                 ExpandedStandaloneTab(
                     standaloneTab = standaloneTab,
+                    isSelected = selectedTabKey == null,
                     shapes = shapes,
                     colors = colors,
                     elevations = elevations,
@@ -992,6 +996,7 @@ private fun SharedTransitionScope.ExpandedTabs(
 @Composable
 private fun SharedTransitionScope.ExpandedStandaloneTab(
     standaloneTab: FloatingTabBarTab,
+    isSelected: Boolean,
     shapes: FloatingTabBarShapes,
     colors: FloatingTabBarColors,
     elevations: FloatingTabBarElevations,
@@ -1020,11 +1025,12 @@ private fun SharedTransitionScope.ExpandedStandaloneTab(
             )
             .clip(shapes.standaloneTabShape)
             .then(tabBarContentModifier())
-            .clickable(
-                onClick = standaloneTab.onClick,
+            .selectable(
+                selected = isSelected,
+                role = Role.Tab,
                 indication = standaloneTab.indication?.invoke(),
-                interactionSource = remember { MutableInteractionSource() }
-            )
+                interactionSource = remember { MutableInteractionSource() },
+            ) { standaloneTab.onClick() }
     )
 }
 
