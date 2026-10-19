@@ -442,6 +442,7 @@ private fun SharedTransitionScope.InlineBar(
         if (hasInlineTab) {
             InlineTab(
                 inlineTab = inlineTab,
+                isSelected = selectedTabKey == inlineTab.key,
                 onInlineTabClick = onInlineTabClick,
                 shapes = shapes,
                 sizes = sizes,
@@ -487,6 +488,7 @@ private fun SharedTransitionScope.InlineBar(
 @Composable
 private fun SharedTransitionScope.InlineTab(
     inlineTab: FloatingTabBarTab,
+    isSelected: Boolean,
     onInlineTabClick: () -> Unit,
     shapes: FloatingTabBarShapes,
     sizes: FloatingTabBarSizes,
@@ -514,7 +516,7 @@ private fun SharedTransitionScope.InlineTab(
             .clip(shapes.tabBarShape)
             .then(tabBarContentModifier())
             .selectable(
-                selected = true,
+                selected = isSelected,
                 role = Role.Tab,
                 indication = inlineTab.indication?.invoke(),
                 interactionSource = remember { MutableInteractionSource() },
