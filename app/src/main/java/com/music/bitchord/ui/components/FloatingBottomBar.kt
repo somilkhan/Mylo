@@ -173,7 +173,6 @@ fun FloatingBottomBar(
     val haptics = rememberHaptics()
     val density = LocalDensity.current
     val currentSelectedIndex by rememberUpdatedState(selectedIndex)
-    val currentOnTabSelected by rememberUpdatedState(onTabSelected)
 
     var rowSize by remember { mutableStateOf(IntSize.Zero) }
     val gapPx = with(density) { 6.dp.toPx() }
@@ -261,13 +260,13 @@ fun FloatingBottomBar(
                 .fillMaxWidth()
                 .selectableGroup()
                 .onSizeChanged { rowSize = it }
-                .pointerInput(tabStepPx, tabs.size) {
+                .pointerInput(Unit) {
                     var totalDrag = 0f
-                    var dragStartIndex = currentSelectedIndex
+                    var dragStartIndex = selectedIndex
                     detectHorizontalDragGestures(
                         onDragStart = {
                             totalDrag = 0f
-                            dragStartIndex = currentSelectedIndex
+                            dragStartIndex = selectedIndex
                         },
                         onDragCancel = { dragOffset = 0f },
                         onDragEnd = {
@@ -275,18 +274,17 @@ fun FloatingBottomBar(
                                 val absoluteIndexFloat = (dragStartIndex + totalDrag / tabStepPx)
                                     .coerceIn(0f, tabs.lastIndex.toFloat())
                                 val newIndex = absoluteIndexFloat.roundToInt()
-                                if (newIndex != currentSelectedIndex) {
-                                    currentOnTabSelected(newIndex)
+                                if (newIndex != selectedIndex) {
+                                    onTabSelected(newIndex)
                                 }
                             }
                             dragOffset = 0f
                         },
                         onHorizontalDrag = { _, delta ->
                             totalDrag += delta
-                            if (tabStepPx <= 0f || tabs.isEmpty()) return@detectHorizontalDragGestures
                             val absoluteIndexFloat = (dragStartIndex + totalDrag / tabStepPx)
                                 .coerceIn(0f, tabs.lastIndex.toFloat())
-                            dragOffset = absoluteIndexFloat * tabStepPx - currentSelectedIndex * tabStepPx
+                            dragOffset = absoluteIndexFloat * tabStepPx - selectedIndex * tabStepPx
 
                             val approxTab = absoluteIndexFloat.roundToInt()
                             if (approxTab != lastHapticTab) {
@@ -311,7 +309,6 @@ fun FloatingBottomBar(
                     tab = tab,
                     selected = index == selectedIndex,
                     glassSpec = glassSpec,
-                    reduceAnimation = reduceAnimation,
                     selectedTint = adaptiveTint,
                     unselectedTint = adaptiveTint?.copy(alpha = 0.65f),
                     onClick = { onTabSelected(index) },
@@ -327,7 +324,6 @@ private fun BottomBarItem(
     tab: BottomTab,
     selected: Boolean,
     glassSpec: AnimationSpec<Float>,
-    reduceAnimation: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     /** Overrides the theme's primary/onSurfaceVariant tint — see the glass branch above. */
@@ -348,7 +344,7 @@ private fun BottomBarItem(
         } else {
             unselectedTint ?: MaterialTheme.colorScheme.onSurfaceVariant
         },
-        animationSpec = if (reduceAnimation) snap() else tween(200),
+        animationSpec = tween(200),
         label = "tabTint",
     )
 

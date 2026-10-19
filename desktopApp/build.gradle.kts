@@ -558,7 +558,7 @@ compose.desktop {
 
             macOS {
                 iconFile.set(project.file("packaging/icons/AppIcon.icns"))
-                bundleID = "com.music.bitchord"
+                bundleID = "app.mylo.music.desktop"
                 appCategory = "public.app-category.music"
                 dockName = "MYLO"
                 infoPlist {
