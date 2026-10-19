@@ -309,6 +309,7 @@ fun FloatingBottomBar(
                     tab = tab,
                     selected = index == selectedIndex,
                     glassSpec = glassSpec,
+                    reduceAnimation = reduceAnimation,
                     selectedTint = adaptiveTint,
                     unselectedTint = adaptiveTint?.copy(alpha = 0.65f),
                     onClick = { onTabSelected(index) },
@@ -324,6 +325,7 @@ private fun BottomBarItem(
     tab: BottomTab,
     selected: Boolean,
     glassSpec: AnimationSpec<Float>,
+    reduceAnimation: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     /** Overrides the theme's primary/onSurfaceVariant tint — see the glass branch above. */
@@ -344,7 +346,7 @@ private fun BottomBarItem(
         } else {
             unselectedTint ?: MaterialTheme.colorScheme.onSurfaceVariant
         },
-        animationSpec = tween(200),
+        animationSpec = if (reduceAnimation) snap() else tween(200),
         label = "tabTint",
     )
 
