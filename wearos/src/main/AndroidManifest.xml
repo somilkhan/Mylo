@@ -10,7 +10,7 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- The watch as the speaker: WatchPlaybackService plays on with the screen off. -->
-    <!-- Updates sent from the phone's "BitChord for Wear OS" settings (SelfUpdate). -->
+    <!-- Updates sent from the phone's "MYLO for Wear OS" settings (SelfUpdate). -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
@@ -65,7 +65,7 @@
         </activity>
 
         <!--
-          Puts BitChord's own ongoing icon on the watch face while the phone
+          Puts MYLO's own ongoing icon on the watch face while the phone
           plays, so tapping it opens this app rather than the system's media
           controller. Woken only by the phone's now-playing writes.
         -->

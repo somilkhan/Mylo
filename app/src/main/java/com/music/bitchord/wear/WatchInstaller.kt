@@ -43,7 +43,7 @@ import java.util.concurrent.TimeUnit
 import com.music.bitchord.wear.WearProtocol as P
 
 /**
- * Settings → "BitChord for Wear OS": which watches have BitChord, whether it is
+ * Settings → "MYLO for Wear OS": which watches have MYLO, whether it is
  * this phone's build, and putting it there without a computer.
  *
  * The phone APK carries the watch APK of the same flavor and signing key
@@ -61,9 +61,9 @@ import com.music.bitchord.wear.WearProtocol as P
  */
 object WatchInstaller {
 
-    private const val TAG = "BitChordWear"
-    private const val APK_ASSET = "wear/BitChordWear.apk"
-    private const val SHA_ASSET = "wear/BitChordWear.sha256"
+    private const val TAG = "MYLOWear"
+    private const val APK_ASSET = "wear/MYLO-Wear.apk"
+    private const val SHA_ASSET = "wear/MYLO-Wear.sha256"
     private const val PAIRING_SERVICE = "_adb-tls-pairing._tcp"
     private const val CONNECT_SERVICE = "_adb-tls-connect._tcp"
 
@@ -225,9 +225,9 @@ object WatchInstaller {
 
     /** The bundled APK, as a file — sendFile and the ADB stream both want one. */
     private fun bundledApk(app: Context): File {
-        val target = File(app.cacheDir, "wear/BitChordWear.apk")
+        val target = File(app.cacheDir, "wear/MYLO-Wear.apk")
         val hash = bundledHash(app)
-        val stamp = File(target.parentFile, "BitChordWear.sha256")
+        val stamp = File(target.parentFile, "MYLO-Wear.sha256")
         if (target.exists() && stamp.exists() && stamp.readText() == hash) return target
         target.parentFile?.mkdirs()
         app.assets.open(APK_ASSET).use { input -> target.outputStream().use { input.copyTo(it) } }
