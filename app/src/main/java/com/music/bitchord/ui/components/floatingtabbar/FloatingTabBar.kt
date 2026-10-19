@@ -58,7 +58,8 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Indication
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -92,6 +93,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
@@ -862,6 +864,7 @@ private fun SharedTransitionScope.ExpandedTabs(
                     horizontalArrangement = Arrangement.spacedBy(sizes.tabSpacing),
                     modifier = Modifier
                         .fillMaxWidth()
+                        .selectableGroup()
                         .onSizeChanged { rowSize = it }
                         .layerBackdrop(tabRow)
                         .pointerInput(Unit) {
@@ -955,11 +958,12 @@ private fun SharedTransitionScope.ExpandedTabs(
                                 .weight(1f)
                                 .skipToLookaheadSize()
                                 .clip(shapes.tabShape)
-                                .clickable(
-                                    onClick = tab.onClick,
+                                .selectable(
+                                    selected = isSelected,
+                                    role = Role.Tab,
                                     indication = tab.indication?.invoke(),
-                                    interactionSource = remember { MutableInteractionSource() }
-                                )
+                                    interactionSource = remember { MutableInteractionSource() },
+                                ) { tab.onClick() }
                                 .padding(sizes.tabExpandedContentPadding)
                         )
                     }
