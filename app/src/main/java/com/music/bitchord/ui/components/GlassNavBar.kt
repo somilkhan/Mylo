@@ -236,7 +236,7 @@ fun GlassNavBar(
                     icon = {
                         Icon(
                             imageVector = tab.icon,
-                            contentDescription = tab.label,
+                            contentDescription = null,
                             tint = tint,
                             modifier = Modifier.size(25.dp),
                         )
