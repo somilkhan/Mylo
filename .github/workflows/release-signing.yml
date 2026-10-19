@@ -1,0 +1,107 @@
+name: MYLO Signed Release Builds
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mylo-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  signed-release:
+    name: Build and verify signed Android releases
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: "platform-tools platforms;android-37.0 platforms;android-36.0 cmake;3.22.1"
+
+      - name: Add Android 37 SDK path expected by current AGP
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -d "$ANDROID_HOME/platforms/android-37.0" && ! -e "$ANDROID_HOME/platforms/android-37" ]]; then
+            ln -s android-37.0 "$ANDROID_HOME/platforms/android-37"
+          fi
+          test -d "$ANDROID_HOME/platforms/android-37"
+
+      - name: Restore release keystore from Actions secrets
+        shell: bash
+        env:
+          MYLO_RELEASE_KEYSTORE_BASE64: ${{ secrets.MYLO_RELEASE_KEYSTORE_BASE64 }}
+          MYLO_RELEASE_STORE_PASSWORD: ${{ secrets.MYLO_RELEASE_STORE_PASSWORD }}
+          MYLO_RELEASE_KEY_PASSWORD: ${{ secrets.MYLO_RELEASE_KEY_PASSWORD }}
+          MYLO_RELEASE_KEY_ALIAS: ${{ secrets.MYLO_RELEASE_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          for name in MYLO_RELEASE_KEYSTORE_BASE64 MYLO_RELEASE_STORE_PASSWORD MYLO_RELEASE_KEY_PASSWORD MYLO_RELEASE_KEY_ALIAS; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error::Required Actions secret $name is missing or empty."
+              exit 1
+            fi
+          done
+          mkdir -p "$RUNNER_TEMP/mylo-signing"
+          printf '%s' "$MYLO_RELEASE_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/mylo-signing/MYLO-release-key.jks"
+          test -s "$RUNNER_TEMP/mylo-signing/MYLO-release-key.jks"
+          cat > keystore.properties <<EOF
+          storeFile=$RUNNER_TEMP/mylo-signing/MYLO-release-key.jks
+          storePassword=$MYLO_RELEASE_STORE_PASSWORD
+          keyAlias=$MYLO_RELEASE_KEY_ALIAS
+          keyPassword=$MYLO_RELEASE_KEY_PASSWORD
+          EOF
+          chmod 600 keystore.properties "$RUNNER_TEMP/mylo-signing/MYLO-release-key.jks"
+          keytool -list -keystore "$RUNNER_TEMP/mylo-signing/MYLO-release-key.jks" -storepass "$MYLO_RELEASE_STORE_PASSWORD" -alias "$MYLO_RELEASE_KEY_ALIAS" >/dev/null
+          echo "Keystore file and configured alias validated."
+
+      - name: Build signed phone, TV and Wear OS release APKs
+        run: ./gradlew --no-daemon --stacktrace :app:assembleProdRelease :tv:assembleProdRelease :wearos:assembleProdRelease
+
+      - name: Verify release APK signatures
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t apks < <(find app/build/outputs/apk/prod/release tv/build/outputs/apk/prod/release wearos/build/outputs/apk/prod/release -type f -name '*.apk' | sort)
+          if [[ ${#apks[@]} -eq 0 ]]; then
+            echo "::error::No release APKs were produced."
+            exit 1
+          fi
+          for apk in "${apks[@]}"; do
+            apksigner verify --verbose "$apk"
+            echo "Verified signature: $apk"
+          done
+
+      - name: Upload signed release APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: mylo-signed-release-apks
+          path: |
+            app/build/outputs/apk/prod/release/*.apk
+            tv/build/outputs/apk/prod/release/*.apk
+            wearos/build/outputs/apk/prod/release/*.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Remove temporary signing material
+        if: always()
+        shell: bash
+        run: |
+          rm -f keystore.properties
+          rm -rf "$RUNNER_TEMP/mylo-signing"
