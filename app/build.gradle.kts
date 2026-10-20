@@ -41,11 +41,11 @@ val lastfmSecret: String = (
  * deployment-specific rather than a property of the source, which is what puts
  * it here beside the others instead of in a constant.
  *
- * Empty is a supported state, not a broken build: the field below is only the
- * *default* the address box on the Listen Together screen starts with, and
- * anything typed there wins and persists. So a fresh checkout without this line
- * builds and runs, and simply asks for an address the first time somebody opens
- * the screen. See ListenTogether.DEFAULT_SERVER.
+ * The default points at BitChord’s existing public party service so a fresh MYLO
+ * install can try Listen Together without manual server setup. Local properties
+ * or the environment can override it for testing or an independently hosted
+ * deployment; an explicitly empty value still disables the built-in default.
+ * See ListenTogether.DEFAULT_SERVER.
  */
 val listenTogetherServer: String = (
     localProps.getProperty("LISTEN_TOGETHER_SERVER")
