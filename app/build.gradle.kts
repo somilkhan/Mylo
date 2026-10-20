@@ -466,6 +466,31 @@ val verifyDevInstall = tasks.register("verifyDevInstall") {
 }
 tasks.matching { it.name == "installDevDebug" }.configureEach { finalizedBy(verifyDevInstall) }
 
+// The approved splash artwork is stored losslessly in Git as a small Base64 WebP
+// source so the repository write path can preserve the binary bytes. Decode it
+// at build time into a generated Android drawable; never decode image data on
+// the UI thread during startup.
+val generateMyloSplashArtwork = tasks.register("generateMyloSplashArtwork") {
+    val encodedLogo = layout.projectDirectory.file("src/main/branding/mylo-logo.webp.base64")
+    val generatedLogo = layout.buildDirectory.file("generated/myloSplash/res/drawable-nodpi/mylo_logo.webp")
+    inputs.file(encodedLogo)
+    outputs.file(generatedLogo)
+
+    doLast {
+        if (!encodedLogo.asFile.isFile) {
+            throw GradleException("Missing approved MYLO splash artwork: ${encodedLogo.asFile}")
+        }
+        val output = generatedLogo.get().asFile
+        output.parentFile.mkdirs()
+        val encoded = encodedLogo.asFile.readText().filterNot(Char::isWhitespace)
+        output.writeBytes(java.util.Base64.getDecoder().decode(encoded))
+    }
+}
+
+android.sourceSets.getByName("main").res.srcDir(layout.buildDirectory.dir("generated/myloSplash/res"))
+tasks.named("preBuild").configure { dependsOn(generateMyloSplashArtwork) }
+
+
 /*
  * The watch app rides inside the phone app, so "MYLO for Wear OS" in
  * Settings can put it on a watch — or update it — with no computer involved.
