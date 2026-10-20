@@ -15,12 +15,12 @@ export function cleanCode(raw: string): string | null {
 }
 
 export function sanitizeServerUrl(raw: string | null | undefined): string | null {
-  const trimmed = raw?.trim().replace(/\\/+$/, '');
+  const trimmed = raw?.trim().replace(/\/+$/, '');
   if (!trimmed) return null;
-  const withScheme = /^https?:\\/\\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : 'https://' + trimmed;
   // URL normalizes literal dot segments before exposing pathname, so inspect
   // the supplied path first to keep validation consistent with Android.
-  const rawPath = withScheme.match(/^https?:\\/\\/[^/?#]*(\\/[^?#]*)?/i)?.[1] ?? '';
+  const rawPath = withScheme.match(/^https?:\/\/[^/?#]*(\/[^?#]*)?/i)?.[1] ?? '';
   if (rawPath.split('/').some((segment) => segment === '.' || segment === '..')) return null;
   try {
     const url = new URL(withScheme);
@@ -37,9 +37,9 @@ export function sanitizeServerUrl(raw: string | null | undefined): string | null
       hostname !== 'localhost' &&
       !hostname.includes('.')
     ) return null;
-    const path = url.pathname.replace(/\\/+$/, '');
+    const path = url.pathname.replace(/\/+$/, '');
     if (path.split('/').some((segment) => segment === '.' || segment === '..')) return null;
-    return `${url.origin}${path}`;
+    return url.origin + path;
   } catch {
     return null;
   }
