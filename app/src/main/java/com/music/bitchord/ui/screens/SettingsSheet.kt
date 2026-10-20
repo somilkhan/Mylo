@@ -1577,10 +1577,6 @@ fun SettingsScreen(
                 withLink(LinkAnnotation.Url("https://discord.gg/pDdKfrdHY6", linkStyles)) {
                     append("Discord")
                 }
-                append("  ")
-                withLink(LinkAnnotation.Url("https://github.com/somilkhan/Mylo", linkStyles)) {
-                    append("Website")
-                }
                 append("\nYouTube Music · Listen Together")
             },
             style = MaterialTheme.typography.labelSmall,
