@@ -21,6 +21,8 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.platform.LocalContext
+import android.provider.Settings
 import kotlinx.coroutines.delay
 import kotlin.math.sin
 
@@ -30,17 +32,31 @@ import kotlin.math.sin
  */
 @Composable
 internal fun MyloSplash(onFinished: () -> Unit) {
-    var progress by remember { mutableFloatStateOf(0f) }
+    val context = LocalContext.current
+    val animationsEnabled = remember {
+        runCatching {
+            Settings.Global.getFloat(
+                context.contentResolver,
+                Settings.Global.ANIMATOR_DURATION_SCALE,
+                1f,
+            ) > 0f
+        }.getOrDefault(true)
+    }
+    var progress by remember { mutableFloatStateOf(if (animationsEnabled) 0f else 1f) }
     val eased by animateFloatAsState(
         targetValue = progress,
         animationSpec = tween(2200, easing = FastOutSlowInEasing),
         label = "mylo-splash-progress",
     )
-    LaunchedEffect(Unit) {
-        delay(80)
-        progress = 1f
-        delay(2450)
-        onFinished()
+    LaunchedEffect(animationsEnabled) {
+        if (!animationsEnabled) {
+            onFinished()
+        } else {
+            delay(80)
+            progress = 1f
+            delay(2450)
+            onFinished()
+        }
     }
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         Canvas(Modifier.fillMaxSize()) {
