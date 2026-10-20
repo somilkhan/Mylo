@@ -58,7 +58,9 @@ jobs:
         run: ./gradlew --no-daemon --stacktrace :app:testDevDebugUnitTest
 
       - name: Upload debug APKs
+        id: upload_apks
         if: always() && steps.build_apks.outcome == 'success'
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: mylo-dev-debug-apks
@@ -68,6 +70,16 @@ jobs:
             wearos/build/outputs/apk/dev/debug/*.apk
           if-no-files-found: error
           retention-days: 14
+
+      - name: Report APK artifact upload failure
+        if: always() && steps.build_apks.outcome == 'success' && steps.upload_apks.outcome == 'failure'
+        shell: bash
+        run: |
+          echo "::warning::Android builds and unit tests passed, but GitHub could not store the APK artifacts. Check Actions artifact storage quota."
+          {
+            echo "### APK artifacts unavailable"
+            echo "Android/TV/Wear OS builds and unit tests succeeded, but artifact upload failed. Check the repository's GitHub Actions storage quota."
+          } >> "$GITHUB_STEP_SUMMARY"
 
   desktop:
     name: Desktop compile and tests
