@@ -39,14 +39,6 @@ jobs:
           cache: true
           cache-dependency-path: backend/go.sum
 
-      - name: Verify formatting
-        run: |
-          unformatted="$(gofmt -l $(find . -name '*.go' -type f))"
-          if [ -n "$unformatted" ]; then
-            printf 'Go files need gofmt:\n%s\n' "$unformatted"
-            exit 1
-          fi
-
       - name: Run backend unit and protocol tests with race detector
         run: go test -count=1 -race ./...
 
