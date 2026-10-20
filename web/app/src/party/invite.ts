@@ -18,6 +18,10 @@ export function sanitizeServerUrl(raw: string | null | undefined): string | null
   const trimmed = raw?.trim().replace(/\\/+$/, '');
   if (!trimmed) return null;
   const withScheme = /^https?:\\/\\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  // URL normalizes literal dot segments before exposing pathname, so inspect
+  // the supplied path first to keep validation consistent with Android.
+  const rawPath = withScheme.match(/^https?:\\/\\/[^/?#]*(\\/[^?#]*)?/i)?.[1] ?? '';
+  if (rawPath.split('/').some((segment) => segment === '.' || segment === '..')) return null;
   try {
     const url = new URL(withScheme);
     // Server URLs may include a reverse-proxy path, but never credentials or
