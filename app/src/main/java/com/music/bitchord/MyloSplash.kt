@@ -5,6 +5,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -58,7 +59,8 @@ internal fun MyloSplash(onFinished: () -> Unit) {
             onFinished()
         }
     }
-    Box(Modifier.fillMaxSize().background(Color.Black)) {
+    // The splash is a true modal startup layer: do not let taps reach the app underneath.
+    Box(Modifier.fillMaxSize().background(Color.Black).clickable(onClick = {})) {
         Canvas(Modifier.fillMaxSize()) {
             val s = minOf(size.width, size.height)
             val cx = size.width * .5f
