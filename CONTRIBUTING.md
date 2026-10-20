@@ -1,75 +1,56 @@
-# Contributing to BitChord
+# Contributing to MYLO
 
-Thank you for contributing to BitChord. Follow these guidelines to ensure an efficient development and review process.
+MYLO is an Android-first music player derived from BitChord. Keep changes focused, preserve upstream notices, and verify behavior instead of inferring it from a successful compile.
 
-## Proposing Contributions
-- Substantial features, refactors, or UI redesigns should normally be discussed before implementation. Open an issue on GitHub to outline your proposal.
-- Straightforward bug fixes, documentation improvements, or minor corrections can be submitted directly as a Pull Request.
+## Development setup
 
-## Branch and Pull Request Workflow
-Always check the repository for the current active version or development branch before starting work.
+- Android: JDK 17, Android SDK platforms/build tools required by the Gradle configuration, NDK and CMake 3.22.1 for native audio code.
+- Backend: use the Go version declared by `backend/go.mod` (currently Go 1.27.0).
+- Web: Node.js 22 and pnpm 12.11.2, as pinned by `.github/workflows/web-ci.yml`.
 
-New work should normally be based on the latest active version or development branch rather than `main`, unless maintainers explicitly instruct otherwise. For example, during the `v1.6.x` release cycle, contributions branch from `v1.6.1`. As new release cycles begin, the target branch will advance accordingly.
+## Build and test
 
-When contributing:
-- Fork the repository and create a descriptive branch (e.g., `fix/streaming-buffer`, `docs/translation-guide`).
-- Keep pull requests focused on a single change or bug fix. Avoid mixing unrelated refactors, cosmetic tweaks, or mass reformatting with functional changes.
-- Keep your branch reasonably synchronized with the target base branch.
-- Provide a clear PR description explaining what was changed and why.
-- Include relevant testing and validation details with your PR.
-- Address review feedback promptly and keep discussions focused on technical merits.
+Run commands from the repository root.
 
-## Development Setup
-The project requires the following tools:
-- **JDK**: Java Development Kit 17 (Eclipse Temurin 17 recommended).
-- **Android SDK**: `compileSdk = 36`, `targetSdk = 36`, `minSdk = 26`.
-- **C/C++ NDK & CMake**: CMake 3.22.1+ and Android NDK (for native audio DSP components configured under `app/src/main/cpp`).
-- **Listen Together Backend (Optional)**: Go 1.22+ if developing or testing the party server (`backend/`).
-
-## Build and Test Commands
-Run Gradle commands from the repository root.
-
-Build:
+Android phone, TV and Wear OS debug builds:
 ```bash
-./gradlew assembleDevDebug
+./gradlew --no-daemon :app:assembleDevDebug :tv:assembleDevDebug :wearos:assembleDevDebug
+./gradlew --no-daemon :app:testDevDebugUnitTest
 ```
 
-Windows:
-```powershell
-.\gradlew.bat assembleDevDebug
-```
-
-Tests:
+A focused Android test:
 ```bash
-./gradlew testDevDebugUnitTest
+./gradlew --no-daemon :app:testDevDebugUnitTest --tests "com.music.bitchord.playback.audio.DirectAudioStreamingRegressionTest"
 ```
 
-Windows:
-```powershell
-.\gradlew.bat testDevDebugUnitTest
-```
-
-Run a specific test:
+Listen Together backend:
 ```bash
-./gradlew testDevDebugUnitTest --tests "com.music.bitchord.playback.audio.DirectAudioStreamingRegressionTest"
+cd backend
+go test -count=1 -race ./...
+go vet ./...
 ```
 
-## Code Quality
-- Follow idiomatic Kotlin and Jetpack Compose conventions.
-- Maintain the project's existing architecture and separation of concerns (UI, domain logic, playback services, and data repositories).
-- Write unit tests for new logic, fixes, and edge cases.
-- Contributors should run relevant tests, must not introduce new failures, and should document known pre-existing failures when applicable.
-- Keep diffs focused and minimal. Avoid unnecessary third-party dependencies.
+Web:
+```bash
+cd web
+pnpm install --frozen-lockfile
+pnpm typecheck
+pnpm test
+pnpm build
+```
 
-## Audio Changes and Telemetry
-For audio changes: application telemetry must not be presented as proof of physical hardware behavior unless that hardware behavior was actually verified.
+## Architecture and review
 
-Distinguish clearly between source metadata, decoder format, internal DSP format, AudioTrack output, AudioFlinger/HAL state, advertised device capability, and external physical endpoint behavior.
+- Keep UI, repositories, domain logic and playback-service responsibilities separate.
+- `MainActivity.kt` is large; prefer focused extractions or targeted edits over broad rewrites.
+- Media3 playback is owned by `PlaybackService`; verify queue and player-state behavior as well as UI state.
+- Add regression tests for behavioral fixes. Run the narrow test first, then relevant module checks.
+- Audio telemetry is not proof of physical endpoint behavior. Distinguish source metadata, decoder/DSP formats, AudioTrack, AudioFlinger/HAL and actual hardware measurements.
+- Do not add endpoints, credentials, dependencies or working-service claims without evidence.
+- Do not claim device verification unless the app was exercised on a real device.
 
-## Review Process
-All pull requests require review and approval by repository maintainers before merging. Maintainers review changes for correctness, architecture fit, and maintainability.
+## CI and release
 
-## Dependencies and Licensing
-BitChord is licensed under the **GNU General Public License v3.0 (GPLv3)**.
+The repository has separate Android/Desktop, backend and web workflows under `.github/workflows/`. Inspect the run for the exact commit being evaluated. Android CI builds debug variants and unit tests; it does not prove playback, background execution, Bluetooth routing or UI quality on hardware.
 
-All contributed code and dependencies must be strictly compatible with GPLv3. Avoid introducing external dependencies unless strictly necessary; any new dependency must be evaluated for necessity, binary size, and license compliance.
+Release signing uses local `keystore.properties` and is not committed. Follow GPL-3.0 and retain applicable upstream license and attribution notices.

@@ -1,0 +1,30 @@
+# MYLO Testing / CI / Release
+
+## CI workflows
+
+- `.github/workflows/android-ci.yml`: Android phone, TV and Wear OS debug builds, Android unit tests, desktop compile/tests, debug APK artifacts.
+- `.github/workflows/backend-ci.yml`: Go backend unit/protocol tests with race detector and `go vet`.
+- `.github/workflows/web-ci.yml`: web workspace typecheck, tests and build.
+
+Always verify the workflow run for the commit under review; a prior green run is not evidence for a newer commit. The Android workflow treats artifact-upload quota failure as a warning after build/test success, so inspect the build/test steps separately from artifact availability.
+
+## Local verification order
+
+1. Run the narrow regression test.
+2. Run `./gradlew --no-daemon :app:testDevDebugUnitTest`.
+3. Run `./gradlew --no-daemon :app:assembleDevDebug :tv:assembleDevDebug :wearos:assembleDevDebug`.
+4. If relevant, run desktop, backend and web checks from `CONTRIBUTING.md`.
+5. Review the diff, generated artifacts, logs and final commit; fix failures and rerun affected checks.
+
+## Report statuses independently
+
+- IMPLEMENTED: code exists.
+- COMMITTED: exact commit is on the intended branch.
+- BUILT: relevant build completed successfully.
+- TESTED: named automated tests completed successfully.
+- CI PASSED: required workflow run completed successfully for that commit.
+- DEVICE VERIFIED: behavior was exercised on real hardware.
+- BLOCKED: a concrete external dependency prevents progress.
+- NOT VERIFIED: evidence is unavailable or incomplete.
+
+Do not infer playback correctness, UI quality, installability, physical audio behavior or device performance from compilation alone. Release signing uses local `keystore.properties`; never commit signing material. Preserve GPL-3.0 notices and release source obligations.
