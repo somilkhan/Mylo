@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import kotlinx.coroutines.delay
 import kotlin.math.sin
@@ -70,6 +71,7 @@ internal fun MyloSplash(onFinished: () -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         val logoSize = minOf(maxWidth, maxHeight) * 0.88f
+        val entranceDistancePx = with(LocalDensity.current) { ((maxHeight + logoSize) / 2f).toPx() }
         Image(
             painter = painterResource(id = R.drawable.mylo_logo),
             contentDescription = "Mylo logo",
@@ -80,7 +82,7 @@ internal fun MyloSplash(onFinished: () -> Unit) {
                     val phase = eased.coerceIn(0f, 1f)
                     // The hanging thread leads the descent; a restrained swing
                     // decays to zero so the artwork settles without a hard stop.
-                    translationY = (1f - phase) * -size.height * 0.72f
+                    translationY = (1f - phase) * -entranceDistancePx
                     rotationZ = -sin(phase * Math.PI).toFloat() * (1f - phase) * 9f
                     alpha = phase
                 },
