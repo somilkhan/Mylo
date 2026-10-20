@@ -489,6 +489,11 @@ val generateMyloSplashArtwork = tasks.register("generateMyloSplashArtwork") {
 
 android.sourceSets.getByName("main").res.srcDir(layout.buildDirectory.dir("generated/myloSplash/res"))
 tasks.named("preBuild").configure { dependsOn(generateMyloSplashArtwork) }
+tasks.configureEach {
+    if (name.startsWith("merge") && name.endsWith("Resources")) {
+        dependsOn(generateMyloSplashArtwork)
+    }
+}
 
 
 /*
