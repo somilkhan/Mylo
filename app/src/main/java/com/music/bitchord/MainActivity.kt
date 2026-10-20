@@ -413,6 +413,7 @@ class MainActivity : AppCompatActivity() {
                 // longer exists and a page squeezed to a sliver to pay for it.
                 // A measured constraint cannot be stale — it is the very width
                 // the split is about to be laid out in.
+                var showMyloSplash by rememberSaveable { mutableStateOf(true) }
                 BoxWithConstraints(Modifier.fillMaxSize()) {
                     BitChordApp(
                         darkTheme = darkTheme,
@@ -420,6 +421,9 @@ class MainActivity : AppCompatActivity() {
                         windowHeight = maxHeight,
                         appBackdrop = appBackdrop,
                     )
+                    if (showMyloSplash) {
+                        MyloSplash(onFinished = { showMyloSplash = false })
+                    }
                 }
                 }
             }
