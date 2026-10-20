@@ -483,7 +483,22 @@ val generateMyloSplashArtwork = tasks.register("generateMyloSplashArtwork") {
         val output = generatedLogo.get().asFile
         output.parentFile.mkdirs()
         val encoded = encodedLogo.asFile.readText().filterNot(Char::isWhitespace)
-        output.writeBytes(java.util.Base64.getDecoder().decode(encoded))
+        val bytes = java.util.Base64.getDecoder().decode(encoded)
+        val isWebp = bytes.size >= 12 &&
+            String(bytes, 0, 4, Charsets.US_ASCII) == "RIFF" &&
+            String(bytes, 8, 4, Charsets.US_ASCII) == "WEBP"
+        val riffSize = if (bytes.size >= 8) {
+            (bytes[4].toLong() and 0xff) or
+                ((bytes[5].toLong() and 0xff) shl 8) or
+                ((bytes[6].toLong() and 0xff) shl 16) or
+                ((bytes[7].toLong() and 0xff) shl 24)
+        } else {
+            -1L
+        }
+        if (!isWebp || riffSize != bytes.size.toLong() - 8L) {
+            throw GradleException("Approved MYLO splash artwork is not a complete WebP image")
+        }
+        output.writeBytes(bytes)
     }
 }
 
