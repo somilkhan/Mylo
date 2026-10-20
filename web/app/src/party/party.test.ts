@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ServerClock } from './clock';
-import { cleanCode, inviteUrl, parseInvite } from './invite';
+import { cleanCode, inviteUrl, parseInvite, sanitizeServerUrl } from './invite';
 import { EMPTY_PLAYBACK, type PartyMember, type PartyQueue, type PartyTrack } from './models';
 import { autoplaySupplierId, detectSingleMove, partyQueueIndexOf, partyUpcomingAfter } from './queueReading';
 
@@ -119,6 +119,15 @@ describe('invites', () => {
     expect(parseInvite('otherapp://party/AB12CD')).toBeNull();
     expect(parseInvite('https://example.com/nope')).toBeNull();
     expect(cleanCode(' ab-12 cd ')).toBe('AB12CD');
+  });
+
+  it('sanitizes custom server URLs without credentials, queries, or fragments', () => {
+    expect(sanitizeServerUrl(' JAM.Example.COM/party/ ')).toBe('https://jam.example.com/party');
+    expect(sanitizeServerUrl('http://localhost:8080/jam')).toBe('http://localhost:8080/jam');
+    expect(sanitizeServerUrl('https://user:secret@jam.example.com')).toBeNull();
+    expect(sanitizeServerUrl('https://jam.example.com?token=secret')).toBeNull();
+    expect(sanitizeServerUrl('https://jam.example.com#section')).toBeNull();
+    expect(sanitizeServerUrl('javascript:alert(1)')).toBeNull();
   });
 
   it('links to a custom server’s own invite page', () => {

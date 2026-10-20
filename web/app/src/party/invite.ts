@@ -15,11 +15,18 @@ export function cleanCode(raw: string): string | null {
 }
 
 export function sanitizeServerUrl(raw: string | null | undefined): string | null {
-  const trimmed = raw?.trim().replace(/\/+$/, '');
+  const trimmed = raw?.trim().replace(/\\/+$/, '');
   if (!trimmed) return null;
-  const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  const withScheme = /^https?:\\/\\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
   try {
-    return new URL(withScheme).host ? withScheme : null;
+    const url = new URL(withScheme);
+    // Server URLs may include a reverse-proxy path, but never credentials or
+    // query/fragment data. Those parts are not part of the server origin and
+    // can make shared invite links ambiguous or leak secrets.
+    if (!['http:', 'https:'].includes(url.protocol) || !url.hostname) return null;
+    if (url.username || url.password || url.search || url.hash) return null;
+    const path = url.pathname.replace(/\\/+$/, '');
+    return `${url.origin}${path}`;
   } catch {
     return null;
   }
