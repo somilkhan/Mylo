@@ -130,6 +130,11 @@ describe('invites', () => {
     expect(sanitizeServerUrl('javascript:alert(1)')).toBeNull();
     expect(sanitizeServerUrl('party')).toBeNull();
     expect(sanitizeServerUrl('https://jam.example.com/../admin')).toBeNull();
+    expect(sanitizeServerUrl('https://jam.example.com/%2e%2e/admin')).toBeNull();
+    expect(sanitizeServerUrl('https://jam.example.com/%2E/admin')).toBeNull();
+    expect(sanitizeServerUrl('https://jam.example.com/%252e%252e/admin')).toBeNull();
+    expect(sanitizeServerUrl('https://jam.example.com/safe%2f..%2fadmin')).toBeNull();
+    expect(sanitizeServerUrl('https://jam.example.com/audio%2etrack')).toBe('https://jam.example.com/audio.track');
   });
 
   it('links to a custom server’s own invite page', () => {
