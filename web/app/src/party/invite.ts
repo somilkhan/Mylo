@@ -25,7 +25,16 @@ export function sanitizeServerUrl(raw: string | null | undefined): string | null
     // can make shared invite links ambiguous or leak secrets.
     if (!['http:', 'https:'].includes(url.protocol) || !url.hostname) return null;
     if (url.username || url.password || url.search || url.hash) return null;
+    const hostname = url.hostname.toLowerCase();
+    // Match Android's server validator: localhost is useful for development,
+    // IPv6 literals are valid, and other hosts must be dotted DNS/IP names.
+    if (
+      !hostname.startsWith('[') &&
+      hostname !== 'localhost' &&
+      !hostname.includes('.')
+    ) return null;
     const path = url.pathname.replace(/\\/+$/, '');
+    if (path.split('/').some((segment) => segment === '.' || segment === '..')) return null;
     return `${url.origin}${path}`;
   } catch {
     return null;

@@ -128,6 +128,8 @@ describe('invites', () => {
     expect(sanitizeServerUrl('https://jam.example.com?token=secret')).toBeNull();
     expect(sanitizeServerUrl('https://jam.example.com#section')).toBeNull();
     expect(sanitizeServerUrl('javascript:alert(1)')).toBeNull();
+    expect(sanitizeServerUrl('party')).toBeNull();
+    expect(sanitizeServerUrl('https://jam.example.com/../admin')).toBeNull();
   });
 
   it('links to a custom server’s own invite page', () => {
