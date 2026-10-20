@@ -58,9 +58,31 @@ import kotlinx.serialization.json.put
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import java.net.URI
+import java.net.URLDecoder
+import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.util.UUID
 import java.util.concurrent.TimeUnit
+
+/**
+ * Detect literal and percent-encoded traversal segments before normalizing a
+ * custom server path. Reverse proxies can decode escaped dots or slashes after
+ * the client has validated the URL, so inspect a few decoding layers as well.
+ */
+private fun hasDotSegments(path: String): Boolean {
+    var candidate = path
+    repeat(4) {
+        if (candidate.split('/').any { segment -> segment == "." || segment == ".." }) return true
+        val decoded = try {
+            URLDecoder.decode(candidate.replace("+", "%2B"), StandardCharsets.UTF_8.name())
+        } catch (_: Exception) {
+            return true
+        }
+        if (decoded == candidate) return false
+        candidate = decoded
+    }
+    return candidate.split('/').any { segment -> segment == "." || segment == ".." }
+}
 
 sealed interface ServerUrlError {
     data object Whitespace : ServerUrlError
@@ -302,12 +324,11 @@ object ListenTogether {
             return ServerUrlValidationResult.Invalid(ServerUrlError.HasFragment)
         }
 
-        val pathSegments = uri.rawPath.orEmpty().split('/').filter { it.isNotEmpty() }
-        for (segment in pathSegments) {
-            if (segment == "." || segment == "..") {
-                return ServerUrlValidationResult.Invalid(ServerUrlError.InvalidPath)
-            }
+        val rawPath = uri.rawPath.orEmpty()
+        if (hasDotSegments(rawPath)) {
+            return ServerUrlValidationResult.Invalid(ServerUrlError.InvalidPath)
         }
+        val pathSegments = rawPath.split('/').filter { it.isNotEmpty() }
         val canonicalPath = if (pathSegments.isEmpty()) "" else "/" + pathSegments.joinToString("/")
 
         val port = uri.port
