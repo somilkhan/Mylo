@@ -14,6 +14,27 @@ export function cleanCode(raw: string): string | null {
   return cleaned.length === CODE_LENGTH ? cleaned : null;
 }
 
+/**
+ * Reject traversal segments before and after URL normalization. URL and reverse
+ * proxies can interpret percent-encoded dots or slashes as path separators, and
+ * some proxy stacks decode a path more than once.
+ */
+function hasDotSegments(path: string): boolean {
+  let candidate = path;
+  for (let depth = 0; depth < 4; depth += 1) {
+    if (candidate.split('/').some((segment) => segment === '.' || segment === '..')) return true;
+    try {
+      const decoded = decodeURIComponent(candidate);
+      if (decoded === candidate) return false;
+      candidate = decoded;
+    } catch {
+      // Malformed escapes are not safe to forward to an arbitrary proxy.
+      return true;
+    }
+  }
+  return candidate.split('/').some((segment) => segment === '.' || segment === '..');
+}
+
 export function sanitizeServerUrl(raw: string | null | undefined): string | null {
   const trimmed = raw?.trim().replace(/\/+$/, '');
   if (!trimmed) return null;
@@ -21,7 +42,7 @@ export function sanitizeServerUrl(raw: string | null | undefined): string | null
   // URL normalizes literal dot segments before exposing pathname, so inspect
   // the supplied path first to keep validation consistent with Android.
   const rawPath = withScheme.match(/^https?:\/\/[^/?#]*(\/[^?#]*)?/i)?.[1] ?? '';
-  if (rawPath.split('/').some((segment) => segment === '.' || segment === '..')) return null;
+  if (hasDotSegments(rawPath)) return null;
   try {
     const url = new URL(withScheme);
     // Server URLs may include a reverse-proxy path, but never credentials or
@@ -38,7 +59,7 @@ export function sanitizeServerUrl(raw: string | null | undefined): string | null
       !hostname.includes('.')
     ) return null;
     const path = url.pathname.replace(/\/+$/, '');
-    if (path.split('/').some((segment) => segment === '.' || segment === '..')) return null;
+    if (hasDotSegments(path)) return null;
     return url.origin + path;
   } catch {
     return null;
