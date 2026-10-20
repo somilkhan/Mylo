@@ -22,7 +22,7 @@
 ```bash
 ./gradlew --no-daemon :app:testDevDebugUnitTest --tests "com.music.bitchord.AudioPipelineTest"
 ./gradlew --no-daemon :app:testDevDebugUnitTest --tests "com.music.bitchord.PlaybackFallbackTest"
-./gradlew --no-daemon :app:testDevDebugUnitTest --tests "com.music.bitchord.playback.QueueCoordinatorTest"
+./gradlew --no-daemon :app:testDevDebugUnitTest --tests "com.music.bitchord.QueueCoordinatorTest"
 ./gradlew --no-daemon :app:testDevDebugUnitTest --tests "com.music.bitchord.playback.audio.DirectAudioStreamingRegressionTest"
 ```
 
