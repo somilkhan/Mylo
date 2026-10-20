@@ -55,6 +55,7 @@ jobs:
         run: ./gradlew --no-daemon --stacktrace :app:assembleDevDebug :tv:assembleDevDebug :wearos:assembleDevDebug
 
       - name: Run Android unit tests
+        id: test_android
         run: ./gradlew --no-daemon --stacktrace :app:testDevDebugUnitTest
 
       - name: Upload debug APKs
@@ -75,10 +76,10 @@ jobs:
         if: always() && steps.build_apks.outcome == 'success' && steps.upload_apks.outcome == 'failure'
         shell: bash
         run: |
-          echo "::warning::Android builds and unit tests passed, but GitHub could not store the APK artifacts. Check Actions artifact storage quota."
+          echo "::warning::Android build succeeded, but GitHub could not store the APK artifacts. The Android unit-test result is reported separately by the test step. Check Actions artifact storage quota."
           {
             echo "### APK artifacts unavailable"
-            echo "Android/TV/Wear OS builds and unit tests succeeded, but artifact upload failed. Check the repository's GitHub Actions storage quota."
+            echo "Android/TV/Wear OS APK builds succeeded, but artifact upload failed. Android unit-test outcome: ${{ steps.test_android.outcome }}. Check the repository's GitHub Actions storage quota."
           } >> "$GITHUB_STEP_SUMMARY"
 
   desktop:
