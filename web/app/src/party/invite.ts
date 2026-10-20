@@ -1,7 +1,8 @@
 /**
- * Party invites (JamInviteLink.kt): `https://bitchord.kushagrasingh.in/invite/<CODE>`,
- * optionally `?server=<custom server>`, and `bitchord://party/<CODE>`. On the
- * web the first is a route of this app (`/invite/:code`).
+ * Party invites: `https://bitchord.kushagrasingh.in/invite/<CODE>`,
+ * optionally `?server=<custom server>`, and `mylo://party/<CODE>` (legacy
+ * `bitchord://party/<CODE>` remains accepted). On the web the HTTPS URL is a
+ * route of this app (`/invite/:code`).
  */
 
 export const INVITE_ORIGIN = 'https://bitchord.kushagrasingh.in';
@@ -32,7 +33,7 @@ export function parseInvite(value: string): { code: string; serverUrl: string | 
     return null;
   }
   const server = sanitizeServerUrl(url.searchParams.get('server'));
-  if (url.protocol === 'bitchord:' && url.host.toLowerCase() === 'party') {
+  if ((url.protocol === 'mylo:' || url.protocol === 'bitchord:') && url.host.toLowerCase() === 'party') {
     const code = cleanCode(url.pathname.replace(/^\/+|\/+$/g, '') || url.searchParams.get('code') || '');
     return code ? { code, serverUrl: server } : null;
   }
