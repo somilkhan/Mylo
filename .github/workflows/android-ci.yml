@@ -9,6 +9,12 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      build_apks:
+        description: "Build and upload Android/TV/Wear OS APKs for device testing"
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -19,7 +25,7 @@ concurrency:
 
 jobs:
   android:
-    name: Android debug build and unit tests
+    name: Android unit tests (optional APK build)
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -50,17 +56,18 @@ jobs:
       - name: Report installed Android platforms
         run: sdkmanager --list | grep -E "platforms;android-|build-tools;" | head -30
 
-      - name: Build Android app, TV and Wear OS variants
+      - name: Build Android app, TV and Wear OS APKs (manual opt-in only)
         id: build_apks
+        if: github.event_name == 'workflow_dispatch' && inputs.build_apks
         run: ./gradlew --no-daemon --stacktrace :app:assembleDevDebug :tv:assembleDevDebug :wearos:assembleDevDebug
 
       - name: Run Android unit tests
         id: test_android
         run: ./gradlew --no-daemon --stacktrace :app:testDevDebugUnitTest
 
-      - name: Upload debug APKs
+      - name: Upload debug APKs (manual opt-in only)
         id: upload_apks
-        if: always() && steps.build_apks.outcome == 'success'
+        if: github.event_name == 'workflow_dispatch' && inputs.build_apks && steps.build_apks.outcome == 'success'
         continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
@@ -70,13 +77,13 @@ jobs:
             tv/build/outputs/apk/dev/debug/*.apk
             wearos/build/outputs/apk/dev/debug/*.apk
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 3
 
       - name: Report APK artifact upload failure
-        if: always() && steps.build_apks.outcome == 'success' && steps.upload_apks.outcome == 'failure'
+        if: always() && github.event_name == 'workflow_dispatch' && inputs.build_apks && steps.build_apks.outcome == 'success' && steps.upload_apks.outcome == 'failure'
         shell: bash
         run: |
-          echo "::warning::Android build succeeded, but GitHub could not store the APK artifacts. The Android unit-test result is reported separately by the test step. Check Actions artifact storage quota."
+          echo "::warning::Android build succeeded, but GitHub could not store the APK artifacts. Check Actions artifact storage quota."
           {
             echo "### APK artifacts unavailable"
             echo "Android/TV/Wear OS APK builds succeeded, but artifact upload failed. Android unit-test outcome: ${{ steps.test_android.outcome }}. Check the repository's GitHub Actions storage quota."
