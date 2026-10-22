@@ -1,4 +1,5 @@
 import java.util.Properties
+import java.util.Base64
 import java.security.MessageDigest
 import java.io.FileInputStream
 
@@ -483,7 +484,7 @@ val generateMyloSplashArtwork = tasks.register("generateMyloSplashArtwork") {
         val output = generatedLogo.get().asFile
         output.parentFile.mkdirs()
         val encoded = encodedLogo.asFile.readText().filterNot(Char::isWhitespace)
-        val bytes = java.util.Base64.getDecoder().decode(encoded)
+        val bytes = Base64.getDecoder().decode(encoded)
         val isWebp = bytes.size >= 12 &&
             String(bytes, 0, 4, Charsets.US_ASCII) == "RIFF" &&
             String(bytes, 8, 4, Charsets.US_ASCII) == "WEBP"
