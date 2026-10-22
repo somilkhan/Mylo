@@ -1,4 +1,5 @@
 import java.util.Properties
+import java.util.Base64
 import java.io.FileInputStream
 
 plugins {
@@ -493,5 +494,48 @@ val replacedByTv: Set<String> = fileTree(tvJava) { include("**/*.kt") }.files
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
     exclude { el ->
         el.file.startsWith(phoneJava) && el.relativePath.pathString in replacedByTv
+    }
+}
+
+// The TV application compiles the shared MyloSplash composable too, so it must
+// generate the same approved drawable as the phone app. Keep the encoded source
+// in the app module as the single source of truth.
+val generateMyloSplashArtwork = tasks.register("generateMyloSplashArtwork") {
+    val encodedLogo = rootProject.file("app/src/main/branding/mylo-logo.webp.base64")
+    val generatedLogo = layout.buildDirectory.file("generated/myloSplash/res/drawable-nodpi/mylo_logo.webp")
+    inputs.file(encodedLogo)
+    outputs.file(generatedLogo)
+
+    doLast {
+        if (!encodedLogo.isFile) {
+            throw GradleException("Missing approved MYLO splash artwork: $encodedLogo")
+        }
+        val output = generatedLogo.get().asFile
+        output.parentFile.mkdirs()
+        val encoded = encodedLogo.readText().filterNot(Char::isWhitespace)
+        val bytes = Base64.getDecoder().decode(encoded)
+        val isWebp = bytes.size >= 12 &&
+            String(bytes, 0, 4, Charsets.US_ASCII) == "RIFF" &&
+            String(bytes, 8, 4, Charsets.US_ASCII) == "WEBP"
+        val riffSize = if (bytes.size >= 8) {
+            (bytes[4].toLong() and 0xff) or
+                ((bytes[5].toLong() and 0xff) shl 8) or
+                ((bytes[6].toLong() and 0xff) shl 16) or
+                ((bytes[7].toLong() and 0xff) shl 24)
+        } else {
+            -1L
+        }
+        if (!isWebp || riffSize != bytes.size.toLong() - 8L) {
+            throw GradleException("Approved MYLO splash artwork is not a complete WebP image")
+        }
+        output.writeBytes(bytes)
+    }
+}
+
+android.sourceSets.getByName("main").res.srcDir(layout.buildDirectory.dir("generated/myloSplash/res"))
+tasks.named("preBuild").configure { dependsOn(generateMyloSplashArtwork) }
+tasks.configureEach {
+    if (name.startsWith("merge") && name.endsWith("Resources")) {
+        dependsOn(generateMyloSplashArtwork)
     }
 }
