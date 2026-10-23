@@ -2,6 +2,12 @@ name: MYLO Signed Release Builds
 
 on:
   workflow_dispatch:
+    inputs:
+      upload_apks:
+        description: "Upload signed APKs as a GitHub Actions artifact (uses storage quota)"
+        required: true
+        type: boolean
+        default: false
   push:
     tags:
       - "v*"
@@ -89,7 +95,8 @@ jobs:
             echo "Verified signature: $apk"
           done
 
-      - name: Upload signed release APKs
+      - name: Upload signed release APKs (manual opt-in only)
+        if: github.event_name == 'workflow_dispatch' && inputs.upload_apks
         uses: actions/upload-artifact@v4
         with:
           name: mylo-signed-release-apks
@@ -99,6 +106,10 @@ jobs:
             wearos/build/outputs/apk/prod/release/*.apk
           if-no-files-found: error
           retention-days: 3
+
+      - name: Report artifact upload skipped
+        if: github.event_name == 'workflow_dispatch' && !inputs.upload_apks
+        run: echo "Signed APKs were built and verified locally in the runner; artifact upload was skipped to preserve Actions storage quota."
 
       - name: Remove temporary signing material
         if: always()
