@@ -58,6 +58,30 @@ class ScrobbleGeneratorTest {
     }
 
     @Test
+    fun store_roundTripsLocalUriAndKeepsDistinctLocalFilesSeparate() {
+        val file = File.createTempFile("local-plays", ".tsv")
+        file.deleteOnExit()
+        val store = PlayHistoryStore(file, zone)
+        val first = play("").copy(localUri = "content://media/external/audio/1")
+        val second = play("").copy(localUri = "content://media/external/audio/2")
+
+        assertEquals(2, store.append(listOf(first, second)))
+        assertEquals(listOf(first, second), store.readAll())
+    }
+
+    @Test
+    fun store_readsLegacyRowsWithoutLocalUri() {
+        val file = File.createTempFile("legacy-plays", ".tsv")
+        file.deleteOnExit()
+        file.writeText("x\\tTitle x\\tA\\tMYLO\\t${now}\\ttrue\\n")
+
+        val stored = PlayHistoryStore(file, zone).readAll()
+
+        assertEquals(1, stored.size)
+        assertEquals(null, stored.single().localUri)
+    }
+
+    @Test
     fun store_roundTripsAndDedupesOnWrite() {
         val file = File.createTempFile("plays", ".tsv")
         file.deleteOnExit()
