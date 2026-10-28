@@ -2766,12 +2766,12 @@ private fun BitChordApp(
                             selectedSection = scrobbleSection,
                             bottomPadding = if (player.song != null) 210.dp else 140.dp,
                             onSectionChange = { scrobbleSection = it },
-                            onPlayTopTracks = { songs ->
+                            onPlayPlaylist = { playlistName, songs ->
                                 if (songs.isNotEmpty()) {
                                     playFrom(
                                         songs,
                                         0,
-                                        QueueSource("Scrobble · Top tracks", PlaybackSourceType.HISTORY),
+                                        QueueSource("Scrobble · $playlistName", PlaybackSourceType.HISTORY),
                                     )
                                 }
                             },
