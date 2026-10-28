@@ -1,8 +1,13 @@
 package com.music.bitchord.data.stats
 
 import com.music.bitchord.data.YtMusicRepository
+import com.music.bitchord.data.DebugLog as Log
+import com.music.bitchord.data.generator.Play
+import com.music.bitchord.data.generator.PlaySource
+import com.music.bitchord.data.generator.ScrobbleHistory
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.model.durationMillis
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -59,10 +64,12 @@ object ListeningRecorder {
     @Synchronized
     fun onSample(song: Song, durationMs: Long) {
         val now = System.currentTimeMillis()
-        if (song.videoId != currentId) {
+        val trackIdentity = song.videoId.ifBlank { song.localUri.orEmpty() }
+        if (trackIdentity != currentId) {
             // A new track anchors the clock and contributes nothing yet — see
-            // the class note on undercounting.
-            currentId = song.videoId
+            // the class note on undercounting. Local files use their URI when
+            // they have no YouTube video id, so adjacent files remain distinct.
+            currentId = trackIdentity
             lastSampleAt = now
             playedThisTrack = 0L
             playCounted = false
@@ -83,6 +90,29 @@ object ListeningRecorder {
         if (counts) playCounted = true
 
         ListeningStats.record(enriched(song), step, counts)
+
+        if (counts) {
+            val play = Play(
+                videoId = song.videoId,
+                title = song.title,
+                artist = song.artist,
+                source = PlaySource.MYLO,
+                atMillis = now,
+                exact = true,
+                localUri = song.localUri,
+            )
+            // The sampler runs on the playback thread. Persist off-thread so a
+            // slow filesystem can never delay audio or the listening counters.
+            scope.launch {
+                try {
+                    ScrobbleHistory.append(listOf(play))
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    Log.w(TAG, "Could not persist Scrobble history", error)
+                }
+            }
+        }
 
         if (++samplesSinceFlush >= FLUSH_EVERY) {
             samplesSinceFlush = 0
@@ -172,6 +202,8 @@ object ListeningRecorder {
      * — a busy main thread, a device coming out of doze — is still counted in
      * full, while the unbounded gap across a pause is not.
      */
+    private const val TAG = "ListeningRecorder"
+
     private const val MAX_STEP_MS = 8_000L
 
     /** Under half a minute is not a listen, however it ended. */
