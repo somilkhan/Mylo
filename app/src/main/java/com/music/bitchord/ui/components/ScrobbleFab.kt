@@ -91,7 +91,7 @@ fun ScrobbleFab(
     ) {
         Icon(
             imageVector = if (open) Icons.Rounded.Close else Icons.Rounded.GraphicEq,
-            contentDescription = null,
+            contentDescription = if (open) "Close Scrobble" else "Open Scrobble",
             tint = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.size(24.dp),
         )
