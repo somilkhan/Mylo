@@ -16,7 +16,6 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Explore
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material3.FilterChip
@@ -169,9 +168,9 @@ private fun LazyListScope.generateSection() {
             ScrobbleRow(
                 title = mode.title,
                 subtitle = if (mode.title == "By genre") {
-                    "Unavailable until listening history and genre metadata are connected"
+                    "${mode.subtitle} · Unavailable until listening history and genre metadata are connected"
                 } else {
-                    "Unavailable until real listening history is connected"
+                    "${mode.subtitle} · Unavailable until real listening history is connected"
                 },
                 leadingIcon = Icons.Rounded.Explore,
             )
@@ -242,10 +241,5 @@ private fun ScrobbleRow(
                 maxLines = 2,
             )
         }
-        Icon(
-            imageVector = Icons.Rounded.ChevronRight,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }
