@@ -258,6 +258,7 @@ import com.music.bitchord.ui.components.QueueActionNoticeHost
 import com.music.bitchord.ui.components.TopBarAccountButton
 import com.music.bitchord.ui.screens.SegmentedControl
 import com.music.bitchord.ui.components.SearchField
+import com.music.bitchord.ui.components.ScrobbleFab
 import com.music.bitchord.sharedui.resources.Res as SharedRes
 import com.music.bitchord.sharedui.resources.search_hint
 import com.music.bitchord.sharedui.resources.search_addons_hint
@@ -314,6 +315,7 @@ import com.music.bitchord.ui.screens.LibraryGridPage
 import com.music.bitchord.ui.screens.LibraryScreen
 import com.music.bitchord.ui.screens.MoodGenrePlaylistsScreen
 import com.music.bitchord.ui.screens.SearchScreen
+import com.music.bitchord.ui.screens.ScrobbleScreen
 import com.music.bitchord.data.settings.SongSort
 import com.music.bitchord.ui.onboarding.OnboardingScreen
 import com.music.bitchord.ui.replay.ReplayScreen
@@ -565,6 +567,8 @@ private fun BitChordApp(
     // opened from the page and the share sheet from either, and closing one
     // has to reveal what it was opened from.
     var showReplay by rememberSaveable { mutableStateOf(false) }
+    var showScrobble by rememberSaveable { mutableStateOf(false) }
+    var scrobbleSection by rememberSaveable { mutableIntStateOf(0) }
     // Library cards use the same Replay page as every other entry point, but
     // category cards ask it to start at their matching ranked section.
     var replayLandingPage by rememberSaveable { mutableStateOf(ReplayStoryPage.INTRO) }
@@ -2528,6 +2532,7 @@ private fun BitChordApp(
         // leaves the tab bar and mini player in place.
         // Replay's three layers unwind in the order they were opened. Ahead of
         // every other handler because they are drawn over everything else.
+        BackHandler(enabled = showScrobble) { showScrobble = false }
         BackHandler(enabled = showReplayShare) { showReplayShare = false }
         BackHandler(enabled = replayStory != null && !showReplayShare) { replayStory = null }
         BackHandler(
@@ -2639,6 +2644,7 @@ private fun BitChordApp(
                         // was live, hit, and changed nothing on screen.
                         showSettings -> "settings"
                         showReplay -> "replay"
+                        showScrobble -> "scrobble"
                         detail != null -> detail.browseId
                         else -> "$TAB_KEY$selectedTab"
                     },
@@ -2706,7 +2712,7 @@ private fun BitChordApp(
                     // the identical copy fading in behind it.
                     val live = detailStack.lastOrNull()?.takeIf {
                         it.browseId == key && key != "settings" && key != "account_scrobbling" &&
-                            key != "discord" && key != "replay" && key != "history" &&
+                            key != "discord" && key != "replay" && key != "scrobble" && key != "history" &&
                             key != "library_show_all"
                     }
                     // Held for the same reason, one step further on: a popped
@@ -2754,6 +2760,12 @@ private fun BitChordApp(
                                 contentPadding = listPadding,
                             )
                         }
+                    } else if (key == "scrobble") {
+                        ScrobbleScreen(
+                            selectedSection = scrobbleSection,
+                            bottomPadding = if (player.song != null) 210.dp else 140.dp,
+                            onSectionChange = { scrobbleSection = it },
+                        )
                     } else if (key == "replay") {
                         ReplayScreen(
                             state = replay,
@@ -3562,6 +3574,7 @@ private fun BitChordApp(
                         showEqualizer -> stringResource(R.string.equalizer)
                         showSettings -> stringResource(R.string.settings)
                         showReplay -> stringResource(R.string.replay)
+                        showScrobble -> "Scrobble"
                         detail != null && detailActiveShelf != null -> detailActiveShelf?.title.orEmpty()
                         detail != null -> detail.title
                         selectedMoodGenre != null -> selectedMoodGenre?.title.orEmpty()
@@ -3587,6 +3600,7 @@ private fun BitChordApp(
                         // The page leads with its own large "Replay", so the bar
                         // stays out of the way until that has been scrolled off.
                         showReplay -> replayScrolled
+                        showScrobble -> true
                         detail != null -> detailScrolled
                         else -> scrolled || selectedTab == TAB_SEARCH
                     },
@@ -3620,6 +3634,7 @@ private fun BitChordApp(
                         settingsSubScreen != null -> ({ settingsSubScreen = null })
                         showSettings -> ({ showSettings = false })
                         showReplay -> ({ showReplay = false })
+                        showScrobble -> ({ showScrobble = false })
                         detailActiveShelf != null -> ({ detailActiveShelf = null })
                         detail != null -> ({ viewModel.closeDetail(); Unit })
                         selectedMoodGenre != null -> ({ viewModel.closeMoodGenre(); Unit })
@@ -3948,6 +3963,7 @@ private fun BitChordApp(
                     settingsSubScreen = null
                     showHistory = false
                     libraryShowAll = null
+                    showScrobble = false
                     selectedTab = index
 
                     // Every search tab tap resets the field, focuses it, and opens
@@ -4043,6 +4059,38 @@ private fun BitChordApp(
             }
 
         }
+
+        ScrobbleFab(
+            visible = selectedTab == TAB_HOME && (
+                showScrobble || (
+                    !showSettings && !showReplay && !showHistory && !showAccountScrobbling &&
+                        !showSources && !showListenTogether && !showWearOs && !showEqualizer &&
+                        !showDiscord && !showSpotify && detail == null && selectedMoodGenre == null &&
+                        libraryShowAll == null && settingsSubScreen == null
+                    )
+                ),
+            open = showScrobble,
+            onClick = {
+                if (showScrobble) {
+                    showScrobble = false
+                } else {
+                    scrobbleSection = 0
+                    showScrobble = true
+                }
+            },
+            surface = if (glassActive) {
+                Modifier.liquidGlass(shape = CircleShape)
+            } else {
+                Modifier.background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
+            },
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(
+                    end = 16.dp,
+                    bottom = if (player.song != null) 174.dp else 112.dp,
+                ),
+            reduceMotion = reducePlayerMotion,
+        )
 
         val playerRaised = showNowPlaying && playerSong != null
 
