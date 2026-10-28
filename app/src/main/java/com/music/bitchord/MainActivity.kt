@@ -4066,41 +4066,40 @@ private fun BitChordApp(
                         onTabSelected = onTabSelected,
                     )
                 }
+            ScrobbleFab(
+                visible = selectedTab == TAB_HOME && (
+                    showScrobble || (
+                        !showSettings && !showReplay && !showHistory && !showAccountScrobbling &&
+                            !showSources && !showListenTogether && !showWearOs && !showEqualizer &&
+                            !showDiscord && !showSpotify && detail == null && selectedMoodGenre == null &&
+                            libraryShowAll == null && settingsSubScreen == null
+                        )
+                    ),
+                open = showScrobble,
+                onClick = {
+                    if (showScrobble) {
+                        showScrobble = false
+                    } else {
+                        scrobbleSection = 0
+                        showScrobble = true
+                    }
+                },
+                surface = if (glassActive) {
+                    Modifier.liquidGlass(shape = CircleShape)
+                } else {
+                    Modifier.background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
+                },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(
+                        end = 16.dp,
+                        bottom = if (player.song != null) 174.dp else 112.dp,
+                    ),
+                reduceMotion = reducePlayerMotion,
+            )
             }
 
         }
-
-        ScrobbleFab(
-            visible = selectedTab == TAB_HOME && (
-                showScrobble || (
-                    !showSettings && !showReplay && !showHistory && !showAccountScrobbling &&
-                        !showSources && !showListenTogether && !showWearOs && !showEqualizer &&
-                        !showDiscord && !showSpotify && detail == null && selectedMoodGenre == null &&
-                        libraryShowAll == null && settingsSubScreen == null
-                    )
-                ),
-            open = showScrobble,
-            onClick = {
-                if (showScrobble) {
-                    showScrobble = false
-                } else {
-                    scrobbleSection = 0
-                    showScrobble = true
-                }
-            },
-            surface = if (glassActive) {
-                Modifier.liquidGlass(shape = CircleShape)
-            } else {
-                Modifier.background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
-            },
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(
-                    end = 16.dp,
-                    bottom = if (player.song != null) 174.dp else 112.dp,
-                ),
-            reduceMotion = reducePlayerMotion,
-        )
 
         val playerRaised = showNowPlaying && playerSong != null
 
