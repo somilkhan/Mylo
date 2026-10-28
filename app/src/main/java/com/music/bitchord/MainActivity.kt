@@ -4067,14 +4067,11 @@ private fun BitChordApp(
                     )
                 }
             ScrobbleFab(
-                visible = selectedTab == TAB_HOME && (
-                    showScrobble || (
-                        !showSettings && !showReplay && !showHistory && !showAccountScrobbling &&
-                            !showSources && !showListenTogether && !showWearOs && !showEqualizer &&
-                            !showDiscord && !showSpotify && detail == null && selectedMoodGenre == null &&
-                            libraryShowAll == null && settingsSubScreen == null
-                        )
-                    ),
+                visible = selectedTab == TAB_HOME &&
+                    !showSettings && !showReplay && !showHistory && !showAccountScrobbling &&
+                    !showSources && !showListenTogether && !showWearOs && !showEqualizer &&
+                    !showDiscord && !showSpotify && detail == null && selectedMoodGenre == null &&
+                    libraryShowAll == null && settingsSubScreen == null,
                 open = showScrobble,
                 onClick = {
                     if (showScrobble) {
