@@ -21,11 +21,15 @@ data class Play(
     val source: PlaySource,
     val atMillis: Long,
     val exact: Boolean,
+    /** Present for local files; lets a generated queue reopen the same device track. */
+    val localUri: String? = null,
 ) {
-    /** Stable key for one song. Video id when there is one, otherwise normalised title and artist. */
-    fun songKey(): String =
-        if (videoId.isNotBlank()) "id:$videoId"
-        else "tx:${normaliseText(title)}|${normaliseText(artist)}"
+    /** Stable identity for a catalogue track or local file, with text as the last resort. */
+    fun songKey(): String = when {
+        videoId.isNotBlank() -> "id:$videoId"
+        !localUri.isNullOrBlank() -> "local:$localUri"
+        else -> "tx:${normaliseText(title)}|${normaliseText(artist)}"
+    }
 
     fun localDay(zone: ZoneId): LocalDate = Instant.ofEpochMilli(atMillis).atZone(zone).toLocalDate()
 }
