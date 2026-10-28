@@ -73,20 +73,17 @@ private val GeneratorModes = listOf(
     GeneratorMode("By genre", "Needs genre tags, not confirmed yet", "Mood"),
 )
 
-/** Sample rows only. Real stats come from the local store once import lands. */
-private data class SampleStat(val label: String, val value: String)
-
-private val SampleStats = listOf(
-    SampleStat("Plays", "269"),
-    SampleStat("Tracks", "170"),
-    SampleStat("Artists", "106"),
-)
+/**
+ * History import and playback-history recording are not wired into this screen yet.
+ * Do not show fabricated listening totals or tracks as if they were user data.
+ */
 
 /**
  * The scrobble page: Statistics, Generate and Playlists.
  *
- * Pure UI over sample data. The bar that switches between these sections is
- * drawn by MainActivity, so this composable does not draw any navigation.
+ * Until the history pipeline is integrated, this screen deliberately avoids
+ * presenting sample content as real listening data. The bar that switches
+ * sections is drawn by MainActivity, so this composable does not draw navigation.
  *
  * [bottomPadding] clears the floating bars, which sit over the page.
  */
@@ -118,7 +115,7 @@ fun ScrobbleScreen(
                 SCROBBLE_TAB_GENERATE -> generateSection(
                     source = source,
                     onSourceChange = { source = it },
-                    onGenerate = { mode -> generated.add(0, "${mode.title} · ${source.label}") },
+                    onGenerate = { /* Real playlist generation is not wired to history yet. */ },
                 )
                 SCROBBLE_TAB_PLAYLISTS -> playlistsSection(generated)
             }
@@ -142,51 +139,34 @@ private fun androidx.compose.foundation.lazy.LazyListScope.statsSection() {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
-    item(key = "stats-row") {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-            SampleStats.forEach { stat ->
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .padding(14.dp),
-                ) {
-                    Text(
-                        text = stat.value,
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Text(
-                        text = stat.label,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
+    item(key = "stats-empty") {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(
+                text = "No listening history available",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = "History import and Mylo play recording are not connected yet. Your real statistics will appear here once that pipeline is implemented.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
-    item(key = "stats-top-title") {
+    item(key = "stats-top-empty") {
         Text(
-            text = "TOP THIS MONTH",
-            style = MaterialTheme.typography.labelMedium,
+            text = "Top tracks will appear after listening history is connected.",
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 8.dp),
-        )
-    }
-    items(
-        listOf(
-            Triple("I Met Her Again", "Maan Panu", "exact"),
-            Triple("Cheques", "Shubh", "approx"),
-            Triple("undressed", "sombr", "approx"),
-            Triple("Marham", "Rochak Kohli", "exact"),
-        ),
-        key = { it.first },
-    ) { (title, artist, tag) ->
-        SampleRow(
-            title = title,
-            subtitle = artist,
-            trailing = tag,
         )
     }
 }
@@ -244,9 +224,13 @@ private fun androidx.compose.foundation.lazy.LazyListScope.generateSection(
         ) { mode ->
             SampleRow(
                 title = mode.title,
-                subtitle = mode.subtitle,
+                subtitle = if (mode.title == "By genre") {
+                    "Unavailable until real listening history and genre metadata are connected"
+                } else {
+                    "Not available until listening history is connected"
+                },
                 trailing = null,
-                onClick = { onGenerate(mode) },
+                onClick = null,
                 leadingIcon = Icons.Rounded.Explore,
             )
         }
@@ -292,8 +276,8 @@ private fun androidx.compose.foundation.lazy.LazyListScope.playlistsSection(gene
 }
 
 /**
- * One row in the scrobble lists. Kept to a single shape so all three sections
- * read as the same family.
+ * One row in the scrobble lists. Kept to a single shape so all sections read
+ * as the same family.
  */
 @Composable
 private fun SampleRow(
