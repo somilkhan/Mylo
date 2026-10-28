@@ -19,7 +19,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Explore
 import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -38,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import com.music.bitchord.data.stats.ListeningStats
 import com.music.bitchord.data.stats.ReplayPeriod
 import com.music.bitchord.data.stats.ReplaySummary
+import com.music.bitchord.data.model.Song
 
 internal const val SCROBBLE_TAB_STATS = 0
 internal const val SCROBBLE_TAB_GENERATE = 1
@@ -46,7 +50,6 @@ internal const val SCROBBLE_TAB_PLAYLISTS = 2
 private data class GeneratorMode(val title: String, val subtitle: String, val group: String)
 
 private val GeneratorModes = listOf(
-    GeneratorMode("Top tracks", "Played most in the last 90 days", "Your history"),
     GeneratorMode("Recent", "What you played this week", "Your history"),
     GeneratorMode("Rediscover", "Loved before, quiet for 60+ days", "Your history"),
     GeneratorMode("Song radio", "Starts from one song you pick", "Discover"),
@@ -65,6 +68,7 @@ fun ScrobbleScreen(
     selectedSection: Int,
     bottomPadding: Dp,
     onSectionChange: (Int) -> Unit,
+    onPlayTopTracks: (List<Song>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var summary by remember { mutableStateOf<ReplaySummary?>(null) }
@@ -112,7 +116,7 @@ fun ScrobbleScreen(
             }
             when (selectedSection) {
                 SCROBBLE_TAB_STATS -> statsSection(summary, loadingStats, statsFailed)
-                SCROBBLE_TAB_GENERATE -> generateSection()
+                SCROBBLE_TAB_GENERATE -> generateSection(summary, loadingStats, onPlayTopTracks)
                 SCROBBLE_TAB_PLAYLISTS -> playlistsSection()
                 else -> statsSection(summary, loadingStats, statsFailed)
             }
@@ -243,7 +247,12 @@ private fun RowScope.Metric(value: String, label: String) {
     }
 }
 
-private fun LazyListScope.generateSection() {
+private fun LazyListScope.generateSection(
+    summary: ReplaySummary?,
+    loading: Boolean,
+    onPlayTopTracks: (List<Song>) -> Unit,
+) {
+    val topTracks = summary?.songs?.take(25)?.map { it.song }.orEmpty()
     item(key = "gen-title") {
         Text(
             text = "Generate",
@@ -258,6 +267,27 @@ private fun LazyListScope.generateSection() {
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+    }
+    when {
+        loading -> item(key = "gen-loading") {
+            Text("Loading listening history…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        topTracks.isEmpty() -> item(key = "gen-no-history") {
+            EmptyCard(
+                title = "No listening data to build from",
+                body = "Play music in Mylo first. Your real top tracks will become playable here; other modes need a per-play history source.",
+            )
+        }
+        else -> item(key = "gen-play-top-tracks") {
+            Button(
+                onClick = { onPlayTopTracks(topTracks) },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Icon(imageVector = Icons.Rounded.PlayArrow, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Play top tracks")
+            }
+        }
     }
     listOf("Your history", "Discover", "Mood").forEach { group ->
         item(key = "gen-group-$group") {
