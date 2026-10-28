@@ -75,7 +75,7 @@ fun ScrobbleScreen(
     var loadingStats by remember { mutableStateOf(false) }
     var statsFailed by remember { mutableStateOf(false) }
 
-    LaunchedEffect(selectedSection) {
+    LaunchedEffect(Unit) {
         if (selectedSection == SCROBBLE_TAB_STATS) {
             loadingStats = true
             statsFailed = false
@@ -158,7 +158,7 @@ private fun LazyListScope.statsSection(
         failed -> item(key = "stats-error") {
             EmptyCard(
                 title = "Couldn't load listening statistics",
-                body = "Your existing listening data could not be read. Return to Statistics to retry.",
+                body = "Your existing listening data could not be read. Close and reopen Scrobble to retry.",
             )
         }
         summary == null || summary.isEmpty -> item(key = "stats-empty") {
