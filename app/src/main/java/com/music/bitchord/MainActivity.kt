@@ -2766,6 +2766,15 @@ private fun BitChordApp(
                             selectedSection = scrobbleSection,
                             bottomPadding = if (player.song != null) 210.dp else 140.dp,
                             onSectionChange = { scrobbleSection = it },
+                            onPlayTopTracks = { songs ->
+                                if (songs.isNotEmpty()) {
+                                    playFrom(
+                                        songs,
+                                        0,
+                                        QueueSource("Scrobble · Top tracks", PlaybackSourceType.HISTORY),
+                                    )
+                                }
+                            },
                         )
                     } else if (key == "replay") {
                         ReplayScreen(
