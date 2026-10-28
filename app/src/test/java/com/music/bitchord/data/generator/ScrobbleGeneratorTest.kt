@@ -73,7 +73,7 @@ class ScrobbleGeneratorTest {
     fun store_readsLegacyRowsWithoutLocalUri() {
         val file = File.createTempFile("legacy-plays", ".tsv")
         file.deleteOnExit()
-        file.writeText("x\\tTitle x\\tA\\tMYLO\\t${now}\\ttrue\\n")
+        file.writeText("x\tTitle x\tA\tMYLO\t${now}\ttrue\n")
 
         val stored = PlayHistoryStore(file, zone).readAll()
 
