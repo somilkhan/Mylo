@@ -43,6 +43,40 @@ class ScrobbleGeneratorTest {
     }
 
     @Test
+    fun recent_returnsNewestUniqueTracksInsideWindow() {
+        val plays = listOf(
+            play("old", daysAgo = 10.0),
+            play("newer", daysAgo = 1.0),
+            play("older", daysAgo = 6.0),
+        )
+
+        val out = ScrobbleGenerator.recent(plays, now, zone, days = 7)
+
+        assertEquals(listOf("id:newer", "id:older"), out.map { it.play.songKey() })
+    }
+
+    @Test
+    fun rediscover_requiresRepeatedPlaysAndAQuietPeriod() {
+        val plays = listOf(
+            play("rediscover", daysAgo = 120.0),
+            play("rediscover", daysAgo = 100.0),
+            play("rediscover", daysAgo = 80.0),
+            play("too-recent", daysAgo = 10.0),
+            play("only-once", daysAgo = 100.0),
+        )
+
+        val out = ScrobbleGenerator.rediscover(
+            plays,
+            now,
+            zone,
+            quietDays = 60,
+            minPlays = 3,
+        )
+
+        assertEquals(listOf("id:rediscover"), out.map { it.play.songKey() })
+    }
+
+    @Test
     fun topTracks_capsSongsPerArtist() {
         val plays = listOf("a", "b", "c", "d").map { play(it, artist = "Same") }
         val out = ScrobbleGenerator.topTracks(plays, now, zone, maxPerArtist = 2)
