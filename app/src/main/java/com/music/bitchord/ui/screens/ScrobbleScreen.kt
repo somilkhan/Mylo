@@ -407,7 +407,7 @@ private fun LazyListScope.playlistsSection() {
     }
     item(key = "pl-empty") {
         Text(
-            text = "No generated playlists yet. Playlist generation will be enabled when real listening history is available.",
+            text = "No saved playlists yet. Scrobble can play mixes on demand; saving, freezing, and scheduled refresh are not wired yet.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 12.dp),
