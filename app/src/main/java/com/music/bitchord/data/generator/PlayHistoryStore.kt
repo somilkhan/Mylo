@@ -14,6 +14,7 @@ import java.time.ZoneId
 class PlayHistoryStore(private val file: File, private val zone: ZoneId = ZoneId.systemDefault()) {
 
     /** Every stored play, oldest first. Lines that do not parse are skipped. */
+    @Synchronized
     fun readAll(): List<Play> {
         if (!file.exists()) return emptyList()
         return file.readLines().mapNotNull(::decode)
