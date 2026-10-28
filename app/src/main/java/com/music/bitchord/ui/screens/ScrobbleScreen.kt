@@ -23,7 +23,6 @@ import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -42,6 +41,7 @@ import com.music.bitchord.data.stats.ListeningStats
 import com.music.bitchord.data.stats.ReplayPeriod
 import com.music.bitchord.data.stats.ReplaySummary
 import com.music.bitchord.data.model.Song
+import kotlinx.coroutines.CancellationException
 
 internal const val SCROBBLE_TAB_STATS = 0
 internal const val SCROBBLE_TAB_GENERATE = 1
@@ -79,10 +79,17 @@ fun ScrobbleScreen(
         if (selectedSection == SCROBBLE_TAB_STATS) {
             loadingStats = true
             statsFailed = false
-            val result = runCatching { ListeningStats.summary(ReplayPeriod.THIS_MONTH) }
-            summary = result.getOrNull()
-            statsFailed = result.isFailure
-            loadingStats = false
+            try {
+                summary = ListeningStats.summary(ReplayPeriod.THIS_MONTH)
+                statsFailed = false
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                summary = null
+                statsFailed = true
+            } finally {
+                loadingStats = false
+            }
         }
     }
 
