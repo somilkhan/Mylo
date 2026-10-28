@@ -80,6 +80,10 @@ import com.music.bitchord.ui.player.PlayerDock
  *
  * [song] null means nothing is playing, and the accessory is simply absent: the
  * bar is then the tab pill and Search alone, and the collapse still works.
+ *
+ * [standaloneIndex] picks the tab drawn as the circle beside the pill. Null
+ * means the last tab, which is Search in the main app. Pass -1 for a bar with
+ * no circle at all.
  */
 @Composable
 fun GlassNavBar(
@@ -101,6 +105,8 @@ fun GlassNavBar(
     dock: PlayerDock? = null,
     /** Dragging the bar's player up into the full player. */
     pull: MiniPlayerPull? = null,
+    /** Index of the tab drawn as the standalone circle. Null is the last tab; -1 is none. */
+    standaloneIndex: Int? = null,
     modifier: Modifier = Modifier,
 ) {
     // Held for the same reason [tabs] is. The glass factory below closes over
@@ -121,8 +127,9 @@ fun GlassNavBar(
 
     // Search is the odd one out in the iOS 26 layout: a circle of its own beside
     // the pill rather than a quarter of it. It is the last tab in BitChord's
-    // order, which is where the shape wants it anyway.
-    val standaloneIndex = tabs.lastIndex
+    // order, which is where the shape wants it anyway. A -1 matches no tab, so
+    // the bar then has no circle.
+    val standaloneIdx = standaloneIndex ?: tabs.lastIndex
 
     // A factory, not a value — see the note in FloatingTabBar's header. Each of
     // the three surfaces gets its own glass modifier and so its own shape cache.
@@ -206,8 +213,8 @@ fun GlassNavBar(
         ),
         // Held too: this is declared `Any?`, so a fresh list every pass is a
         // changed argument by identity and defeats skipping on its own.
-        contentKey = remember(selectedIndex, tabs, contentColor) {
-            listOf(selectedIndex, tabs, contentColor)
+        contentKey = remember(selectedIndex, tabs, contentColor, standaloneIdx) {
+            listOf(selectedIndex, tabs, contentColor, standaloneIdx)
         },
     ) {
         tabs.forEachIndexed { index, tab ->
@@ -217,7 +224,7 @@ fun GlassNavBar(
                 if (!isSelected) haptics.play(Haptic.Select)
                 currentOnTabSelected(index)
             }
-            if (index == standaloneIndex) {
+            if (index == standaloneIdx) {
                 standaloneTab(
                     key = index,
                     icon = {
