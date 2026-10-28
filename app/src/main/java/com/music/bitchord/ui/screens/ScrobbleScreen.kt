@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -23,12 +24,20 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.music.bitchord.data.stats.ListeningStats
+import com.music.bitchord.data.stats.ReplayPeriod
+import com.music.bitchord.data.stats.ReplaySummary
 
 internal const val SCROBBLE_TAB_STATS = 0
 internal const val SCROBBLE_TAB_GENERATE = 1
@@ -58,6 +67,21 @@ fun ScrobbleScreen(
     onSectionChange: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var summary by remember { mutableStateOf<ReplaySummary?>(null) }
+    var loadingStats by remember { mutableStateOf(false) }
+    var statsFailed by remember { mutableStateOf(false) }
+
+    LaunchedEffect(selectedSection) {
+        if (selectedSection == SCROBBLE_TAB_STATS) {
+            loadingStats = true
+            statsFailed = false
+            val result = runCatching { ListeningStats.summary(ReplayPeriod.THIS_MONTH) }
+            summary = result.getOrNull()
+            statsFailed = result.isFailure
+            loadingStats = false
+        }
+    }
+
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -87,16 +111,20 @@ fun ScrobbleScreen(
                 }
             }
             when (selectedSection) {
-                SCROBBLE_TAB_STATS -> statsSection()
+                SCROBBLE_TAB_STATS -> statsSection(summary, loadingStats, statsFailed)
                 SCROBBLE_TAB_GENERATE -> generateSection()
                 SCROBBLE_TAB_PLAYLISTS -> playlistsSection()
-                else -> statsSection()
+                else -> statsSection(summary, loadingStats, statsFailed)
             }
         }
     }
 }
 
-private fun LazyListScope.statsSection() {
+private fun LazyListScope.statsSection(
+    summary: ReplaySummary?,
+    loading: Boolean,
+    failed: Boolean,
+) {
     item(key = "stats-title") {
         Text(
             text = "Statistics",
@@ -107,32 +135,111 @@ private fun LazyListScope.statsSection() {
     }
     item(key = "stats-lede") {
         Text(
-            text = "Your listening history, in one place.",
+            text = "Mylo listening · This month",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
-    item(key = "stats-empty") {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-                .padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Text(
-                text = "No listening history available",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Text(
-                text = "Mylo play recording and external history imports are not connected yet. Real statistics will appear here once that pipeline is implemented.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+    when {
+        loading -> item(key = "stats-loading") {
+            Text("Loading listening statistics…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        failed -> item(key = "stats-error") {
+            EmptyCard(
+                title = "Couldn't load listening statistics",
+                body = "Your existing listening data could not be read. Return to Statistics to retry.",
             )
         }
+        summary == null || summary.isEmpty -> item(key = "stats-empty") {
+            EmptyCard(
+                title = "No Mylo listening data this month yet",
+                body = "Mylo records listening on this device. Play a few tracks and your actual totals and top tracks will appear here. External YouTube Music history import is separate and is not connected yet.",
+            )
+        }
+        else -> {
+            item(key = "stats-overview") {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Text(
+                        text = summary.label,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Metric(value = "${summary.minutes}", label = "Minutes")
+                        Metric(value = "${summary.totalPlays}", label = "Plays")
+                        Metric(value = "${summary.distinctSongs}", label = "Tracks")
+                    }
+                }
+            }
+            item(key = "stats-top-heading") {
+                Text(
+                    text = "Top tracks",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
+            items(summary.songs.take(10), key = { "stats-track-${it.song.videoId}" }) { ranked ->
+                ScrobbleRow(
+                    title = ranked.song.title,
+                    subtitle = "${ranked.song.artist.ifBlank { "Unknown artist" }} · ${ranked.plays} plays · ${ranked.ms / 60_000} min",
+                    leadingIcon = Icons.Rounded.History,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptyCard(title: String, body: String) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .padding(18.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Text(
+            text = body,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun RowScope.Metric(value: String, label: String) {
+    Column(
+        modifier = Modifier.weight(1f),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Text(
+            text = value,
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
