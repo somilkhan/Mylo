@@ -37,11 +37,17 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.music.bitchord.data.generator.Play
+import com.music.bitchord.data.generator.ScrobbleGenerator
+import com.music.bitchord.data.generator.ScrobbleHistory
 import com.music.bitchord.data.stats.ListeningStats
 import com.music.bitchord.data.stats.ReplayPeriod
 import com.music.bitchord.data.stats.ReplaySummary
 import com.music.bitchord.data.model.Song
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.time.ZoneId
 
 internal const val SCROBBLE_TAB_STATS = 0
 internal const val SCROBBLE_TAB_GENERATE = 1
@@ -50,8 +56,6 @@ internal const val SCROBBLE_TAB_PLAYLISTS = 2
 private data class GeneratorMode(val title: String, val subtitle: String, val group: String)
 
 private val GeneratorModes = listOf(
-    GeneratorMode("Recent", "What you played this week", "Your history"),
-    GeneratorMode("Rediscover", "Loved before, quiet for 60+ days", "Your history"),
     GeneratorMode("Song radio", "Starts from one song you pick", "Discover"),
     GeneratorMode("Similar artists", "Artists close to your top list", "Discover"),
     GeneratorMode("Never heard", "New to you, close to your taste", "Discover"),
@@ -68,28 +72,37 @@ fun ScrobbleScreen(
     selectedSection: Int,
     bottomPadding: Dp,
     onSectionChange: (Int) -> Unit,
-    onPlayTopTracks: (List<Song>) -> Unit,
+    onPlayPlaylist: (String, List<Song>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var summary by remember { mutableStateOf<ReplaySummary?>(null) }
-    var loadingStats by remember { mutableStateOf(false) }
+    var loadingStats by remember { mutableStateOf(true) }
     var statsFailed by remember { mutableStateOf(false) }
+    var historyPlays by remember { mutableStateOf<List<Play>>(emptyList()) }
+    var loadingHistory by remember { mutableStateOf(true) }
+    var historyFailed by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
-        if (selectedSection == SCROBBLE_TAB_STATS) {
-            loadingStats = true
-            statsFailed = false
-            try {
-                summary = ListeningStats.summary(ReplayPeriod.THIS_MONTH)
-                statsFailed = false
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (_: Exception) {
-                summary = null
-                statsFailed = true
-            } finally {
-                loadingStats = false
-            }
+        try {
+            summary = ListeningStats.summary(ReplayPeriod.THIS_MONTH)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            summary = null
+            statsFailed = true
+        } finally {
+            loadingStats = false
+        }
+
+        try {
+            historyPlays = withContext(Dispatchers.IO) { ScrobbleHistory.readAll() }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            historyPlays = emptyList()
+            historyFailed = true
+        } finally {
+            loadingHistory = false
         }
     }
 
@@ -123,7 +136,7 @@ fun ScrobbleScreen(
             }
             when (selectedSection) {
                 SCROBBLE_TAB_STATS -> statsSection(summary, loadingStats, statsFailed)
-                SCROBBLE_TAB_GENERATE -> generateSection(summary, loadingStats, onPlayTopTracks)
+                SCROBBLE_TAB_GENERATE -> generateSection(summary, loadingStats, historyPlays, loadingHistory, historyFailed, onPlayPlaylist)
                 SCROBBLE_TAB_PLAYLISTS -> playlistsSection()
                 else -> statsSection(summary, loadingStats, statsFailed)
             }
@@ -256,10 +269,26 @@ private fun RowScope.Metric(value: String, label: String) {
 
 private fun LazyListScope.generateSection(
     summary: ReplaySummary?,
-    loading: Boolean,
-    onPlayTopTracks: (List<Song>) -> Unit,
+    loadingStats: Boolean,
+    historyPlays: List<Play>,
+    loadingHistory: Boolean,
+    historyFailed: Boolean,
+    onPlayPlaylist: (String, List<Song>) -> Unit,
 ) {
     val topTracks = summary?.songs?.take(25)?.map { it.song }.orEmpty()
+    val zone = ZoneId.systemDefault()
+    val now = System.currentTimeMillis()
+    val recentSongs = ScrobbleGenerator.recent(historyPlays, now, zone, days = 7, limit = 25)
+        .map { it.play.toSong() }
+    val rediscoverSongs = ScrobbleGenerator.rediscover(
+        historyPlays,
+        now,
+        zone,
+        quietDays = 60,
+        minPlays = 3,
+        limit = 25,
+    ).map { it.play.toSong() }
+
     item(key = "gen-title") {
         Text(
             text = "Generate",
@@ -270,24 +299,18 @@ private fun LazyListScope.generateSection(
     }
     item(key = "gen-lede") {
         Text(
-            text = "Build playlists from your listening history.",
+            text = "Play mixes built from your actual Mylo listening.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
     when {
-        loading -> item(key = "gen-loading") {
-            Text("Loading listening history…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        loadingStats -> item(key = "gen-loading-stats") {
+            Text("Loading listening statistics…", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        topTracks.isEmpty() -> item(key = "gen-no-history") {
-            EmptyCard(
-                title = "No listening data to build from",
-                body = "Play music in Mylo first. Your real top tracks will become playable here; other modes need a per-play history source.",
-            )
-        }
-        else -> item(key = "gen-play-top-tracks") {
+        topTracks.isNotEmpty() -> item(key = "gen-play-top-tracks") {
             Button(
-                onClick = { onPlayTopTracks(topTracks) },
+                onClick = { onPlayPlaylist("Top tracks", topTracks) },
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Icon(imageVector = Icons.Rounded.PlayArrow, contentDescription = null)
@@ -296,7 +319,50 @@ private fun LazyListScope.generateSection(
             }
         }
     }
-    listOf("Your history", "Discover", "Mood").forEach { group ->
+    when {
+        loadingHistory -> item(key = "gen-loading-history") {
+            Text("Loading recent listens…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        historyFailed -> item(key = "gen-history-error") {
+            EmptyCard(
+                title = "Couldn't load play history",
+                body = "The local history file could not be read. Close and reopen Scrobble to retry.",
+            )
+        }
+        recentSongs.isNotEmpty() -> item(key = "gen-play-recent") {
+            Button(
+                onClick = { onPlayPlaylist("Recent", recentSongs) },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Icon(imageVector = Icons.Rounded.PlayArrow, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Play recent")
+            }
+        }
+    }
+    if (!loadingHistory && !historyFailed) {
+        if (rediscoverSongs.isNotEmpty()) {
+            item(key = "gen-rediscover") {
+                Button(
+                    onClick = { onPlayPlaylist("Rediscover", rediscoverSongs) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(imageVector = Icons.Rounded.PlayArrow, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Rediscover forgotten tracks")
+                }
+            }
+        } else {
+            item(key = "gen-rediscover-empty") {
+                Text(
+                    text = "Rediscover unlocks after a song has been recorded on at least three separate days and then stays quiet for 60 days.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+    listOf("Discover", "Mood").forEach { group ->
         item(key = "gen-group-$group") {
             Text(
                 text = group.uppercase(),
@@ -312,15 +378,23 @@ private fun LazyListScope.generateSection(
             ScrobbleRow(
                 title = mode.title,
                 subtitle = if (mode.title == "By genre") {
-                    "${mode.subtitle} · Unavailable until listening history and genre metadata are connected"
+                    "${mode.subtitle} · Unavailable until genre metadata is connected"
                 } else {
-                    "${mode.subtitle} · Unavailable until real listening history is connected"
+                    "${mode.subtitle} · Requires a recommendation source that is not connected yet"
                 },
                 leadingIcon = Icons.Rounded.Explore,
             )
         }
     }
 }
+
+private fun Play.toSong(): Song = Song(
+    videoId = videoId,
+    title = title,
+    artist = artist,
+    thumbnailUrl = null,
+    localUri = localUri,
+)
 
 private fun LazyListScope.playlistsSection() {
     item(key = "pl-title") {
