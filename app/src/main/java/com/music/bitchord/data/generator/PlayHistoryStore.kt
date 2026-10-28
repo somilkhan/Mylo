@@ -1,5 +1,6 @@
 package com.music.bitchord.data.generator
 
+import android.content.Context
 import java.io.File
 import java.time.ZoneId
 
@@ -37,14 +38,51 @@ class PlayHistoryStore(private val file: File, private val zone: ZoneId = ZoneId
 
     private fun encode(p: Play): String =
         listOf(
-            p.videoId, p.title, p.artist, p.source.name, p.atMillis.toString(), p.exact.toString(),
+            p.videoId, p.title, p.artist, p.source.name, p.atMillis.toString(), p.exact.toString(), p.localUri.orEmpty(),
         ).joinToString("\t") { it.replace('\t', ' ').replace('\n', ' ') }
 
     private fun decode(line: String): Play? {
         val parts = line.split('\t')
-        if (parts.size != 6) return null
+        if (parts.size !in 6..7) return null
         val source = runCatching { PlaySource.valueOf(parts[3]) }.getOrNull() ?: return null
         val at = parts[4].toLongOrNull() ?: return null
-        return Play(parts[0], parts[1], parts[2], source, at, parts[5] == "true")
+        return Play(
+            videoId = parts[0],
+            title = parts[1],
+            artist = parts[2],
+            source = source,
+            atMillis = at,
+            exact = parts[5] == "true",
+            localUri = parts.getOrNull(6)?.takeIf(String::isNotBlank),
+        )
     }
+}
+
+
+/**
+ * Process-wide owner for Mylo's private listening-history file. Playback writes
+ * through this shared instance on an IO dispatcher; UI readers use the same
+ * store so they see the same persisted history.
+ */
+object ScrobbleHistory {
+    @Volatile
+    private var store: PlayHistoryStore? = null
+
+    @Synchronized
+    fun init(context: Context) {
+        if (store == null) {
+            store = PlayHistoryStore(
+                File(context.applicationContext.filesDir, "scrobble_history.tsv"),
+            )
+        }
+    }
+
+    fun append(incoming: List<Play>): Int = requireStore().append(incoming)
+
+    fun readAll(): List<Play> = requireStore().readAll()
+
+    fun forget() = requireStore().forget()
+
+    private fun requireStore(): PlayHistoryStore =
+        checkNotNull(store) { "ScrobbleHistory must be initialized by the application first" }
 }
