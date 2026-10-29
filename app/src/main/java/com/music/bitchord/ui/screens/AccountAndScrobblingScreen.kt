@@ -20,6 +20,19 @@ import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.SwitchAccount
 import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import com.music.bitchord.data.generator.ScrobbleHistory
+import com.music.bitchord.data.generator.ScrobbleHistorySync
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -68,6 +81,26 @@ fun AccountAndScrobblingScreen(
     val discordUsername by AppSettings.discordUsername.collectAsStateWithLifecycle()
     val discordRpcEnabled by AppSettings.discordRpcEnabled.collectAsStateWithLifecycle()
     val spotifyConnected by AppSettings.spotifySpdcToken.collectAsStateWithLifecycle()
+    val appContext = LocalContext.current.applicationContext
+    val historySyncPrefs = remember(appContext) {
+        appContext.getSharedPreferences(ScrobbleHistorySync.PREFS_NAME, android.content.Context.MODE_PRIVATE)
+    }
+    var historySyncEnabled by remember(historySyncPrefs) {
+        mutableStateOf(historySyncPrefs.getBoolean(ScrobbleHistorySync.KEY_ENABLED, false))
+    }
+    var showForgetImportedHistory by remember { mutableStateOf(false) }
+    var historyActionMessage by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+
+    DisposableEffect(historySyncPrefs) {
+        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { prefs, key ->
+            if (key == ScrobbleHistorySync.KEY_ENABLED) {
+                historySyncEnabled = prefs.getBoolean(ScrobbleHistorySync.KEY_ENABLED, false)
+            }
+        }
+        historySyncPrefs.registerOnSharedPreferenceChangeListener(listener)
+        onDispose { historySyncPrefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
 
     Column(
         modifier = modifier
@@ -105,6 +138,49 @@ fun AccountAndScrobblingScreen(
                 )
                 FullWidthDivider()
                 DestructiveRow(label = stringResource(R.string.sign_out), onClick = onSignOut)
+            }
+        }
+
+        SettingsGroup(
+            header = "YouTube Music history",
+            footer = "Imported history stays on this device. Automatic refresh runs on Wi-Fi about every six hours; imported rows are marked approximate.",
+        ) {
+            SettingsRow(
+                icon = Icons.Rounded.History,
+                title = "Background history sync",
+                subtitle = if (historySyncEnabled) "Enabled · Wi-Fi only" else "Paused",
+                trailing = {
+                    Switch(
+                        checked = historySyncEnabled,
+                        onCheckedChange = { enabled ->
+                            if (enabled) ScrobbleHistorySync.schedule(appContext)
+                            else ScrobbleHistorySync.cancel(appContext)
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedTrackColor = MaterialTheme.colorScheme.primary,
+                            checkedBorderColor = MaterialTheme.colorScheme.primary,
+                        ),
+                    )
+                },
+                onClick = {
+                    if (historySyncEnabled) ScrobbleHistorySync.cancel(appContext)
+                    else ScrobbleHistorySync.schedule(appContext)
+                },
+            )
+            FullWidthDivider()
+            SettingsRow(
+                icon = Icons.Rounded.History,
+                title = "Forget imported history",
+                subtitle = "Remove imported listens only. Mylo's own listening history is kept.",
+                onClick = { showForgetImportedHistory = true },
+            )
+            if (historyActionMessage != null) {
+                Text(
+                    text = historyActionMessage.orEmpty(),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
             }
         }
 
@@ -352,6 +428,28 @@ fun AccountAndScrobblingScreen(
         }
 
         Spacer(Modifier.height(24.dp))
+    }
+
+    if (showForgetImportedHistory) {
+        AlertDialog(
+            onDismissRequest = { showForgetImportedHistory = false },
+            title = { Text("Forget imported history?") },
+            text = { Text("This removes imported YouTube Music and other external listening rows from this device. Mylo-recorded listens will remain.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showForgetImportedHistory = false
+                        scope.launch {
+                            withContext(Dispatchers.IO) { ScrobbleHistory.forgetImported() }
+                            historyActionMessage = "Imported history cleared."
+                        }
+                    },
+                ) { Text("Forget imported history") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showForgetImportedHistory = false }) { Text("Cancel") }
+            },
+        )
     }
 }
 
