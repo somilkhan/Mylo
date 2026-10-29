@@ -1,5 +1,8 @@
 package com.music.bitchord.ui.screens
 
+import android.content.Context
+import android.content.SharedPreferences
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,7 +28,9 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -39,11 +44,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 import com.music.bitchord.data.YtMusicRepository
 import com.music.bitchord.data.generator.Play
 import com.music.bitchord.data.generator.PlaySource
 import com.music.bitchord.data.generator.ScrobbleGenerator
 import com.music.bitchord.data.generator.ScrobbleHistory
+import com.music.bitchord.data.generator.ScrobbleHistorySync
 import com.music.bitchord.data.stats.ListeningStats
 import com.music.bitchord.data.stats.ReplayPeriod
 import com.music.bitchord.data.stats.ReplaySummary
@@ -53,6 +60,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import java.time.ZoneId
+import java.text.DateFormat
+import java.util.Date
 
 internal const val SCROBBLE_TAB_STATS = 0
 internal const val SCROBBLE_TAB_GENERATE = 1
@@ -89,6 +98,39 @@ fun ScrobbleScreen(
     var importingYouTube by remember { mutableStateOf(false) }
     var importMessage by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
+    val appContext = LocalContext.current.applicationContext
+    val syncPrefs = remember(appContext) {
+        appContext.getSharedPreferences(ScrobbleHistorySync.PREFS_NAME, Context.MODE_PRIVATE)
+    }
+    var autoSyncEnabled by remember(syncPrefs) {
+        mutableStateOf(syncPrefs.getBoolean(ScrobbleHistorySync.KEY_ENABLED, false))
+    }
+    var lastSyncAt by remember(syncPrefs) {
+        mutableStateOf(syncPrefs.getLong(ScrobbleHistorySync.KEY_LAST_SYNC_AT, 0L))
+    }
+    var lastSyncStatus by remember(syncPrefs) {
+        mutableStateOf(syncPrefs.getString(ScrobbleHistorySync.KEY_LAST_STATUS, null))
+    }
+    var lastSyncAdded by remember(syncPrefs) {
+        mutableStateOf(syncPrefs.getInt(ScrobbleHistorySync.KEY_LAST_ADDED, 0))
+    }
+
+    DisposableEffect(syncPrefs) {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { prefs, key ->
+            when (key) {
+                ScrobbleHistorySync.KEY_ENABLED ->
+                    autoSyncEnabled = prefs.getBoolean(ScrobbleHistorySync.KEY_ENABLED, false)
+                ScrobbleHistorySync.KEY_LAST_SYNC_AT ->
+                    lastSyncAt = prefs.getLong(ScrobbleHistorySync.KEY_LAST_SYNC_AT, 0L)
+                ScrobbleHistorySync.KEY_LAST_STATUS ->
+                    lastSyncStatus = prefs.getString(ScrobbleHistorySync.KEY_LAST_STATUS, null)
+                ScrobbleHistorySync.KEY_LAST_ADDED ->
+                    lastSyncAdded = prefs.getInt(ScrobbleHistorySync.KEY_LAST_ADDED, 0)
+            }
+        }
+        syncPrefs.registerOnSharedPreferenceChangeListener(listener)
+        onDispose { syncPrefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
 
     LaunchedEffect(Unit) {
         try {
@@ -152,6 +194,18 @@ fun ScrobbleScreen(
                     historyFailed = historyFailed,
                     importingYouTube = importingYouTube,
                     importMessage = importMessage,
+                    autoSyncEnabled = autoSyncEnabled,
+                    syncStatusText = backgroundSyncStatusText(
+                        lastSyncStatus,
+                        lastSyncAt,
+                        lastSyncAdded,
+                        autoSyncEnabled,
+                    ),
+                    onAutoSyncChange = { enabled ->
+                        autoSyncEnabled = enabled
+                        if (enabled) ScrobbleHistorySync.schedule(appContext)
+                        else ScrobbleHistorySync.cancel(appContext)
+                    },
                     onImportYouTubeHistory = {
                         scope.launch {
                             importingYouTube = true
@@ -329,6 +383,9 @@ private fun LazyListScope.generateSection(
     historyFailed: Boolean,
     importingYouTube: Boolean,
     importMessage: String?,
+    autoSyncEnabled: Boolean,
+    syncStatusText: String,
+    onAutoSyncChange: (Boolean) -> Unit,
     onImportYouTubeHistory: () -> Unit,
     onPlayPlaylist: (String, List<Song>) -> Unit,
 ) {
@@ -384,6 +441,40 @@ private fun LazyListScope.generateSection(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+    }
+    item(key = "gen-background-sync") {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(
+                    text = "Background sync",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = "Refresh YouTube history about every 12 hours when a network is available.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(checked = autoSyncEnabled, onCheckedChange = onAutoSyncChange)
+        }
+    }
+    item(key = "gen-background-sync-status") {
+        Text(
+            text = syncStatusText,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
     when {
         loadingStats -> item(key = "gen-loading-stats") {
@@ -467,6 +558,23 @@ private fun LazyListScope.generateSection(
             )
         }
     }
+}
+
+private fun backgroundSyncStatusText(
+    status: String?,
+    lastSyncAt: Long,
+    lastAdded: Int,
+    enabled: Boolean,
+): String = when (status) {
+    ScrobbleHistorySync.STATUS_SUCCESS ->
+        "Last background sync: ${DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(lastSyncAt))} · $lastAdded new listens"
+    ScrobbleHistorySync.STATUS_NO_DATED_ROWS ->
+        "Last sync found no date-labelled history rows; unsupported date groups were skipped."
+    ScrobbleHistorySync.STATUS_WAITING_FOR_SIGN_IN ->
+        "Waiting for Mylo's YouTube Music sign-in. Sync will check again on the next interval."
+    ScrobbleHistorySync.STATUS_RETRYING ->
+        "Background sync failed; it will retry when a network is available."
+    else -> if (enabled) "Background sync is enabled; waiting for the first run." else "Background sync is off."
 }
 
 private fun Play.toSong(): Song = Song(
