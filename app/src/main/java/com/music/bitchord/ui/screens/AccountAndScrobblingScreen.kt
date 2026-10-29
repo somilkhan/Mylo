@@ -481,6 +481,8 @@ private fun historySyncSubtitle(
     return when (status) {
         ScrobbleHistorySync.STATUS_WAITING_FOR_SIGN_IN ->
             "Waiting for YouTube Music sign-in"
+        ScrobbleHistorySync.STATUS_WAITING_FOR_WIFI ->
+            "Waiting for Wi-Fi"
         ScrobbleHistorySync.STATUS_RETRYING ->
             "Sync failed; will retry on Wi-Fi"
         ScrobbleHistorySync.STATUS_NO_DATED_ROWS ->
