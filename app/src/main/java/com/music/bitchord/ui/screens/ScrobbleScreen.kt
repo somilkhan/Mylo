@@ -411,7 +411,7 @@ private fun LazyListScope.generateSection(
     }
     item(key = "gen-lede") {
         Text(
-            text = "Play mixes built from your actual Mylo listening.",
+            text = "Play mixes built from your actual listening history.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
