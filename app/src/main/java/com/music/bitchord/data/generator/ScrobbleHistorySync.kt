@@ -1,6 +1,8 @@
 package com.music.bitchord.data.generator
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
@@ -31,6 +33,7 @@ object ScrobbleHistorySync {
     const val STATUS_SUCCESS = "success"
     const val STATUS_NO_DATED_ROWS = "no_dated_rows"
     const val STATUS_WAITING_FOR_SIGN_IN = "waiting_for_sign_in"
+    const val STATUS_WAITING_FOR_WIFI = "waiting_for_wifi"
     const val STATUS_RETRYING = "retrying"
 
     private const val UNIQUE_WORK_NAME = "mylo-youtube-history-sync"
@@ -125,6 +128,13 @@ class ScrobbleHistorySyncWorker(
         if (!prefs.getBoolean(ScrobbleHistorySync.KEY_ENABLED, false)) return Result.success()
 
         val now = System.currentTimeMillis()
+        if (!isOnWifi()) {
+            prefs.edit()
+                .putLong(ScrobbleHistorySync.KEY_LAST_ATTEMPT_AT, now)
+                .putString(ScrobbleHistorySync.KEY_LAST_STATUS, ScrobbleHistorySync.STATUS_WAITING_FOR_WIFI)
+                .apply()
+            return Result.retry()
+        }
         if (Innertube.cookie.isNullOrBlank()) {
             prefs.edit()
                 .putLong(ScrobbleHistorySync.KEY_LAST_ATTEMPT_AT, now)
@@ -181,6 +191,14 @@ class ScrobbleHistorySyncWorker(
             DebugLog.w(TAG, "Background YouTube history sync failed; WorkManager will retry", error)
             Result.retry()
         }
+    }
+
+    private fun isOnWifi(): Boolean {
+        val connectivity = applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE)
+            as? ConnectivityManager ?: return false
+        val network = connectivity.activeNetwork ?: return false
+        val capabilities = connectivity.getNetworkCapabilities(network) ?: return false
+        return capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
     }
 
     private companion object {
