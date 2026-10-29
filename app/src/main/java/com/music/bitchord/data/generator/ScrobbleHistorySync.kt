@@ -19,7 +19,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
 
-/** Explicitly opt-in, network-constrained sync of date-labelled YouTube history. */
+/** Explicitly opt-in, Wi-Fi-constrained sync of date-labelled YouTube history. */
 object ScrobbleHistorySync {
     const val PREFS_NAME = "scrobble_history_sync"
     const val KEY_ENABLED = "youtube_auto_sync_enabled"
@@ -44,10 +44,10 @@ object ScrobbleHistorySync {
             .apply()
 
         val constraints = Constraints.Builder()
-            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .setRequiredNetworkType(NetworkType.UNMETERED)
             .build()
         val workManager = WorkManager.getInstance(appContext)
-        val periodic = PeriodicWorkRequestBuilder<ScrobbleHistorySyncWorker>(12, TimeUnit.HOURS)
+        val periodic = PeriodicWorkRequestBuilder<ScrobbleHistorySyncWorker>(6, TimeUnit.HOURS)
             .setConstraints(constraints)
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.MINUTES)
             .build()
@@ -71,9 +71,9 @@ object ScrobbleHistorySync {
         if (!prefs.getBoolean(KEY_ENABLED, false)) return
 
         val constraints = Constraints.Builder()
-            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .setRequiredNetworkType(NetworkType.UNMETERED)
             .build()
-        val periodic = PeriodicWorkRequestBuilder<ScrobbleHistorySyncWorker>(12, TimeUnit.HOURS)
+        val periodic = PeriodicWorkRequestBuilder<ScrobbleHistorySyncWorker>(6, TimeUnit.HOURS)
             .setConstraints(constraints)
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.MINUTES)
             .build()
