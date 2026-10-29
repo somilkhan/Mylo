@@ -130,6 +130,20 @@ class ScrobbleGeneratorTest {
     }
 
     @Test
+    fun forgetImported_preservesMyloRecordedHistory() {
+        val file = File.createTempFile("mixed-plays", ".tsv")
+        file.deleteOnExit()
+        val store = PlayHistoryStore(file, zone)
+        val own = play("own")
+        val imported = play("external", source = PlaySource.YOUTUBE_MUSIC, exact = false)
+        store.append(listOf(own, imported))
+
+        store.forgetImported()
+
+        assertEquals(listOf(own), store.readAll())
+    }
+
+    @Test
     fun store_roundTripsAndDedupesOnWrite() {
         val file = File.createTempFile("plays", ".tsv")
         file.deleteOnExit()
