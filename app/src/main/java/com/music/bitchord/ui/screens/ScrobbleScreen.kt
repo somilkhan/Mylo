@@ -98,9 +98,9 @@ fun ScrobbleScreen(
         }
     }
 
-    // Refresh when moving between sections and after background sync completes.
-    // This also picks up plays recorded while the overlay was open.
-    LaunchedEffect(selectedSection, lastSyncAt) {
+    // Refresh when moving between sections. Reopening the overlay also reloads
+    // any plays or imported rows added while it was closed.
+    LaunchedEffect(selectedSection) {
         loadingHistory = true
         try {
             historyPlays = withContext(Dispatchers.IO) { ScrobbleHistory.readAll() }
