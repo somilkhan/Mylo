@@ -117,15 +117,17 @@ fun ScrobbleScreen(
 
     DisposableEffect(syncPrefs) {
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { prefs, key ->
-            when (key) {
-                ScrobbleHistorySync.KEY_ENABLED ->
-                    autoSyncEnabled = prefs.getBoolean(ScrobbleHistorySync.KEY_ENABLED, false)
-                ScrobbleHistorySync.KEY_LAST_SYNC_AT ->
-                    lastSyncAt = prefs.getLong(ScrobbleHistorySync.KEY_LAST_SYNC_AT, 0L)
-                ScrobbleHistorySync.KEY_LAST_STATUS ->
-                    lastSyncStatus = prefs.getString(ScrobbleHistorySync.KEY_LAST_STATUS, null)
-                ScrobbleHistorySync.KEY_LAST_ADDED ->
-                    lastSyncAdded = prefs.getInt(ScrobbleHistorySync.KEY_LAST_ADDED, 0)
+            scope.launch {
+                when (key) {
+                    ScrobbleHistorySync.KEY_ENABLED ->
+                        autoSyncEnabled = prefs.getBoolean(ScrobbleHistorySync.KEY_ENABLED, false)
+                    ScrobbleHistorySync.KEY_LAST_SYNC_AT ->
+                        lastSyncAt = prefs.getLong(ScrobbleHistorySync.KEY_LAST_SYNC_AT, 0L)
+                    ScrobbleHistorySync.KEY_LAST_STATUS ->
+                        lastSyncStatus = prefs.getString(ScrobbleHistorySync.KEY_LAST_STATUS, null)
+                    ScrobbleHistorySync.KEY_LAST_ADDED ->
+                        lastSyncAdded = prefs.getInt(ScrobbleHistorySync.KEY_LAST_ADDED, 0)
+                }
             }
         }
         syncPrefs.registerOnSharedPreferenceChangeListener(listener)
