@@ -56,6 +56,20 @@ class ScrobbleGeneratorTest {
     }
 
     @Test
+    fun recentAndTopTracks_ignoreFutureDatedRows() {
+        val plays = listOf(
+            play("past", daysAgo = 1.0),
+            play("future").copy(atMillis = now + day),
+        )
+
+        val recent = ScrobbleGenerator.recent(plays, now, zone, days = 7)
+        val top = ScrobbleGenerator.topTracks(plays, now, zone, windowDays = 7)
+
+        assertEquals(listOf("id:past"), recent.map { it.play.songKey() })
+        assertEquals(listOf("id:past"), top.map { it.play.songKey() })
+    }
+
+    @Test
     fun rediscover_requiresRepeatedPlaysAndAQuietPeriod() {
         val plays = listOf(
             play("rediscover", daysAgo = 120.0),
