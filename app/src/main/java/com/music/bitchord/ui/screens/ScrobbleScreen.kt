@@ -80,8 +80,8 @@ private val GeneratorModes = listOf(
 )
 
 /**
- * Scrobble's UI shell. Navigation is local to this screen; history sources and
- * playlist actions stay unavailable until they are connected to real data.
+ * Scrobble's UI shell. Statistics use Mylo's local aggregates; generated
+ * queues and YouTube Music history use the persisted play-history store.
  */
 @Composable
 fun ScrobbleScreen(
@@ -147,9 +147,15 @@ fun ScrobbleScreen(
         } finally {
             loadingStats = false
         }
+    }
 
+    // Refresh when moving between sections and after background sync completes.
+    // This also picks up plays recorded while the overlay was open.
+    LaunchedEffect(selectedSection, lastSyncAt) {
+        loadingHistory = true
         try {
             historyPlays = withContext(Dispatchers.IO) { ScrobbleHistory.readAll() }
+            historyFailed = false
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {
@@ -289,7 +295,7 @@ private fun LazyListScope.statsSection(
         summary == null || summary.isEmpty -> item(key = "stats-empty") {
             EmptyCard(
                 title = "No Mylo listening data this month yet",
-                body = "Mylo records listening on this device. Play a few tracks and your actual totals and top tracks will appear here. External YouTube Music history import is separate and is not connected yet.",
+                body = "Mylo records listening on this device. Play a few tracks and your actual totals and top tracks will appear here. You can import date-labelled YouTube Music history from Generate.",
             )
         }
         else -> {
