@@ -33,6 +33,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.music.bitchord.data.generator.ScrobbleHistory
 import com.music.bitchord.data.generator.ScrobbleHistorySync
+import java.text.DateFormat
+import java.util.Date
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -88,14 +90,30 @@ fun AccountAndScrobblingScreen(
     var historySyncEnabled by remember(historySyncPrefs) {
         mutableStateOf(historySyncPrefs.getBoolean(ScrobbleHistorySync.KEY_ENABLED, false))
     }
+    var historySyncStatus by remember(historySyncPrefs) {
+        mutableStateOf(historySyncPrefs.getString(ScrobbleHistorySync.KEY_LAST_STATUS, null))
+    }
+    var historyLastSyncAt by remember(historySyncPrefs) {
+        mutableStateOf(historySyncPrefs.getLong(ScrobbleHistorySync.KEY_LAST_SYNC_AT, 0L))
+    }
+    var historyLastAdded by remember(historySyncPrefs) {
+        mutableStateOf(historySyncPrefs.getInt(ScrobbleHistorySync.KEY_LAST_ADDED, 0))
+    }
     var showForgetImportedHistory by remember { mutableStateOf(false) }
     var historyActionMessage by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
     DisposableEffect(historySyncPrefs) {
         val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { prefs, key ->
-            if (key == ScrobbleHistorySync.KEY_ENABLED) {
-                historySyncEnabled = prefs.getBoolean(ScrobbleHistorySync.KEY_ENABLED, false)
+            when (key) {
+                ScrobbleHistorySync.KEY_ENABLED ->
+                    historySyncEnabled = prefs.getBoolean(ScrobbleHistorySync.KEY_ENABLED, false)
+                ScrobbleHistorySync.KEY_LAST_STATUS ->
+                    historySyncStatus = prefs.getString(ScrobbleHistorySync.KEY_LAST_STATUS, null)
+                ScrobbleHistorySync.KEY_LAST_SYNC_AT ->
+                    historyLastSyncAt = prefs.getLong(ScrobbleHistorySync.KEY_LAST_SYNC_AT, 0L)
+                ScrobbleHistorySync.KEY_LAST_ADDED ->
+                    historyLastAdded = prefs.getInt(ScrobbleHistorySync.KEY_LAST_ADDED, 0)
             }
         }
         historySyncPrefs.registerOnSharedPreferenceChangeListener(listener)
@@ -148,7 +166,7 @@ fun AccountAndScrobblingScreen(
             SettingsRow(
                 icon = Icons.Rounded.History,
                 title = "Background history sync",
-                subtitle = if (historySyncEnabled) "Enabled · Wi-Fi only" else "Paused",
+                subtitle = historySyncSubtitle(historySyncEnabled, historySyncStatus, historyLastSyncAt, historyLastAdded),
                 trailing = {
                     Switch(
                         checked = historySyncEnabled,
@@ -450,6 +468,29 @@ fun AccountAndScrobblingScreen(
                 TextButton(onClick = { showForgetImportedHistory = false }) { Text("Cancel") }
             },
         )
+    }
+}
+
+private fun historySyncSubtitle(
+    enabled: Boolean,
+    status: String?,
+    lastSyncAt: Long,
+    lastAdded: Int,
+): String {
+    if (!enabled) return "Paused"
+    return when (status) {
+        ScrobbleHistorySync.STATUS_WAITING_FOR_SIGN_IN ->
+            "Waiting for YouTube Music sign-in"
+        ScrobbleHistorySync.STATUS_RETRYING ->
+            "Sync failed; will retry on Wi-Fi"
+        ScrobbleHistorySync.STATUS_NO_DATED_ROWS ->
+            "No date-labelled rows found on last sync"
+        ScrobbleHistorySync.STATUS_SUCCESS -> {
+            val time = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
+                .format(Date(lastSyncAt))
+            "Wi-Fi only · Last sync $time · $lastAdded new listens"
+        }
+        else -> "Wi-Fi only · Sync about every six hours"
     }
 }
 
