@@ -20,12 +20,19 @@ import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.model.SongMenu
 import com.music.bitchord.data.model.SubscriptionState
 import com.music.bitchord.data.model.UserPlaylist
+import com.music.bitchord.data.model.YtMusicHistoryEntry
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
+import java.time.DayOfWeek
+import java.time.LocalDate
+import java.time.MonthDay
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.TextStyle
 import java.util.Locale
 
 /**
@@ -494,6 +501,96 @@ object InnertubeParser {
         }
         walk(root)
         return out.values.toList()
+    }
+
+    /**
+     * Reads the account history without collapsing repeated rows, carrying the
+     * date heading down to each track. The API does not expose a trustworthy
+     * timestamp per row; unsupported headings are skipped rather than guessed.
+     */
+    fun collectHistoryEntries(
+        root: JsonElement,
+        nowMillis: Long,
+        zone: ZoneId,
+    ): List<YtMusicHistoryEntry> {
+        val today = java.time.Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate()
+        val out = ArrayList<YtMusicHistoryEntry>()
+        val credit = pageCredit(root)
+
+        fun walk(node: JsonElement, inheritedDate: LocalDate?) {
+            when (node) {
+                is JsonObject -> {
+                    val shelf = node["musicShelfRenderer"] as? JsonObject
+                    if (shelf != null) {
+                        val label = shelf.o("title").runs().ifBlank {
+                            shelf.o("header").o("musicHeaderRenderer").o("title").runs()
+                        }
+                        val date = historyDateFromLabel(label, today) ?: inheritedDate
+                        shelf["contents"]?.let { walk(it, date) }
+                        shelf["continuations"]?.let { walk(it, date) }
+                        return
+                    }
+
+                    val row = node["musicResponsiveListItemRenderer"] as? JsonObject
+                    if (row != null) {
+                        val song = parseResponsiveListItem(row, credit)
+                        if (song != null && inheritedDate != null) {
+                            val noon = inheritedDate.atTime(12, 0).atZone(zone).toInstant().toEpochMilli()
+                            // A "Today" bucket can be viewed before noon. Never invent a future listen.
+                            val timestamp = if (inheritedDate == today) minOf(noon, nowMillis) else noon
+                            out += YtMusicHistoryEntry(song, timestamp, exact = false)
+                        }
+                        return
+                    }
+
+                    node.values.forEach { walk(it, inheritedDate) }
+                }
+                is JsonArray -> node.forEach { walk(it, inheritedDate) }
+                else -> Unit
+            }
+        }
+
+        walk(root, null)
+        return out
+    }
+
+    private fun historyDateFromLabel(label: String, today: LocalDate): LocalDate? {
+        val clean = label.trim()
+            .substringBefore(" · ")
+            .substringBefore(" • ")
+            .substringBefore(" (")
+            .trim()
+        when (clean.lowercase(Locale.ROOT)) {
+            "today" -> return today
+            "yesterday" -> return today.minusDays(1)
+        }
+
+        val weekday = DayOfWeek.values().firstOrNull {
+            it.getDisplayName(TextStyle.FULL, Locale.US).equals(clean, ignoreCase = true) ||
+                it.getDisplayName(TextStyle.SHORT, Locale.US).equals(clean, ignoreCase = true)
+        }
+        if (weekday != null) {
+            val difference = (today.dayOfWeek.value - weekday.value + 7) % 7
+            // Weekday-only headings mean the most recent past occurrence; Today has its own label.
+            return today.minusDays((if (difference == 0) 7 else difference).toLong())
+        }
+
+        val explicitPatterns = listOf("MMM d, uuuu", "MMMM d, uuuu", "M/d/uuuu")
+        for (pattern in explicitPatterns) {
+            val parsed = runCatching {
+                LocalDate.parse(clean, DateTimeFormatter.ofPattern(pattern, Locale.US))
+            }.getOrNull()
+            if (parsed != null) return parsed
+        }
+
+        val monthDayPatterns = listOf("MMM d", "MMMM d")
+        for (pattern in monthDayPatterns) {
+            val parsed = runCatching {
+                MonthDay.parse(clean, DateTimeFormatter.ofPattern(pattern, Locale.US)).atYear(today.year)
+            }.getOrNull() ?: continue
+            return if (parsed.isAfter(today)) parsed.minusYears(1) else parsed
+        }
+        return null
     }
 
     /** A playlist page's own tracks, the ones YouTube suggests adding, and the token for the rest. */
