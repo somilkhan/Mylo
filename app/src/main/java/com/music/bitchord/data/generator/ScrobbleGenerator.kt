@@ -34,7 +34,9 @@ object ScrobbleGenerator {
         limit: Int = 25,
         maxPerArtist: Int = 2,
     ): List<Ranked> {
-        val inWindow = plays.filter { nowMillis - it.atMillis <= windowDays * DAY_MS }
+        val inWindow = plays.filter {
+            it.atMillis <= nowMillis && nowMillis - it.atMillis <= windowDays * DAY_MS
+        }
         return rankSongs(inWindow, nowMillis, zone, limit, maxPerArtist) { count ->
             "Played $count times in $windowDays days"
         }
@@ -48,7 +50,9 @@ object ScrobbleGenerator {
         days: Int = 7,
         limit: Int = 25,
     ): List<Ranked> {
-        val inWindow = plays.filter { nowMillis - it.atMillis <= days * DAY_MS }
+        val inWindow = plays.filter {
+            it.atMillis <= nowMillis && nowMillis - it.atMillis <= days * DAY_MS
+        }
         return inWindow
             .groupBy { it.songKey() }
             .map { (_, group) -> group.maxBy { it.atMillis } to group.size }
