@@ -480,7 +480,7 @@ private fun historySyncSubtitle(
     if (!enabled) return "Paused"
     return when (status) {
         ScrobbleHistorySync.STATUS_WAITING_FOR_SIGN_IN ->
-            "Waiting for YouTube Music sign-in"
+            "Reconnect YouTube Music to resume history sync"
         ScrobbleHistorySync.STATUS_WAITING_FOR_WIFI ->
             "Waiting for Wi-Fi"
         ScrobbleHistorySync.STATUS_RETRYING ->
