@@ -21,6 +21,7 @@ import androidx.compose.material.icons.rounded.Explore
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -30,6 +31,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,7 +39,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.music.bitchord.data.YtMusicRepository
 import com.music.bitchord.data.generator.Play
+import com.music.bitchord.data.generator.PlaySource
 import com.music.bitchord.data.generator.ScrobbleGenerator
 import com.music.bitchord.data.generator.ScrobbleHistory
 import com.music.bitchord.data.stats.ListeningStats
@@ -47,6 +51,7 @@ import com.music.bitchord.data.model.Song
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.launch
 import java.time.ZoneId
 
 internal const val SCROBBLE_TAB_STATS = 0
@@ -81,6 +86,9 @@ fun ScrobbleScreen(
     var historyPlays by remember { mutableStateOf<List<Play>>(emptyList()) }
     var loadingHistory by remember { mutableStateOf(true) }
     var historyFailed by remember { mutableStateOf(false) }
+    var importingYouTube by remember { mutableStateOf(false) }
+    var importMessage by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         try {
@@ -136,7 +144,53 @@ fun ScrobbleScreen(
             }
             when (selectedSection) {
                 SCROBBLE_TAB_STATS -> statsSection(summary, loadingStats, statsFailed)
-                SCROBBLE_TAB_GENERATE -> generateSection(summary, loadingStats, historyPlays, loadingHistory, historyFailed, onPlayPlaylist)
+                SCROBBLE_TAB_GENERATE -> generateSection(
+                    summary = summary,
+                    loadingStats = loadingStats,
+                    historyPlays = historyPlays,
+                    loadingHistory = loadingHistory,
+                    historyFailed = historyFailed,
+                    importingYouTube = importingYouTube,
+                    importMessage = importMessage,
+                    onImportYouTubeHistory = {
+                        scope.launch {
+                            importingYouTube = true
+                            importMessage = null
+                            try {
+                                val entries = YtMusicRepository.historyWithDates().getOrThrow()
+                                val incoming = entries.map { entry ->
+                                    Play(
+                                        videoId = entry.song.videoId,
+                                        title = entry.song.title,
+                                        artist = entry.song.artist,
+                                        source = PlaySource.YOUTUBE_MUSIC,
+                                        atMillis = entry.playedAtMillis,
+                                        exact = entry.exact,
+                                        localUri = entry.song.localUri,
+                                    )
+                                }
+                                val result = withContext(Dispatchers.IO) {
+                                    val added = ScrobbleHistory.append(incoming)
+                                    added to ScrobbleHistory.readAll()
+                                }
+                                historyPlays = result.second
+                                historyFailed = false
+                                importMessage = when {
+                                    entries.isEmpty() -> "No date-labelled history rows were recognized; no timestamps were guessed."
+                                    result.first == 0 -> "History is already up to date."
+                                    else -> "Imported ${result.first} new listening entries."
+                                }
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (error: Exception) {
+                                importMessage = "YouTube Music history import failed: ${error.message ?: "check account sign-in"}"
+                            } finally {
+                                importingYouTube = false
+                            }
+                        }
+                    },
+                    onPlayPlaylist = onPlayPlaylist,
+                )
                 SCROBBLE_TAB_PLAYLISTS -> playlistsSection()
                 else -> statsSection(summary, loadingStats, statsFailed)
             }
@@ -273,6 +327,9 @@ private fun LazyListScope.generateSection(
     historyPlays: List<Play>,
     loadingHistory: Boolean,
     historyFailed: Boolean,
+    importingYouTube: Boolean,
+    importMessage: String?,
+    onImportYouTubeHistory: () -> Unit,
     onPlayPlaylist: (String, List<Song>) -> Unit,
 ) {
     val topTracks = summary?.songs?.take(25)?.map { it.song }.orEmpty()
@@ -303,6 +360,30 @@ private fun LazyListScope.generateSection(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+    }
+    item(key = "gen-import-youtube") {
+        Button(
+            onClick = onImportYouTubeHistory,
+            enabled = !importingYouTube,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            if (importingYouTube) {
+                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+            } else {
+                Icon(imageVector = Icons.Rounded.History, contentDescription = null)
+            }
+            Spacer(Modifier.width(8.dp))
+            Text(if (importingYouTube) "Importing YouTube Music history…" else "Import YouTube Music history")
+        }
+    }
+    if (importMessage != null) {
+        item(key = "gen-import-status") {
+            Text(
+                text = importMessage,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
     when {
         loadingStats -> item(key = "gen-loading-stats") {
