@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import com.music.bitchord.data.generator.Play
+import com.music.bitchord.data.generator.PlaySource
 import com.music.bitchord.data.generator.ScrobbleGenerator
 import com.music.bitchord.data.generator.ScrobbleHistory
 import com.music.bitchord.data.stats.ListeningStats
@@ -52,6 +53,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.time.ZoneId
+import java.time.YearMonth
 
 internal const val SCROBBLE_TAB_STATS = 0
 internal const val SCROBBLE_TAB_GENERATE = 1
@@ -144,7 +146,7 @@ fun ScrobbleScreen(
                 }
             }
             when (selectedSection) {
-                SCROBBLE_TAB_STATS -> statsSection(summary, loadingStats, statsFailed)
+                SCROBBLE_TAB_STATS -> statsSection(summary, loadingStats, statsFailed, historyPlays, loadingHistory)
                 SCROBBLE_TAB_GENERATE -> generateSection(
                     summary = summary,
                     loadingStats = loadingStats,
@@ -154,7 +156,7 @@ fun ScrobbleScreen(
                     onPlayPlaylist = onPlayPlaylist,
                 )
                 SCROBBLE_TAB_PLAYLISTS -> playlistsSection()
-                else -> statsSection(summary, loadingStats, statsFailed)
+                else -> statsSection(summary, loadingStats, statsFailed, historyPlays, loadingHistory)
             }
         }
     }
@@ -164,6 +166,8 @@ private fun LazyListScope.statsSection(
     summary: ReplaySummary?,
     loading: Boolean,
     failed: Boolean,
+    historyPlays: List<Play>,
+    loadingHistory: Boolean,
 ) {
     item(key = "stats-title") {
         Text(
@@ -237,6 +241,61 @@ private fun LazyListScope.statsSection(
             }
         }
     }
+
+    item(key = "stats-source-split") {
+        val zone = ZoneId.systemDefault()
+        val currentMonth = YearMonth.now(zone)
+        val monthlyHistory = historyPlays.filter {
+            YearMonth.from(it.localDay(zone)) == currentMonth
+        }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(
+                text = "History source split · This month",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            when {
+                loadingHistory -> Text(
+                    "Loading source history…",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                monthlyHistory.isEmpty() -> Text(
+                    "History fills as you listen in Mylo or enable background YouTube Music sync in Settings.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                else -> {
+                    val sourceCounts = monthlyHistory.groupingBy { it.source }.eachCount()
+                    listOf(
+                        PlaySource.MYLO,
+                        PlaySource.YOUTUBE_MUSIC,
+                        PlaySource.LAST_FM,
+                        PlaySource.LISTENBRAINZ,
+                    ).filter { (sourceCounts[it] ?: 0) > 0 }.forEach { source ->
+                        Text(
+                            text = "${sourceLabel(source)} · ${sourceCounts[source]} listens",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun sourceLabel(source: PlaySource): String = when (source) {
+    PlaySource.MYLO -> "Mylo"
+    PlaySource.YOUTUBE_MUSIC -> "YouTube Music"
+    PlaySource.LAST_FM -> "Last.fm"
+    PlaySource.LISTENBRAINZ -> "ListenBrainz"
 }
 
 @Composable
