@@ -150,8 +150,6 @@ fun ScrobbleScreen(
             when (selectedSection) {
                 SCROBBLE_TAB_STATS -> statsSection(summary, loadingStats, statsFailed, historyPlays, loadingHistory)
                 SCROBBLE_TAB_GENERATE -> generateSection(
-                    summary = summary,
-                    loadingStats = loadingStats,
                     historyPlays = historyPlays,
                     loadingHistory = loadingHistory,
                     historyFailed = historyFailed,
@@ -378,16 +376,20 @@ private fun RowScope.Metric(value: String, label: String) {
 }
 
 private fun LazyListScope.generateSection(
-    summary: ReplaySummary?,
-    loadingStats: Boolean,
     historyPlays: List<Play>,
     loadingHistory: Boolean,
     historyFailed: Boolean,
     onPlayPlaylist: (String, List<Song>) -> Unit,
 ) {
-    val topTracks = summary?.songs?.take(25)?.map { it.song }.orEmpty()
     val zone = ZoneId.systemDefault()
     val now = System.currentTimeMillis()
+    val topTracks = ScrobbleGenerator.topTracks(
+        historyPlays,
+        now,
+        zone,
+        windowDays = 90,
+        limit = 25,
+    ).map { it.play.toSong() }
     val recentSongs = ScrobbleGenerator.recent(historyPlays, now, zone, days = 7, limit = 25)
         .map { it.play.toSong() }
     val rediscoverSongs = ScrobbleGenerator.rediscover(
@@ -415,8 +417,14 @@ private fun LazyListScope.generateSection(
         )
     }
     when {
-        loadingStats -> item(key = "gen-loading-stats") {
-            Text("Loading listening statistics…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        loadingHistory -> item(key = "gen-loading-top-tracks") {
+            Text("Loading top tracks…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        historyFailed -> item(key = "gen-top-tracks-error") {
+            EmptyCard(
+                title = "Couldn't load top tracks",
+                body = "The local history file could not be read. Close and reopen Scrobble to retry.",
+            )
         }
         topTracks.isNotEmpty() -> item(key = "gen-play-top-tracks") {
             Button(
@@ -427,6 +435,12 @@ private fun LazyListScope.generateSection(
                 Spacer(Modifier.width(8.dp))
                 Text("Play top tracks")
             }
+        }
+        else -> item(key = "gen-top-tracks-empty") {
+            Text(
+                "Top tracks appear after Mylo or YouTube Music listening is recorded.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
     when {
