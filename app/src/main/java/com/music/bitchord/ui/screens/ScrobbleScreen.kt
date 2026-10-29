@@ -54,6 +54,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.time.ZoneId
 import java.time.YearMonth
+import java.text.DateFormat
+import java.util.Date
 
 internal const val SCROBBLE_TAB_STATS = 0
 internal const val SCROBBLE_TAB_GENERATE = 1
@@ -242,12 +244,12 @@ private fun LazyListScope.statsSection(
         }
     }
 
+    val zone = ZoneId.systemDefault()
+    val currentMonth = YearMonth.now(zone)
+    val monthlyHistory = historyPlays.filter {
+        YearMonth.from(it.localDay(zone)) == currentMonth
+    }
     item(key = "stats-source-split") {
-        val zone = ZoneId.systemDefault()
-        val currentMonth = YearMonth.now(zone)
-        val monthlyHistory = historyPlays.filter {
-            YearMonth.from(it.localDay(zone)) == currentMonth
-        }
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -287,6 +289,39 @@ private fun LazyListScope.statsSection(
                     }
                 }
             }
+        }
+    }
+
+    item(key = "stats-recent-history-heading") {
+        Text(
+            text = "Recent listens",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+    }
+    when {
+        loadingHistory -> item(key = "stats-recent-history-loading") {
+            Text("Loading recent listens…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        monthlyHistory.isEmpty() -> item(key = "stats-recent-history-empty") {
+            Text(
+                "No listens recorded in the local history for this month.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        else -> items(
+            monthlyHistory.sortedByDescending { it.atMillis }.take(10),
+            key = { "history-${it.source}-${it.songKey()}-${it.atMillis}" },
+        ) { play ->
+            val date = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
+                .format(Date(play.atMillis))
+            ScrobbleRow(
+                title = play.title.ifBlank { "Unknown track" },
+                subtitle = "${play.artist.ifBlank { "Unknown artist" }} · ${sourceLabel(play.source)} · ${if (play.exact) "Exact" else "Approx."} · $date",
+                leadingIcon = Icons.Rounded.History,
+            )
         }
     }
 }
