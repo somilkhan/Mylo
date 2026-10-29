@@ -31,10 +31,22 @@ class PlayHistoryStore(private val file: File, private val zone: ZoneId = ZoneId
         return added
     }
 
-    /** Removes everything. */
+    /** Removes everything, including Mylo's own playback history. */
     @Synchronized
     fun forget() {
         if (file.exists()) file.delete()
+    }
+
+    /** Removes imported rows while preserving plays recorded by Mylo itself. */
+    @Synchronized
+    fun forgetImported() {
+        if (!file.exists()) return
+        val retained = readAll().filter { it.source == PlaySource.MYLO }
+        if (retained.isEmpty()) {
+            file.delete()
+        } else {
+            file.writeText(retained.joinToString("\\n", postfix = "\\n") { encode(it) })
+        }
     }
 
     private fun encode(p: Play): String =
@@ -83,6 +95,8 @@ object ScrobbleHistory {
     fun readAll(): List<Play> = requireStore().readAll()
 
     fun forget() = requireStore().forget()
+
+    fun forgetImported() = requireStore().forgetImported()
 
     private fun requireStore(): PlayHistoryStore =
         checkNotNull(store) { "ScrobbleHistory must be initialized by the application first" }
