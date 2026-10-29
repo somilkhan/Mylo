@@ -155,6 +155,17 @@ class ScrobbleHistorySyncWorker(
                 val error = response.exceptionOrNull()
                     ?: IllegalStateException("YouTube history import failed without an exception")
                 if (error is CancellationException) throw error
+                if (isAuthenticationFailure(error)) {
+                    prefs.edit()
+                        .putLong(ScrobbleHistorySync.KEY_LAST_ATTEMPT_AT, now)
+                        .putString(
+                            ScrobbleHistorySync.KEY_LAST_STATUS,
+                            ScrobbleHistorySync.STATUS_WAITING_FOR_SIGN_IN,
+                        )
+                        .apply()
+                    DebugLog.w(TAG, "YouTube history sync needs the account to reconnect", error)
+                    return Result.success()
+                }
                 prefs.edit()
                     .putLong(ScrobbleHistorySync.KEY_LAST_ATTEMPT_AT, now)
                     .putString(ScrobbleHistorySync.KEY_LAST_STATUS, ScrobbleHistorySync.STATUS_RETRYING)
@@ -197,6 +208,22 @@ class ScrobbleHistorySyncWorker(
             DebugLog.w(TAG, "Background YouTube history sync failed; WorkManager will retry", error)
             Result.retry()
         }
+    }
+
+    private fun isAuthenticationFailure(error: Throwable): Boolean {
+        var current: Throwable? = error
+        while (current != null) {
+            val message = current.message.orEmpty().lowercase()
+            if (
+                message.contains("http 401") ||
+                message.contains("http 403") ||
+                message.contains("unauthorized") ||
+                message.contains("authentication required") ||
+                message.contains("sign in to continue")
+            ) return true
+            current = current.cause
+        }
+        return false
     }
 
     private fun isOnWifi(): Boolean {
