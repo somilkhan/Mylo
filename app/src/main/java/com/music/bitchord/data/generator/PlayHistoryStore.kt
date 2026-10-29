@@ -45,7 +45,7 @@ class PlayHistoryStore(private val file: File, private val zone: ZoneId = ZoneId
         if (retained.isEmpty()) {
             file.delete()
         } else {
-            file.writeText(retained.joinToString("\\n", postfix = "\\n") { encode(it) })
+            file.writeText(retained.joinToString("\n", postfix = "\n") { encode(it) })
         }
     }
 
