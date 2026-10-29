@@ -82,6 +82,12 @@ object ScrobbleHistorySync {
     fun ensurePeriodic(context: Context) {
         val appContext = context.applicationContext
         val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        if (!prefs.contains(KEY_ENABLED) && !Innertube.cookie.isNullOrBlank()) {
+            // Existing signed-in installs get the same silent first import as a
+            // fresh login after this feature is added.
+            schedule(appContext)
+            return
+        }
         if (!prefs.getBoolean(KEY_ENABLED, false)) return
 
         val constraints = Constraints.Builder()
