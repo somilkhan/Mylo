@@ -23,6 +23,7 @@ import com.music.bitchord.data.model.ShelfItem
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.model.SongMenu
 import com.music.bitchord.data.model.UserPlaylist
+import com.music.bitchord.data.model.YtMusicHistoryEntry
 import com.music.bitchord.data.sources.TrackMatcher
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -31,6 +32,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonObject
+import java.time.ZoneId
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 
@@ -149,6 +151,18 @@ object YtMusicRepository {
      * whereas this is the page you open when twenty is not enough.
      */
     suspend fun history(): Result<List<Song>> = call("history") { fetchHistory() }
+
+    /**
+     * The same account feed, retaining the date group each row belongs to.
+     * Times are approximate day anchors because Innertube does not provide a
+     * reliable timestamp per history row.
+     */
+    suspend fun historyWithDates(
+        nowMillis: Long = System.currentTimeMillis(),
+        zone: ZoneId = ZoneId.systemDefault(),
+    ): Result<List<YtMusicHistoryEntry>> = call("history:dated") {
+        InnertubeParser.collectHistoryEntries(Innertube.browse(HISTORY), nowMillis, zone)
+    }
 
     /** Account listening history for the Recents feed. */
     suspend fun recents(): Result<List<Song>> = call("recents") {
