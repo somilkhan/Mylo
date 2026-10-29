@@ -193,7 +193,7 @@ private fun LazyListScope.statsSection(
         summary == null || summary.isEmpty -> item(key = "stats-empty") {
             EmptyCard(
                 title = "No Mylo listening data this month yet",
-                body = "Mylo records listening on this device. Play a few tracks and your actual totals and top tracks will appear here. You can import date-labelled YouTube Music history from Generate.",
+                body = "Mylo records listening on this device. Play a few tracks and your actual totals and top tracks will appear here. Enable background history sync in Settings to add date-labelled YouTube Music listens silently.",
             )
         }
         else -> {
