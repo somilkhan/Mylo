@@ -317,6 +317,7 @@ import com.music.bitchord.ui.screens.LibraryScreen
 import com.music.bitchord.ui.screens.MoodGenrePlaylistsScreen
 import com.music.bitchord.ui.screens.SearchScreen
 import com.music.bitchord.ui.screens.ScrobbleScreen
+import com.music.bitchord.data.generator.ScrobbleHistorySync
 import com.music.bitchord.data.settings.SongSort
 import com.music.bitchord.ui.onboarding.OnboardingScreen
 import com.music.bitchord.ui.replay.ReplayScreen
@@ -5044,7 +5045,12 @@ private fun BitChordApp(
                                 confirmingProfile = false
                                 if (accepted) {
                                     webSession = null
-                                    if (mode == WebSessionMode.SIGN_IN) selectedTab = 2
+                                    if (mode == WebSessionMode.SIGN_IN) {
+                                        selectedTab = 2
+                                        // First history sync is silent and Wi-Fi-only.
+                                        // The Settings toggle can disable it at any time.
+                                        ScrobbleHistorySync.schedule(context)
+                                    }
                                 } else {
                                     captureFailed = true
                                 }
