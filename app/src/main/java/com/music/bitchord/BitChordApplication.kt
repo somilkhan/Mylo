@@ -143,7 +143,6 @@ class BitChordApplication : Application(), SingletonImageLoader.Factory {
         ListeningStats.init(this)
         // Shared private history used by the Scrobble generator and playback recorder.
         ScrobbleHistory.init(this)
-        ScrobbleHistorySync.ensurePeriodic(this)
         // After AppSettings, whose switch decides whether half of it runs.
         ArtistFacts.init(this)
         // One cache directory can only be opened once per process, and
@@ -171,6 +170,8 @@ class BitChordApplication : Application(), SingletonImageLoader.Factory {
         // The public "apps open right now" count; see Presence.
         com.music.bitchord.data.presence.AndroidPresence.install(this)
         backgroundInit.join()
+        // Schedule only after the shared Innertube client and startup stores are ready.
+        ScrobbleHistorySync.ensurePeriodic(this)
     }
 
     /**
