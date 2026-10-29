@@ -573,16 +573,25 @@ private fun backgroundSyncStatusText(
     lastSyncAt: Long,
     lastAdded: Int,
     enabled: Boolean,
-): String = when (status) {
-    ScrobbleHistorySync.STATUS_SUCCESS ->
-        "Last background sync: ${DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(lastSyncAt))} · $lastAdded new listens"
-    ScrobbleHistorySync.STATUS_NO_DATED_ROWS ->
-        "Last sync found no date-labelled history rows; unsupported date groups were skipped."
-    ScrobbleHistorySync.STATUS_WAITING_FOR_SIGN_IN ->
-        "Waiting for Mylo's YouTube Music sign-in. Sync will check again on the next interval."
-    ScrobbleHistorySync.STATUS_RETRYING ->
-        "Background sync failed; it will retry when a network is available."
-    else -> if (enabled) "Background sync is enabled; waiting for the first run." else "Background sync is off."
+): String {
+    if (!enabled) {
+        return if (lastSyncAt > 0L) {
+            "Background sync is off. Last successful sync: ${DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(lastSyncAt))} · $lastAdded new listens"
+        } else {
+            "Background sync is off."
+        }
+    }
+    return when (status) {
+        ScrobbleHistorySync.STATUS_SUCCESS ->
+            "Last background sync: ${DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(lastSyncAt))} · $lastAdded new listens"
+        ScrobbleHistorySync.STATUS_NO_DATED_ROWS ->
+            "Last sync found no date-labelled history rows; unsupported date groups were skipped."
+        ScrobbleHistorySync.STATUS_WAITING_FOR_SIGN_IN ->
+            "Waiting for Mylo's YouTube Music sign-in. Sync will check again on the next interval."
+        ScrobbleHistorySync.STATUS_RETRYING ->
+            "Background sync failed; it will retry when a network is available."
+        else -> "Background sync is enabled; waiting for the first run."
+    }
 }
 
 private fun Play.toSong(): Song = Song(
