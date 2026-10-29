@@ -5049,7 +5049,7 @@ private fun BitChordApp(
                                         selectedTab = 2
                                         // First history sync is silent and Wi-Fi-only.
                                         // The Settings toggle can disable it at any time.
-                                        ScrobbleHistorySync.schedule(context)
+                                        ScrobbleHistorySync.onLogin(context)
                                     }
                                 } else {
                                     captureFailed = true
