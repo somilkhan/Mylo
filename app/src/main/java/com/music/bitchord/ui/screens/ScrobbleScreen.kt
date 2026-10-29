@@ -305,14 +305,14 @@ private fun LazyListScope.statsSection(
         loadingHistory -> item(key = "stats-recent-history-loading") {
             Text("Loading recent listens…", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        monthlyHistory.isEmpty() -> item(key = "stats-recent-history-empty") {
+        historyPlays.isEmpty() -> item(key = "stats-recent-history-empty") {
             Text(
-                "No listens recorded in the local history for this month.",
+                "No listens have been recorded in the local history yet.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         else -> items(
-            monthlyHistory.sortedByDescending { it.atMillis }.take(10),
+            historyPlays.sortedByDescending { it.atMillis }.take(10),
             key = { "history-${it.source}-${it.songKey()}-${it.atMillis}" },
         ) { play ->
             val date = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
