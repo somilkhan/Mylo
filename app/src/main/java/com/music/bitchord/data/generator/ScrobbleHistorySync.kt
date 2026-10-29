@@ -36,6 +36,17 @@ object ScrobbleHistorySync {
     private const val UNIQUE_WORK_NAME = "mylo-youtube-history-sync"
     private const val IMMEDIATE_WORK_NAME = "$UNIQUE_WORK_NAME-immediate"
 
+    /**
+     * Start a silent import on first successful sign-in. Once the listener has
+     * explicitly disabled sync, subsequent sign-ins must respect that choice.
+     */
+    fun onLogin(context: Context) {
+        val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        if (!prefs.contains(KEY_ENABLED) || prefs.getBoolean(KEY_ENABLED, false)) {
+            schedule(context)
+        }
+    }
+
     fun schedule(context: Context) {
         val appContext = context.applicationContext
         appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
