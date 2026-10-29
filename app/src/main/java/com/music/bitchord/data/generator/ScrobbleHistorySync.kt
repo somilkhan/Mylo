@@ -126,6 +126,7 @@ class ScrobbleHistorySyncWorker(
             val response = YtMusicRepository.historyWithDates()
             if (response.isFailure) {
                 val error = response.exceptionOrNull()
+                    ?: IllegalStateException("YouTube history import failed without an exception")
                 if (error is CancellationException) throw error
                 prefs.edit()
                     .putLong(ScrobbleHistorySync.KEY_LAST_ATTEMPT_AT, now)
