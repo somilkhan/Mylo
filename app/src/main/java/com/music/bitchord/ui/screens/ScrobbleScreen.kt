@@ -45,6 +45,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import com.music.bitchord.data.YtMusicRepository
 import com.music.bitchord.data.generator.Play
 import com.music.bitchord.data.generator.PlaySource
@@ -232,9 +234,9 @@ fun ScrobbleScreen(
                                 historyPlays = result.second
                                 historyFailed = false
                                 importMessage = when {
-                                    entries.isEmpty() -> "No date-labelled history rows were recognized; no timestamps were guessed."
+                                    entries.isEmpty() -> "No date-labelled rows were recognized on the available history page; no timestamps were guessed."
                                     result.first == 0 -> "History is already up to date."
-                                    else -> "Imported ${result.first} new listening entries."
+                                    else -> "Imported ${result.first} new listening entries from the available history page."
                                 }
                             } catch (cancelled: CancellationException) {
                                 throw cancelled
@@ -468,7 +470,11 @@ private fun LazyListScope.generateSection(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Switch(checked = autoSyncEnabled, onCheckedChange = onAutoSyncChange)
+            Switch(
+                checked = autoSyncEnabled,
+                onCheckedChange = onAutoSyncChange,
+                modifier = Modifier.semantics { contentDescription = "Background sync" },
+            )
         }
     }
     item(key = "gen-background-sync-status") {
