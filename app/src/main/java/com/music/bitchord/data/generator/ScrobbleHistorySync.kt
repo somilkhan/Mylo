@@ -206,6 +206,7 @@ object ScrobbleHistorySync {
             schedule(appContext)
             return
         }
+        if (prefs.getBoolean(KEY_SIGNED_OUT, false)) return
         if (!prefs.getBoolean(KEY_ENABLED, false)) return
 
         val constraints = Constraints.Builder()
