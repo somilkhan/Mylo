@@ -30,4 +30,17 @@ class InnertubeParserApiErrorTest {
         assertTrue(failure is IllegalStateException)
         assertTrue(failure!!.isYouTubeAuthenticationFailure())
     }
+
+    @Test
+    fun moodAndGenresApiErrorIsNotParsedAsAnEmptyExplorePage() {
+        val response = Json.parseToJsonElement(
+            """{"error":{"code":503,"status":"SERVICE_UNAVAILABLE","message":"Try again later"}}""",
+        ).let { it as kotlinx.serialization.json.JsonObject }
+
+        val failure = runCatching { InnertubeParser.parseMoodAndGenres(response) }.exceptionOrNull()
+
+        assertTrue("API errors must remain failures instead of empty Explore sections", failure is IllegalStateException)
+        assertTrue(failure!!.message.orEmpty().contains("SERVICE_UNAVAILABLE"))
+        assertTrue(failure.message.orEmpty().contains("503"))
+    }
 }

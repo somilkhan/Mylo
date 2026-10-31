@@ -36,7 +36,7 @@ Backend CI runs these checks using the Go version declared in `backend/go.mod`. 
 - Never log cookies, SAPISID values, account tokens or imported listening rows. Imported history remains local and must not be exported through backup/device-transfer rules.
 
 Useful regression coverage: `AuthCookieTest`, `AccountSessionsTest`, and `ScrobbleSessionIdentityTest`. Verify Android unit tests and the exact PR-head CI run; device checks are still required for real session expiry, sign-out, account switching and background scheduling.
-- Innertube browse responses can carry a top-level `error` object with HTTP 200. Detect that envelope before parsing history; never turn an API error into a successful empty-history sync. Preserve the API code/status so the worker can pause for authentication recovery.
+- Innertube browse responses can carry a top-level `error` object with HTTP 200. Every browse-response parser (home, continuation, mood/genre, history, and endpoint-specific parsers) must reject that envelope before reading content and preserve its code/status. Repository layers must not swallow transport or API failures into successful empty feeds when the UI or worker needs to distinguish unavailable data from a genuinely empty result. In particular, never turn an API error into an empty-history sync; preserve authentication status so the worker can pause for reconnect.
 
 
 ## Existing history-import provider contracts

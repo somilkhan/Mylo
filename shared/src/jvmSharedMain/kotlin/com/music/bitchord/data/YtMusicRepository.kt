@@ -258,8 +258,9 @@ object YtMusicRepository {
 
         if (exploreSongs.isNotEmpty()) return@call exploreSongs
 
-        // 5. Fallback if everything was filtered out
-        allHomeTrackSongs.ifEmpty { exploreSongs }
+        // 5. No unplayed recommendations are available. Never reintroduce
+        // listening-history tracks after the exclusion filter has run.
+        emptyList()
     }
 
     private const val HISTORY = "FEmusic_history"

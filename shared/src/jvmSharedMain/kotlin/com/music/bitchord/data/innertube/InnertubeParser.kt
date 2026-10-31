@@ -245,6 +245,7 @@ object InnertubeParser {
      * section's button, with the English title as a backstop.
      */
     fun parseMoodAndGenres(response: JsonObject): List<MoodGenreSection> {
+        requireNoApiError(response, "moods and genres")
         val sections = response.o("contents")
             .o("singleColumnBrowseResultsRenderer").a("tabs")?.firstOrNull()
             .o("tabRenderer").o("content").o("sectionListRenderer").a("contents")
