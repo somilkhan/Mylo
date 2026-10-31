@@ -167,7 +167,7 @@ object YtMusicRepository {
     /** Account listening history for the Recents feed. */
     suspend fun recents(): Result<List<Song>> = call("recents") {
         if (Innertube.cookie != null) {
-            val history = runCatching { fetchHistory() }.getOrDefault(emptyList())
+            val history = fetchRecentHistory(Innertube.cookie) { fetchHistory() }
             if (history.isNotEmpty()) return@call history
         }
         emptyList()
@@ -1082,3 +1082,12 @@ object YtMusicRepository {
                 .onFailure { Log.w(TAG, "$label failed: ${it.message}") }
         }
 }
+
+/**
+ * Read account history only for an authenticated session. A failed request is
+ * deliberately propagated: an unavailable history feed is not an empty one.
+ */
+internal suspend fun <T> fetchRecentHistory(
+    cookie: String?,
+    fetch: suspend () -> List<T>,
+): List<T> = if (cookie == null) emptyList() else fetch()
