@@ -27,9 +27,11 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -41,6 +43,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import com.music.bitchord.data.YtMusicRepository
 import com.music.bitchord.data.generator.Play
 import com.music.bitchord.data.generator.PlaySource
 import com.music.bitchord.data.generator.ScrobbleGenerator
@@ -61,16 +64,6 @@ internal const val SCROBBLE_TAB_STATS = 0
 internal const val SCROBBLE_TAB_GENERATE = 1
 internal const val SCROBBLE_TAB_PLAYLISTS = 2
 
-private data class GeneratorMode(val title: String, val subtitle: String, val group: String)
-
-private val GeneratorModes = listOf(
-    GeneratorMode("Song radio", "Starts from one song you pick", "Discover"),
-    GeneratorMode("Similar artists", "Artists close to your top list", "Discover"),
-    GeneratorMode("Never heard", "New to you, close to your taste", "Discover"),
-    GeneratorMode("My mix", "Mylo plays and YouTube, blended", "Mood"),
-    GeneratorMode("By genre", "Needs genre tags, not confirmed yet", "Mood"),
-)
-
 /**
  * Scrobble's UI shell. Statistics use Mylo's local aggregates; generated
  * queues and YouTube Music history use the persisted play-history store.
@@ -81,6 +74,7 @@ fun ScrobbleScreen(
     bottomPadding: Dp,
     onSectionChange: (Int) -> Unit,
     onPlayPlaylist: (String, List<Song>) -> Unit,
+    onBrowseMoods: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var summary by remember { mutableStateOf<ReplaySummary?>(null) }
@@ -89,6 +83,13 @@ fun ScrobbleScreen(
     var historyPlays by remember { mutableStateOf<List<Play>>(emptyList()) }
     var loadingHistory by remember { mutableStateOf(true) }
     var historyFailed by remember { mutableStateOf(false) }
+    var recommendationRequest by remember { mutableIntStateOf(0) }
+    var lastRecommendationRequest by remember { mutableIntStateOf(-1) }
+    var recommendedSongs by remember { mutableStateOf<List<Song>>(emptyList()) }
+    var loadingRecommendations by remember { mutableStateOf(false) }
+    var recommendationsReady by remember { mutableStateOf(false) }
+    var recommendationsFailed by remember { mutableStateOf(false) }
+
     LaunchedEffect(Unit) {
         try {
             summary = ListeningStats.summary(ReplayPeriod.THIS_MONTH)
@@ -116,6 +117,44 @@ fun ScrobbleScreen(
             historyFailed = true
         } finally {
             loadingHistory = false
+        }
+    }
+
+    LaunchedEffect(selectedSection, historyPlays, loadingHistory, recommendationRequest) {
+        if (
+            selectedSection != SCROBBLE_TAB_GENERATE ||
+            loadingHistory ||
+            recommendationRequest == lastRecommendationRequest
+        ) return@LaunchedEffect
+
+        lastRecommendationRequest = recommendationRequest
+        loadingRecommendations = true
+        recommendationsReady = false
+        recommendationsFailed = false
+        try {
+            val excludedIds = historyPlays.mapNotNull { play ->
+                play.videoId.takeIf { it.isNotBlank() }
+            }.toSet()
+            val result = YtMusicRepository.quickPicks(excludedIds)
+            val error = result.exceptionOrNull()
+            if (error != null) {
+                if (error is CancellationException) throw error
+                recommendationsFailed = true
+            } else {
+                recommendedSongs = result.getOrNull().orEmpty()
+                    .asSequence()
+                    .filter { it.videoId.isNotBlank() }
+                    .distinctBy { it.videoId }
+                    .toList()
+                recommendationsReady = true
+            }
+        } catch (cancelled: CancellationException) {
+            lastRecommendationRequest = -1
+            throw cancelled
+        } catch (_: Exception) {
+            recommendationsFailed = true
+        } finally {
+            loadingRecommendations = false
         }
     }
 
@@ -153,7 +192,13 @@ fun ScrobbleScreen(
                     historyPlays = historyPlays,
                     loadingHistory = loadingHistory,
                     historyFailed = historyFailed,
+                    recommendations = recommendedSongs,
+                    loadingRecommendations = loadingRecommendations,
+                    recommendationsReady = recommendationsReady,
+                    recommendationsFailed = recommendationsFailed,
+                    onRetryRecommendations = { recommendationRequest += 1 },
                     onPlayPlaylist = onPlayPlaylist,
+                    onBrowseMoods = onBrowseMoods,
                 )
                 SCROBBLE_TAB_PLAYLISTS -> playlistsSection()
                 else -> statsSection(summary, loadingStats, statsFailed, historyPlays, loadingHistory)
@@ -379,7 +424,13 @@ private fun LazyListScope.generateSection(
     historyPlays: List<Play>,
     loadingHistory: Boolean,
     historyFailed: Boolean,
+    recommendations: List<Song>,
+    loadingRecommendations: Boolean,
+    recommendationsReady: Boolean,
+    recommendationsFailed: Boolean,
+    onRetryRecommendations: () -> Unit,
     onPlayPlaylist: (String, List<Song>) -> Unit,
+    onBrowseMoods: () -> Unit,
 ) {
     val zone = ZoneId.systemDefault()
     val now = System.currentTimeMillis()
@@ -486,30 +537,126 @@ private fun LazyListScope.generateSection(
             }
         }
     }
-    listOf("Discover", "Mood").forEach { group ->
-        item(key = "gen-group-$group") {
-            Text(
-                text = group.uppercase(),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 8.dp),
-            )
+    item(key = "gen-discover-heading") {
+        Text(
+            text = "Discover",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+    }
+    when {
+        loadingRecommendations -> item(key = "gen-discover-loading") {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                Text(
+                    "Finding recommendations from YouTube Music…",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
-        items(
-            GeneratorModes.filter { it.group == group },
-            key = { "gen-${it.title}" },
-        ) { mode ->
-            ScrobbleRow(
-                title = mode.title,
-                subtitle = if (mode.title == "By genre") {
-                    "${mode.subtitle} · Unavailable until genre metadata is connected"
-                } else {
-                    "${mode.subtitle} · Requires a recommendation source that is not connected yet"
-                },
-                leadingIcon = Icons.Rounded.Explore,
-            )
+        recommendationsFailed -> {
+            item(key = "gen-discover-error") {
+                EmptyCard(
+                    title = "Recommendations unavailable",
+                    body = "YouTube Music couldn't load discovery picks. Check your connection and try again.",
+                )
+            }
+            item(key = "gen-discover-retry") {
+                TextButton(onClick = onRetryRecommendations) { Text("Try again") }
+            }
+        }
+        recommendationsReady && recommendations.isEmpty() -> {
+            item(key = "gen-discover-empty") {
+                EmptyCard(
+                    title = "No new recommendations",
+                    body = "YouTube Music didn't return playable tracks outside your recorded listening history.",
+                )
+            }
+            item(key = "gen-discover-refresh-empty") {
+                TextButton(onClick = onRetryRecommendations) { Text("Refresh recommendations") }
+            }
+        }
+        recommendationsReady -> {
+            item(key = "gen-discover-play") {
+                Button(
+                    onClick = { onPlayPlaylist("Discover", recommendations) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(imageVector = Icons.Rounded.Explore, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Play discovery picks")
+                }
+            }
+            item(key = "gen-discover-refresh") {
+                TextButton(onClick = onRetryRecommendations) { Text("Refresh recommendations") }
+            }
+            val myMix = interleaveScrobbleMix(topTracks, recommendations)
+            if (topTracks.isNotEmpty() && recommendations.isNotEmpty() && myMix.isNotEmpty()) {
+                item(key = "gen-my-mix") {
+                    Button(
+                        onClick = { onPlayPlaylist("My mix", myMix) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(imageVector = Icons.Rounded.PlayArrow, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Play My mix")
+                    }
+                }
+            }
         }
     }
+    item(key = "gen-mood-heading") {
+        Text(
+            text = "Mood & genres",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+    }
+    item(key = "gen-browse-moods") {
+        Button(
+            onClick = onBrowseMoods,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Icon(imageVector = Icons.Rounded.Explore, contentDescription = null)
+            Spacer(Modifier.width(8.dp))
+            Text("Browse moods & genres")
+        }
+    }
+}
+
+/**
+ * Alternates familiar tracks with fresh recommendations while preserving each
+ * playable identity. Local files use their URI; catalogue tracks use videoId.
+ */
+internal fun interleaveScrobbleMix(
+    topTracks: List<Song>,
+    recommendations: List<Song>,
+    limit: Int = 25,
+): List<Song> {
+    if (limit <= 0) return emptyList()
+    val mixed = ArrayList<Song>(minOf(limit, topTracks.size + recommendations.size))
+    val seen = HashSet<String>()
+
+    fun append(song: Song?) {
+        if (song == null || mixed.size >= limit) return
+        val identity = song.localUri?.takeIf { it.isNotBlank() }?.let { "local:$it" }
+            ?: song.videoId.takeIf { it.isNotBlank() }?.let { "video:$it" }
+            ?: return
+        if (seen.add(identity)) mixed += song
+    }
+
+    var index = 0
+    while (mixed.size < limit && (index < topTracks.size || index < recommendations.size)) {
+        append(topTracks.getOrNull(index))
+        append(recommendations.getOrNull(index))
+        index++
+    }
+    return mixed
 }
 
 private fun Play.toSong(): Song = Song(

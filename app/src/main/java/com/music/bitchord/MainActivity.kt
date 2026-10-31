@@ -2776,6 +2776,11 @@ private fun BitChordApp(
                                     )
                                 }
                             },
+                            onBrowseMoods = {
+                                showScrobble = false
+                                viewModel.closeMoodGenre()
+                                selectedTab = TAB_EXPLORE
+                            },
                         )
                     } else if (key == "replay") {
                         ReplayScreen(
