@@ -76,6 +76,29 @@ class YtMusicHistoryParserTest {
         assertTrue(failure!!.isYouTubeAuthenticationFailure())
     }
 
+
+    @Test
+    fun explicitFutureDateBucketIsNotImported() {
+        val json = Json.parseToJsonElement(
+            """
+            {
+              "contents": [
+                {
+                  "musicShelfRenderer": {
+                    "title": {"runs": [{"text": "Nov 3, 2026"}]},
+                    "contents": [${row("future", "Future Track", "Future Artist")}]
+                  }
+                }
+              ]
+            }
+            """.trimIndent(),
+        )
+
+        val entries = InnertubeParser.collectHistoryEntries(json, now, zone)
+
+        assertTrue(entries.isEmpty())
+    }
+
     private fun row(id: String, title: String, artist: String): String =
         """
         {

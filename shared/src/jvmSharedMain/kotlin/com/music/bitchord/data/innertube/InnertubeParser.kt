@@ -553,7 +553,7 @@ object InnertubeParser {
                     val row = node["musicResponsiveListItemRenderer"] as? JsonObject
                     if (row != null) {
                         val song = parseResponsiveListItem(row, credit)
-                        if (song != null && inheritedDate != null) {
+                        if (song != null && inheritedDate != null && !inheritedDate.isAfter(today)) {
                             val noon = inheritedDate.atTime(12, 0).atZone(zone).toInstant().toEpochMilli()
                             // A "Today" bucket can be viewed before noon. Never invent a future listen.
                             val timestamp = if (inheritedDate == today) minOf(noon, nowMillis) else noon
