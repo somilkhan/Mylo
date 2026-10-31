@@ -48,10 +48,7 @@ import kotlin.math.min
  */
 object ListeningRecorder {
 
-    private var currentId: String? = null
-    private var lastSampleAt: Long = 0L
-    private var playedThisTrack: Long = 0L
-    private var playCounted = false
+    private val playClock = ListeningPlayClock()
     private var samplesSinceFlush = 0
 
     /**
@@ -61,43 +58,41 @@ object ListeningRecorder {
      * runtime stands in until it does, and a track with neither simply has to
      * clear the thirty-second floor to count as a play.
      */
+    /**
+     * Called by Media3 when the track first becomes audible. Unlike the progress
+     * sampler, this event is not delayed by its five-second sampling interval.
+     * Repeated notifications for the same uninterrupted track do not reset it.
+     */
+    @Synchronized
+    fun onStarted(song: Song, atMillis: Long = System.currentTimeMillis()) {
+        val trackIdentity = song.localUri?.takeIf { it.isNotBlank() } ?: song.videoId
+        playClock.start(trackIdentity, atMillis)
+    }
+
     @Synchronized
     fun onSample(song: Song, durationMs: Long) {
         val now = System.currentTimeMillis()
         val trackIdentity = song.localUri?.takeIf { it.isNotBlank() } ?: song.videoId
-        if (trackIdentity != currentId) {
-            // A new track anchors the clock and contributes nothing yet — see
-            // the class note on undercounting. Local files use their URI when
-            // they have no YouTube video id, so adjacent files remain distinct.
-            currentId = trackIdentity
-            lastSampleAt = now
-            playedThisTrack = 0L
-            playCounted = false
-            return
-        }
-        val step = (now - lastSampleAt).coerceIn(0L, MAX_STEP_MS)
-        lastSampleAt = now
-        if (step <= 0L) return
-        playedThisTrack += step
-
         val length = durationMs.takeIf { it > 0 } ?: song.durationMillis()
         val threshold = if (length > 0) {
             min(length / 2, PLAY_CEILING_MS).coerceAtLeast(PLAY_FLOOR_MS)
         } else {
             PLAY_FLOOR_MS
         }
-        val counts = !playCounted && playedThisTrack >= threshold
-        if (counts) playCounted = true
+        val sample = playClock.sample(trackIdentity, now, threshold)
+        val step = sample.elapsedMillis
+        if (step <= 0L) return
+        val counts = sample.playStartedAtMillis != null
 
         ListeningStats.record(enriched(song), step, counts)
 
-        if (counts) {
+        sample.playStartedAtMillis?.let { startedAtMillis ->
             val play = Play(
                 videoId = song.videoId,
                 title = song.title,
                 artist = song.artist,
                 source = PlaySource.MYLO,
-                atMillis = now,
+                atMillis = startedAtMillis,
                 exact = true,
                 localUri = song.localUri,
             )
@@ -129,9 +124,7 @@ object ListeningRecorder {
      */
     @Synchronized
     fun onStopped() {
-        currentId = null
-        playedThisTrack = 0L
-        playCounted = false
+        playClock.reset()
         samplesSinceFlush = 0
         ListeningStats.flush()
     }
@@ -218,3 +211,58 @@ object ListeningRecorder {
     /** What a YouTube video id looks like, and nothing else this app plays does. */
     private const val YOUTUBE_ID_LENGTH = 11
 }
+
+/**
+ * Tracks one uninterrupted audible segment. The start instant comes from the
+ * player's audible-state/transition callbacks; the progress sampler only
+ * contributes elapsed listening time and decides when the play qualifies.
+ */
+internal class ListeningPlayClock(
+    private val maxStepMillis: Long = 8_000L,
+) {
+    private var trackIdentity: String? = null
+    private var lastSampleAtMillis = 0L
+    private var startedAtMillis = 0L
+    private var playedMillis = 0L
+    private var counted = false
+
+    fun start(identity: String, atMillis: Long) {
+        if (identity == trackIdentity) return
+        trackIdentity = identity
+        lastSampleAtMillis = atMillis
+        startedAtMillis = atMillis
+        playedMillis = 0L
+        counted = false
+    }
+
+    fun sample(identity: String, nowMillis: Long, thresholdMillis: Long): ListeningSample {
+        if (identity != trackIdentity) {
+            start(identity, nowMillis)
+            return ListeningSample(elapsedMillis = 0L)
+        }
+
+        val step = (nowMillis - lastSampleAtMillis).coerceIn(0L, maxStepMillis)
+        lastSampleAtMillis = nowMillis
+        if (step <= 0L) return ListeningSample(elapsedMillis = step)
+
+        playedMillis += step
+        if (!counted && playedMillis >= thresholdMillis.coerceAtLeast(1L)) {
+            counted = true
+            return ListeningSample(step, startedAtMillis)
+        }
+        return ListeningSample(elapsedMillis = step)
+    }
+
+    fun reset() {
+        trackIdentity = null
+        lastSampleAtMillis = 0L
+        startedAtMillis = 0L
+        playedMillis = 0L
+        counted = false
+    }
+}
+
+internal data class ListeningSample(
+    val elapsedMillis: Long,
+    val playStartedAtMillis: Long? = null,
+)

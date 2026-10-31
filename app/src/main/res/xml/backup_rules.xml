@@ -19,4 +19,5 @@
     <exclude domain="sharedpref" path="bitchord_party_queue_stash.xml" />
     <!-- Listening history is private device data; do not cloud-back it up. -->
     <exclude domain="file" path="scrobble_history.tsv" />
+    <exclude domain="file" path="scrobble_history.tsv.tmp" />
 </full-backup-content>

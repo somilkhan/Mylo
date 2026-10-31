@@ -888,6 +888,7 @@ class PlaybackService : MediaLibraryService() {
 
             val song = exoPlayer.currentMediaItem?.toSong()
             val durationMs = exoPlayer.duration.takeIf { it > 0 }
+            if (isPlaying && song != null) ListeningRecorder.onStarted(song)
             scrobbleManager?.onPlayerStateChanged(isPlaying, song, durationMs)
 
             // The listening record has to be told a pause happened, not merely
@@ -3473,6 +3474,7 @@ class PlaybackService : MediaLibraryService() {
         val newSong = mediaItem?.toSong()
         val durationMs = exoPlayer.duration.takeIf { it > 0 }
         if (exoPlayer.isPlaying) {
+            newSong?.let { ListeningRecorder.onStarted(it) }
             scrobbleManager?.onSongStart(newSong, durationMs)
         }
 
