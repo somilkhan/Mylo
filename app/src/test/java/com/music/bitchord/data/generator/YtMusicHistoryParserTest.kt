@@ -60,6 +60,21 @@ class YtMusicHistoryParserTest {
         assertFalse(entries.any { it.exact })
     }
 
+
+    @Test
+    fun historyApiAuthenticationErrorIsNotReportedAsEmptyHistory() {
+        val response = Json.parseToJsonElement(
+            """{"error":{"code":401,"status":"UNAUTHENTICATED","message":"Invalid credentials"}}""",
+        )
+
+        val failure = runCatching {
+            InnertubeParser.collectHistoryEntries(response, now, zone)
+        }.exceptionOrNull()
+
+        assertTrue("An API error envelope must fail instead of becoming empty history", failure is IllegalStateException)
+        assertTrue(failure!!.isYouTubeAuthenticationFailure())
+    }
+
     private fun row(id: String, title: String, artist: String): String =
         """
         {

@@ -81,6 +81,15 @@ class ScrobbleSessionIdentityTest {
         assertTrue(IllegalStateException("LOGIN_REQUIRED").isYouTubeAuthenticationFailure())
     }
 
+
+    @Test
+    fun unauthenticatedApiStatusRequiresReconnection() {
+        assertTrue(
+            IllegalStateException("Innertube history request rejected: UNAUTHENTICATED")
+                .isYouTubeAuthenticationFailure(),
+        )
+    }
+
     @Test
     fun transientNetworkErrorsRemainRetryable() {
         assertFalse(IllegalStateException("socket timeout").isYouTubeAuthenticationFailure())
