@@ -15,6 +15,7 @@ import com.music.bitchord.data.AppUpdateChecker
 import com.music.bitchord.data.LocalMediaRepository
 import com.music.bitchord.data.LikeState
 import com.music.bitchord.data.YtMusicRepository
+import com.music.bitchord.data.generator.ScrobbleHistorySync
 import com.music.bitchord.data.model.SPOTIFY_MISSING_PREFIX
 import com.music.bitchord.data.model.SPOTIFY_PENDING_PREFIX
 import com.music.bitchord.data.spotify.SPOTIFY_PAGE_PREFIX
@@ -3122,6 +3123,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val oldAccountId = _activeAccountId.value
         val oldProfileId = _activeProfileId.value
         viewModelScope.launch {
+            ScrobbleHistorySync.onSessionChanging(getApplication())
             // Validate the exact cookie/profile pair before writing any of it.
             // The old implementation persisted first and unconditionally set
             // signedIn=true; a half-finished channel chooser therefore became
@@ -3147,6 +3149,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             }
             if (account == null) {
                 restoreActiveSession(oldAccountId, oldProfileId)
+                ScrobbleHistorySync.onSessionChanged(getApplication())
                 onComplete(false)
                 return@launch
             }
@@ -3163,6 +3166,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             }
             if (accountId == null) {
                 restoreActiveSession(oldAccountId, oldProfileId)
+                ScrobbleHistorySync.onSessionChanged(getApplication())
                 onComplete(false)
                 return@launch
             }
@@ -3211,6 +3215,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             if (wasSignedIn) clearListenerState()
             reloadForAccount()
             loadChannels(force = true)
+            ScrobbleHistorySync.onSessionChanged(getApplication())
             onComplete(true)
         }
     }
@@ -3228,6 +3233,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val source = _googleAccounts.value.firstOrNull { it.accountId == accountId } ?: return
         val profile = supplied ?: source.profiles.firstOrNull { it.profileId == selectedProfileId } ?: return
         if (accountId == _activeAccountId.value && profile.profileId == _activeProfileId.value) return
+        ScrobbleHistorySync.onSessionChanging(getApplication())
         cacheCurrentListener()
         val index = source.profiles.indexOfFirst { it.profileId == profile.profileId }
         val updatedProfiles = if (index >= 0) {
@@ -3252,6 +3258,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         StreamResolver.onSessionChanged()
         clearListenerState(restoreCached = true)
         reloadForAccount()
+        ScrobbleHistorySync.onSessionChanged(getApplication())
     }
 
     /** Returns false at an edge, allowing the avatar to play its elastic cue. */
@@ -3263,6 +3270,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun removeAccount(accountId: String) {
+        ScrobbleHistorySync.onSessionChanging(getApplication())
         val fallback = authStore.removeAccount(accountId)
         _googleAccounts.value = authStore.sessions
         if (fallback == null) { signOut(); return }
@@ -3368,6 +3376,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             removeAccount(current)
             return
         }
+        ScrobbleHistorySync.onSignedOut(getApplication())
         authStore.signOut()
         Innertube.cookie = null
         // The mirror image: verdicts reached with a session in hand say nothing

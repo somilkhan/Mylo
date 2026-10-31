@@ -13,6 +13,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import com.music.bitchord.auth.AuthStore
 import com.music.bitchord.data.DebugLog
 import com.music.bitchord.data.YtMusicRepository
 import com.music.bitchord.data.innertube.Innertube
@@ -29,6 +30,9 @@ object ScrobbleHistorySync {
     const val KEY_LAST_ATTEMPT_AT = "youtube_last_sync_attempt_at"
     const val KEY_LAST_ADDED = "youtube_last_sync_added"
     const val KEY_LAST_STATUS = "youtube_last_sync_status"
+    private const val KEY_SESSION_GENERATION = "youtube_sync_session_generation"
+
+    private val sessionLock = Any()
 
     const val STATUS_SUCCESS = "success"
     const val STATUS_NO_DATED_ROWS = "no_dated_rows"
@@ -48,6 +52,87 @@ object ScrobbleHistorySync {
         if (!prefs.contains(KEY_ENABLED) || prefs.getBoolean(KEY_ENABLED, false)) {
             schedule(context)
         }
+    }
+
+    /** Fence in-flight work before the authenticated account/profile changes. */
+    fun onSessionChanging(context: Context) {
+        val appContext = context.applicationContext
+        synchronized(sessionLock) {
+            val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            prefs.edit()
+                .putLong(KEY_SESSION_GENERATION, prefs.getLong(KEY_SESSION_GENERATION, 0L) + 1L)
+                .apply()
+        }
+        WorkManager.getInstance(appContext).cancelUniqueWork(IMMEDIATE_WORK_NAME)
+    }
+
+    /** Schedule a fresh silent import after the new account/profile is active. */
+    fun onSessionChanged(context: Context) {
+        val appContext = context.applicationContext
+        val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        if (!prefs.getBoolean(KEY_ENABLED, false)) return
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.UNMETERED)
+            .build()
+        val immediate = OneTimeWorkRequestBuilder<ScrobbleHistorySyncWorker>()
+            .setConstraints(constraints)
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
+            .build()
+        WorkManager.getInstance(appContext).enqueueUniqueWork(
+            IMMEDIATE_WORK_NAME,
+            ExistingWorkPolicy.REPLACE,
+            immediate,
+        )
+    }
+
+    /** Cancel on sign-out without clearing the listener's sync opt-in. */
+    fun onSignedOut(context: Context) {
+        val appContext = context.applicationContext
+        onSessionChanging(appContext)
+        WorkManager.getInstance(appContext).cancelUniqueWork(UNIQUE_WORK_NAME)
+    }
+
+    /** Return only the identity of the currently restored, signing-capable account. */
+    internal fun currentSessionIdentity(context: Context): ScrobbleSessionIdentity? {
+        val appContext = context.applicationContext
+        val authStore = AuthStore(appContext)
+        val session = authStore.activeSession ?: return null
+        if (!AuthStore.hasApiSid(session.cookie) || Innertube.cookie != session.cookie) return null
+        return session.scrobbleIdentity(authStore.activeProfileId)
+    }
+
+    internal fun currentSessionGeneration(context: Context): Long =
+        context.applicationContext
+            .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getLong(KEY_SESSION_GENERATION, 0L)
+
+    /** Revalidate and append atomically against session invalidation and sync opt-out. */
+    internal fun appendIfCurrentSession(
+        context: Context,
+        expectedGeneration: Long,
+        expectedIdentity: ScrobbleSessionIdentity,
+        incoming: List<Play>,
+    ): Int? = synchronized(sessionLock) {
+        val appContext = context.applicationContext
+        val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        if (
+            !prefs.getBoolean(KEY_ENABLED, false) ||
+            prefs.getLong(KEY_SESSION_GENERATION, 0L) != expectedGeneration ||
+            currentSessionIdentity(appContext) != expectedIdentity
+        ) return@synchronized null
+        ScrobbleHistory.append(incoming)
+    }
+
+    internal fun isCurrentSession(
+        context: Context,
+        expectedGeneration: Long,
+        expectedIdentity: ScrobbleSessionIdentity,
+    ): Boolean = synchronized(sessionLock) {
+        val appContext = context.applicationContext
+        val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.getBoolean(KEY_ENABLED, false) &&
+            prefs.getLong(KEY_SESSION_GENERATION, 0L) == expectedGeneration &&
+            currentSessionIdentity(appContext) == expectedIdentity
     }
 
     fun schedule(context: Context) {
@@ -82,7 +167,10 @@ object ScrobbleHistorySync {
     fun ensurePeriodic(context: Context) {
         val appContext = context.applicationContext
         val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        if (!prefs.contains(KEY_ENABLED) && !Innertube.cookie.isNullOrBlank()) {
+        val activeCookie = AuthStore(appContext).activeSession?.cookie
+        val hasRestoredSession = activeCookie != null &&
+            AuthStore.hasApiSid(activeCookie) && Innertube.cookie == activeCookie
+        if (!prefs.contains(KEY_ENABLED) && hasRestoredSession) {
             // Existing signed-in installs get the same silent first import as a
             // fresh login after this feature is added.
             schedule(appContext)
@@ -105,12 +193,13 @@ object ScrobbleHistorySync {
     }
 
     fun cancel(context: Context) {
-        context.applicationContext
-            .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val appContext = context.applicationContext
+        onSessionChanging(appContext)
+        appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .putBoolean(KEY_ENABLED, false)
             .apply()
-        WorkManager.getInstance(context.applicationContext).apply {
+        WorkManager.getInstance(appContext).apply {
             cancelUniqueWork(UNIQUE_WORK_NAME)
             cancelUniqueWork(IMMEDIATE_WORK_NAME)
         }
@@ -139,9 +228,11 @@ class ScrobbleHistorySyncWorker(
                 .putLong(ScrobbleHistorySync.KEY_LAST_ATTEMPT_AT, now)
                 .putString(ScrobbleHistorySync.KEY_LAST_STATUS, ScrobbleHistorySync.STATUS_WAITING_FOR_WIFI)
                 .apply()
-            return Result.retry()
+            return Result.success()
         }
-        if (Innertube.cookie.isNullOrBlank()) {
+        val generation = ScrobbleHistorySync.currentSessionGeneration(applicationContext)
+        val identity = ScrobbleHistorySync.currentSessionIdentity(applicationContext)
+        if (identity == null) {
             prefs.edit()
                 .putLong(ScrobbleHistorySync.KEY_LAST_ATTEMPT_AT, now)
                 .putString(ScrobbleHistorySync.KEY_LAST_STATUS, ScrobbleHistorySync.STATUS_WAITING_FOR_SIGN_IN)
@@ -155,7 +246,10 @@ class ScrobbleHistorySyncWorker(
                 val error = response.exceptionOrNull()
                     ?: IllegalStateException("YouTube history import failed without an exception")
                 if (error is CancellationException) throw error
-                if (isAuthenticationFailure(error)) {
+                if (!ScrobbleHistorySync.isCurrentSession(applicationContext, generation, identity)) {
+                    return Result.success()
+                }
+                if (error.isYouTubeAuthenticationFailure()) {
                     prefs.edit()
                         .putLong(ScrobbleHistorySync.KEY_LAST_ATTEMPT_AT, now)
                         .putString(
@@ -186,7 +280,14 @@ class ScrobbleHistorySyncWorker(
                     localUri = entry.song.localUri,
                 )
             }
-            val added = withContext(Dispatchers.IO) { ScrobbleHistory.append(incoming) }
+            val added = withContext(Dispatchers.IO) {
+                ScrobbleHistorySync.appendIfCurrentSession(
+                    applicationContext,
+                    generation,
+                    identity,
+                    incoming,
+                )
+            } ?: return Result.success()
             prefs.edit()
                 .putLong(ScrobbleHistorySync.KEY_LAST_SYNC_AT, now)
                 .putLong(ScrobbleHistorySync.KEY_LAST_ATTEMPT_AT, now)
@@ -201,6 +302,9 @@ class ScrobbleHistorySyncWorker(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
+            if (!ScrobbleHistorySync.isCurrentSession(applicationContext, generation, identity)) {
+                return Result.success()
+            }
             prefs.edit()
                 .putLong(ScrobbleHistorySync.KEY_LAST_ATTEMPT_AT, now)
                 .putString(ScrobbleHistorySync.KEY_LAST_STATUS, ScrobbleHistorySync.STATUS_RETRYING)
@@ -208,22 +312,6 @@ class ScrobbleHistorySyncWorker(
             DebugLog.w(TAG, "Background YouTube history sync failed; WorkManager will retry", error)
             Result.retry()
         }
-    }
-
-    private fun isAuthenticationFailure(error: Throwable): Boolean {
-        var current: Throwable? = error
-        while (current != null) {
-            val message = current.message.orEmpty().lowercase()
-            if (
-                message.contains("http 401") ||
-                message.contains("http 403") ||
-                message.contains("unauthorized") ||
-                message.contains("authentication required") ||
-                message.contains("sign in to continue")
-            ) return true
-            current = current.cause
-        }
-        return false
     }
 
     private fun isOnWifi(): Boolean {
