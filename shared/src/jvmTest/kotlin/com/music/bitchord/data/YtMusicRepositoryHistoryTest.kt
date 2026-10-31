@@ -1,5 +1,6 @@
 package com.music.bitchord.data
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -36,5 +37,25 @@ class YtMusicRepositoryHistoryTest {
         val result = fetchRecentHistory("session-cookie") { emptyList<String>() }
 
         assertEquals(emptyList(), result)
+    }
+
+    @Test
+    fun cancellableFetchRethrowsCancellationInsteadOfReturningFallback() = runBlocking {
+        val cancellation = CancellationException("caller navigated away")
+
+        val thrown = assertFailsWith<CancellationException> {
+            runCatchingCancellable<String> { throw cancellation }
+        }
+
+        assertEquals(cancellation, thrown)
+    }
+
+    @Test
+    fun cancellableFetchKeepsOrdinaryFailuresRecoverable() = runBlocking {
+        val failure = IllegalStateException("temporary network failure")
+
+        val result = runCatchingCancellable<String> { throw failure }
+
+        assertEquals(failure, result.exceptionOrNull())
     }
 }

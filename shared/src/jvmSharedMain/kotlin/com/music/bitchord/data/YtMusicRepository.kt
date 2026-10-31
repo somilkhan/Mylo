@@ -108,7 +108,7 @@ object YtMusicRepository {
      */
     private suspend fun recentlyPlayed(): HomeShelf? {
         val ytSongs = if (Innertube.cookie != null) {
-            runCatching { fetchHistory() }.getOrDefault(emptyList())
+            runCatchingCancellable { fetchHistory() }.getOrDefault(emptyList())
         } else {
             emptyList()
         }
@@ -475,7 +475,7 @@ object YtMusicRepository {
      * treated the same as a failure and the other route is tried.
      */
     suspend fun accountChannels(): Result<List<AccountChannel>> = call("channels") {
-        val viaInnertube = runCatching {
+        val viaInnertube = runCatchingCancellable {
             InnertubeParser.parseAccountChannels(Innertube.accountsList())
         }.onFailure { Log.w(TAG, "accounts_list unavailable: ${it.message}") }
             .getOrNull()
@@ -502,11 +502,11 @@ object YtMusicRepository {
             // liked without holding this page open behind the whole list —
             // see [syncLikedMusic] and MainViewModel's fetchLibrary.
             val liked = async { browseSongs(LIKED_MUSIC).getOrNull() }
-            val added = async { runCatching { songsPaged(LIBRARY_SONGS) }.getOrDefault(emptyList()) }
+            val added = async { runCatchingCancellable { songsPaged(LIBRARY_SONGS) }.getOrDefault(emptyList()) }
             val shelves = LIBRARY_FEEDS
                 .map { (title, browseId) ->
                     async {
-                        HomeShelf(title, runCatching { libraryItemsPaged(browseId) }.getOrDefault(emptyList()))
+                        HomeShelf(title, runCatchingCancellable { libraryItemsPaged(browseId) }.getOrDefault(emptyList()))
                     }
                 }
                 .awaitAll()
@@ -809,7 +809,7 @@ object YtMusicRepository {
             (shelf?.songs ?: InnertubeParser.collectSongsDeep(response)).forEach { out[it.videoId] = it }
             val token = shelf?.continuation ?: InnertubeParser.continuationToken(response)
             if (token == null || page++ >= MAX_PAGES) break
-            response = runCatching { Innertube.browseContinuation(token) }.getOrNull() ?: break
+            response = runCatchingCancellable { Innertube.browseContinuation(token) }.getOrNull() ?: break
         }
         return out.values.toList()
     }
@@ -835,7 +835,7 @@ object YtMusicRepository {
             }
             val token = parsed.continuation ?: break
             if (page++ >= MAX_PAGES) break
-            response = runCatching { Innertube.browseContinuation(token) }.getOrNull() ?: break
+            response = runCatchingCancellable { Innertube.browseContinuation(token) }.getOrNull() ?: break
         }
         return out.values.toList()
     }
@@ -1033,14 +1033,14 @@ object YtMusicRepository {
         coroutineScope {
             val fullSongsDeferred = async {
                 page.moreSongsBrowseId?.let { playlistId ->
-                    runCatching { songsPaged(playlistId) }.getOrNull()
+                    runCatchingCancellable { songsPaged(playlistId) }.getOrNull()
                 }
             }
             val shelvesDeferred = page.sections.map { shelf ->
                 async {
                     val moreBrowseId = shelf.moreBrowseId
                     if (moreBrowseId != null) {
-                        val fullItems = runCatching {
+                        val fullItems = runCatchingCancellable {
                             itemsPaged(moreBrowseId, shelf.moreParams)
                         }.getOrNull()
                         if (!fullItems.isNullOrEmpty()) {
@@ -1062,7 +1062,8 @@ object YtMusicRepository {
 
     private suspend fun <T> call(label: String, block: suspend () -> T): Result<T> =
         withContext(Dispatchers.IO) {
-            runCatching { block() }.recoverCatching { failure ->
+            runCatchingCancellable { block() }.recoverCatching { failure ->
+                if (failure is CancellationException) throw failure
                 // Context cookies can rotate while a process is alive. Refresh
                 // once and retry; never loop or silently sign the listener out.
                 val rejected = failure.message?.contains("401") == true ||
@@ -1091,3 +1092,18 @@ internal suspend fun <T> fetchRecentHistory(
     cookie: String?,
     fetch: suspend () -> List<T>,
 ): List<T> = if (cookie == null) emptyList() else fetch()
+
+
+/**
+ * Like [runCatching], but never turns structured-concurrency cancellation into
+ * a fallback value or a partial-success Result. Use around every suspending
+ * operation whose ordinary failures are intentionally recoverable.
+ */
+internal suspend fun <T> runCatchingCancellable(block: suspend () -> T): Result<T> =
+    try {
+        Result.success(block())
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (failure: Throwable) {
+        Result.failure(failure)
+    }
