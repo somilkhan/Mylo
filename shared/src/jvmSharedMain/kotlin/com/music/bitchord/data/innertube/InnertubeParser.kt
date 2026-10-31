@@ -513,6 +513,25 @@ object InnertubeParser {
         nowMillis: Long,
         zone: ZoneId,
     ): List<YtMusicHistoryEntry> {
+        // Innertube sometimes returns an API-level error envelope with HTTP 200.
+        // Treating it as an empty browse tree would mark an expired session as a
+        // successful zero-row sync and leave background refresh running forever.
+        val apiError = (root as? JsonObject)?.get("error")
+        if (apiError != null) {
+            val errorObject = apiError as? JsonObject
+            val code = (errorObject?.get("code") as? JsonPrimitive)?.contentOrNull
+            val status = (errorObject?.get("status") as? JsonPrimitive)?.contentOrNull
+            val message = (errorObject?.get("message") as? JsonPrimitive)?.contentOrNull
+            val details = listOfNotNull(
+                code?.let { "code=$it" },
+                status?.let { "status=$it" },
+                message?.let { "message=$it" },
+            ).joinToString(", ")
+            throw IllegalStateException(
+                "Innertube history request rejected${details.takeIf(String::isNotBlank)?.let { ": $it" }.orEmpty()}",
+            )
+        }
+
         val today = java.time.Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate()
         val out = ArrayList<YtMusicHistoryEntry>()
         val credit = pageCredit(root)

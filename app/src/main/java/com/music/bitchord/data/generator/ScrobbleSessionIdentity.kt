@@ -39,6 +39,9 @@ internal fun Throwable.isYouTubeAuthenticationFailure(): Boolean {
             message.contains("unauthorized") ||
             message.contains("forbidden") ||
             message.contains("authentication required") ||
+            message.contains("unauthenticated") ||
+            message.contains("invalid session") ||
+            message.contains("session expired") ||
             message.contains("login_required") ||
             message.contains("login required") ||
             message.contains("sign in to continue")
