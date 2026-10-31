@@ -177,8 +177,9 @@ object YtMusicRepository {
      * Recommended discovery tracks for Quick Picks, strictly excluding listening history and recents.
      */
     suspend fun quickPicks(excludeSongIds: Set<String> = emptySet()): Result<List<Song>> = call("quickPicks") {
-        val homeRaw = runCatching { Innertube.browse("FEmusic_home") }.getOrNull()
-        val shelves = if (homeRaw != null) InnertubeParser.parseHome(homeRaw) else emptyList()
+        // Preserve request failures so the UI can distinguish an unavailable
+        // recommendation source from a genuinely empty set of new tracks.
+        val shelves = InnertubeParser.parseHome(Innertube.browse("FEmusic_home"))
 
         // 1. Direct "Quick picks" or "Mix" or "Recommendations" shelf
         val qpShelf = shelves.firstOrNull {
@@ -241,7 +242,7 @@ object YtMusicRepository {
         if (uniqueAllHome.isNotEmpty()) return@call uniqueAllHome
 
         // 4. Explore / New releases
-        val explore = runCatching { shelvesOf("FEmusic_new_releases") }.getOrDefault(emptyList())
+        val explore = shelvesOf("FEmusic_new_releases")
         val exploreSongs = explore.flatMap { shelf ->
             shelf.items.mapNotNull { item ->
                 item.videoId?.takeUnless { it in excludeSongIds }?.let { vid ->
