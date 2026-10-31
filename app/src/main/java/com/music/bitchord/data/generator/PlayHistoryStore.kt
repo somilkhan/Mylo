@@ -2,6 +2,10 @@ package com.music.bitchord.data.generator
 
 import android.content.Context
 import java.io.File
+import java.io.IOException
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.time.ZoneId
 
 /**
@@ -26,8 +30,7 @@ class PlayHistoryStore(private val file: File, private val zone: ZoneId = ZoneId
         val before = readAll()
         val after = dedupePlays(before + incoming, zone)
         val added = after.size - dedupePlays(before, zone).size
-        file.parentFile?.mkdirs()
-        file.writeText(after.joinToString("\n", postfix = "\n") { encode(it) })
+        writeAtomically(after)
         return added
     }
 
@@ -45,14 +48,40 @@ class PlayHistoryStore(private val file: File, private val zone: ZoneId = ZoneId
         if (retained.isEmpty()) {
             file.delete()
         } else {
-            file.writeText(retained.joinToString("\n", postfix = "\n") { encode(it) })
+            writeAtomically(retained)
+        }
+    }
+
+    /** Replace the history file only after the complete new contents are durable in a sibling file. */
+    private fun writeAtomically(plays: List<Play>) {
+        file.parentFile?.mkdirs()
+        val temporary = File(file.absolutePath + ".tmp")
+        val contents = plays.joinToString("\n", postfix = "\n") { encode(it) }
+        try {
+            temporary.writeText(contents)
+            try {
+                Files.move(
+                    temporary.toPath(),
+                    file.toPath(),
+                    StandardCopyOption.ATOMIC_MOVE,
+                    StandardCopyOption.REPLACE_EXISTING,
+                )
+            } catch (_: AtomicMoveNotSupportedException) {
+                if (!temporary.renameTo(file)) {
+                    Files.move(temporary.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING)
+                }
+            }
+        } catch (error: Exception) {
+            throw IOException("Could not safely replace Scrobble history", error)
+        } finally {
+            if (temporary.exists()) temporary.delete()
         }
     }
 
     private fun encode(p: Play): String =
         listOf(
             p.videoId, p.title, p.artist, p.source.name, p.atMillis.toString(), p.exact.toString(), p.localUri.orEmpty(),
-        ).joinToString("\t") { it.replace('\t', ' ').replace('\n', ' ') }
+        ).joinToString("\t") { it.replace('\t', ' ').replace('\n', ' ').replace('\r', ' ') }
 
     private fun decode(line: String): Play? {
         val parts = line.split('\t')

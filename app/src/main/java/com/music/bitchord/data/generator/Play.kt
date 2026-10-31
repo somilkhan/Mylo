@@ -26,8 +26,8 @@ data class Play(
 ) {
     /** Stable identity for a catalogue track or local file, with text as the last resort. */
     fun songKey(): String = when {
-        videoId.isNotBlank() -> "id:$videoId"
         !localUri.isNullOrBlank() -> "local:$localUri"
+        videoId.isNotBlank() -> "id:$videoId"
         else -> "tx:${normaliseText(title)}|${normaliseText(artist)}"
     }
 

@@ -110,11 +110,66 @@ class ScrobbleGeneratorTest {
         val file = File.createTempFile("local-plays", ".tsv")
         file.deleteOnExit()
         val store = PlayHistoryStore(file, zone)
-        val first = play("").copy(localUri = "content://media/external/audio/1")
-        val second = play("").copy(localUri = "content://media/external/audio/2")
+        // LocalMediaRepository may attach a matched YouTube video id to a file.
+        // The content URI must remain the identity in that case.
+        val first = play("matched-video").copy(localUri = "content://media/external/audio/1")
+        val second = play("matched-video").copy(localUri = "content://media/external/audio/2")
 
         assertEquals(2, store.append(listOf(first, second)))
         assertEquals(listOf(first, second), store.readAll())
+    }
+
+    @Test
+    fun recent_dedupesSameSongOnTheSameLocalDay() {
+        val exact = play("same", daysAgo = 1.0)
+        val importedDuplicate = exact.copy(source = PlaySource.YOUTUBE_MUSIC, exact = false)
+        val previousDay = play("same", daysAgo = 2.0)
+
+        val result = ScrobbleGenerator.recent(
+            listOf(exact, importedDuplicate, previousDay),
+            now,
+            zone,
+        )
+
+        assertEquals(2, result.single().plays)
+    }
+
+    @Test
+    fun rediscover_doesNotTreatSameDayDuplicatesAsRepeatedListens() {
+        val first = play("same", daysAgo = 100.0)
+        val duplicate = first.copy(source = PlaySource.YOUTUBE_MUSIC, exact = false)
+        val secondDay = play("same", daysAgo = 90.0)
+
+        val result = ScrobbleGenerator.rediscover(
+            listOf(first, duplicate, secondDay),
+            now,
+            zone,
+            quietDays = 60,
+            minPlays = 3,
+        )
+
+        assertTrue(result.isEmpty())
+    }
+
+    @Test
+    fun localUriTakesPrecedenceOverMatchedVideoId() {
+        val first = play("same-video").copy(localUri = "content://media/external/audio/1")
+        val second = play("same-video").copy(localUri = "content://media/external/audio/2")
+
+        assertTrue(first.songKey() != second.songKey())
+        assertEquals(2, dedupePlays(listOf(first, second), zone).size)
+    }
+
+    @Test
+    fun storeSkipsMalformedRowsAndLeavesNoTemporaryFileAfterWrite() {
+        val file = File.createTempFile("malformed-plays", ".tsv")
+        file.deleteOnExit()
+        file.writeText("broken row\\n")
+        val store = PlayHistoryStore(file, zone)
+
+        assertEquals(1, store.append(listOf(play("valid"))))
+        assertEquals(listOf("valid"), store.readAll().map { it.videoId })
+        assertTrue(!File(file.absolutePath + ".tmp").exists())
     }
 
     @Test

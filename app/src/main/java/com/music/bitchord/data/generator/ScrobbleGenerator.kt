@@ -53,7 +53,7 @@ object ScrobbleGenerator {
         val inWindow = plays.filter {
             it.atMillis <= nowMillis && nowMillis - it.atMillis <= days * DAY_MS
         }
-        return inWindow
+        return dedupePlays(inWindow, zone)
             .groupBy { it.songKey() }
             .map { (_, group) -> group.maxBy { it.atMillis } to group.size }
             .sortedByDescending { it.first.atMillis }
@@ -73,7 +73,7 @@ object ScrobbleGenerator {
         limit: Int = 25,
         maxPerArtist: Int = 2,
     ): List<Ranked> {
-        val byKey = plays.groupBy { it.songKey() }
+        val byKey = dedupePlays(plays, zone).groupBy { it.songKey() }
         val candidates = byKey.values.filter { group ->
             group.size >= minPlays && nowMillis - group.maxOf { it.atMillis } >= quietDays * DAY_MS
         }.flatten()

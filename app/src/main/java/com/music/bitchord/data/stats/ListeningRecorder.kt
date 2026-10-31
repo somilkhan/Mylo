@@ -64,7 +64,7 @@ object ListeningRecorder {
     @Synchronized
     fun onSample(song: Song, durationMs: Long) {
         val now = System.currentTimeMillis()
-        val trackIdentity = song.videoId.ifBlank { song.localUri.orEmpty() }
+        val trackIdentity = song.localUri?.takeIf { it.isNotBlank() } ?: song.videoId
         if (trackIdentity != currentId) {
             // A new track anchors the clock and contributes nothing yet — see
             // the class note on undercounting. Local files use their URI when
