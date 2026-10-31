@@ -31,6 +31,8 @@ object ScrobbleHistorySync {
     const val KEY_LAST_ADDED = "youtube_last_sync_added"
     const val KEY_LAST_STATUS = "youtube_last_sync_status"
     private const val KEY_SESSION_GENERATION = "youtube_sync_session_generation"
+    private const val KEY_SESSION_SUSPENDED = "youtube_sync_session_suspended"
+    private const val KEY_SIGNED_OUT = "youtube_sync_signed_out"
 
     private val sessionLock = Any()
 
@@ -61,6 +63,7 @@ object ScrobbleHistorySync {
             val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             prefs.edit()
                 .putLong(KEY_SESSION_GENERATION, prefs.getLong(KEY_SESSION_GENERATION, 0L) + 1L)
+                .putBoolean(KEY_SESSION_SUSPENDED, true)
                 .apply()
         }
         WorkManager.getInstance(appContext).cancelUniqueWork(IMMEDIATE_WORK_NAME)
@@ -70,7 +73,14 @@ object ScrobbleHistorySync {
     fun onSessionChanged(context: Context) {
         val appContext = context.applicationContext
         val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        if (!prefs.getBoolean(KEY_ENABLED, false)) return
+        val enabled = synchronized(sessionLock) {
+            prefs.edit()
+                .putBoolean(KEY_SESSION_SUSPENDED, false)
+                .putBoolean(KEY_SIGNED_OUT, false)
+                .apply()
+            prefs.getBoolean(KEY_ENABLED, false)
+        }
+        if (!enabled) return
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.UNMETERED)
             .build()
@@ -89,12 +99,21 @@ object ScrobbleHistorySync {
     fun onSignedOut(context: Context) {
         val appContext = context.applicationContext
         onSessionChanging(appContext)
+        appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_SIGNED_OUT, true)
+            .apply()
         WorkManager.getInstance(appContext).cancelUniqueWork(UNIQUE_WORK_NAME)
     }
 
     /** Return only the identity of the currently restored, signing-capable account. */
     internal fun currentSessionIdentity(context: Context): ScrobbleSessionIdentity? {
         val appContext = context.applicationContext
+        val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        if (
+            prefs.getBoolean(KEY_SESSION_SUSPENDED, false) ||
+            prefs.getBoolean(KEY_SIGNED_OUT, false)
+        ) return null
         val authStore = AuthStore(appContext)
         val session = authStore.activeSession ?: return null
         if (!AuthStore.hasApiSid(session.cookie) || Innertube.cookie != session.cookie) return null
@@ -170,7 +189,18 @@ object ScrobbleHistorySync {
         val activeCookie = AuthStore(appContext).activeSession?.cookie
         val hasRestoredSession = activeCookie != null &&
             AuthStore.hasApiSid(activeCookie) && Innertube.cookie == activeCookie
-        if (!prefs.contains(KEY_ENABLED) && hasRestoredSession) {
+        if (
+            hasRestoredSession &&
+            prefs.getBoolean(KEY_SESSION_SUSPENDED, false) &&
+            !prefs.getBoolean(KEY_SIGNED_OUT, false)
+        ) {
+            // Recover a process death during an account/profile switch. A real
+            // sign-out remains paused until the next successful login.
+            synchronized(sessionLock) {
+                prefs.edit().putBoolean(KEY_SESSION_SUSPENDED, false).apply()
+            }
+        }
+        if (!prefs.contains(KEY_ENABLED) && hasRestoredSession && !prefs.getBoolean(KEY_SIGNED_OUT, false)) {
             // Existing signed-in installs get the same silent first import as a
             // fresh login after this feature is added.
             schedule(appContext)
@@ -194,11 +224,13 @@ object ScrobbleHistorySync {
 
     fun cancel(context: Context) {
         val appContext = context.applicationContext
-        onSessionChanging(appContext)
-        appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .edit()
-            .putBoolean(KEY_ENABLED, false)
-            .apply()
+        synchronized(sessionLock) {
+            val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            prefs.edit()
+                .putLong(KEY_SESSION_GENERATION, prefs.getLong(KEY_SESSION_GENERATION, 0L) + 1L)
+                .putBoolean(KEY_ENABLED, false)
+                .apply()
+        }
         WorkManager.getInstance(appContext).apply {
             cancelUniqueWork(UNIQUE_WORK_NAME)
             cancelUniqueWork(IMMEDIATE_WORK_NAME)
