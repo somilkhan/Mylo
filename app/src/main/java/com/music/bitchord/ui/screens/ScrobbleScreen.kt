@@ -187,7 +187,7 @@ fun ScrobbleScreen(
                 }
             }
             when (selectedSection) {
-                SCROBBLE_TAB_STATS -> statsSection(summary, loadingStats, statsFailed, historyPlays, loadingHistory)
+                SCROBBLE_TAB_STATS -> statsSection(summary, loadingStats, statsFailed, historyPlays, loadingHistory, historyFailed)
                 SCROBBLE_TAB_GENERATE -> generateSection(
                     historyPlays = historyPlays,
                     loadingHistory = loadingHistory,
@@ -201,7 +201,7 @@ fun ScrobbleScreen(
                     onBrowseMoods = onBrowseMoods,
                 )
                 SCROBBLE_TAB_PLAYLISTS -> playlistsSection()
-                else -> statsSection(summary, loadingStats, statsFailed, historyPlays, loadingHistory)
+                else -> statsSection(summary, loadingStats, statsFailed, historyPlays, loadingHistory, historyFailed)
             }
         }
     }
@@ -213,6 +213,7 @@ private fun LazyListScope.statsSection(
     failed: Boolean,
     historyPlays: List<Play>,
     loadingHistory: Boolean,
+    historyFailed: Boolean,
 ) {
     item(key = "stats-title") {
         Text(
@@ -312,6 +313,10 @@ private fun LazyListScope.statsSection(
                     "Loading source history…",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                historyFailed -> Text(
+                    "Couldn't read local listening history. Reopen Scrobble to retry.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 monthlyHistory.isEmpty() -> Text(
                     "History fills as you listen in Mylo or enable background YouTube Music sync in Settings.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -347,6 +352,12 @@ private fun LazyListScope.statsSection(
     when {
         loadingHistory -> item(key = "stats-recent-history-loading") {
             Text("Loading recent listens…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        historyFailed -> item(key = "stats-recent-history-error") {
+            EmptyCard(
+                title = "Couldn't load recent listens",
+                body = "The local history file could not be read. Close and reopen Scrobble to retry.",
+            )
         }
         historyPlays.isEmpty() -> item(key = "stats-recent-history-empty") {
             Text(
