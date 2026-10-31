@@ -198,9 +198,14 @@ fun ScrobbleScreen(
                     recommendationsFailed = recommendationsFailed,
                     onRetryRecommendations = { recommendationRequest += 1 },
                     onPlayPlaylist = onPlayPlaylist,
+                    onSavePlaylist = ScrobblePlaylistStore::save,
                     onBrowseMoods = onBrowseMoods,
                 )
-                SCROBBLE_TAB_PLAYLISTS -> playlistsSection()
+                SCROBBLE_TAB_PLAYLISTS -> playlistsSection(
+                    playlists = ScrobblePlaylistStore.playlists,
+                    onPlayPlaylist = onPlayPlaylist,
+                    onRemovePlaylist = ScrobblePlaylistStore::remove,
+                )
                 else -> statsSection(summary, loadingStats, statsFailed, historyPlays, loadingHistory, historyFailed)
             }
         }
@@ -441,6 +446,7 @@ private fun LazyListScope.generateSection(
     recommendationsFailed: Boolean,
     onRetryRecommendations: () -> Unit,
     onPlayPlaylist: (String, List<Song>) -> Unit,
+    onSavePlaylist: (String, String, List<Song>) -> Unit,
     onBrowseMoods: () -> Unit,
 ) {
     val zone = ZoneId.systemDefault()
@@ -489,13 +495,21 @@ private fun LazyListScope.generateSection(
             )
         }
         topTracks.isNotEmpty() -> item(key = "gen-play-top-tracks") {
-            Button(
-                onClick = { onPlayPlaylist("Top tracks", topTracks) },
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Icon(imageVector = Icons.Rounded.PlayArrow, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text("Play top tracks")
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Button(
+                    onClick = { onPlayPlaylist("Top tracks", topTracks) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(imageVector = Icons.Rounded.PlayArrow, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Play top tracks")
+                }
+                TextButton(
+                    onClick = {
+                        onSavePlaylist("Top tracks", "Your most-played tracks from the last 90 days.", topTracks)
+                    },
+                    modifier = Modifier.align(Alignment.End),
+                ) { Text("Save to Playlists") }
             }
         }
         else -> item(key = "gen-top-tracks-empty") {
@@ -516,26 +530,46 @@ private fun LazyListScope.generateSection(
             )
         }
         recentSongs.isNotEmpty() -> item(key = "gen-play-recent") {
-            Button(
-                onClick = { onPlayPlaylist("Recent", recentSongs) },
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Icon(imageVector = Icons.Rounded.PlayArrow, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text("Play recent")
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Button(
+                    onClick = { onPlayPlaylist("Recent", recentSongs) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(imageVector = Icons.Rounded.PlayArrow, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Play recent")
+                }
+                TextButton(
+                    onClick = {
+                        onSavePlaylist("Recent", "Tracks you've listened to in the last seven days.", recentSongs)
+                    },
+                    modifier = Modifier.align(Alignment.End),
+                ) { Text("Save to Playlists") }
             }
         }
     }
     if (!loadingHistory && !historyFailed) {
         if (rediscoverSongs.isNotEmpty()) {
             item(key = "gen-rediscover") {
-                Button(
-                    onClick = { onPlayPlaylist("Rediscover", rediscoverSongs) },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Icon(imageVector = Icons.Rounded.PlayArrow, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Rediscover forgotten tracks")
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Button(
+                        onClick = { onPlayPlaylist("Rediscover", rediscoverSongs) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(imageVector = Icons.Rounded.PlayArrow, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Rediscover forgotten tracks")
+                    }
+                    TextButton(
+                        onClick = {
+                            onSavePlaylist(
+                                "Rediscover",
+                                "Tracks played at least three times and left quiet for 60+ days.",
+                                rediscoverSongs,
+                            )
+                        },
+                        modifier = Modifier.align(Alignment.End),
+                    ) { Text("Save to Playlists") }
                 }
             }
         } else {
@@ -593,13 +627,25 @@ private fun LazyListScope.generateSection(
         }
         recommendationsReady -> {
             item(key = "gen-discover-play") {
-                Button(
-                    onClick = { onPlayPlaylist("Discover", recommendations) },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Icon(imageVector = Icons.Rounded.Explore, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Play discovery picks")
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Button(
+                        onClick = { onPlayPlaylist("Discover", recommendations) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(imageVector = Icons.Rounded.Explore, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Play discovery picks")
+                    }
+                    TextButton(
+                        onClick = {
+                            onSavePlaylist(
+                                "Discover",
+                                "New YouTube Music picks outside your recorded listening history.",
+                                recommendations,
+                            )
+                        },
+                        modifier = Modifier.align(Alignment.End),
+                    ) { Text("Save to Playlists") }
                 }
             }
             item(key = "gen-discover-refresh") {
@@ -608,13 +654,25 @@ private fun LazyListScope.generateSection(
             val myMix = interleaveScrobbleMix(topTracks, recommendations)
             if (topTracks.isNotEmpty() && recommendations.isNotEmpty() && myMix.isNotEmpty()) {
                 item(key = "gen-my-mix") {
-                    Button(
-                        onClick = { onPlayPlaylist("My mix", myMix) },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Icon(imageVector = Icons.Rounded.PlayArrow, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text("Play My mix")
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Button(
+                            onClick = { onPlayPlaylist("My mix", myMix) },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Icon(imageVector = Icons.Rounded.PlayArrow, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Play My mix")
+                        }
+                        TextButton(
+                            onClick = {
+                                onSavePlaylist(
+                                    "My mix",
+                                    "A blend of familiar favourites and new discovery picks.",
+                                    myMix,
+                                )
+                            },
+                            modifier = Modifier.align(Alignment.End),
+                        ) { Text("Save to Playlists") }
                     }
                 }
             }
@@ -678,7 +736,11 @@ private fun Play.toSong(): Song = Song(
     localUri = localUri,
 )
 
-private fun LazyListScope.playlistsSection() {
+private fun LazyListScope.playlistsSection(
+    playlists: List<SavedScrobblePlaylist>,
+    onPlayPlaylist: (String, List<Song>) -> Unit,
+    onRemovePlaylist: (String) -> Unit,
+) {
     item(key = "pl-title") {
         Text(
             text = "Playlists",
@@ -687,13 +749,53 @@ private fun LazyListScope.playlistsSection() {
             color = MaterialTheme.colorScheme.onBackground,
         )
     }
-    item(key = "pl-empty") {
-        Text(
-            text = "No saved playlists yet. Scrobble can play mixes on demand; saving, freezing, and scheduled refresh are not wired yet.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 12.dp),
-        )
+    if (playlists.isEmpty()) {
+        item(key = "pl-empty") {
+            Text(
+                text = "Save Top tracks, Recent, Rediscover or Discover from Generate. Saved mixes stay available for this app session.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 12.dp),
+            )
+        }
+    } else {
+        items(playlists, key = { "scrobble-playlist-${it.title}" }) { playlist ->
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = playlist.title,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = playlist.reason,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = "${playlist.songs.size} tracks · This session only",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = { onPlayPlaylist(playlist.title, playlist.songs) }) {
+                        Icon(imageVector = Icons.Rounded.PlayArrow, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Play")
+                    }
+                    TextButton(onClick = { onRemovePlaylist(playlist.title) }) {
+                        Text("Remove")
+                    }
+                }
+            }
+        }
     }
 }
 

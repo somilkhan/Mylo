@@ -1,0 +1,48 @@
+package com.music.bitchord.data
+
+import com.music.bitchord.data.model.Song
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+
+class YtMusicRepositoryRecommendationsTest {
+
+    @Test
+    fun recommendationsDropBlankPlayedAndDuplicateIds() {
+        val result = unplayedRecommendations(
+            listOf(song("played"), song("fresh"), song("fresh"), song("")),
+            setOf("played"),
+        )
+
+        assertEquals(listOf("fresh"), result.map(Song::videoId))
+    }
+
+    @Test
+    fun fallbackUsesExploreWhenEveryHomeCandidateWasPlayed() {
+        val result = selectQuickPickFallback(
+            homeSongs = listOf(song("played"), song("")),
+            exploreSongs = listOf(song("played"), song("new")),
+            excludedSongIds = setOf("played"),
+        )
+
+        assertEquals(listOf("new"), result.map(Song::videoId))
+    }
+
+    @Test
+    fun fallbackIsEmptyWhenEveryCandidateWasPlayedOrUnplayable() {
+        val result = selectQuickPickFallback(
+            homeSongs = listOf(song("played"), song("")),
+            exploreSongs = listOf(song("played"), song("")),
+            excludedSongIds = setOf("played"),
+        )
+
+        assertTrue(result.isEmpty())
+    }
+
+    private fun song(id: String) = Song(
+        videoId = id,
+        title = id.ifBlank { "Unplayable" },
+        artist = "Artist",
+        thumbnailUrl = null,
+    )
+}

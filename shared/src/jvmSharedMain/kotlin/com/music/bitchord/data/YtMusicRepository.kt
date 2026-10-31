@@ -166,8 +166,9 @@ object YtMusicRepository {
 
     /** Account listening history for the Recents feed. */
     suspend fun recents(): Result<List<Song>> = call("recents") {
-        if (Innertube.cookie != null) {
-            val history = fetchRecentHistory(Innertube.cookie) { fetchHistory() }
+        val cookie = Innertube.cookie
+        if (cookie != null) {
+            val history = fetchRecentHistory(cookie) { fetchHistory() }
             if (history.isNotEmpty()) return@call history
         }
         emptyList()
@@ -188,16 +189,19 @@ object YtMusicRepository {
                 it.title.contains("mix", ignoreCase = true) ||
                 it.title.contains("recommend", ignoreCase = true)
         }
-        val qpSongs = qpShelf?.items?.mapNotNull { item ->
-            item.videoId?.takeUnless { it in excludeSongIds }?.let { vid ->
-                Song(
-                    videoId = vid,
-                    title = item.title,
-                    artist = InnertubeParser.artistFromSubtitle(item.subtitle),
-                    thumbnailUrl = item.thumbnailUrl,
-                )
-            }
-        }.orEmpty()
+        val qpSongs = unplayedRecommendations(
+            qpShelf?.items?.mapNotNull { item ->
+                item.videoId?.let { vid ->
+                    Song(
+                        videoId = vid,
+                        title = item.title,
+                        artist = InnertubeParser.artistFromSubtitle(item.subtitle),
+                        thumbnailUrl = item.thumbnailUrl,
+                    )
+                }
+            }.orEmpty(),
+            excludeSongIds,
+        )
         if (qpSongs.isNotEmpty()) return@call qpSongs
 
         // 2. All shelves on Home (excluding shelves mentioning recent/history, and skipping top shelf if multiple exist)
@@ -209,18 +213,21 @@ object YtMusicRepository {
             }
         } else shelves
 
-        val homeShelfSongs = candidateShelves.flatMap { shelf ->
-            shelf.items.mapNotNull { item ->
-                item.videoId?.takeUnless { it in excludeSongIds }?.let { vid ->
-                    Song(
-                        videoId = vid,
-                        title = item.title,
-                        artist = InnertubeParser.artistFromSubtitle(item.subtitle),
-                        thumbnailUrl = item.thumbnailUrl,
-                    )
+        val homeShelfSongs = unplayedRecommendations(
+            candidateShelves.flatMap { shelf ->
+                shelf.items.mapNotNull { item ->
+                    item.videoId?.let { vid ->
+                        Song(
+                            videoId = vid,
+                            title = item.title,
+                            artist = InnertubeParser.artistFromSubtitle(item.subtitle),
+                            thumbnailUrl = item.thumbnailUrl,
+                        )
+                    }
                 }
-            }
-        }.distinctBy { it.videoId }
+            },
+            excludeSongIds,
+        )
 
         if (homeShelfSongs.isNotEmpty()) return@call homeShelfSongs
 
@@ -238,29 +245,32 @@ object YtMusicRepository {
             }
         }.distinctBy { it.videoId }
 
-        val uniqueAllHome = allHomeTrackSongs.filterNot { it.videoId in excludeSongIds }
+        val uniqueAllHome = unplayedRecommendations(allHomeTrackSongs, excludeSongIds)
         if (uniqueAllHome.isNotEmpty()) return@call uniqueAllHome
 
         // 4. Explore / New releases
         val explore = shelvesOf("FEmusic_new_releases")
-        val exploreSongs = explore.flatMap { shelf ->
-            shelf.items.mapNotNull { item ->
-                item.videoId?.takeUnless { it in excludeSongIds }?.let { vid ->
-                    Song(
-                        videoId = vid,
-                        title = item.title,
-                        artist = InnertubeParser.artistFromSubtitle(item.subtitle),
-                        thumbnailUrl = item.thumbnailUrl,
-                    )
+        val exploreSongs = unplayedRecommendations(
+            explore.flatMap { shelf ->
+                shelf.items.mapNotNull { item ->
+                    item.videoId?.let { vid ->
+                        Song(
+                            videoId = vid,
+                            title = item.title,
+                            artist = InnertubeParser.artistFromSubtitle(item.subtitle),
+                            thumbnailUrl = item.thumbnailUrl,
+                        )
+                    }
                 }
-            }
-        }.distinctBy { it.videoId }
+            },
+            excludeSongIds,
+        )
 
         if (exploreSongs.isNotEmpty()) return@call exploreSongs
 
-        // 5. No unplayed recommendations are available. Never reintroduce
-        // listening-history tracks after the exclusion filter has run.
-        emptyList()
+        // 5. Reapply exclusions at the boundary so a future fallback cannot
+        // accidentally reintroduce played or unplayable rows.
+        selectQuickPickFallback(allHomeTrackSongs, exploreSongs, excludeSongIds)
     }
 
     private const val HISTORY = "FEmusic_history"
@@ -1107,3 +1117,21 @@ internal suspend fun <T> runCatchingCancellable(block: suspend () -> T): Result<
     } catch (failure: Throwable) {
         Result.failure(failure)
     }
+
+
+/** Remove played/unplayable rows and duplicate catalogue IDs from a candidate set. */
+internal fun unplayedRecommendations(
+    songs: List<Song>,
+    excludedSongIds: Set<String>,
+): List<Song> = songs.asSequence()
+    .filter { it.videoId.isNotBlank() && it.videoId !in excludedSongIds }
+    .distinctBy { it.videoId }
+    .toList()
+
+/** Last-resort selection that never falls back to the unfiltered source list. */
+internal fun selectQuickPickFallback(
+    homeSongs: List<Song>,
+    exploreSongs: List<Song>,
+    excludedSongIds: Set<String>,
+): List<Song> = unplayedRecommendations(homeSongs, excludedSongIds)
+    .ifEmpty { unplayedRecommendations(exploreSongs, excludedSongIds) }

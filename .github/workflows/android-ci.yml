@@ -107,6 +107,9 @@ jobs:
       - name: Compile desktop application
         run: ./gradlew --no-daemon --stacktrace :desktopApp:compileKotlin
 
+      - name: Run shared JVM unit tests
+        run: ./gradlew --no-daemon --stacktrace :shared:jvmTest :sharedUi:jvmTest :desktopUi:jvmTest
+
       - name: Run desktop unit tests
         run: ./gradlew --no-daemon --stacktrace :desktopApp:test
 
