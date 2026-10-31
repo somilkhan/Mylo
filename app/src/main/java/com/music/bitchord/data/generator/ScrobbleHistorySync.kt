@@ -33,6 +33,7 @@ object ScrobbleHistorySync {
     private const val KEY_SESSION_GENERATION = "youtube_sync_session_generation"
     private const val KEY_SESSION_SUSPENDED = "youtube_sync_session_suspended"
     private const val KEY_SIGNED_OUT = "youtube_sync_signed_out"
+    private const val KEY_AUTH_REQUIRED = "youtube_sync_auth_required"
 
     private val sessionLock = Any()
 
@@ -77,10 +78,11 @@ object ScrobbleHistorySync {
             prefs.edit()
                 .putBoolean(KEY_SESSION_SUSPENDED, false)
                 .putBoolean(KEY_SIGNED_OUT, false)
+                .putBoolean(KEY_AUTH_REQUIRED, false)
                 .apply()
             prefs.getBoolean(KEY_ENABLED, false)
         }
-        if (!enabled) return
+        if (!enabled || currentSessionIdentity(appContext) == null) return
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.UNMETERED)
             .build()
@@ -98,12 +100,50 @@ object ScrobbleHistorySync {
     /** Cancel on sign-out without clearing the listener's sync opt-in. */
     fun onSignedOut(context: Context) {
         val appContext = context.applicationContext
-        onSessionChanging(appContext)
-        appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .edit()
-            .putBoolean(KEY_SIGNED_OUT, true)
-            .apply()
-        WorkManager.getInstance(appContext).cancelUniqueWork(UNIQUE_WORK_NAME)
+        synchronized(sessionLock) {
+            val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            prefs.edit()
+                .putLong(KEY_SESSION_GENERATION, prefs.getLong(KEY_SESSION_GENERATION, 0L) + 1L)
+                .putBoolean(KEY_SESSION_SUSPENDED, true)
+                .putBoolean(KEY_SIGNED_OUT, true)
+                .putString(KEY_LAST_STATUS, STATUS_WAITING_FOR_SIGN_IN)
+                .apply()
+        }
+        WorkManager.getInstance(appContext).apply {
+            cancelUniqueWork(IMMEDIATE_WORK_NAME)
+            cancelUniqueWork(UNIQUE_WORK_NAME)
+        }
+    }
+
+    /** Pause periodic retries after a confirmed auth rejection until Mylo's existing login succeeds. */
+    internal fun pauseForAuthentication(
+        context: Context,
+        expectedGeneration: Long,
+        expectedIdentity: ScrobbleSessionIdentity,
+    ) {
+        val appContext = context.applicationContext
+        val paused = synchronized(sessionLock) {
+            val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            if (
+                !prefs.getBoolean(KEY_ENABLED, false) ||
+                prefs.getLong(KEY_SESSION_GENERATION, 0L) != expectedGeneration ||
+                currentSessionIdentity(appContext) != expectedIdentity
+            ) {
+                false
+            } else {
+                prefs.edit()
+                    .putBoolean(KEY_AUTH_REQUIRED, true)
+                    .putString(KEY_LAST_STATUS, STATUS_WAITING_FOR_SIGN_IN)
+                    .apply()
+                true
+            }
+        }
+        if (paused) {
+            WorkManager.getInstance(appContext).apply {
+                cancelUniqueWork(IMMEDIATE_WORK_NAME)
+                cancelUniqueWork(UNIQUE_WORK_NAME)
+            }
+        }
     }
 
     /** Return only the identity of the currently restored, signing-capable account. */
@@ -112,7 +152,8 @@ object ScrobbleHistorySync {
         val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         if (
             prefs.getBoolean(KEY_SESSION_SUSPENDED, false) ||
-            prefs.getBoolean(KEY_SIGNED_OUT, false)
+            prefs.getBoolean(KEY_SIGNED_OUT, false) ||
+            prefs.getBoolean(KEY_AUTH_REQUIRED, false)
         ) return null
         val authStore = AuthStore(appContext)
         val session = authStore.activeSession ?: return null
@@ -156,10 +197,9 @@ object ScrobbleHistorySync {
 
     fun schedule(context: Context) {
         val appContext = context.applicationContext
-        appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .edit()
-            .putBoolean(KEY_ENABLED, true)
-            .apply()
+        val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putBoolean(KEY_ENABLED, true).apply()
+        if (prefs.getBoolean(KEY_SIGNED_OUT, false) || currentSessionIdentity(appContext) == null) return
 
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.UNMETERED)
@@ -206,7 +246,8 @@ object ScrobbleHistorySync {
             schedule(appContext)
             return
         }
-        if (prefs.getBoolean(KEY_SIGNED_OUT, false)) return
+        if (!hasRestoredSession || prefs.getBoolean(KEY_SIGNED_OUT, false)) return
+        if (prefs.getBoolean(KEY_AUTH_REQUIRED, false)) return
         if (!prefs.getBoolean(KEY_ENABLED, false)) return
 
         val constraints = Constraints.Builder()
@@ -256,19 +297,27 @@ class ScrobbleHistorySyncWorker(
         if (!prefs.getBoolean(ScrobbleHistorySync.KEY_ENABLED, false)) return Result.success()
 
         val now = System.currentTimeMillis()
-        if (!isOnWifi()) {
-            prefs.edit()
-                .putLong(ScrobbleHistorySync.KEY_LAST_ATTEMPT_AT, now)
-                .putString(ScrobbleHistorySync.KEY_LAST_STATUS, ScrobbleHistorySync.STATUS_WAITING_FOR_WIFI)
-                .apply()
-            return Result.success()
-        }
         val generation = ScrobbleHistorySync.currentSessionGeneration(applicationContext)
         val identity = ScrobbleHistorySync.currentSessionIdentity(applicationContext)
         if (identity == null) {
+            if (
+                !prefs.getBoolean(ScrobbleHistorySync.KEY_SESSION_SUSPENDED, false) &&
+                !prefs.getBoolean(ScrobbleHistorySync.KEY_SIGNED_OUT, false)
+            ) {
+                prefs.edit()
+                    .putLong(ScrobbleHistorySync.KEY_LAST_ATTEMPT_AT, now)
+                    .putString(ScrobbleHistorySync.KEY_LAST_STATUS, ScrobbleHistorySync.STATUS_WAITING_FOR_SIGN_IN)
+                    .apply()
+            }
+            return Result.success()
+        }
+        if (!isOnWifi()) {
+            if (!ScrobbleHistorySync.isCurrentSession(applicationContext, generation, identity)) {
+                return Result.success()
+            }
             prefs.edit()
                 .putLong(ScrobbleHistorySync.KEY_LAST_ATTEMPT_AT, now)
-                .putString(ScrobbleHistorySync.KEY_LAST_STATUS, ScrobbleHistorySync.STATUS_WAITING_FOR_SIGN_IN)
+                .putString(ScrobbleHistorySync.KEY_LAST_STATUS, ScrobbleHistorySync.STATUS_WAITING_FOR_WIFI)
                 .apply()
             return Result.success()
         }
@@ -283,13 +332,8 @@ class ScrobbleHistorySyncWorker(
                     return Result.success()
                 }
                 if (error.isYouTubeAuthenticationFailure()) {
-                    prefs.edit()
-                        .putLong(ScrobbleHistorySync.KEY_LAST_ATTEMPT_AT, now)
-                        .putString(
-                            ScrobbleHistorySync.KEY_LAST_STATUS,
-                            ScrobbleHistorySync.STATUS_WAITING_FOR_SIGN_IN,
-                        )
-                        .apply()
+                    ScrobbleHistorySync.pauseForAuthentication(applicationContext, generation, identity)
+                    prefs.edit().putLong(ScrobbleHistorySync.KEY_LAST_ATTEMPT_AT, now).apply()
                     DebugLog.w(TAG, "YouTube history sync needs the account to reconnect", error)
                     return Result.success()
                 }

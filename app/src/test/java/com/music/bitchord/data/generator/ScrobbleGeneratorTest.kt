@@ -164,7 +164,7 @@ class ScrobbleGeneratorTest {
     fun storeSkipsMalformedRowsAndLeavesNoTemporaryFileAfterWrite() {
         val file = File.createTempFile("malformed-plays", ".tsv")
         file.deleteOnExit()
-        file.writeText("broken row\\n")
+        file.writeText("broken row" + System.lineSeparator())
         val store = PlayHistoryStore(file, zone)
 
         assertEquals(1, store.append(listOf(play("valid"))))

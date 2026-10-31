@@ -36,3 +36,11 @@ Backend CI runs these checks using the Go version declared in `backend/go.mod`. 
 - Never log cookies, SAPISID values, account tokens or imported listening rows. Imported history remains local and must not be exported through backup/device-transfer rules.
 
 Useful regression coverage: `AuthCookieTest`, `AccountSessionsTest`, and `ScrobbleSessionIdentityTest`. Verify Android unit tests and the exact PR-head CI run; device checks are still required for real session expiry, sign-out, account switching and background scheduling.
+
+
+## Existing history-import provider contracts
+
+- **ListenBrainz:** reuse the existing stored token. Validate it with `GET /1/validate-token` (the response supplies the account username). For bounded incremental reads, use `GET /1/user/{username}/listens` with supported time bounds. For a complete account history, use the authenticated asynchronous export flow (`POST /1/export`, poll the returned export ID, then download the archive); persist the export ID across worker restarts and respect the documented polling/rate limits. Do not repeatedly paginate the entire account history.
+- **Last.fm:** `user.getRecentTracks` is an API-key + username method; it does not use the stored session key for authentication. Preserve the returned Unix timestamps, paginate within the documented page limit, and skip now-playing rows that have no listen timestamp.
+- Neither provider returns a YouTube Music video ID as a guaranteed playable identifier. Imported rows may be used for statistics, but a queue must resolve title/artist against YouTube Music using `TrackMatcher` and reject ambiguous or unresolved matches. Never put an MBID, recording_msid, title, or synthetic string into `Song.videoId`.
+- Keep provider imports explicitly opt-in and separate from outbound scrobbling. Do not expose a provider control until its credentials, pagination/export lifecycle, deduplication, timestamp semantics, and playable-track resolution are implemented and tested.

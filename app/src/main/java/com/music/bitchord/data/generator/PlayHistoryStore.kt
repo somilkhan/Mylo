@@ -12,8 +12,9 @@ import java.time.ZoneId
  * Append-only local file of plays, one per line, tab separated. Plays are
  * deduplicated on write, so importing the same history twice adds nothing.
  *
- * The file is plain text on purpose: it can be read, backed up and deleted
- * without a schema. [forget] removes everything, which is the Settings button.
+ * The file is plain text on purpose: it can be inspected and deleted without
+ * a schema. Android backup and device-transfer rules explicitly exclude it.
+ * [forget] removes everything, which is the Settings button.
  */
 class PlayHistoryStore(private val file: File, private val zone: ZoneId = ZoneId.systemDefault()) {
 
@@ -52,7 +53,7 @@ class PlayHistoryStore(private val file: File, private val zone: ZoneId = ZoneId
         }
     }
 
-    /** Replace the history file only after the complete new contents are durable in a sibling file. */
+    /** Replace the history file only after the complete new contents are written to a sibling file. */
     private fun writeAtomically(plays: List<Play>) {
         file.parentFile?.mkdirs()
         val temporary = File(file.absolutePath + ".tmp")
