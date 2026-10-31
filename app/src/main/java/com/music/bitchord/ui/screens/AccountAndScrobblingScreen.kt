@@ -185,6 +185,15 @@ fun AccountAndScrobblingScreen(
                     else ScrobbleHistorySync.schedule(appContext)
                 },
             )
+            if (shouldOfferYouTubeReconnect(signedIn, historySyncEnabled, historySyncStatus)) {
+                FullWidthDivider()
+                SettingsRow(
+                    icon = Icons.Rounded.History,
+                    title = "Reconnect YouTube Music",
+                    subtitle = "Use your existing YouTube Music sign-in to resume history sync.",
+                    onClick = onSignIn,
+                )
+            }
             FullWidthDivider()
             SettingsRow(
                 icon = Icons.Rounded.History,
@@ -470,6 +479,17 @@ fun AccountAndScrobblingScreen(
         )
     }
 }
+
+/**
+ * Expired sessions keep their stored account visible, so the ordinary signed-out
+ * action is hidden. Offer the existing sign-in flow only while sync is enabled
+ * and the worker has explicitly requested reconnection.
+ */
+internal fun shouldOfferYouTubeReconnect(
+    signedIn: Boolean,
+    syncEnabled: Boolean,
+    status: String?,
+): Boolean = signedIn && syncEnabled && status == ScrobbleHistorySync.STATUS_WAITING_FOR_SIGN_IN
 
 private fun historySyncSubtitle(
     enabled: Boolean,
