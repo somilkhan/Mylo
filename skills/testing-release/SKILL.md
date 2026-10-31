@@ -16,6 +16,10 @@ Always verify the workflow run for the commit under review; a prior green run is
 4. If relevant, run desktop, backend and web checks from `CONTRIBUTING.md`.
 5. Review the diff, generated artifacts, logs and final commit; fix failures and rerun affected checks.
 
+## Private history and backup rules
+
+Scrobble history is stored in `filesDir/scrobble_history.tsv` with an atomic sibling `scrobble_history.tsv.tmp`. Exclude both files from Android cloud backup and device transfer in `backup_rules.xml` and `data_extraction_rules.xml`. Revisit exclusions whenever the history store adds a journal, temporary, or sidecar file.
+
 ## Report statuses independently
 
 - IMPLEMENTED: code exists.

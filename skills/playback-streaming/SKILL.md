@@ -28,6 +28,13 @@
 
 Confirm exact test class names in `app/src/test` before invoking a focused test.
 
+## Listening-history timestamps
+
+- `ListeningRecorder.onStarted` is called from Media3 audible-state and track-transition callbacks. That event supplies the timestamp for a Mylo play.
+- The five-second progress sampler contributes listened duration and decides when a play qualifies; never stamp a play at the threshold-crossing sample.
+- Keep `onStopped` wired to pause/stop/track transitions so paused wall-clock gaps are not counted. Preserve local-file identity via `Song.localUri`.
+- Regression coverage lives in `app/src/test/java/com/music/bitchord/data/stats/ListeningRecorderTest.kt`; run it with `:app:testDevDebugUnitTest --tests com.music.bitchord.data.stats.ListeningRecorderTest`.
+
 ## Evidence boundaries
 
 Do not treat a selected codec, advertised output capability, DSP format, telemetry event or successful build as proof of sound reaching a physical endpoint. Bluetooth/USB/device routing requires the relevant real hardware to verify. Keep fixes narrow; the playback service and queue are high-risk shared state.

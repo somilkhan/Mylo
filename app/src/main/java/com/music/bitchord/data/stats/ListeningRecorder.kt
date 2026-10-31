@@ -52,13 +52,6 @@ object ListeningRecorder {
     private var samplesSinceFlush = 0
 
     /**
-     * One tick of the player's sampler.
-     *
-     * [durationMs] is the decoder's figure when it has one; the row's stated
-     * runtime stands in until it does, and a track with neither simply has to
-     * clear the thirty-second floor to count as a play.
-     */
-    /**
      * Called by Media3 when the track first becomes audible. Unlike the progress
      * sampler, this event is not delayed by its five-second sampling interval.
      * Repeated notifications for the same uninterrupted track do not reset it.
@@ -69,6 +62,11 @@ object ListeningRecorder {
         playClock.start(trackIdentity, atMillis)
     }
 
+    /**
+     * One tick of the player's sampler. [durationMs] is the decoder's figure
+     * when it has one; the row's stated runtime stands in until it does, and a
+     * track with neither simply has to clear the thirty-second floor to count.
+     */
     @Synchronized
     fun onSample(song: Song, durationMs: Long) {
         val now = System.currentTimeMillis()
