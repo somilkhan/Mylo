@@ -2619,6 +2619,9 @@ private fun BitChordApp(
         // one child it always had and changes nothing.
         Row(Modifier.fillMaxSize()) {
             Box(Modifier.weight(1f).fillMaxHeight()) {
+                // Share the measured bottom-bar stack height with Scrobble so its
+                // scroll content clears the real mini-player/navigation layout.
+                val floatingBarsHeight = remember { mutableIntStateOf(0) }
                 AnimatedContent(
                     targetState = when {
                         showSpotify && detail == null -> "spotify"
@@ -2765,7 +2768,9 @@ private fun BitChordApp(
                     } else if (key == "scrobble") {
                         ScrobbleScreen(
                             selectedSection = scrobbleSection,
-                            bottomPadding = if (player.song != null) 210.dp else 140.dp,
+                            bottomPadding = if (floatingBarsHeight.intValue > 0) {
+                                with(LocalDensity.current) { floatingBarsHeight.intValue.toDp() + 12.dp }
+                            } else if (player.song != null) 210.dp else 140.dp,
                             onSectionChange = { scrobbleSection = it },
                             onPlayPlaylist = { playlistName, songs ->
                                 if (songs.isNotEmpty()) {
@@ -3958,8 +3963,7 @@ private fun BitChordApp(
                 )
 
                 // Whichever bar is drawing reports its height here, for the
-                // guard to read at layout — never in composition, see the guard.
-                val floatingBarsHeight = remember { mutableIntStateOf(0) }
+                // guard and Scrobble's scroll inset to read at layout.
                 FloatingBarsTapGuard(
                     barsHeight = { floatingBarsHeight.intValue },
                     modifier = Modifier.align(Alignment.BottomCenter),

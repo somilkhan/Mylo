@@ -32,3 +32,8 @@ Scrobble history is stored in `filesDir/scrobble_history.tsv` with an atomic sib
 - NOT VERIFIED: evidence is unavailable or incomplete.
 
 Do not infer playback correctness, UI quality, installability, physical audio behavior or device performance from compilation alone. Release signing uses local `keystore.properties`; never commit signing material. Preserve GPL-3.0 notices and release source obligations.
+
+## Kotlin Multiplatform JVM test coverage
+
+- The desktop app test task does not execute test tasks from its project dependencies. CI and local verification must run :shared:jvmTest :sharedUi:jvmTest :desktopUi:jvmTest explicitly before :desktopApp:test.
+- The Android app suite is separate: run :app:testDevDebugUnitTest. A successful desktop test task does not cover Android-only code, and an Android unit-test pass does not execute the shared JVM-only test source sets.

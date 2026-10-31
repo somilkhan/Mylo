@@ -1084,10 +1084,9 @@ object YtMusicRepository {
                 Innertube.refreshSessionScope()
                 block()
             }
-                // runCatching catches Throwable, cancellation included, which
-                // would turn "the user typed another letter" into a failed
-                // Result and put the abandoned request's error on screen.
-                // Cancellation isn't this call's to answer for.
+                // The initial request uses runCatchingCancellable. Keep this
+                // guard for cancellation raised during the one-time session
+                // refresh/retry path: it must never become an ordinary Result.
                 .onFailure { if (it is CancellationException) throw it }
                 .onSuccess { Log.d(TAG, "$label ok") }
                 .onFailure { Log.w(TAG, "$label failed: ${it.message}") }
