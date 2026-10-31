@@ -25,7 +25,7 @@ class YtMusicRepositoryHistoryTest {
         val failure = IllegalStateException("UNAUTHENTICATED: LOGIN_REQUIRED")
 
         val thrown = assertFailsWith<IllegalStateException> {
-            fetchRecentHistory("session-cookie") { throw failure }
+            fetchRecentHistory<String>("session-cookie") { throw failure }
         }
 
         assertEquals(failure, thrown)
