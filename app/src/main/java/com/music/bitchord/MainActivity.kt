@@ -265,6 +265,7 @@ import com.music.bitchord.ui.components.TopBarAccountButton
 import com.music.bitchord.ui.screens.SegmentedControl
 import com.music.bitchord.ui.components.SearchField
 import com.music.bitchord.ui.components.ScrobbleFab
+import com.music.bitchord.ui.components.scrobbleFabVisible
 import com.music.bitchord.ui.components.liquidGlass
 import com.music.bitchord.sharedui.resources.Res as SharedRes
 import com.music.bitchord.sharedui.resources.search_hint
@@ -4104,11 +4105,14 @@ private fun BitChordApp(
                     )
                 }
             ScrobbleFab(
-                visible = selectedTab == TAB_HOME &&
-                    !showSettings && !showReplay && !showHistory && !showAccountScrobbling &&
-                    !showSources && !showListenTogether && !showWearOs && !showEqualizer &&
-                    !showDiscord && !showSpotify && detail == null && selectedMoodGenre == null &&
-                    libraryShowAll == null && settingsSubScreen == null,
+                visible = scrobbleFabVisible(
+                    selectedTab = selectedTab,
+                    homeTab = TAB_HOME,
+                    overlayOpen = showSettings || showReplay || showHistory || showAccountScrobbling ||
+                        showSources || showListenTogether || showWearOs || showEqualizer ||
+                        showDiscord || showSpotify || detail != null || selectedMoodGenre != null ||
+                        libraryShowAll != null || settingsSubScreen != null,
+                ),
                 open = showScrobble,
                 onClick = {
                     if (showScrobble) {
