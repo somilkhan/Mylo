@@ -210,10 +210,8 @@ object ScrobbleHistorySync {
 
     /**
      * Revalidate the active identity, append the history and publish its cursor
-     * and UI summary under one lock so stale work cannot overwrite a new profile.
-     * session-locked operation. A profile switch either happens before this
-     * guard (so the stale response is discarded) or after the status write
-     * (so onSessionChanged can safely publish the newly selected profile).
+     * and UI summary under one lock. Stale responses are discarded, and a later
+     * profile switch can safely publish the newly selected profile's status.
      */
     internal fun appendIfCurrentSession(
         context: Context,
