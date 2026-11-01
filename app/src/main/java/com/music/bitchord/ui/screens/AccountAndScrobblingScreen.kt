@@ -161,7 +161,7 @@ fun AccountAndScrobblingScreen(
 
         SettingsGroup(
             header = "YouTube Music history",
-            footer = "Imported history stays on this device. Automatic refresh runs about every six hours when a network connection is available; imported rows are marked approximate.",
+            footer = "Imported history stays on this device. The first import runs after sign-in; automatic refresh runs about every six hours on an unmetered connection (usually Wi-Fi). Imported rows are approximate.",
         ) {
             SettingsRow(
                 icon = Icons.Rounded.History,
@@ -502,9 +502,9 @@ private fun historySyncSubtitle(
         ScrobbleHistorySync.STATUS_WAITING_FOR_SIGN_IN ->
             "Reconnect YouTube Music to resume history sync"
         ScrobbleHistorySync.STATUS_WAITING_FOR_WIFI ->
-            "Waiting for a network connection"
+            "Waiting for an unmetered connection"
         ScrobbleHistorySync.STATUS_RETRYING ->
-            "Sync failed; will retry when a network is available"
+            "Sync failed; will retry on an unmetered connection"
         ScrobbleHistorySync.STATUS_NO_DATED_ROWS ->
             "No date-labelled rows found on last sync"
         ScrobbleHistorySync.STATUS_SUCCESS -> {
@@ -512,7 +512,7 @@ private fun historySyncSubtitle(
                 .format(Date(lastSyncAt))
             "Last sync $time · $lastAdded new listens"
         }
-        else -> "Sync about every six hours when online"
+        else -> "Sync about every six hours on an unmetered connection"
     }
 }
 
