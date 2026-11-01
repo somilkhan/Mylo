@@ -119,13 +119,14 @@ class YtMusicRepositoryHistoryTest {
             """{"error":{"code":401,"status":"UNAUTHENTICATED","message":"Invalid credentials"}}""",
         ) as JsonObject
 
-        assertFailsWith<IllegalStateException> {
+        val failure = assertFailsWith<IllegalStateException> {
             collectPagedYtMusicHistory(
                 firstPage = response,
                 nowMillis = 1L,
                 zone = ZoneId.of("UTC"),
             ) { error("An API error must not trigger continuation requests") }
         }
+        assertEquals(true, failure.message.orEmpty().contains("401"))
     }
 
     private fun historyRow(videoId: String, title: String): String =
