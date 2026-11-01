@@ -1182,7 +1182,9 @@ internal suspend fun collectPagedYtMusicHistory(
         val token = InnertubeParser.continuationToken(response)
             ?.takeIf(String::isNotBlank)
             ?: break
-        if (!seenTokens.add(token)) break
+        check(seenTokens.add(token)) {
+            "YouTube Music history pagination repeated a continuation token; refusing to import an incomplete history"
+        }
         response = loadNext(token)
     }
 
