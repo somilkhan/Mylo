@@ -141,8 +141,7 @@ object DesktopDownloadQueue {
             while (true) {
                 val item = takeNext() ?: return
                 val id = item.song.videoId
-                onRunning(id, currentJob())
-                _active.update { it + (id to item.copy(state = DesktopDownloadState.Running(0f))) }
+                if (!onRunning(id, item, currentJob())) return
                 val result = runCatching {
                     DesktopDownloadManager.download(item.song) { downloaded, total ->
                         val fraction = if (total != null && total > 0L) {
@@ -201,14 +200,26 @@ object DesktopDownloadQueue {
     }
 
     /** Attaches the job fetching [videoId], unless it has been cancelled meanwhile. */
-    private fun onRunning(videoId: String, job: Job?) {
-        val cancelled = synchronized(lock) {
-            if (videoId !in running) return@synchronized true
+    /**
+     * Attaches the worker and publishes its Running state as one queue transition.
+     *
+     * Cancellation can land after [takeNext] claims an item but before the worker attaches its
+     * Job. In that window [cancel] removes the running slot without a Job to cancel. Publishing
+     * Running outside this lock used to resurrect the cancelled row after it had been removed.
+     */
+    private fun onRunning(videoId: String, item: DesktopDownloadItem, job: Job?): Boolean =
+        synchronized(lock) {
+            if (videoId !in running) {
+                job?.cancel()
+                return@synchronized false
+            }
             running[videoId] = job
-            false
+            _active.update { current ->
+                if (videoId !in current) current
+                else current + (videoId to item.copy(state = DesktopDownloadState.Running(0f)))
+            }
+            true
         }
-        if (cancelled) job?.cancel()
-    }
 
     private fun onIdle(videoId: String) {
         synchronized(lock) { running.remove(videoId) }
