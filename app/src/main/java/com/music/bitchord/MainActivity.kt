@@ -3210,6 +3210,18 @@ private fun BitChordApp(
                             onRefresh = { viewModel.refresh(MainViewModel.Feed.EXPLORE) },
                             pullState = explorePull,
                             contentPadding = listPadding,
+                            replay = {
+                                LibraryReplayEntry(
+                                    cards = replayCards,
+                                    loading = replay.loading,
+                                    holder = account?.name.orEmpty(),
+                                    memberSince = replay.memberSince,
+                                    onOpenReplay = { page ->
+                                        replayLandingPage = page
+                                        showReplay = true
+                                    },
+                                )
+                            },
                         )
                         TAB_SEARCH -> SearchScreen(
                             query = query,
@@ -3399,18 +3411,7 @@ private fun BitChordApp(
                             onNewPlaylist = { creatingPlaylist = true },
                             onImportSpotifyPlaylist = { showSpotifyImportDialog = true },
                             onShowAll = { shelf -> libraryShowAll = shelf },
-                            replay = {
-                                LibraryReplayEntry(
-                                    cards = replayCards,
-                                    loading = replay.loading,
-                                    holder = account?.name.orEmpty(),
-                                    memberSince = replay.memberSince,
-                                    onOpenReplay = { page ->
-                                        replayLandingPage = page
-                                        showReplay = true
-                                    },
-                                )
-                            },
+                            replay = {},
                             onSignIn = { webSession = WebSessionMode.SIGN_IN },
                             onRetry = viewModel::loadLibrary,
                             refreshing = MainViewModel.Feed.LIBRARY in refreshing,
