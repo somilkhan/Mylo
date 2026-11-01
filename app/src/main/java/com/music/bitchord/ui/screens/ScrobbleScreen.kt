@@ -2,6 +2,7 @@ package com.music.bitchord.ui.screens
 
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,6 +19,7 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Explore
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.PlayArrow
@@ -36,11 +38,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import com.music.bitchord.data.YtMusicRepository
@@ -89,6 +93,7 @@ fun ScrobbleScreen(
     var loadingRecommendations by remember { mutableStateOf(false) }
     var recommendationsReady by remember { mutableStateOf(false) }
     var recommendationsFailed by remember { mutableStateOf(false) }
+    var openedPlaylistTitle by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
         try {
@@ -201,11 +206,29 @@ fun ScrobbleScreen(
                     onSavePlaylist = ScrobblePlaylistStore::save,
                     onBrowseMoods = onBrowseMoods,
                 )
-                SCROBBLE_TAB_PLAYLISTS -> playlistsSection(
-                    playlists = ScrobblePlaylistStore.playlists,
-                    onPlayPlaylist = onPlayPlaylist,
-                    onRemovePlaylist = ScrobblePlaylistStore::remove,
-                )
+                SCROBBLE_TAB_PLAYLISTS -> {
+                    val openedPlaylist = openedPlaylistTitle?.let { title ->
+                        ScrobblePlaylistStore.playlists.firstOrNull { it.title == title }
+                    }
+                    if (openedPlaylist != null) {
+                        playlistDetailSection(
+                            playlist = openedPlaylist,
+                            onBack = { openedPlaylistTitle = null },
+                            onPlayPlaylist = onPlayPlaylist,
+                        )
+                    } else {
+                        openedPlaylistTitle = null
+                        playlistsSection(
+                            playlists = ScrobblePlaylistStore.playlists,
+                            onOpenPlaylist = { openedPlaylistTitle = it },
+                            onPlayPlaylist = onPlayPlaylist,
+                            onRemovePlaylist = { title ->
+                                ScrobblePlaylistStore.remove(title)
+                                if (openedPlaylistTitle == title) openedPlaylistTitle = null
+                            },
+                        )
+                    }
+                }
                 else -> statsSection(summary, loadingStats, statsFailed, historyPlays, loadingHistory, historyFailed)
             }
         }
@@ -736,8 +759,58 @@ private fun Play.toSong(): Song = Song(
     localUri = localUri,
 )
 
+private fun LazyListScope.playlistDetailSection(
+    playlist: SavedScrobblePlaylist,
+    onBack: () -> Unit,
+    onPlayPlaylist: (String, List<Song>) -> Unit,
+) {
+    item(key = "pl-detail-back") {
+        TextButton(onClick = onBack) {
+            Icon(imageVector = Icons.Rounded.ArrowBack, contentDescription = null)
+            Spacer(Modifier.width(6.dp))
+            Text("Playlists")
+        }
+    }
+    item(key = "pl-detail-header") {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = playlist.title,
+                style = MaterialTheme.typography.headlineLarge,
+                fontWeight = FontWeight.ExtraBold,
+                color = MaterialTheme.colorScheme.onBackground,
+            )
+            Text(playlist.reason, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                text = "${playlist.songs.size} tracks",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Button(
+                onClick = { onPlayPlaylist(playlist.title, playlist.songs) },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Icon(imageVector = Icons.Rounded.PlayArrow, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Play all")
+            }
+        }
+    }
+    items(playlist.songs, key = { song ->
+        "pl-detail-${playlist.title}-${song.localUri ?: song.videoId}-${playlist.songs.indexOf(song)}"
+    }) { song ->
+        val index = playlist.songs.indexOf(song)
+        ScrobbleRow(
+            title = song.title.ifBlank { "Unknown track" },
+            subtitle = song.artist.ifBlank { "Unknown artist" },
+            artworkUrl = song.thumbnailUrl,
+            onClick = { onPlayPlaylist(playlist.title, playlist.songs.drop(index)) },
+        )
+    }
+}
+
 private fun LazyListScope.playlistsSection(
     playlists: List<SavedScrobblePlaylist>,
+    onOpenPlaylist: (String) -> Unit,
     onPlayPlaylist: (String, List<Song>) -> Unit,
     onRemovePlaylist: (String) -> Unit,
 ) {
@@ -785,6 +858,9 @@ private fun LazyListScope.playlistsSection(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = { onOpenPlaylist(playlist.title) }) {
+                        Text("Open")
+                    }
                     Button(onClick = { onPlayPlaylist(playlist.title, playlist.songs) }) {
                         Icon(imageVector = Icons.Rounded.PlayArrow, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
@@ -804,6 +880,8 @@ private fun ScrobbleRow(
     title: String,
     subtitle: String,
     leadingIcon: androidx.compose.ui.graphics.vector.ImageVector = Icons.Rounded.History,
+    artworkUrl: String? = null,
+    onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -812,6 +890,7 @@ private fun ScrobbleRow(
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant)
+            .clickable(enabled = onClick != null) { onClick?.invoke() }
             .padding(horizontal = 14.dp, vertical = 12.dp),
     ) {
         Box(
@@ -821,12 +900,21 @@ private fun ScrobbleRow(
                 .clip(RoundedCornerShape(10.dp))
                 .background(MaterialTheme.colorScheme.surface),
         ) {
-            Icon(
-                imageVector = leadingIcon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(20.dp),
-            )
+            if (!artworkUrl.isNullOrBlank()) {
+                AsyncImage(
+                    model = artworkUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)),
+                )
+            } else {
+                Icon(
+                    imageVector = leadingIcon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
         }
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
