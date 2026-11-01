@@ -86,12 +86,15 @@ class PlayHistoryStore(private val file: File, private val zone: ZoneId = ZoneId
 
     private fun encode(p: Play): String =
         listOf(
-            p.videoId, p.title, p.artist, p.source.name, p.atMillis.toString(), p.exact.toString(), p.localUri.orEmpty(), p.thumbnailUrl.orEmpty(), p.localPath.orEmpty(),
+            p.videoId, p.title, p.artist, p.source.name, p.atMillis.toString(), p.exact.toString(),
+            p.localUri.orEmpty(), p.thumbnailUrl.orEmpty(), p.localPath.orEmpty(),
+            p.durationText.orEmpty(), p.artistId.orEmpty(), p.albumId.orEmpty(), p.albumName.orEmpty(),
+            p.isVideo.toString(), p.isVideoOrigin.toString(),
         ).joinToString("\t") { it.replace('\t', ' ').replace('\n', ' ').replace('\r', ' ') }
 
     private fun decode(line: String): Play? {
         val parts = line.split('\t')
-        if (parts.size !in 6..9) return null
+        if (parts.size !in 6..15) return null
         val source = runCatching { PlaySource.valueOf(parts[3]) }.getOrNull() ?: return null
         val at = parts[4].toLongOrNull() ?: return null
         return Play(
@@ -104,6 +107,13 @@ class PlayHistoryStore(private val file: File, private val zone: ZoneId = ZoneId
             localUri = parts.getOrNull(6)?.takeIf(String::isNotBlank),
             thumbnailUrl = parts.getOrNull(7)?.takeIf(String::isNotBlank),
             localPath = parts.getOrNull(8)?.takeIf(String::isNotBlank),
+            durationText = parts.getOrNull(9)?.takeIf(String::isNotBlank),
+            artistId = parts.getOrNull(10)?.takeIf(String::isNotBlank),
+            albumId = parts.getOrNull(11)?.takeIf(String::isNotBlank),
+            albumName = parts.getOrNull(12)?.takeIf(String::isNotBlank),
+            isVideo = parts.getOrNull(13)?.toBooleanStrictOrNull() ?: false,
+            isVideoOrigin = parts.getOrNull(14)?.toBooleanStrictOrNull()
+                ?: (parts.getOrNull(13)?.toBooleanStrictOrNull() ?: false),
         )
     }
 }
