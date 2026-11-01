@@ -139,17 +139,25 @@ class AndroidAutoMediaLibraryTest {
             }
         }
 
-        withContext(Dispatchers.Main) {
-            mediaBrowser.search("Adele", null)
-        }
+        mediaBrowser.addListener(listener)
+        try {
+            withContext(Dispatchers.Main) {
+                mediaBrowser.search("Adele", null)
+            }
 
-        // Wait for search result notification
-        searchLatch.await(10, TimeUnit.SECONDS)
+            assertTrue(
+                "Search result change notification was not delivered",
+                searchLatch.await(10, TimeUnit.SECONDS),
+            )
+            assertTrue("Search result count must be non-negative", resultCount >= 0)
 
-        val results = withContext(Dispatchers.Main) {
-            mediaBrowser.getSearchResult("Adele", 0, 10, null).get(10, TimeUnit.SECONDS)
+            val results = withContext(Dispatchers.Main) {
+                mediaBrowser.getSearchResult("Adele", 0, 10, null).get(10, TimeUnit.SECONDS)
+            }
+            assertNotNull("Search result should not be null", results)
+            assertNotNull("Search result items should not be null", results.value)
+        } finally {
+            mediaBrowser.removeListener(listener)
         }
-        assertNotNull("Search result should not be null", results)
-        assertNotNull("Search result items should not be null", results.value)
     }
 }
