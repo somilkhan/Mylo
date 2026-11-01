@@ -114,7 +114,7 @@ class YtMusicRepositoryHistoryTest {
     }
 
     @Test
-    fun datedHistoryContinuationPreservesApiErrors() {
+    fun datedHistoryContinuationPreservesApiErrors() = runBlocking {
         val response = Json.parseToJsonElement(
             """{"error":{"code":401,"status":"UNAUTHENTICATED","message":"Invalid credentials"}}""",
         ) as JsonObject
