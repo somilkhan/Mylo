@@ -20,13 +20,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
 
-internal fun shouldResumeScrobbleHistorySync(hasSavedChoice: Boolean, enabled: Boolean): Boolean =
-    hasSavedChoice && enabled
+internal fun shouldResumeScrobbleHistorySync(hasExplicitConsent: Boolean, enabled: Boolean): Boolean =
+    hasExplicitConsent && enabled
 
 /** Explicitly opt-in sync of date-labelled YouTube history whenever a network is connected. */
 object ScrobbleHistorySync {
     const val PREFS_NAME = "scrobble_history_sync"
     const val KEY_ENABLED = "youtube_auto_sync_enabled"
+    private const val KEY_CONSENT_RECORDED = "youtube_history_sync_consent_recorded"
     const val KEY_LAST_SYNC_AT = "youtube_last_sync_at"
     const val KEY_LAST_ATTEMPT_AT = "youtube_last_sync_attempt_at"
     const val KEY_LAST_ADDED = "youtube_last_sync_added"
@@ -37,6 +38,32 @@ object ScrobbleHistorySync {
     private const val KEY_AUTH_REQUIRED = "youtube_sync_auth_required"
 
     private val sessionLock = Any()
+
+    /**
+     * Older builds could set KEY_ENABLED during sign-in without a user action.
+     * Such a value is not consent: migrate it to paused once, then wait for the
+     * listener to enable the Settings switch explicitly.
+     */
+    private fun ensureConsentState(prefs: android.content.SharedPreferences) {
+        if (!prefs.contains(KEY_CONSENT_RECORDED)) {
+            prefs.edit()
+                .putBoolean(KEY_ENABLED, false)
+                .putBoolean(KEY_CONSENT_RECORDED, true)
+                .apply()
+        }
+    }
+
+    private fun hasExplicitlyEnabledSync(prefs: android.content.SharedPreferences): Boolean =
+        shouldResumeScrobbleHistorySync(
+            hasExplicitConsent = prefs.getBoolean(KEY_CONSENT_RECORDED, false),
+            enabled = prefs.getBoolean(KEY_ENABLED, false),
+        )
+
+    internal fun isSyncEnabled(context: Context): Boolean {
+        val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        ensureConsentState(prefs)
+        return hasExplicitlyEnabledSync(prefs)
+    }
 
     const val STATUS_SUCCESS = "success"
     const val STATUS_NO_DATED_ROWS = "no_dated_rows"
@@ -52,10 +79,10 @@ object ScrobbleHistorySync {
      * A first sign-in is not consent to retain and periodically import account history.
      */
     fun onLogin(context: Context) {
-        val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        if (shouldResumeScrobbleHistorySync(prefs.contains(KEY_ENABLED), prefs.getBoolean(KEY_ENABLED, false))) {
-            schedule(context)
-        }
+        val appContext = context.applicationContext
+        val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        ensureConsentState(prefs)
+        if (hasExplicitlyEnabledSync(prefs)) scheduleWork(appContext)
     }
 
     /** Fence in-flight work before the authenticated account/profile changes. */
@@ -75,15 +102,17 @@ object ScrobbleHistorySync {
     fun onSessionChanged(context: Context) {
         val appContext = context.applicationContext
         val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        ensureConsentState(prefs)
         val enabled = synchronized(sessionLock) {
             prefs.edit()
                 .putBoolean(KEY_SESSION_SUSPENDED, false)
                 .putBoolean(KEY_SIGNED_OUT, false)
                 .putBoolean(KEY_AUTH_REQUIRED, false)
                 .apply()
-            prefs.getBoolean(KEY_ENABLED, false)
+            hasExplicitlyEnabledSync(prefs)
         }
         if (!enabled || currentSessionIdentity(appContext) == null) return
+        enqueuePeriodicWork(appContext)
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
             .build()
@@ -126,7 +155,7 @@ object ScrobbleHistorySync {
         val paused = synchronized(sessionLock) {
             val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             if (
-                !prefs.getBoolean(KEY_ENABLED, false) ||
+                !hasExplicitlyEnabledSync(prefs) ||
                 prefs.getLong(KEY_SESSION_GENERATION, 0L) != expectedGeneration ||
                 currentSessionIdentity(appContext) != expectedIdentity
             ) {
@@ -177,7 +206,7 @@ object ScrobbleHistorySync {
         val appContext = context.applicationContext
         val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         if (
-            !prefs.getBoolean(KEY_ENABLED, false) ||
+            !hasExplicitlyEnabledSync(prefs) ||
             prefs.getLong(KEY_SESSION_GENERATION, 0L) != expectedGeneration ||
             currentSessionIdentity(appContext) != expectedIdentity
         ) return@synchronized null
@@ -191,45 +220,60 @@ object ScrobbleHistorySync {
     ): Boolean = synchronized(sessionLock) {
         val appContext = context.applicationContext
         val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        prefs.getBoolean(KEY_ENABLED, false) &&
+        hasExplicitlyEnabledSync(prefs) &&
             prefs.getLong(KEY_SESSION_GENERATION, 0L) == expectedGeneration &&
             currentSessionIdentity(appContext) == expectedIdentity
     }
 
+    /** Called by the Settings switch; this is the only path that records consent. */
     fun schedule(context: Context) {
         val appContext = context.applicationContext
         val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        prefs.edit().putBoolean(KEY_ENABLED, true).apply()
-        if (prefs.getBoolean(KEY_SIGNED_OUT, false) || currentSessionIdentity(appContext) == null) return
+        ensureConsentState(prefs)
+        prefs.edit()
+            .putBoolean(KEY_CONSENT_RECORDED, true)
+            .putBoolean(KEY_ENABLED, true)
+            .apply()
+        scheduleWork(appContext)
+    }
 
-        val periodicConstraints = Constraints.Builder()
-            .setRequiredNetworkType(NetworkType.UNMETERED)
-            .build()
+    /** Resume already-consented work without changing the user's choice. */
+    private fun scheduleWork(appContext: Context) {
+        val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        if (!hasExplicitlyEnabledSync(prefs) || prefs.getBoolean(KEY_SIGNED_OUT, false) ||
+            currentSessionIdentity(appContext) == null
+        ) return
+        enqueuePeriodicWork(appContext)
         val immediateConstraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
             .build()
-        val workManager = WorkManager.getInstance(appContext)
-        val periodic = PeriodicWorkRequestBuilder<ScrobbleHistorySyncWorker>(6, TimeUnit.HOURS)
-            .setConstraints(periodicConstraints)
-            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.MINUTES)
-            .build()
-        workManager.enqueueUniquePeriodicWork(
-            UNIQUE_WORK_NAME,
-            ExistingPeriodicWorkPolicy.KEEP,
-            periodic,
-        )
-
         val immediate = OneTimeWorkRequestBuilder<ScrobbleHistorySyncWorker>()
             .setConstraints(immediateConstraints)
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
             .build()
-        workManager.enqueueUniqueWork(IMMEDIATE_WORK_NAME, ExistingWorkPolicy.KEEP, immediate)
+        WorkManager.getInstance(appContext).enqueueUniqueWork(IMMEDIATE_WORK_NAME, ExistingWorkPolicy.KEEP, immediate)
+    }
+
+    private fun enqueuePeriodicWork(appContext: Context) {
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.UNMETERED)
+            .build()
+        val periodic = PeriodicWorkRequestBuilder<ScrobbleHistorySyncWorker>(6, TimeUnit.HOURS)
+            .setConstraints(constraints)
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.MINUTES)
+            .build()
+        WorkManager.getInstance(appContext).enqueueUniquePeriodicWork(
+            UNIQUE_WORK_NAME,
+            ExistingPeriodicWorkPolicy.KEEP,
+            periodic,
+        )
     }
 
     /** Re-register the persistent periodic work after process/app recreation, without an extra immediate fetch. */
     fun ensurePeriodic(context: Context) {
         val appContext = context.applicationContext
         val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        ensureConsentState(prefs)
         val activeCookie = AuthStore(appContext).activeSession?.cookie
         val hasRestoredSession = activeCookie != null &&
             AuthStore.hasApiSid(activeCookie) && Innertube.cookie == activeCookie
@@ -246,20 +290,8 @@ object ScrobbleHistorySync {
         }
         if (!hasRestoredSession || prefs.getBoolean(KEY_SIGNED_OUT, false)) return
         if (prefs.getBoolean(KEY_AUTH_REQUIRED, false)) return
-        if (!shouldResumeScrobbleHistorySync(prefs.contains(KEY_ENABLED), prefs.getBoolean(KEY_ENABLED, false))) return
-
-        val constraints = Constraints.Builder()
-            .setRequiredNetworkType(NetworkType.UNMETERED)
-            .build()
-        val periodic = PeriodicWorkRequestBuilder<ScrobbleHistorySyncWorker>(6, TimeUnit.HOURS)
-            .setConstraints(constraints)
-            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.MINUTES)
-            .build()
-        WorkManager.getInstance(appContext).enqueueUniquePeriodicWork(
-            UNIQUE_WORK_NAME,
-            ExistingPeriodicWorkPolicy.KEEP,
-            periodic,
-        )
+        if (!hasExplicitlyEnabledSync(prefs)) return
+        enqueuePeriodicWork(appContext)
     }
 
     fun cancel(context: Context) {
@@ -269,6 +301,7 @@ object ScrobbleHistorySync {
             prefs.edit()
                 .putLong(KEY_SESSION_GENERATION, prefs.getLong(KEY_SESSION_GENERATION, 0L) + 1L)
                 .putBoolean(KEY_ENABLED, false)
+                .putBoolean(KEY_CONSENT_RECORDED, true)
                 .apply()
         }
         WorkManager.getInstance(appContext).apply {
@@ -292,7 +325,7 @@ class ScrobbleHistorySyncWorker(
             ScrobbleHistorySync.PREFS_NAME,
             Context.MODE_PRIVATE,
         )
-        if (!prefs.getBoolean(ScrobbleHistorySync.KEY_ENABLED, false)) return Result.success()
+        if (!ScrobbleHistorySync.isSyncEnabled(applicationContext)) return Result.success()
 
         val now = System.currentTimeMillis()
         val generation = ScrobbleHistorySync.currentSessionGeneration(applicationContext)
