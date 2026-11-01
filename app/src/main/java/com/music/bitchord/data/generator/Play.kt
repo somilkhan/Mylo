@@ -46,13 +46,22 @@ internal fun normaliseText(s: String): String =
  * counted twice.
  */
 fun dedupePlays(plays: List<Play>, zone: ZoneId): List<Play> {
-    val chosen = LinkedHashMap<String, Play>()
-    for (play in plays) {
-        val key = "${play.songKey()}@${play.localDay(zone)}"
-        val existing = chosen[key]
-        if (existing == null || rank(play) > rank(existing)) chosen[key] = play
-    }
-    return chosen.values.sortedBy { it.atMillis }
+    val byTrackAndDay = plays.groupBy { "${it.songKey()}@${it.localDay(zone)}" }
+    return byTrackAndDay.values.flatMap { sameDay ->
+        // Mylo records a qualifying event for every completed listen. Keep
+        // distinct event timestamps; collapsing these to one row per day made
+        // repeat listens invisible to Top Tracks and Rediscover.
+        val myloEvents = sameDay
+            .filter { it.source == PlaySource.MYLO && it.exact }
+            .distinctBy { it.atMillis }
+        if (myloEvents.isNotEmpty()) {
+            myloEvents
+        } else {
+            // Imported sources may overlap. Keep the most trustworthy single
+            // row for that track/day so the same listen is not counted twice.
+            listOf(sameDay.maxBy { rank(it) })
+        }
+    }.sortedBy { it.atMillis }
 }
 
 private fun rank(play: Play): Int = when {

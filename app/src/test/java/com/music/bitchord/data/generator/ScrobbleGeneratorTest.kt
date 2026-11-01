@@ -120,6 +120,28 @@ class ScrobbleGeneratorTest {
     }
 
     @Test
+    fun dedupePlays_preservesDistinctMyloRepeatListensOnSameDay() {
+        val first = play("repeat", daysAgo = 1.0)
+        val second = first.copy(atMillis = first.atMillis + 60 * 60 * 1000L)
+        val duplicateEvent = first.copy(source = PlaySource.MYLO)
+
+        val result = dedupePlays(listOf(first, second, duplicateEvent), zone)
+
+        assertEquals(listOf(first.atMillis, second.atMillis), result.map { it.atMillis })
+    }
+
+    @Test
+    fun dedupePlays_prefersAllMyloEventsOverOverlappingImportedRows() {
+        val first = play("repeat", daysAgo = 1.0)
+        val second = first.copy(atMillis = first.atMillis + 60 * 60 * 1000L)
+        val imported = first.copy(source = PlaySource.YOUTUBE_MUSIC, exact = false)
+
+        val result = dedupePlays(listOf(imported, first, second), zone)
+
+        assertEquals(listOf(first, second), result)
+    }
+
+    @Test
     fun recent_dedupesSameSongOnTheSameLocalDay() {
         val exact = play("same", daysAgo = 1.0)
         val importedDuplicate = exact.copy(source = PlaySource.YOUTUBE_MUSIC, exact = false)
