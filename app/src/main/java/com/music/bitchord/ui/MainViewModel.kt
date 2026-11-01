@@ -3273,10 +3273,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun removeAccount(accountId: String) {
-        ScrobbleHistorySync.onSessionChanging(getApplication())
+        val removingActiveAccount = accountId == _activeAccountId.value
+        if (removingActiveAccount) ScrobbleHistorySync.onSessionChanging(getApplication())
         val fallback = authStore.removeAccount(accountId)
         _googleAccounts.value = authStore.sessions
         if (fallback == null) { signOut(); return }
+        // Removing an inactive account must not disturb the active listener or
+        // fence its background history worker. AuthStore preserves that session.
+        if (!removingActiveAccount) return
         selectProfile(fallback.accountId, fallback.activeProfileId ?: fallback.profiles.firstOrNull()?.profileId ?: return)
     }
 
