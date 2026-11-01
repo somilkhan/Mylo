@@ -161,7 +161,13 @@ object YtMusicRepository {
         nowMillis: Long = System.currentTimeMillis(),
         zone: ZoneId = ZoneId.systemDefault(),
     ): Result<List<YtMusicHistoryEntry>> = call("history:dated") {
-        InnertubeParser.collectHistoryEntries(Innertube.browse(HISTORY), nowMillis, zone)
+        collectPagedYtMusicHistory(
+            firstPage = Innertube.browse(HISTORY),
+            nowMillis = nowMillis,
+            zone = zone,
+        ) { token ->
+            Innertube.browseContinuation(token)
+        }
     }
 
     /** Account listening history for the Recents feed. */
@@ -1129,6 +1135,49 @@ internal suspend fun <T> runCatchingCancellable(block: suspend () -> T): Result<
         Result.failure(failure)
     }
 
+
+/**
+ * Read every dated history page. Continuation responses often contain rows
+ * without repeating their date heading, so carry the last known bucket into
+ * the next page. A repeated token ends the walk rather than looping forever.
+ *
+ * Fetch failures deliberately propagate: a partial history must not be
+ * reported as a successful complete import.
+ */
+internal suspend fun collectPagedYtMusicHistory(
+    firstPage: JsonObject,
+    nowMillis: Long,
+    zone: ZoneId,
+    loadNext: suspend (String) -> JsonObject,
+): List<YtMusicHistoryEntry> {
+    val entries = ArrayList<YtMusicHistoryEntry>()
+    val seenTokens = HashSet<String>()
+    var response = firstPage
+    var inheritedDate: java.time.LocalDate? = null
+
+    while (true) {
+        val pageEntries = InnertubeParser.collectHistoryEntries(
+            root = response,
+            nowMillis = nowMillis,
+            zone = zone,
+            inheritedDate = inheritedDate,
+        )
+        entries += pageEntries
+        pageEntries.lastOrNull()?.let { last ->
+            inheritedDate = java.time.Instant.ofEpochMilli(last.playedAtMillis)
+                .atZone(zone)
+                .toLocalDate()
+        }
+
+        val token = InnertubeParser.continuationToken(response)
+            ?.takeIf(String::isNotBlank)
+            ?: break
+        if (!seenTokens.add(token)) break
+        response = loadNext(token)
+    }
+
+    return entries
+}
 
 /** Union local/imported and live account history before filtering Quick Picks. */
 internal fun mergeQuickPickExclusions(
