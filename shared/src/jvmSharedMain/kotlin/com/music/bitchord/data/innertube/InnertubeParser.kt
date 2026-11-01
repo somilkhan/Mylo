@@ -537,6 +537,12 @@ object InnertubeParser {
         val continuationDate: LocalDate?,
     )
 
+    /** All track identities on a history page, even when its date heading is unsupported. */
+    fun collectHistorySongs(root: JsonElement): List<Song> {
+        requireNoApiError(root, "history")
+        return collectSongsDeep(root)
+    }
+
     fun collectHistoryEntries(
         root: JsonElement,
         nowMillis: Long,

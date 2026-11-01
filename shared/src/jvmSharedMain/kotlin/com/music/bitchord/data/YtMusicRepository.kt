@@ -143,6 +143,12 @@ object YtMusicRepository {
     private suspend fun fetchHistory(): List<Song> =
         InnertubeParser.collectSongsDeep(Innertube.browse(HISTORY)).distinctBy { it.videoId }
 
+    /** Full account history for pages and recommendation exclusion; the Home shelf stays first-page only. */
+    private suspend fun fetchAllHistorySongs(): List<Song> =
+        collectPagedYtMusicHistorySongs(Innertube.browse(HISTORY)) { token ->
+            Innertube.browseContinuation(token)
+        }
+
     /**
      * The account's listening history, in the order YouTube Music keeps it.
      *
@@ -150,7 +156,7 @@ object YtMusicRepository {
      * a shelf on the home page and stops at [RECENT_LIMIT] so it stays a shelf,
      * whereas this is the page you open when twenty is not enough.
      */
-    suspend fun history(): Result<List<Song>> = call("history") { fetchHistory() }
+    suspend fun history(): Result<List<Song>> = call("history") { fetchAllHistorySongs() }
 
     /**
      * The same account feed, retaining the date group each row belongs to.
@@ -194,9 +200,7 @@ object YtMusicRepository {
             // Exclude tracks from every history page, not only the first shelf
             // returned by browse(HISTORY). The date parser is deliberately
             // approximate; only the song identities matter to this filter.
-            runCatchingCancellable {
-                historyWithDates().getOrThrow().map { it.song }
-            }.getOrDefault(emptyList())
+            runCatchingCancellable { fetchAllHistorySongs() }.getOrDefault(emptyList())
         } else {
             emptyList()
         }
@@ -1171,18 +1175,14 @@ internal suspend fun collectPagedYtMusicHistory(
     var inheritedDate: java.time.LocalDate? = null
 
     while (true) {
-        val pageEntries = InnertubeParser.collectHistoryEntries(
+        val page = InnertubeParser.collectDatedHistoryPage(
             root = response,
             nowMillis = nowMillis,
             zone = zone,
             inheritedDate = inheritedDate,
         )
-        entries += pageEntries
-        pageEntries.lastOrNull()?.let { last ->
-            inheritedDate = java.time.Instant.ofEpochMilli(last.playedAtMillis)
-                .atZone(zone)
-                .toLocalDate()
-        }
+        entries += page.entries
+        inheritedDate = page.continuationDate
 
         val token = InnertubeParser.continuationToken(response)
             ?.takeIf(String::isNotBlank)
@@ -1194,6 +1194,27 @@ internal suspend fun collectPagedYtMusicHistory(
     }
 
     return entries
+}
+
+/** Read every history page without requiring a supported date heading. */
+internal suspend fun collectPagedYtMusicHistorySongs(
+    firstPage: JsonObject,
+    loadNext: suspend (String) -> JsonObject,
+): List<Song> {
+    val songs = ArrayList<Song>()
+    val seenTokens = HashSet<String>()
+    var response = firstPage
+    while (true) {
+        songs += InnertubeParser.collectHistorySongs(response)
+        val token = InnertubeParser.continuationToken(response)
+            ?.takeIf(String::isNotBlank)
+            ?: break
+        check(seenTokens.add(token)) {
+            "YouTube Music history pagination repeated a continuation token; refusing to return incomplete history"
+        }
+        response = loadNext(token)
+    }
+    return songs.distinctBy { it.videoId }
 }
 
 /** Union local/imported and live account history before filtering Quick Picks. */

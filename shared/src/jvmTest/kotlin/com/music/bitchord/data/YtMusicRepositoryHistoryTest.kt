@@ -92,16 +92,14 @@ class YtMusicRepositoryHistoryTest {
     }
 
     @Test
-    fun quickPickExclusionsIncludeHistoryTracksFoundOnLaterPages() = runBlocking {
-        val zone = ZoneId.of("UTC")
-        val now = LocalDate.of(2026, 10, 29).atTime(9, 0).atZone(zone).toInstant().toEpochMilli()
+    fun quickPickExclusionsIncludeUndatedRowsAndTracksFoundOnLaterPages() = runBlocking {
         val firstPage = Json.parseToJsonElement(
             """
             {
               "contents": [{
                 "musicShelfRenderer": {
-                  "title": {"runs": [{"text": "Yesterday"}]},
-                  "contents": [${historyRow("first", "First track")}],
+                  "title": {"runs": [{"text": "Older"}]},
+                  "contents": [${historyRow("played-undated", "Played without supported date")}],
                   "continuations": [{"nextContinuationData": {"continuation": "page-2"}}]
                 }
               }]
@@ -120,18 +118,23 @@ class YtMusicRepositoryHistoryTest {
             """.trimIndent(),
         ) as JsonObject
 
-        val history = collectPagedYtMusicHistory(firstPage, now, zone) { token ->
+        val history = collectPagedYtMusicHistorySongs(firstPage) { token ->
             assertEquals("page-2", token)
             secondPage
         }
+        assertEquals(
+            listOf("played-undated", "played-on-page-two"),
+            history.map { it.videoId },
+        )
         val excluded = mergeQuickPickExclusions(
             localHistoryIds = emptySet(),
             accountHistoryIds = history.mapNotNullTo(HashSet()) {
-                it.song.videoId.takeIf(String::isNotBlank)
+                it.videoId.takeIf(String::isNotBlank)
             },
         )
         val recommendations = unplayedRecommendations(
             listOf(
+                Song("played-undated", "Played without supported date", "Artist", null),
                 Song("played-on-page-two", "Played later track", "Artist", null),
                 Song("fresh", "Fresh track", "Artist", null),
             ),
