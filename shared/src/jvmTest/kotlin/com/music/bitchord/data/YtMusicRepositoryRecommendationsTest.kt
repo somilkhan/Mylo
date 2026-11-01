@@ -28,6 +28,28 @@ class YtMusicRepositoryRecommendationsTest {
     }
 
     @Test
+    fun localHistoryWithoutVideoIdsExcludesMatchingRecommendationMetadata() {
+        val excludedMetadata = setOf(quickPickMetadataKey("  Local   Track ", "Local Artist"))
+        val result = unplayedRecommendations(
+            listOf(
+                Song("yt-local-track", "Local Track", "Local Artist", null),
+                Song("fresh", "Fresh Track", "Fresh Artist", null),
+            ),
+            excludedSongIds = emptySet(),
+            excludedMetadataKeys = excludedMetadata,
+        )
+        assertEquals(listOf("fresh"), result.map(Song::videoId))
+    }
+
+    @Test
+    fun metadataExclusionsNormalizeCaseAndWhitespace() {
+        assertEquals(
+            quickPickMetadataKey("Same Track", "Same Artist"),
+            quickPickMetadataKey("  same   track ", " SAME ARTIST "),
+        )
+    }
+
+    @Test
     fun fallbackUsesExploreWhenEveryHomeCandidateWasPlayed() {
         val result = selectQuickPickFallback(
             homeSongs = listOf(song("played"), song("")),

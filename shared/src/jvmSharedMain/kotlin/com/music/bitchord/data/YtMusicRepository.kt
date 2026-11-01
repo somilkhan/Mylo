@@ -183,18 +183,25 @@ object YtMusicRepository {
     /**
      * Recommended discovery tracks for Quick Picks, strictly excluding listening history and recents.
      */
-    suspend fun quickPicks(excludeSongIds: Set<String> = emptySet()): Result<List<Song>> = call("quickPicks") {
+    suspend fun quickPicks(
+        excludeSongIds: Set<String> = emptySet(),
+        excludeTitleArtistPairs: Set<Pair<String, String>> = emptySet(),
+    ): Result<List<Song>> = call("quickPicks") {
         // Merge Mylo's imported/local history with the account's current
         // YouTube Music history. The latter is best-effort: an unavailable
         // history feed must not make otherwise available recommendations fail.
-        val accountHistoryIds = if (Innertube.cookie != null) {
-            runCatchingCancellable { fetchHistory() }
-                .getOrDefault(emptyList())
-                .mapNotNullTo(HashSet()) { it.videoId.takeIf(String::isNotBlank) }
+        val accountHistory = if (Innertube.cookie != null) {
+            runCatchingCancellable { fetchHistory() }.getOrDefault(emptyList())
         } else {
-            emptySet()
+            emptyList()
         }
-        val excludedIds = mergeQuickPickExclusions(excludeSongIds, accountHistoryIds)
+        val excludedIds = mergeQuickPickExclusions(
+            excludeSongIds,
+            accountHistory.mapNotNullTo(HashSet()) { it.videoId.takeIf(String::isNotBlank) },
+        )
+        val excludedMetadataKeys = excludeTitleArtistPairs
+            .mapTo(HashSet()) { (title, artist) -> quickPickMetadataKey(title, artist) }
+            .apply { accountHistory.forEach { add(quickPickMetadataKey(it.title, it.artist)) } }
 
         // Preserve Home request failures so the UI can distinguish an unavailable
         // recommendation source from a genuinely empty set of new tracks.
@@ -219,6 +226,7 @@ object YtMusicRepository {
                 }
             }.orEmpty(),
             excludedIds,
+            excludedMetadataKeys,
         )
         if (qpSongs.isNotEmpty()) return@call qpSongs
 
@@ -245,6 +253,7 @@ object YtMusicRepository {
                 }
             },
             excludedIds,
+            excludedMetadataKeys,
         )
 
         if (homeShelfSongs.isNotEmpty()) return@call homeShelfSongs
@@ -263,7 +272,7 @@ object YtMusicRepository {
             }
         }.distinctBy { it.videoId }
 
-        val uniqueAllHome = unplayedRecommendations(allHomeTrackSongs, excludedIds)
+        val uniqueAllHome = unplayedRecommendations(allHomeTrackSongs, excludedIds, excludedMetadataKeys)
         if (uniqueAllHome.isNotEmpty()) return@call uniqueAllHome
 
         // 4. Explore / New releases
@@ -282,13 +291,14 @@ object YtMusicRepository {
                 }
             },
             excludedIds,
+            excludedMetadataKeys,
         )
 
         if (exploreSongs.isNotEmpty()) return@call exploreSongs
 
         // 5. Reapply exclusions at the boundary so a future fallback cannot
         // accidentally reintroduce played or unplayable rows.
-        selectQuickPickFallback(allHomeTrackSongs, exploreSongs, excludedIds)
+        selectQuickPickFallback(allHomeTrackSongs, exploreSongs, excludedIds, excludedMetadataKeys)
     }
 
     private const val HISTORY = "FEmusic_history"
@@ -1189,11 +1199,22 @@ internal fun mergeQuickPickExclusions(
     .toSet()
 
 /** Remove played/unplayable rows and duplicate catalogue IDs from a candidate set. */
+internal fun quickPickMetadataKey(title: String, artist: String): String =
+    "${normaliseQuickPickText(title)}|${normaliseQuickPickText(artist)}"
+
+private fun normaliseQuickPickText(value: String): String =
+    value.trim().lowercase(Locale.ROOT).split(Regex("\\s+")).filter(String::isNotBlank).joinToString(" ")
+
 internal fun unplayedRecommendations(
     songs: List<Song>,
     excludedSongIds: Set<String>,
+    excludedMetadataKeys: Set<String> = emptySet(),
 ): List<Song> = songs.asSequence()
-    .filter { it.videoId.isNotBlank() && it.videoId !in excludedSongIds }
+    .filter { song ->
+        song.videoId.isNotBlank() &&
+            song.videoId !in excludedSongIds &&
+            quickPickMetadataKey(song.title, song.artist) !in excludedMetadataKeys
+    }
     .distinctBy { it.videoId }
     .toList()
 
@@ -1202,5 +1223,6 @@ internal fun selectQuickPickFallback(
     homeSongs: List<Song>,
     exploreSongs: List<Song>,
     excludedSongIds: Set<String>,
-): List<Song> = unplayedRecommendations(homeSongs, excludedSongIds)
-    .ifEmpty { unplayedRecommendations(exploreSongs, excludedSongIds) }
+    excludedMetadataKeys: Set<String> = emptySet(),
+): List<Song> = unplayedRecommendations(homeSongs, excludedSongIds, excludedMetadataKeys)
+    .ifEmpty { unplayedRecommendations(exploreSongs, excludedSongIds, excludedMetadataKeys) }

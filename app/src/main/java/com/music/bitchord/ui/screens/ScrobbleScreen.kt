@@ -140,7 +140,8 @@ fun ScrobbleScreen(
             val excludedIds = historyPlays.mapNotNull { play ->
                 play.videoId.takeIf { it.isNotBlank() }
             }.toSet()
-            val result = YtMusicRepository.quickPicks(excludedIds)
+            val excludedTitleArtistPairs = historyPlays.map { play -> play.title to play.artist }.toSet()
+            val result = YtMusicRepository.quickPicks(excludedIds, excludedTitleArtistPairs)
             val error = result.exceptionOrNull()
             if (error != null) {
                 if (error is CancellationException) throw error
