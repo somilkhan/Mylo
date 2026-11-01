@@ -985,12 +985,7 @@ private fun LazyListScope.playlistsSection(
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
                     .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .padding(16.dp)
-                    .clickable(
-                        role = Role.Button,
-                        onClickLabel = "Open ${playlist.title}",
-                        onClick = { onOpenPlaylist(playlist.title) },
-                    ),
+                    .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 ScrobbleRow(
@@ -1000,9 +995,6 @@ private fun LazyListScope.playlistsSection(
                     onClick = { onOpenPlaylist(playlist.title) },
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = { onOpenPlaylist(playlist.title) }) {
-                        Text("Open")
-                    }
                     Button(onClick = { onPlayPlaylist(playlist.title, playlist.songs) }) {
                         Icon(imageVector = Icons.Rounded.PlayArrow, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
