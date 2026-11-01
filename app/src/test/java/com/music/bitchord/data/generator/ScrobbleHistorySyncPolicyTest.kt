@@ -6,8 +6,8 @@ import org.junit.Test
 
 class ScrobbleHistorySyncPolicyTest {
     @Test
-    fun firstSuccessfulLoginEnablesTheDefaultImport() {
-        assertTrue(shouldScheduleScrobbleSyncOnLogin(hasSavedChoice = false, enabled = false))
+    fun firstSuccessfulLoginDoesNotEnableHistoryImportWithoutConsent() {
+        assertFalse(shouldScheduleScrobbleSyncOnLogin(hasSavedChoice = false, enabled = false))
     }
 
     @Test
