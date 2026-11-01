@@ -889,6 +889,12 @@ private fun Play.toSong(): Song = Song(
     title = title,
     artist = artist,
     thumbnailUrl = thumbnailUrl,
+    durationText = durationText,
+    artistId = artistId,
+    albumId = albumId,
+    albumName = albumName,
+    isVideo = isVideo,
+    isVideoOrigin = isVideoOrigin,
     localUri = localUri,
     localPath = localPath,
 )
