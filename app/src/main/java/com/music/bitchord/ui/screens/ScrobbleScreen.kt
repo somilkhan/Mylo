@@ -752,7 +752,7 @@ private fun LazyListScope.playlistsSection(
     if (playlists.isEmpty()) {
         item(key = "pl-empty") {
             Text(
-                text = "Save Top tracks, Recent, Rediscover or Discover from Generate. Saved mixes stay available for this app session.",
+                text = "Save Top tracks, Recent, Rediscover or Discover from Generate. Saved mixes stay on this device until you remove them.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 12.dp),
@@ -780,7 +780,7 @@ private fun LazyListScope.playlistsSection(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    text = "${playlist.songs.size} tracks · This session only",
+                    text = "${playlist.songs.size} tracks · Saved on this device",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

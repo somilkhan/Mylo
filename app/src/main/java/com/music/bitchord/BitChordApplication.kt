@@ -143,6 +143,8 @@ class BitChordApplication : Application(), SingletonImageLoader.Factory {
         ListeningStats.init(this)
         // Shared private history used by the Scrobble generator and playback recorder.
         ScrobbleHistory.init(this)
+        // Generated Scrobble mixes are user-saved device data, separate from play history.
+        com.music.bitchord.ui.screens.ScrobblePlaylistStore.init(this)
         // After AppSettings, whose switch decides whether half of it runs.
         ArtistFacts.init(this)
         // One cache directory can only be opened once per process, and

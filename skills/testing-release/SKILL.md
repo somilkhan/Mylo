@@ -18,7 +18,7 @@ Always verify the workflow run for the commit under review; a prior green run is
 
 ## Private history and backup rules
 
-Scrobble history is stored in `filesDir/scrobble_history.tsv` with an atomic sibling `scrobble_history.tsv.tmp`. Exclude both files from Android cloud backup and device transfer in `backup_rules.xml` and `data_extraction_rules.xml`. Revisit exclusions whenever the history store adds a journal, temporary, or sidecar file.
+Scrobble history is stored in `filesDir/scrobble_history.tsv` with an atomic sibling `scrobble_history.tsv.tmp`. Exclude both files from Android cloud backup and device transfer in `backup_rules.xml` and `data_extraction_rules.xml`. Revisit exclusions whenever the history store adds a journal, temporary, or sidecar file. Saved Scrobble mixes are a separate versioned SharedPreferences store; preserve `Song.localUri` and `Song.localPath` in its codec and test round-tripping local-file identity. Do not clear the stored JSON when decoding an unknown future schema.
 
 ## Report statuses independently
 
