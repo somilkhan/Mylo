@@ -143,7 +143,7 @@ object DesktopDownloadQueue {
             while (true) {
                 val item = takeNext(currentJob() ?: error("Download worker has no coroutine Job")) ?: return
                 val id = item.song.videoId
-                val result = try {
+                val result: Result<Result<Song>> = try {
                     Result.success(
                         DesktopDownloadManager.download(item.song) { downloaded, total ->
                             val fraction = if (total != null && total > 0L) {
