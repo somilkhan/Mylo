@@ -674,6 +674,12 @@ private fun LazyListScope.generateSection(
             )
         }
     }
+    generatedTrackPreview(
+        keyPrefix = "top-tracks",
+        playlistName = "Top tracks",
+        songs = topTracks,
+        onPlayPlaylist = onPlayPlaylist,
+    )
     when {
         loadingHistory -> item(key = "gen-loading-history") {
             Text("Loading recent listens…", color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -703,6 +709,12 @@ private fun LazyListScope.generateSection(
             }
         }
     }
+    generatedTrackPreview(
+        keyPrefix = "recent",
+        playlistName = "Recent",
+        songs = recentSongs,
+        onPlayPlaylist = onPlayPlaylist,
+    )
     if (!loadingHistory && !historyFailed) {
         if (rediscoverSongs.isNotEmpty()) {
             item(key = "gen-rediscover") {
@@ -727,6 +739,12 @@ private fun LazyListScope.generateSection(
                     ) { Text("Save to Playlists") }
                 }
             }
+            generatedTrackPreview(
+        keyPrefix = "rediscover",
+        playlistName = "Rediscover",
+        songs = rediscoverSongs,
+        onPlayPlaylist = onPlayPlaylist,
+    )
         } else {
             item(key = "gen-rediscover-empty") {
                 Text(
@@ -806,6 +824,12 @@ private fun LazyListScope.generateSection(
             item(key = "gen-discover-refresh") {
                 TextButton(onClick = onRetryRecommendations) { Text("Refresh recommendations") }
             }
+            generatedTrackPreview(
+        keyPrefix = "discover",
+        playlistName = "Discover",
+        songs = recommendations,
+        onPlayPlaylist = onPlayPlaylist,
+    )
             val myMix = interleaveScrobbleMix(topTracks, recommendations)
             if (topTracks.isNotEmpty() && recommendations.isNotEmpty() && myMix.isNotEmpty()) {
                 item(key = "gen-my-mix") {
@@ -830,6 +854,12 @@ private fun LazyListScope.generateSection(
                         ) { Text("Save to Playlists") }
                     }
                 }
+                generatedTrackPreview(
+        keyPrefix = "my-mix",
+        playlistName = "My mix",
+        songs = myMix,
+        onPlayPlaylist = onPlayPlaylist,
+    )
             }
         }
     }
@@ -849,6 +879,47 @@ private fun LazyListScope.generateSection(
             Icon(imageVector = Icons.Rounded.Explore, contentDescription = null)
             Spacer(Modifier.width(8.dp))
             Text("Browse moods & genres")
+        }
+    }
+}
+
+/**
+ * Real, tappable examples from the generated queue. This deliberately renders
+ * only returned Song data; it never substitutes sample tracks or artwork.
+ */
+private fun LazyListScope.generatedTrackPreview(
+    keyPrefix: String,
+    playlistName: String,
+    songs: List<Song>,
+    onPlayPlaylist: (String, List<Song>) -> Unit,
+    limit: Int = 3,
+) {
+    val previewSongs = songs.take(limit)
+    items(
+        count = previewSongs.size,
+        key = { index ->
+            val song = previewSongs[index]
+            "gen-preview-$keyPrefix-${song.localUri ?: song.localPath ?: song.videoId}-$index"
+        },
+    ) { index ->
+        val song = previewSongs[index]
+        ScrobbleRow(
+            title = song.title.ifBlank { "Unknown track" },
+            subtitle = listOfNotNull(
+                song.artist.ifBlank { "Unknown artist" },
+                song.durationText?.takeIf(String::isNotBlank),
+            ).joinToString(" · "),
+            artworkUrl = song.thumbnailUrl,
+            onClick = { onPlayPlaylist(playlistName, songs.drop(index)) },
+        )
+    }
+    if (songs.size > previewSongs.size) {
+        item(key = "gen-preview-$keyPrefix-more") {
+            Text(
+                text = "${songs.size - previewSongs.size} more tracks",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
