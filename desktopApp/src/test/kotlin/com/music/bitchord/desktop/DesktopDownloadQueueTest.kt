@@ -1,6 +1,8 @@
 package com.music.bitchord.desktop
 
 import com.music.bitchord.data.model.Song
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -45,6 +47,19 @@ class DesktopDownloadQueueTest {
         assertTrue("gone" in DesktopDownloadQueue.active.value)
         DesktopDownloadQueue.cancel("gone")
         assertFalse("gone" in DesktopDownloadQueue.active.value)
+    }
+
+    @Test
+    fun `cancelling during worker startup never resurrects a queue row`() = runBlocking {
+        repeat(40) { index ->
+            val id = "cancel-at-start-$index"
+            DesktopDownloadQueue.enqueue(song(id))
+            DesktopDownloadQueue.cancel(id)
+        }
+
+        // Let any worker that already claimed an item finish its cancellation path.
+        delay(150)
+        assertTrue(DesktopDownloadQueue.active.value.isEmpty())
     }
 
     @Test
