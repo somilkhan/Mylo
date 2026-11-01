@@ -343,7 +343,11 @@ class ScrobbleHistorySyncWorker(
             return Result.success()
         }
         return try {
-            val response = YtMusicRepository.historyWithDates()
+            // First import is complete; later runs refetch only the newest date
+            // buckets plus a one-day overlap for late-arriving history rows.
+            val lastSyncAt = prefs.getLong(ScrobbleHistorySync.KEY_LAST_SYNC_AT, 0L)
+                .takeIf { it > 0L }
+            val response = YtMusicRepository.historyWithDates(notBeforeMillis = lastSyncAt)
             if (response.isFailure) {
                 val error = response.exceptionOrNull()
                     ?: IllegalStateException("YouTube history import failed without an exception")
