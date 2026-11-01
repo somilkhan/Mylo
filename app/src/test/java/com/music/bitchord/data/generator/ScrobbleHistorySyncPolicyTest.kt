@@ -7,16 +7,16 @@ import org.junit.Test
 class ScrobbleHistorySyncPolicyTest {
     @Test
     fun firstSuccessfulLoginDoesNotEnableHistoryImportWithoutConsent() {
-        assertFalse(shouldScheduleScrobbleSyncOnLogin(hasSavedChoice = false, enabled = false))
+        assertFalse(shouldResumeScrobbleHistorySync(hasSavedChoice = false, enabled = false))
     }
 
     @Test
     fun explicitOptOutSurvivesLaterLogins() {
-        assertFalse(shouldScheduleScrobbleSyncOnLogin(hasSavedChoice = true, enabled = false))
+        assertFalse(shouldResumeScrobbleHistorySync(hasSavedChoice = true, enabled = false))
     }
 
     @Test
     fun previouslyEnabledSyncResumesAfterLogin() {
-        assertTrue(shouldScheduleScrobbleSyncOnLogin(hasSavedChoice = true, enabled = true))
+        assertTrue(shouldResumeScrobbleHistorySync(hasSavedChoice = true, enabled = true))
     }
 }
