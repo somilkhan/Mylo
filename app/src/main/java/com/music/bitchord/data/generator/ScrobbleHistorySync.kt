@@ -111,15 +111,17 @@ object ScrobbleHistorySync {
                 .apply()
             hasExplicitlyEnabledSync(prefs)
         }
-        if (!enabled) return
-        val identity = currentSessionIdentity(appContext) ?: return
-        // The UI's summary timestamp follows the active account/profile. The
-        // import cursor itself is stored under the identity-scoped key below.
-        prefs.edit()
-            .putLong(KEY_LAST_SYNC_AT, prefs.getLong(identity.historySyncCursorPreferenceKey(), 0L))
-            .putInt(KEY_LAST_ADDED, 0)
-            .remove(KEY_LAST_STATUS)
-            .apply()
+        val identity = currentSessionIdentity(appContext)
+        // The single UI summary follows the active account/profile even while
+        // syncing is paused. The import cursor remains identity-scoped below.
+        if (identity != null) {
+            prefs.edit()
+                .putLong(KEY_LAST_SYNC_AT, prefs.getLong(identity.historySyncCursorPreferenceKey(), 0L))
+                .putInt(KEY_LAST_ADDED, 0)
+                .remove(KEY_LAST_STATUS)
+                .apply()
+        }
+        if (!enabled || identity == null) return
         enqueuePeriodicWork(appContext)
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
@@ -206,9 +208,9 @@ object ScrobbleHistorySync {
             .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .getLong(KEY_SESSION_GENERATION, 0L)
 
-    /** Revalidate and append atomically against session invalidation and sync opt-out. */
     /**
-     * Append and publish the matching account's sync cursor/status as one
+     * Revalidate the active identity, append the history and publish its cursor
+     * and UI summary under one lock so stale work cannot overwrite a new profile.
      * session-locked operation. A profile switch either happens before this
      * guard (so the stale response is discarded) or after the status write
      * (so onSessionChanged can safely publish the newly selected profile).
