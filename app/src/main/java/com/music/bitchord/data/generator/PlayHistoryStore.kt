@@ -6,6 +6,10 @@ import java.io.IOException
 import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import java.time.ZoneId
 
 /**
@@ -110,6 +114,11 @@ class PlayHistoryStore(private val file: File, private val zone: ZoneId = ZoneId
  * store so they see the same persisted history.
  */
 object ScrobbleHistory {
+    private val _revision = MutableStateFlow(0L)
+
+    /** Changes whenever a listen is appended or history is explicitly cleared. */
+    val revision: StateFlow<Long> = _revision.asStateFlow()
+
     @Volatile
     private var store: PlayHistoryStore? = null
 
@@ -122,13 +131,23 @@ object ScrobbleHistory {
         }
     }
 
-    fun append(incoming: List<Play>): Int = requireStore().append(incoming)
+    fun append(incoming: List<Play>): Int {
+        val added = requireStore().append(incoming)
+        if (added > 0) _revision.update { it + 1L }
+        return added
+    }
 
     fun readAll(): List<Play> = requireStore().readAll()
 
-    fun forget() = requireStore().forget()
+    fun forget() {
+        requireStore().forget()
+        _revision.update { it + 1L }
+    }
 
-    fun forgetImported() = requireStore().forgetImported()
+    fun forgetImported() {
+        requireStore().forgetImported()
+        _revision.update { it + 1L }
+    }
 
     private fun requireStore(): PlayHistoryStore =
         checkNotNull(store) { "ScrobbleHistory must be initialized by the application first" }
