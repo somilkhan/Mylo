@@ -84,14 +84,7 @@ jobs:
           # The hosted runner has <3 GB free after SDK setup; the AVD's 7.3 GB
           # default userdata image cannot be created. Keep the test device lean.
           disk-size: 2G
-          # Normalize the generated AVD config: the action appends disk-size,
-          # but the template can contain an earlier, larger userdata setting.
-          pre-emulator-launch-script: |
-            set -euo pipefail
-            config="${HOME}/.android/avd/test.avd/config.ini"
-            sed -i '/^disk.dataPartition.size=/d' "${config}"
-            printf '%s\n' 'disk.dataPartition.size=2G' >> "${config}"
-            grep -Fxq 'disk.dataPartition.size=2G' "${config}"
+          pre-emulator-launch-script: bash .github/scripts/configure-avd-userdata.sh
           disable-animations: true
           script: ./gradlew --no-daemon --stacktrace :app:connectedDevDebugAndroidTest
 
