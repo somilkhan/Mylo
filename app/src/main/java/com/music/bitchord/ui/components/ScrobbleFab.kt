@@ -2,6 +2,7 @@ package com.music.bitchord.ui.components
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.snap
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
@@ -16,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.dp
 
 /** Diameter of the scrobble button. Matches the Search circle beside it. */
@@ -53,7 +55,7 @@ fun ScrobbleFab(
     folded: Boolean = false,
 ) {
     val spec = if (reduceMotion) {
-        spring<Float>(dampingRatio = 1f, stiffness = 10_000f)
+        snap()
     } else {
         spring<Float>(dampingRatio = 0.72f, stiffness = 320f)
     }
@@ -82,6 +84,7 @@ fun ScrobbleFab(
                 this.alpha = alpha
             }
             .then(surface)
+            .then(if (visible) Modifier else Modifier.clearAndSetSemantics { })
             .then(
                 if (visible) {
                     Modifier.clickable(
