@@ -32,7 +32,7 @@ Use JDK 17 and the SDK/NDK/CMake versions required by the project. Check Android
 - The FAB is SCROBBLE_FAB_SIZE (62 dp). The bottom pill reserves its width plus a 10 dp gap; keep that slot, measured floating-bar inset, mini-player stack and window insets in sync when changing navigation geometry.
 - While Scrobble is open, reuse the existing bottom pill for Stats / Generate / Playlists. Do not introduce a second navigation bar or move Replay under Scrobble.
 - Pass the same reduced-motion preference to FAB, page transitions, metrics and source-split animation. The FAB snaps instead of springing when reduced motion is enabled; new Scrobble animations must do the same.
-- ScrobbleFabTest proves only the pure Home/overlay visibility rule. It does not prove placement, touch-target clearance, scrolling, mini-player interaction, fold behavior, contrast or animation quality; those remain device checks.
+- ScrobbleFabTest proves the pure Home/overlay visibility rule. ScrobbleFabComposeTest runs on the API 36 emulator and verifies accessible visibility, click semantics and a minimum 48 dp target; neither proves MainActivity placement, mini-player/scroll interaction, glass/standard fold behavior, real-device contrast or animation quality.
 
 ## Known traps
 

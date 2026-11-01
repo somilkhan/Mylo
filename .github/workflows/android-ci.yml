@@ -68,6 +68,23 @@ jobs:
         id: test_android
         run: ./gradlew --no-daemon --stacktrace :app:testDevDebugUnitTest
 
+      - name: Enable KVM for Android emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run Android instrumented tests on API 36 emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: ./gradlew --no-daemon --stacktrace :app:connectedDevDebugAndroidTest
+
       - name: Upload debug APKs (manual opt-in only)
         id: upload_apks
         if: github.event_name == 'workflow_dispatch' && inputs.build_apks && steps.build_apks.outcome == 'success'
