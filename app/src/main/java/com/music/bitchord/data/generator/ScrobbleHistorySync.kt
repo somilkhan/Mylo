@@ -158,6 +158,7 @@ object ScrobbleHistorySync {
         context: Context,
         expectedGeneration: Long,
         expectedIdentity: ScrobbleSessionIdentity,
+        attemptedAtMillis: Long,
     ) {
         val appContext = context.applicationContext
         val paused = synchronized(sessionLock) {
@@ -171,6 +172,7 @@ object ScrobbleHistorySync {
             } else {
                 prefs.edit()
                     .putBoolean(KEY_AUTH_REQUIRED, true)
+                    .putLong(KEY_LAST_ATTEMPT_AT, attemptedAtMillis)
                     .putString(KEY_LAST_STATUS, STATUS_WAITING_FOR_SIGN_IN)
                     .apply()
                 true
@@ -205,11 +207,19 @@ object ScrobbleHistorySync {
             .getLong(KEY_SESSION_GENERATION, 0L)
 
     /** Revalidate and append atomically against session invalidation and sync opt-out. */
+    /**
+     * Append and publish the matching account's sync cursor/status as one
+     * session-locked operation. A profile switch either happens before this
+     * guard (so the stale response is discarded) or after the status write
+     * (so onSessionChanged can safely publish the newly selected profile).
+     */
     internal fun appendIfCurrentSession(
         context: Context,
         expectedGeneration: Long,
         expectedIdentity: ScrobbleSessionIdentity,
         incoming: List<Play>,
+        syncedAtMillis: Long,
+        status: String,
     ): Int? = synchronized(sessionLock) {
         val appContext = context.applicationContext
         val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -218,7 +228,38 @@ object ScrobbleHistorySync {
             prefs.getLong(KEY_SESSION_GENERATION, 0L) != expectedGeneration ||
             currentSessionIdentity(appContext) != expectedIdentity
         ) return@synchronized null
-        ScrobbleHistory.append(incoming)
+
+        val added = ScrobbleHistory.append(incoming)
+        prefs.edit()
+            .putLong(expectedIdentity.historySyncCursorPreferenceKey(), syncedAtMillis)
+            .putLong(KEY_LAST_SYNC_AT, syncedAtMillis)
+            .putLong(KEY_LAST_ATTEMPT_AT, syncedAtMillis)
+            .putInt(KEY_LAST_ADDED, added)
+            .putString(KEY_LAST_STATUS, status)
+            .apply()
+        added
+    }
+
+    /** Update retry state only while the worker still owns the active identity. */
+    internal fun updateStatusIfCurrentSession(
+        context: Context,
+        expectedGeneration: Long,
+        expectedIdentity: ScrobbleSessionIdentity,
+        attemptedAtMillis: Long,
+        status: String,
+    ): Boolean = synchronized(sessionLock) {
+        val appContext = context.applicationContext
+        val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        if (
+            !hasExplicitlyEnabledSync(prefs) ||
+            prefs.getLong(KEY_SESSION_GENERATION, 0L) != expectedGeneration ||
+            currentSessionIdentity(appContext) != expectedIdentity
+        ) return@synchronized false
+        prefs.edit()
+            .putLong(KEY_LAST_ATTEMPT_AT, attemptedAtMillis)
+            .putString(KEY_LAST_STATUS, status)
+            .apply()
+        true
     }
 
     internal fun isCurrentSession(
@@ -364,15 +405,24 @@ class ScrobbleHistorySyncWorker(
                     return Result.success()
                 }
                 if (error.isYouTubeAuthenticationFailure()) {
-                    ScrobbleHistorySync.pauseForAuthentication(applicationContext, generation, identity)
-                    prefs.edit().putLong(ScrobbleHistorySync.KEY_LAST_ATTEMPT_AT, now).apply()
+                    ScrobbleHistorySync.pauseForAuthentication(
+                        applicationContext,
+                        generation,
+                        identity,
+                        attemptedAtMillis = now,
+                    )
                     DebugLog.w(TAG, "YouTube history sync needs the account to reconnect", error)
                     return Result.success()
                 }
-                prefs.edit()
-                    .putLong(ScrobbleHistorySync.KEY_LAST_ATTEMPT_AT, now)
-                    .putString(ScrobbleHistorySync.KEY_LAST_STATUS, ScrobbleHistorySync.STATUS_RETRYING)
-                    .apply()
+                if (
+                    !ScrobbleHistorySync.updateStatusIfCurrentSession(
+                        applicationContext,
+                        generation,
+                        identity,
+                        attemptedAtMillis = now,
+                        status = ScrobbleHistorySync.STATUS_RETRYING,
+                    )
+                ) return Result.success()
                 DebugLog.w(TAG, "Background YouTube history sync failed; WorkManager will retry", error)
                 return Result.retry()
             }
@@ -397,36 +447,30 @@ class ScrobbleHistorySyncWorker(
                     isVideoOrigin = entry.song.isVideoOrigin,
                 )
             }
-            val added = withContext(Dispatchers.IO) {
+            withContext(Dispatchers.IO) {
                 ScrobbleHistorySync.appendIfCurrentSession(
                     applicationContext,
                     generation,
                     identity,
                     incoming,
-                )
-            } ?: return Result.success()
-            prefs.edit()
-                .putLong(cursorKey, now)
-                .putLong(ScrobbleHistorySync.KEY_LAST_SYNC_AT, now)
-                .putLong(ScrobbleHistorySync.KEY_LAST_ATTEMPT_AT, now)
-                .putInt(ScrobbleHistorySync.KEY_LAST_ADDED, added)
-                .putString(
-                    ScrobbleHistorySync.KEY_LAST_STATUS,
-                    if (entries.isEmpty()) ScrobbleHistorySync.STATUS_NO_DATED_ROWS
+                    syncedAtMillis = now,
+                    status = if (entries.isEmpty()) ScrobbleHistorySync.STATUS_NO_DATED_ROWS
                     else ScrobbleHistorySync.STATUS_SUCCESS,
                 )
-                .apply()
+            } ?: return Result.success()
             Result.success()
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
-            if (!ScrobbleHistorySync.isCurrentSession(applicationContext, generation, identity)) {
-                return Result.success()
-            }
-            prefs.edit()
-                .putLong(ScrobbleHistorySync.KEY_LAST_ATTEMPT_AT, now)
-                .putString(ScrobbleHistorySync.KEY_LAST_STATUS, ScrobbleHistorySync.STATUS_RETRYING)
-                .apply()
+            if (
+                !ScrobbleHistorySync.updateStatusIfCurrentSession(
+                    applicationContext,
+                    generation,
+                    identity,
+                    attemptedAtMillis = now,
+                    status = ScrobbleHistorySync.STATUS_RETRYING,
+                )
+            ) return Result.success()
             DebugLog.w(TAG, "Background YouTube history sync failed; WorkManager will retry", error)
             Result.retry()
         }
