@@ -23,7 +23,7 @@ import java.util.concurrent.TimeUnit
 internal fun shouldScheduleScrobbleSyncOnLogin(hasSavedChoice: Boolean, enabled: Boolean): Boolean =
     !hasSavedChoice || enabled
 
-/** Explicitly opt-in, Wi-Fi-constrained sync of date-labelled YouTube history. */
+/** Explicitly opt-in sync of date-labelled YouTube history whenever a network is connected. */
 object ScrobbleHistorySync {
     const val PREFS_NAME = "scrobble_history_sync"
     const val KEY_ENABLED = "youtube_auto_sync_enabled"
@@ -203,7 +203,7 @@ object ScrobbleHistorySync {
         if (prefs.getBoolean(KEY_SIGNED_OUT, false) || currentSessionIdentity(appContext) == null) return
 
         val constraints = Constraints.Builder()
-            .setRequiredNetworkType(NetworkType.UNMETERED)
+            .setRequiredNetworkType(NetworkType.CONNECTED)
             .build()
         val workManager = WorkManager.getInstance(appContext)
         val periodic = PeriodicWorkRequestBuilder<ScrobbleHistorySyncWorker>(6, TimeUnit.HOURS)
@@ -252,7 +252,7 @@ object ScrobbleHistorySync {
         if (!prefs.getBoolean(KEY_ENABLED, false)) return
 
         val constraints = Constraints.Builder()
-            .setRequiredNetworkType(NetworkType.UNMETERED)
+            .setRequiredNetworkType(NetworkType.CONNECTED)
             .build()
         val periodic = PeriodicWorkRequestBuilder<ScrobbleHistorySyncWorker>(6, TimeUnit.HOURS)
             .setConstraints(constraints)
