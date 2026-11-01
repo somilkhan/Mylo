@@ -260,7 +260,7 @@ class ScrobbleGeneratorTest {
         assertEquals(1, store.append(listOf(original)))
         assertEquals(original, store.readAll().single())
 
-        file.writeText("legacy\\tLegacy title\\tLegacy artist\\tMYLO\\t${now}\\ttrue\\n")
+        file.writeText("legacy\tLegacy title\tLegacy artist\tMYLO\t${now}\ttrue\n")
         val legacy = store.readAll().single()
         assertEquals("Legacy title", legacy.title)
         assertEquals(null, legacy.durationText)
