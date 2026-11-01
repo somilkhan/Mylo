@@ -244,12 +244,6 @@ object ScrobbleHistorySync {
                 prefs.edit().putBoolean(KEY_SESSION_SUSPENDED, false).apply()
             }
         }
-        if (!prefs.contains(KEY_ENABLED) && hasRestoredSession && !prefs.getBoolean(KEY_SIGNED_OUT, false)) {
-            // Existing signed-in installs get the same silent first import as a
-            // fresh login after this feature is added.
-            schedule(appContext)
-            return
-        }
         if (!hasRestoredSession || prefs.getBoolean(KEY_SIGNED_OUT, false)) return
         if (prefs.getBoolean(KEY_AUTH_REQUIRED, false)) return
         if (!prefs.getBoolean(KEY_ENABLED, false)) return
