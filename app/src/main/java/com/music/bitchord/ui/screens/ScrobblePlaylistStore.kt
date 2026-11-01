@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateListOf
 import com.music.bitchord.data.model.ArtistRef
 import com.music.bitchord.data.model.Song
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
