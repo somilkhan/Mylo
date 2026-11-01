@@ -188,7 +188,7 @@ object YtMusicRepository {
         } else {
             emptySet()
         }
-        val excludedIds = mergeQuickPickExclusions(excludedIds, accountHistoryIds)
+        val excludedIds = mergeQuickPickExclusions(excludeSongIds, accountHistoryIds)
 
         // Preserve Home request failures so the UI can distinguish an unavailable
         // recommendation source from a genuinely empty set of new tracks.
@@ -257,7 +257,7 @@ object YtMusicRepository {
             }
         }.distinctBy { it.videoId }
 
-        val uniqueAllHome = unplayedRecommendations(allHomeTrackSongs, excludeSongIds)
+        val uniqueAllHome = unplayedRecommendations(allHomeTrackSongs, excludedIds)
         if (uniqueAllHome.isNotEmpty()) return@call uniqueAllHome
 
         // 4. Explore / New releases
@@ -282,7 +282,7 @@ object YtMusicRepository {
 
         // 5. Reapply exclusions at the boundary so a future fallback cannot
         // accidentally reintroduce played or unplayable rows.
-        selectQuickPickFallback(allHomeTrackSongs, exploreSongs, excludeSongIds)
+        selectQuickPickFallback(allHomeTrackSongs, exploreSongs, excludedIds)
     }
 
     private const val HISTORY = "FEmusic_history"
