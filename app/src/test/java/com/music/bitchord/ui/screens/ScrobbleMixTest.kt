@@ -1,10 +1,48 @@
 package com.music.bitchord.ui.screens
 
 import com.music.bitchord.data.model.Song
+import com.music.bitchord.data.generator.Play
+import com.music.bitchord.data.generator.PlaySource
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class ScrobbleMixTest {
+    @Test
+    fun historyPlayConversionPreservesTrackMetadataAndLocalPlaybackIdentity() {
+        val play = Play(
+            videoId = "video-id",
+            title = "Track",
+            artist = "Artist",
+            source = PlaySource.MYLO,
+            atMillis = 1_000L,
+            exact = true,
+            localUri = "content://media/audio/42",
+            thumbnailUrl = "https://img.example/cover.jpg",
+            localPath = "/storage/music/track.flac",
+            durationText = "3:42",
+            artistId = "UCartist",
+            albumId = "MPREalbum",
+            albumName = "Album",
+            isVideo = true,
+            isVideoOrigin = true,
+        )
+
+        val song = play.toSong()
+
+        assertEquals(play.videoId, song.videoId)
+        assertEquals(play.title, song.title)
+        assertEquals(play.artist, song.artist)
+        assertEquals(play.localUri, song.localUri)
+        assertEquals(play.localPath, song.localPath)
+        assertEquals(play.thumbnailUrl, song.thumbnailUrl)
+        assertEquals(play.durationText, song.durationText)
+        assertEquals(play.artistId, song.artistId)
+        assertEquals(play.albumId, song.albumId)
+        assertEquals(play.albumName, song.albumName)
+        assertEquals(play.isVideo, song.isVideo)
+        assertEquals(play.isVideoOrigin, song.isVideoOrigin)
+    }
+
     @Test
     fun interleavesTopTracksAndDiscoveriesWithoutDuplicateCatalogueIds() {
         val mixed = interleaveScrobbleMix(
