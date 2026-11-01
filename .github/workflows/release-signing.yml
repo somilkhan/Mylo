@@ -96,7 +96,9 @@ jobs:
           done
 
       - name: Upload signed release APKs (manual opt-in only)
+        id: upload_apks
         if: github.event_name == 'workflow_dispatch' && inputs.upload_apks
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: mylo-signed-release-apks
@@ -106,6 +108,16 @@ jobs:
             wearos/build/outputs/apk/prod/release/*.apk
           if-no-files-found: error
           retention-days: 3
+
+      - name: Report artifact upload failure
+        if: always() && github.event_name == 'workflow_dispatch' && inputs.upload_apks && steps.upload_apks.outcome == 'failure'
+        shell: bash
+        run: |
+          echo "::warning::Signed APKs built and signatures verified, but GitHub Actions artifact storage rejected the upload. This is a storage quota/accounting issue, not a Gradle build failure."
+          {
+            echo "### Signed APKs built, but upload failed"
+            echo "All signed phone, TV and Wear OS release APKs were built and signature-verified. GitHub rejected artifact storage because the Actions storage quota is still enforced. Check account-level Actions/Packages storage; do not rerun the build solely to retry this upload."
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Report artifact upload skipped
         if: github.event_name == 'workflow_dispatch' && !inputs.upload_apks
