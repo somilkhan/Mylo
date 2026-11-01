@@ -3273,7 +3273,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun removeAccount(accountId: String) {
-        val removingActiveAccount = accountId == _activeAccountId.value
+        val currentActiveAccountId = _activeAccountId.value ?: authStore.activeSession?.accountId
+        val removingActiveAccount = accountId == currentActiveAccountId
         if (removingActiveAccount) ScrobbleHistorySync.onSessionChanging(getApplication())
         val fallback = authStore.removeAccount(accountId)
         _googleAccounts.value = authStore.sessions
