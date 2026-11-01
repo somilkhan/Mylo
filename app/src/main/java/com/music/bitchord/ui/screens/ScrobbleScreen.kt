@@ -881,7 +881,7 @@ private fun ScrobbleRow(
             .clickable(
                 enabled = onClick != null,
                 role = if (onClick != null) Role.Button else null,
-                onClickLabel = onClick?.let { "Open $title" },
+                onClickLabel = onClick?.let { "Select $title" },
             ) { onClick?.invoke() }
             .padding(horizontal = 14.dp, vertical = 12.dp),
     ) {
