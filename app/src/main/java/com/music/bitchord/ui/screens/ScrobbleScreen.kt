@@ -3,6 +3,7 @@ package com.music.bitchord.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -877,7 +878,11 @@ private fun ScrobbleRow(
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant)
-            .clickable(enabled = onClick != null) { onClick?.invoke() }
+            .clickable(
+                enabled = onClick != null,
+                role = if (onClick != null) Role.Button else null,
+                onClickLabel = onClick?.let { "Open $title" },
+            ) { onClick?.invoke() }
             .padding(horizontal = 14.dp, vertical = 12.dp),
     ) {
         Box(
