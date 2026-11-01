@@ -22,6 +22,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
 
+internal fun shouldScheduleScrobbleSyncOnLogin(hasSavedChoice: Boolean, enabled: Boolean): Boolean =
+    !hasSavedChoice || enabled
+
 /** Explicitly opt-in, Wi-Fi-constrained sync of date-labelled YouTube history. */
 object ScrobbleHistorySync {
     const val PREFS_NAME = "scrobble_history_sync"
@@ -52,7 +55,7 @@ object ScrobbleHistorySync {
      */
     fun onLogin(context: Context) {
         val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        if (!prefs.contains(KEY_ENABLED) || prefs.getBoolean(KEY_ENABLED, false)) {
+        if (shouldScheduleScrobbleSyncOnLogin(prefs.contains(KEY_ENABLED), prefs.getBoolean(KEY_ENABLED, false))) {
             schedule(context)
         }
     }
