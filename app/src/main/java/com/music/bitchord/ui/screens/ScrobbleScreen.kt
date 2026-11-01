@@ -945,7 +945,10 @@ private fun LazyListScope.playlistDetailSection(
         val song = playlist.songs[index]
         ScrobbleRow(
             title = song.title.ifBlank { "Unknown track" },
-            subtitle = song.artist.ifBlank { "Unknown artist" },
+            subtitle = listOfNotNull(
+                song.artist.ifBlank { "Unknown artist" },
+                song.durationText?.takeIf(String::isNotBlank),
+            ).joinToString(" · "),
             artworkUrl = song.thumbnailUrl,
             onClick = { onPlayPlaylist(playlist.title, playlist.songs.drop(index)) },
         )
@@ -982,6 +985,11 @@ private fun LazyListScope.playlistsSection(
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
                     .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .clickable(
+                        role = Role.Button,
+                        onClickLabel = "Open ${playlist.title}",
+                        onClick = { onOpenPlaylist(playlist.title) },
+                    )
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
