@@ -43,6 +43,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -87,14 +88,15 @@ fun ScrobbleScreen(
     var loadingHistory by remember { mutableStateOf(true) }
     var historyFailed by remember { mutableStateOf(false) }
     var recommendationRequest by remember { mutableIntStateOf(0) }
-    var lastRecommendationRequest by remember { mutableIntStateOf(-1) }
     var recommendedSongs by remember { mutableStateOf<List<Song>>(emptyList()) }
     var loadingRecommendations by remember { mutableStateOf(false) }
     var recommendationsReady by remember { mutableStateOf(false) }
     var recommendationsFailed by remember { mutableStateOf(false) }
     var openedPlaylistTitle by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(Unit) {
+    val historyRevision by ScrobbleHistory.revision.collectAsStateWithLifecycle()
+
+    LaunchedEffect(historyRevision) {
         try {
             summary = ListeningStats.summary(ReplayPeriod.THIS_MONTH)
         } catch (cancelled: CancellationException) {
@@ -109,7 +111,7 @@ fun ScrobbleScreen(
 
     // Refresh when moving between sections. Reopening the overlay also reloads
     // any plays or imported rows added while it was closed.
-    LaunchedEffect(selectedSection) {
+    LaunchedEffect(selectedSection, historyRevision) {
         loadingHistory = true
         try {
             historyPlays = withContext(Dispatchers.IO) { ScrobbleHistory.readAll() }
@@ -127,11 +129,9 @@ fun ScrobbleScreen(
     LaunchedEffect(selectedSection, historyPlays, loadingHistory, recommendationRequest) {
         if (
             selectedSection != SCROBBLE_TAB_GENERATE ||
-            loadingHistory ||
-            recommendationRequest == lastRecommendationRequest
+            loadingHistory
         ) return@LaunchedEffect
 
-        lastRecommendationRequest = recommendationRequest
         loadingRecommendations = true
         recommendationsReady = false
         recommendationsFailed = false
@@ -153,7 +153,6 @@ fun ScrobbleScreen(
                 recommendationsReady = true
             }
         } catch (cancelled: CancellationException) {
-            lastRecommendationRequest = -1
             throw cancelled
         } catch (_: Exception) {
             recommendationsFailed = true
