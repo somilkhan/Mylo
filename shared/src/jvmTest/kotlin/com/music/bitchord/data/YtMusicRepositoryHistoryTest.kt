@@ -10,6 +10,7 @@ import java.time.ZoneId
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 import kotlin.test.assertFailsWith
 
 class YtMusicRepositoryHistoryTest {
