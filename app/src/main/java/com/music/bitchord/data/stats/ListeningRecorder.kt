@@ -62,6 +62,9 @@ object ListeningRecorder {
             ?: song.localPath?.takeIf { it.isNotBlank() }
             ?: song.videoId
         playClock.start(trackIdentity, atMillis)
+        // Start the lightweight catalogue lookup before the first qualifying
+        // play event so its album/artist metadata can be captured with history.
+        enriched(song)
     }
 
     /**
@@ -86,25 +89,26 @@ object ListeningRecorder {
         if (step <= 0L) return
         val counts = sample.playStartedAtMillis != null
 
-        ListeningStats.record(enriched(song), step, counts)
+        val recordedSong = enriched(song)
+        ListeningStats.record(recordedSong, step, counts)
 
         sample.playStartedAtMillis?.let { startedAtMillis ->
             val play = Play(
-                videoId = song.videoId,
-                title = song.title,
-                artist = song.artist,
+                videoId = recordedSong.videoId,
+                title = recordedSong.title,
+                artist = recordedSong.artist,
                 source = PlaySource.MYLO,
                 atMillis = startedAtMillis,
                 exact = true,
-                localUri = song.localUri,
-                thumbnailUrl = song.thumbnailUrl,
-                localPath = song.localPath,
-                durationText = song.durationText,
-                artistId = song.artistId,
-                albumId = song.albumId,
-                albumName = song.albumName,
-                isVideo = song.isVideo,
-                isVideoOrigin = song.isVideoOrigin,
+                localUri = recordedSong.localUri,
+                thumbnailUrl = recordedSong.thumbnailUrl,
+                localPath = recordedSong.localPath,
+                durationText = recordedSong.durationText,
+                artistId = recordedSong.artistId,
+                albumId = recordedSong.albumId,
+                albumName = recordedSong.albumName,
+                isVideo = recordedSong.isVideo,
+                isVideoOrigin = recordedSong.isVideoOrigin,
             )
             // The sampler runs on the playback thread. Persist off-thread so a
             // slow filesystem can never delay audio or the listening counters.
@@ -187,7 +191,7 @@ object ListeningRecorder {
         // Only tracks YouTube can answer for. A file on the device and a
         // source-module track both carry ids this endpoint has never heard of,
         // and asking would be a failed request per play, forever.
-        if (song.localUri != null || song.videoId.length != YOUTUBE_ID_LENGTH) return song
+        if (song.localUri != null || song.localPath != null || song.videoId.length != YOUTUBE_ID_LENGTH) return song
         if (asked.add(song.videoId)) {
             scope.launch {
                 YtMusicRepository.trackLinks(song.videoId).getOrNull()?.let {
