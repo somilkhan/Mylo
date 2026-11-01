@@ -50,6 +50,7 @@ fun ScrobbleFab(
     surface: Modifier,
     modifier: Modifier = Modifier,
     reduceMotion: Boolean = false,
+    folded: Boolean = false,
 ) {
     val spec = if (reduceMotion) {
         spring<Float>(dampingRatio = 1f, stiffness = 10_000f)
@@ -57,7 +58,11 @@ fun ScrobbleFab(
         spring<Float>(dampingRatio = 0.72f, stiffness = 320f)
     }
     val scale by animateFloatAsState(
-        targetValue = if (visible) 1f else 0.6f,
+        targetValue = when {
+            !visible -> 0.6f
+            folded -> 0.84f
+            else -> 1f
+        },
         animationSpec = spec,
         label = "scrobbleFabScale",
     )
