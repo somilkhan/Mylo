@@ -92,6 +92,54 @@ class YtMusicRepositoryHistoryTest {
     }
 
     @Test
+    fun incrementalDatedHistoryStopsAfterTheOneDayOverlapAndKeepsOnlyRecentRows() = runBlocking {
+        val zone = ZoneId.of("UTC")
+        val now = LocalDate.of(2026, 10, 29).atTime(9, 0).atZone(zone).toInstant().toEpochMilli()
+        val lastSync = LocalDate.of(2026, 10, 28).atTime(8, 0).atZone(zone).toInstant().toEpochMilli()
+        val firstPage = Json.parseToJsonElement(
+            """
+            {
+              "contents": [{
+                "musicShelfRenderer": {
+                  "title": {"runs": [{"text": "Yesterday"}]},
+                  "contents": [${historyRow("recent", "Recent track")}],
+                  "continuations": [{"nextContinuationData": {"continuation": "page-2"}}]
+                }
+              }]
+            }
+            """.trimIndent(),
+        ) as JsonObject
+        val olderPage = Json.parseToJsonElement(
+            """
+            {
+              "contents": [{
+                "musicShelfRenderer": {
+                  "title": {"runs": [{"text": "Oct 26, 2026"}]},
+                  "contents": [${historyRow("old", "Old track")}],
+                  "continuations": [{"nextContinuationData": {"continuation": "page-3"}}]
+                }
+              }]
+            }
+            """.trimIndent(),
+        ) as JsonObject
+        var requests = 0
+
+        val result = collectPagedYtMusicHistory(
+            firstPage = firstPage,
+            nowMillis = now,
+            zone = zone,
+            notBeforeMillis = lastSync,
+        ) { token ->
+            requests++
+            assertEquals("page-2", token)
+            olderPage
+        }
+
+        assertEquals(1, requests, "Older history pages must not be fetched after crossing the overlap window")
+        assertEquals(listOf("recent"), result.map { it.song.videoId })
+    }
+
+    @Test
     fun quickPickExclusionsIncludeUndatedRowsAndTracksFoundOnLaterPages() = runBlocking {
         val firstPage = Json.parseToJsonElement(
             """
