@@ -26,6 +26,6 @@ Use JDK 17 and the SDK/NDK/CMake versions required by the project. Check Android
 
 ## Known traps
 
-- The startup window is black, but the requested anime-character splash animation is not implemented. Do not substitute the inherited metallic headphone logo.
+- The approved splash artwork is committed at `app/src/main/branding/mylo-logo.webp.base64`; `:app:generateMyloSplashArtwork` validates and decodes it to `R.drawable.mylo_logo`. `MyloSplash.kt` animates the flattened character/emblem/thread/wave composition from above with a settling swing and respects the system animator-duration scale. Keep this exact artwork; the inherited metallic headphone SVGs are not substitutes. The source is a single flattened image, so do not claim independent character-layer animation.
 - Internal package names still contain `bitchord`; do not rename them without an explicit compatibility plan.
 - Performance/refresh-rate preferences are requests to Android, not guarantees about actual display cadence.
