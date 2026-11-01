@@ -535,6 +535,7 @@ object InnertubeParser {
         root: JsonElement,
         nowMillis: Long,
         zone: ZoneId,
+        inheritedDate: LocalDate? = null,
     ): List<YtMusicHistoryEntry> {
         requireNoApiError(root, "history")
 
@@ -550,7 +551,9 @@ object InnertubeParser {
                         val label = shelf.o("title").runs().ifBlank {
                             shelf.o("header").o("musicHeaderRenderer").o("title").runs()
                         }
-                        val date = historyDateFromLabel(label, today) ?: inheritedDate
+                        // Only inherit a date when the continuation has no heading. An unknown
+                        // heading must stay unknown rather than borrowing another day's date.
+                        val date = if (label.isBlank()) inheritedDate else historyDateFromLabel(label, today)
                         shelf["contents"]?.let { walk(it, date) }
                         shelf["continuations"]?.let { walk(it, date) }
                         return
@@ -575,7 +578,7 @@ object InnertubeParser {
             }
         }
 
-        walk(root, null)
+        walk(root, inheritedDate)
         return out
     }
 
