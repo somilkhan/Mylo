@@ -740,11 +740,11 @@ private fun LazyListScope.generateSection(
                 }
             }
             generatedTrackPreview(
-        keyPrefix = "rediscover",
-        playlistName = "Rediscover",
-        songs = rediscoverSongs,
-        onPlayPlaylist = onPlayPlaylist,
-    )
+                keyPrefix = "rediscover",
+                playlistName = "Rediscover",
+                songs = rediscoverSongs,
+                onPlayPlaylist = onPlayPlaylist,
+            )
         } else {
             item(key = "gen-rediscover-empty") {
                 Text(
@@ -825,11 +825,11 @@ private fun LazyListScope.generateSection(
                 TextButton(onClick = onRetryRecommendations) { Text("Refresh recommendations") }
             }
             generatedTrackPreview(
-        keyPrefix = "discover",
-        playlistName = "Discover",
-        songs = recommendations,
-        onPlayPlaylist = onPlayPlaylist,
-    )
+                keyPrefix = "discover",
+                playlistName = "Discover",
+                songs = recommendations,
+                onPlayPlaylist = onPlayPlaylist,
+            )
             val myMix = interleaveScrobbleMix(topTracks, recommendations)
             if (topTracks.isNotEmpty() && recommendations.isNotEmpty() && myMix.isNotEmpty()) {
                 item(key = "gen-my-mix") {
@@ -855,11 +855,11 @@ private fun LazyListScope.generateSection(
                     }
                 }
                 generatedTrackPreview(
-        keyPrefix = "my-mix",
-        playlistName = "My mix",
-        songs = myMix,
-        onPlayPlaylist = onPlayPlaylist,
-    )
+                    keyPrefix = "my-mix",
+                    playlistName = "My mix",
+                    songs = myMix,
+                    onPlayPlaylist = onPlayPlaylist,
+                )
             }
         }
     }
