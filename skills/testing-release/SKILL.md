@@ -11,8 +11,9 @@ Always verify the workflow run for the commit under review; a prior green run is
 ## Local verification order
 
 1. Run the narrow regression test.
-2. Run `./gradlew --no-daemon :app:testDevDebugUnitTest`.
-3. Run `./gradlew --no-daemon :app:assembleDevDebug :tv:assembleDevDebug :wearos:assembleDevDebug`.
+2. Run `./gradlew --no-daemon :tv:compileDevDebugKotlin` to verify the shared phone-source TV variant and generated splash drawable without assembling an APK.
+3. Run `./gradlew --no-daemon :app:testDevDebugUnitTest`.
+4. When device/release artifacts are needed, run `./gradlew --no-daemon :app:assembleDevDebug :tv:assembleDevDebug :wearos:assembleDevDebug`.
 4. If relevant, run desktop, backend and web checks from `CONTRIBUTING.md`.
 5. Review the diff, generated artifacts, logs and final commit; fix failures and rerun affected checks.
 

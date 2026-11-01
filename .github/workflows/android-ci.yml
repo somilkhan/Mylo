@@ -61,6 +61,9 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && inputs.build_apks
         run: ./gradlew --no-daemon --stacktrace :app:assembleDevDebug :tv:assembleDevDebug :wearos:assembleDevDebug
 
+      - name: Compile TV Android source set
+        run: ./gradlew --no-daemon --stacktrace :tv:compileDevDebugKotlin
+
       - name: Run Android unit tests
         id: test_android
         run: ./gradlew --no-daemon --stacktrace :app:testDevDebugUnitTest
