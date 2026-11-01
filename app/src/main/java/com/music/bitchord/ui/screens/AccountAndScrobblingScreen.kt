@@ -161,7 +161,7 @@ fun AccountAndScrobblingScreen(
 
         SettingsGroup(
             header = "YouTube Music history",
-            footer = "Imported history stays on this device. Automatic refresh runs on Wi-Fi about every six hours; imported rows are marked approximate.",
+            footer = "Imported history stays on this device. Automatic refresh runs about every six hours when a network connection is available; imported rows are marked approximate.",
         ) {
             SettingsRow(
                 icon = Icons.Rounded.History,
@@ -502,17 +502,17 @@ private fun historySyncSubtitle(
         ScrobbleHistorySync.STATUS_WAITING_FOR_SIGN_IN ->
             "Reconnect YouTube Music to resume history sync"
         ScrobbleHistorySync.STATUS_WAITING_FOR_WIFI ->
-            "Waiting for Wi-Fi"
+            "Waiting for a network connection"
         ScrobbleHistorySync.STATUS_RETRYING ->
-            "Sync failed; will retry on Wi-Fi"
+            "Sync failed; will retry when a network is available"
         ScrobbleHistorySync.STATUS_NO_DATED_ROWS ->
             "No date-labelled rows found on last sync"
         ScrobbleHistorySync.STATUS_SUCCESS -> {
             val time = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
                 .format(Date(lastSyncAt))
-            "Wi-Fi only · Last sync $time · $lastAdded new listens"
+            "Last sync $time · $lastAdded new listens"
         }
-        else -> "Wi-Fi only · Sync about every six hours"
+        else -> "Sync about every six hours when online"
     }
 }
 

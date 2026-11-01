@@ -1,8 +1,6 @@
 package com.music.bitchord.data.generator
 
 import android.content.Context
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
@@ -87,7 +85,7 @@ object ScrobbleHistorySync {
         }
         if (!enabled || currentSessionIdentity(appContext) == null) return
         val constraints = Constraints.Builder()
-            .setRequiredNetworkType(NetworkType.UNMETERED)
+            .setRequiredNetworkType(NetworkType.CONNECTED)
             .build()
         val immediate = OneTimeWorkRequestBuilder<ScrobbleHistorySyncWorker>()
             .setConstraints(constraints)
@@ -314,17 +312,6 @@ class ScrobbleHistorySyncWorker(
             }
             return Result.success()
         }
-        if (!isOnWifi()) {
-            if (!ScrobbleHistorySync.isCurrentSession(applicationContext, generation, identity)) {
-                return Result.success()
-            }
-            prefs.edit()
-                .putLong(ScrobbleHistorySync.KEY_LAST_ATTEMPT_AT, now)
-                .putString(ScrobbleHistorySync.KEY_LAST_STATUS, ScrobbleHistorySync.STATUS_WAITING_FOR_WIFI)
-                .apply()
-            return Result.success()
-        }
-
         return try {
             val response = YtMusicRepository.historyWithDates()
             if (response.isFailure) {
@@ -395,13 +382,6 @@ class ScrobbleHistorySyncWorker(
         }
     }
 
-    private fun isOnWifi(): Boolean {
-        val connectivity = applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE)
-            as? ConnectivityManager ?: return false
-        val network = connectivity.activeNetwork ?: return false
-        val capabilities = connectivity.getNetworkCapabilities(network) ?: return false
-        return capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
-    }
 
     private companion object {
         const val TAG = "ScrobbleHistorySync"
