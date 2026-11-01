@@ -21,7 +21,7 @@ import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
 
 internal fun shouldScheduleScrobbleSyncOnLogin(hasSavedChoice: Boolean, enabled: Boolean): Boolean =
-    !hasSavedChoice || enabled
+    hasSavedChoice && enabled
 
 /** Explicitly opt-in sync of date-labelled YouTube history whenever a network is connected. */
 object ScrobbleHistorySync {
@@ -48,8 +48,8 @@ object ScrobbleHistorySync {
     private const val IMMEDIATE_WORK_NAME = "$UNIQUE_WORK_NAME-immediate"
 
     /**
-     * Start a silent import on first successful sign-in. Once the listener has
-     * explicitly disabled sync, subsequent sign-ins must respect that choice.
+     * Resume background import only after the listener has explicitly enabled it.
+     * A first sign-in is not consent to retain and periodically import account history.
      */
     fun onLogin(context: Context) {
         val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
