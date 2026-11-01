@@ -97,17 +97,19 @@ class AuthStore(context: Context) {
 
     fun removeAccount(accountId: String): GoogleAccountSession? {
         val current = sessions
+        val currentActiveAccountId = activeSession?.accountId
+        val removingActiveAccount = accountId == currentActiveAccountId
         val remaining = current.filterNot { it.accountId == accountId }
         replaceSessions(remaining)
         val selectedId = remainingAccountIdAfterRemoval(
             accountIds = current.map { it.accountId },
-            activeAccountId = activeAccountId,
+            activeAccountId = currentActiveAccountId,
             removedAccountId = accountId,
         )
         val fallback = remaining.firstOrNull { it.accountId == selectedId }
         select(fallback?.accountId.orEmpty(), fallback?.activeProfileId)
         prefs.edit().putString(KEY_COOKIE, fallback?.cookie).apply()
-        BrowserSession.clearGoogleCookies()
+        if (removingActiveAccount) BrowserSession.clearGoogleCookies()
         return fallback
     }
 
