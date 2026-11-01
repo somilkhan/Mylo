@@ -111,7 +111,7 @@ object DesktopDownloadQueue {
             _active.value = emptyMap()
             currentJobs
         }
-        jobs.forEach(Job::cancel)
+        jobs.forEach { it.cancel() }
     }
 
     /** Drops the finished and failed rows, leaving whatever is still going. */
@@ -143,19 +143,25 @@ object DesktopDownloadQueue {
             while (true) {
                 val item = takeNext(currentJob() ?: error("Download worker has no coroutine Job")) ?: return
                 val id = item.song.videoId
-                val result = runCatching {
-                    DesktopDownloadManager.download(item.song) { downloaded, total ->
-                        val fraction = if (total != null && total > 0L) {
-                            (downloaded.toDouble() / total).toFloat().coerceIn(0f, 1f)
-                        } else {
-                            0f
-                        }
-                        _active.update { current ->
-                            // A cancelled/retried row has a different sequence even when its ID matches.
-                            if (current[id]?.sequence != item.sequence) current
-                            else current + (id to item.copy(state = DesktopDownloadState.Running(fraction)))
-                        }
-                    }
+                val result = try {
+                    Result.success(
+                        DesktopDownloadManager.download(item.song) { downloaded, total ->
+                            val fraction = if (total != null && total > 0L) {
+                                (downloaded.toDouble() / total).toFloat().coerceIn(0f, 1f)
+                            } else {
+                                0f
+                            }
+                            _active.update { current ->
+                                // A cancelled/retried row has a different sequence even when its ID matches.
+                                if (current[id]?.sequence != item.sequence) current
+                                else current + (id to item.copy(state = DesktopDownloadState.Running(fraction)))
+                            }
+                        },
+                    )
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    throw cancelled
+                } catch (failure: Throwable) {
+                    Result.failure(failure)
                 }
                 onIdle(id, item.sequence)
                 result.fold(
