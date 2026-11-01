@@ -1317,7 +1317,7 @@ object ListenTogether {
             put("type", "ping")
             put("clientMs", sentAt)
         }
-        runCatching { send(Frame.Text(frame.toString())) }
+        runCatchingCancellable { send(Frame.Text(frame.toString())) }
     }
 
     /**
@@ -1337,7 +1337,7 @@ object ListenTogether {
                 put("positionMs", position)
                 put("isPlaying", _state.value.playback.isPlaying)
             }
-            runCatching { send(Frame.Text(frame.toString())) }
+            runCatchingCancellable { send(Frame.Text(frame.toString())) }
         }
     }
 
