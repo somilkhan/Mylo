@@ -169,7 +169,7 @@ object DownloadStore {
             "${MediaStore.MediaColumns.DISPLAY_NAME} = ? AND (" +
                 "${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ? OR " +
                 "${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ?)",
-            arrayOf(name, "%/$FOLDER%", "%/$LEGACY_FOLDER%"),
+            arrayOf(name, "%$relativePath%", "%$legacyRelativePath%"),
             null,
         )?.use { cursor ->
             if (!cursor.moveToFirst()) return@use null
