@@ -4127,13 +4127,10 @@ private fun BitChordApp(
                     .windowInsetsPadding(floatingBarInsets)
                     .padding(
                         end = 16.dp,
-                        bottom = if (glassActive) {
-                            if (player.song != null) 174.dp else 112.dp
-                        } else {
-                            2.dp
-                        },
+                        bottom = if (glassActive) 2.dp + SCROBBLE_FAB_SIZE + 10.dp else 2.dp,
                     ),
                 reduceMotion = reducePlayerMotion,
+                folded = glassActive && navBarScroll.isInline,
             )
             }
 
