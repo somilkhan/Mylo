@@ -111,7 +111,15 @@ object ScrobbleHistorySync {
                 .apply()
             hasExplicitlyEnabledSync(prefs)
         }
-        if (!enabled || currentSessionIdentity(appContext) == null) return
+        if (!enabled) return
+        val identity = currentSessionIdentity(appContext) ?: return
+        // The UI's summary timestamp follows the active account/profile. The
+        // import cursor itself is stored under the identity-scoped key below.
+        prefs.edit()
+            .putLong(KEY_LAST_SYNC_AT, prefs.getLong(identity.historySyncCursorPreferenceKey(), 0L))
+            .putInt(KEY_LAST_ADDED, 0)
+            .remove(KEY_LAST_STATUS)
+            .apply()
         enqueuePeriodicWork(appContext)
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
@@ -345,8 +353,8 @@ class ScrobbleHistorySyncWorker(
         return try {
             // First import is complete; later runs refetch only the newest date
             // buckets plus a one-day overlap for late-arriving history rows.
-            val lastSyncAt = prefs.getLong(ScrobbleHistorySync.KEY_LAST_SYNC_AT, 0L)
-                .takeIf { it > 0L }
+            val cursorKey = identity.historySyncCursorPreferenceKey()
+            val lastSyncAt = prefs.getLong(cursorKey, 0L).takeIf { it > 0L }
             val response = YtMusicRepository.historyWithDates(notBeforeMillis = lastSyncAt)
             if (response.isFailure) {
                 val error = response.exceptionOrNull()
@@ -398,6 +406,7 @@ class ScrobbleHistorySyncWorker(
                 )
             } ?: return Result.success()
             prefs.edit()
+                .putLong(cursorKey, now)
                 .putLong(ScrobbleHistorySync.KEY_LAST_SYNC_AT, now)
                 .putLong(ScrobbleHistorySync.KEY_LAST_ATTEMPT_AT, now)
                 .putInt(ScrobbleHistorySync.KEY_LAST_ADDED, added)

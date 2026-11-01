@@ -1158,12 +1158,18 @@ internal suspend fun <T> runCatchingCancellable(block: suspend () -> T): Result<
 
 
 /**
- * Read every dated history page. Continuation responses often contain rows
- * without repeating their date heading, so carry the last known bucket into
- * the next page. A repeated token ends the walk rather than looping forever.
+ * Read the supported date-labelled history buckets.
  *
- * Fetch failures deliberately propagate: a partial history must not be
- * reported as a successful complete import.
+ * A null [notBeforeMillis] performs the initial full paginated import. Later
+ * imports filter against the local date one day before the last successful
+ * sync, retaining an overlap for rows that arrive late. Paging stops only when
+ * a page exposes a known continuation date older than that cutoff; an unknown
+ * heading cannot prove that older pages are safe to skip.
+ *
+ * Continuation shelves with no heading inherit the previous bucket, while an
+ * unsupported heading clears that context rather than borrowing a wrong date.
+ * Repeated tokens fail the import instead of looping or returning partial data.
+ * Fetch failures deliberately propagate for the same reason.
  */
 internal suspend fun collectPagedYtMusicHistory(
     firstPage: JsonObject,

@@ -29,6 +29,28 @@ internal fun GoogleAccountSession.scrobbleIdentity(selectedProfileId: String?): 
     )
 }
 
+/**
+ * Preferences key for the last successful history import for this account/profile.
+ *
+ * Cookie fingerprints intentionally do not participate: rotating a valid session
+ * must fence in-flight requests, but it must not restart a complete history import.
+ * Stable account/channel identifiers are hashed so raw account metadata is never
+ * written into a preference key.
+ */
+internal fun ScrobbleSessionIdentity.historySyncCursorPreferenceKey(): String {
+    val stableIdentity = listOf(
+        accountId,
+        profileId.orEmpty(),
+        pageId.orEmpty(),
+        dataSyncId.orEmpty(),
+        authUser.orEmpty(),
+    ).joinToString(separator = "\u0000")
+    val fingerprint = MessageDigest.getInstance("SHA-256")
+        .digest(stableIdentity.toByteArray(Charsets.UTF_8))
+        .joinToString("") { "%02x".format(it.toInt() and 0xff) }
+    return "youtube_history_sync_cursor_$fingerprint"
+}
+
 /** Recognize Innertube authentication rejection through wrapped transport errors. */
 internal fun Throwable.isYouTubeAuthenticationFailure(): Boolean {
     var current: Throwable? = this

@@ -36,6 +36,15 @@ Backend CI runs these checks using the Go version declared in `backend/go.mod`. 
 - Never log cookies, SAPISID values, account tokens or imported listening rows. Imported history remains local and must not be exported through backup/device-transfer rules.
 
 Useful regression coverage: `AuthCookieTest`, `AccountSessionsTest`, and `ScrobbleSessionIdentityTest`. Verify Android unit tests and the exact PR-head CI run; device checks are still required for real session expiry, sign-out, account switching and background scheduling.
+
+### YouTube Music history import cursor and paging
+
+- The importer is `data/generator/ScrobbleHistorySync.kt`; it reuses the authenticated session restored by `BitChordApplication`. It is opt-in only. The immediate import requires a connected network; the recurring worker runs every six hours on an unmetered network.
+- The first successful import traverses the complete paginated set of supported date-labelled history buckets. Innertube provides day buckets, not per-listen timestamps: imported rows use approximate local-day anchors (noon, clamped to the current time for Today) and must remain marked inexact. Unsupported/unknown headings are not assigned fabricated dates.
+- Incremental refresh uses the last successful cursor for the active Google account/profile/channel, not the global UI status timestamp. The preference key is a SHA-256 digest of stable account/profile/channel identifiers; the cookie fingerprint is excluded so cookie rotation does not cause a full re-import. A new account, profile or channel has no cursor and therefore receives a full import.
+- The incremental cutoff is the local date one day before the last successful sync. Keep that overlap to catch late-arriving rows. Stop paging only after a page reports a known continuation date older than the cutoff; unknown headings must continue paging because they cannot prove that older pages are safe to omit.
+- Append only after revalidating the captured account/profile, session generation and explicit-consent state. A switch/sign-out/opt-out fences in-flight writes. Treat 401/403 and `LOGIN_REQUIRED` as reconnect-required (pause periodic work); retry transient failures. Never turn a failed/unauthenticated response into a successful empty import.
+- Regression coverage: `ScrobbleHistorySyncPolicyTest`, `ScrobbleSessionIdentityTest`, `YtMusicHistoryParserTest`, and `YtMusicRepositoryHistoryTest`. Run `:app:testDevDebugUnitTest` and `:shared:jvmTest`; device verification is still required for actual account switching, sign-out and background scheduling.
 - Innertube browse responses can carry a top-level `error` object with HTTP 200. Every browse-response parser (home, continuation, mood/genre, history, and endpoint-specific parsers) must reject that envelope before reading content and preserve its code/status. Repository layers must not swallow transport or API failures into successful empty feeds when the UI or worker needs to distinguish unavailable data from a genuinely empty result. In particular, never turn an API error into an empty-history sync; preserve authentication status so the worker can pause for reconnect.
 
 

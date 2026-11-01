@@ -75,6 +75,31 @@ class ScrobbleSessionIdentityTest {
     }
 
     @Test
+    fun historySyncCursorSurvivesCookieRotationForTheSameAccountAndProfile() {
+        val first = account(cookie = "SAPISID=first").scrobbleIdentity("profile-a")
+        val rotated = account(cookie = "SAPISID=rotated").scrobbleIdentity("profile-a")
+
+        assertNotEquals(first, rotated)
+        assertEquals(first.historySyncCursorPreferenceKey(), rotated.historySyncCursorPreferenceKey())
+    }
+
+    @Test
+    fun historySyncCursorIsScopedToAccountProfileAndChannel() {
+        val first = account().scrobbleIdentity("profile-a")
+        val otherAccount = account(id = "account-b", cookie = "SAPISID=session-b")
+            .scrobbleIdentity("profile-a")
+        val otherProfile = account().copy(
+            profiles = listOf(YouTubeProfile("profile-b", "Brand", dataSyncId = "datasync-b")),
+            activeProfileId = "profile-b",
+        ).scrobbleIdentity("profile-b")
+        val otherChannel = account(dataSyncId = "datasync-other").scrobbleIdentity("profile-a")
+
+        assertNotEquals(first.historySyncCursorPreferenceKey(), otherAccount.historySyncCursorPreferenceKey())
+        assertNotEquals(first.historySyncCursorPreferenceKey(), otherProfile.historySyncCursorPreferenceKey())
+        assertNotEquals(first.historySyncCursorPreferenceKey(), otherChannel.historySyncCursorPreferenceKey())
+    }
+
+    @Test
     fun wrapped401And403ErrorsRequireReconnection() {
         assertTrue(IllegalStateException("request failed: 401 Unauthorized").isYouTubeAuthenticationFailure())
         assertTrue(IllegalStateException("outer", IllegalStateException("403 Forbidden")).isYouTubeAuthenticationFailure())
