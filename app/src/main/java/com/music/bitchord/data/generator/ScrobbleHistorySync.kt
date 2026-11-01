@@ -20,7 +20,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
 
-internal fun shouldScheduleScrobbleSyncOnLogin(hasSavedChoice: Boolean, enabled: Boolean): Boolean =
+internal fun shouldResumeScrobbleHistorySync(hasSavedChoice: Boolean, enabled: Boolean): Boolean =
     hasSavedChoice && enabled
 
 /** Explicitly opt-in sync of date-labelled YouTube history whenever a network is connected. */
@@ -53,7 +53,7 @@ object ScrobbleHistorySync {
      */
     fun onLogin(context: Context) {
         val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        if (shouldScheduleScrobbleSyncOnLogin(prefs.contains(KEY_ENABLED), prefs.getBoolean(KEY_ENABLED, false))) {
+        if (shouldResumeScrobbleHistorySync(prefs.contains(KEY_ENABLED), prefs.getBoolean(KEY_ENABLED, false))) {
             schedule(context)
         }
     }
@@ -246,7 +246,7 @@ object ScrobbleHistorySync {
         }
         if (!hasRestoredSession || prefs.getBoolean(KEY_SIGNED_OUT, false)) return
         if (prefs.getBoolean(KEY_AUTH_REQUIRED, false)) return
-        if (!prefs.getBoolean(KEY_ENABLED, false)) return
+        if (!shouldResumeScrobbleHistorySync(prefs.contains(KEY_ENABLED), prefs.getBoolean(KEY_ENABLED, false))) return
 
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.UNMETERED)
