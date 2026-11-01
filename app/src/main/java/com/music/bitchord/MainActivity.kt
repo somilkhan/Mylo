@@ -67,6 +67,10 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.LocalOverscrollFactory
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowUpward
+import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.BarChart
+import androidx.compose.material.icons.rounded.QueueMusic
+import com.music.bitchord.ui.components.SCROBBLE_FAB_SIZE
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.CloudOff
@@ -1168,6 +1172,15 @@ private fun BitChordApp(
             BottomTab(exploreLabel, BitChordIcons.TabExplore),
             BottomTab(libraryLabel, BitChordIcons.TabLibrary),
             BottomTab(searchLabel, BitChordIcons.TabSearch),
+        )
+    }
+
+    // The existing pill becomes Scrobble's section switcher while its page is open.
+    val scrobbleTabs = remember {
+        listOf(
+            BottomTab("Stats", Icons.Rounded.BarChart),
+            BottomTab("Generate", Icons.Rounded.AutoAwesome),
+            BottomTab("Playlists", Icons.Rounded.QueueMusic),
         )
     }
 
@@ -3994,6 +4007,14 @@ private fun BitChordApp(
                     }
                 }
 
+                val displayedTabs = if (showScrobble) scrobbleTabs else tabs
+                val displayedSelectedIndex = if (showScrobble) scrobbleSection else selectedTab
+                val onDisplayedTabSelected: (Int) -> Unit = if (showScrobble) {
+                    { scrobbleSection = it }
+                } else {
+                    onTabSelected
+                }
+
                 if (glassActive) Column(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
@@ -4007,9 +4028,9 @@ private fun BitChordApp(
                     // controls dock into the tab bar rather than riding above it,
                     // and the pair folds together on scroll. See [GlassNavBar].
                     GlassNavBar(
-                        tabs = tabs,
-                        selectedIndex = selectedTab,
-                        onTabSelected = onTabSelected,
+                        tabs = displayedTabs,
+                        selectedIndex = displayedSelectedIndex,
+                        onTabSelected = onDisplayedTabSelected,
                         scrollConnection = navBarScroll,
                         song = player.song,
                         isPlaying = player.isPlaying,
@@ -4028,6 +4049,7 @@ private fun BitChordApp(
                         onBlockedControl = showHostOnlyNotice,
                         dock = activeDock,
                         pull = playerSheetMotion.takeIf { !reducePlayerMotion },
+                        standaloneIndex = if (showScrobble) -1 else null,
                         modifier = Modifier.fillMaxWidth(),
                     )
                 } else Column(
@@ -4041,6 +4063,8 @@ private fun BitChordApp(
                         // already been bounded by the time it is applied.
                         .widthIn(max = FLOATING_BAR_MAX_WIDTH)
                         .fillMaxWidth()
+                        // Keep a fixed slot for the Scrobble button at the pill's right.
+                        .padding(end = SCROBBLE_FAB_SIZE + 10.dp)
                         .onSizeChanged { floatingBarsHeight.intValue = it.height },
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
@@ -4070,10 +4094,10 @@ private fun BitChordApp(
                         Spacer(Modifier.height(8.dp))
                     }
                     FloatingBottomBar(
-                        tabs = tabs,
-                        selectedIndex = selectedTab,
+                        tabs = displayedTabs,
+                        selectedIndex = displayedSelectedIndex,
                         hazeState = hazeState,
-                        onTabSelected = onTabSelected,
+                        onTabSelected = onDisplayedTabSelected,
                     )
                 }
             ScrobbleFab(
@@ -4100,7 +4124,11 @@ private fun BitChordApp(
                     .align(Alignment.BottomEnd)
                     .padding(
                         end = 16.dp,
-                        bottom = if (player.song != null) 174.dp else 112.dp,
+                        bottom = if (glassActive) {
+                            if (player.song != null) 174.dp else 112.dp
+                        } else {
+                            2.dp
+                        },
                     ),
                 reduceMotion = reducePlayerMotion,
             )
