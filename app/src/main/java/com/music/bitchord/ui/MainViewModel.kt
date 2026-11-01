@@ -3216,8 +3216,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             reloadForAccount()
             loadChannels(force = true)
             ScrobbleHistorySync.onSessionChanged(getApplication())
-            // A first successful login opts into the initial silent import by default;
-            // a previously saved explicit opt-out remains authoritative.
+            // Login resumes history import only when the listener has enabled
+            // background sync in Settings; signing in alone is not consent.
             ScrobbleHistorySync.onLogin(getApplication())
             onComplete(true)
         }
