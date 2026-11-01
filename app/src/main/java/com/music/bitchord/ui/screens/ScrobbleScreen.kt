@@ -884,7 +884,7 @@ internal fun interleaveScrobbleMix(
     return mixed
 }
 
-private fun Play.toSong(): Song = Song(
+internal fun Play.toSong(): Song = Song(
     videoId = videoId,
     title = title,
     artist = artist,
