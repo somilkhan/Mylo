@@ -27,6 +27,13 @@ data class Play(
     val thumbnailUrl: String? = null,
     /** Filesystem fallback for local tracks whose playable identity is path-based. */
     val localPath: String? = null,
+    /** Catalogue metadata retained so generated mixes can render real track rows. */
+    val durationText: String? = null,
+    val artistId: String? = null,
+    val albumId: String? = null,
+    val albumName: String? = null,
+    val isVideo: Boolean = false,
+    val isVideoOrigin: Boolean = isVideo,
 ) {
     /** Stable identity for a catalogue track or local file, with text as the last resort. */
     fun songKey(): String = when {
