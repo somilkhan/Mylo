@@ -309,6 +309,22 @@ class ScrobbleGeneratorTest {
     }
 
     @Test
+    fun store_replacingImportedRowWithExactMyloPlayReportsChangeWithoutIncreasingCount() {
+        val file = File.createTempFile("replace-imported-play", ".tsv")
+        file.deleteOnExit()
+        val store = PlayHistoryStore(file, zone)
+        val imported = play("same", source = PlaySource.YOUTUBE_MUSIC, exact = false)
+        val exactMylo = imported.copy(source = PlaySource.MYLO, exact = true)
+
+        assertEquals(1, store.append(listOf(imported)))
+        val result = store.appendWithResult(listOf(exactMylo))
+
+        assertEquals(0, result.addedCount)
+        assertTrue(result.changed)
+        assertEquals(listOf(exactMylo), store.readAll())
+    }
+
+    @Test
     fun store_roundTripsAndDedupesOnWrite() {
         val file = File.createTempFile("plays", ".tsv")
         file.deleteOnExit()

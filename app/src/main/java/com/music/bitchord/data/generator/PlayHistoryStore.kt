@@ -32,12 +32,24 @@ class PlayHistoryStore(private val file: File, private val zone: ZoneId = ZoneId
 
     /** Adds [incoming], preserving distinct Mylo events and reconciling imported overlaps. */
     @Synchronized
-    fun append(incoming: List<Play>): Int {
+    fun append(incoming: List<Play>): Int = appendWithResult(incoming).addedCount
+
+    /**
+     * Reports content replacement as a change even when the number of rows stays constant.
+     * For example, an exact Mylo listen can replace an approximate imported row for the same
+     * track and day; callers must refresh readers even though no additional row was added.
+     */
+    @Synchronized
+    internal fun appendWithResult(incoming: List<Play>): PlayHistoryAppendResult {
         val before = readAll()
+        val normalizedBefore = dedupePlays(before, zone)
         val after = dedupePlays(before + incoming, zone)
-        val added = after.size - dedupePlays(before, zone).size
-        writeAtomically(after)
-        return added
+        val result = PlayHistoryAppendResult(
+            addedCount = after.size - normalizedBefore.size,
+            changed = after != before,
+        )
+        if (result.changed) writeAtomically(after)
+        return result
     }
 
     /** Removes everything, including Mylo's own playback history. */
@@ -119,6 +131,11 @@ class PlayHistoryStore(private val file: File, private val zone: ZoneId = ZoneId
 }
 
 
+internal data class PlayHistoryAppendResult(
+    val addedCount: Int,
+    val changed: Boolean,
+)
+
 /**
  * Process-wide owner for Mylo's private listening-history file. Playback writes
  * through this shared instance on an IO dispatcher; UI readers use the same
@@ -143,9 +160,9 @@ object ScrobbleHistory {
     }
 
     fun append(incoming: List<Play>): Int {
-        val added = requireStore().append(incoming)
-        if (added > 0) _revision.update { it + 1L }
-        return added
+        val result = requireStore().appendWithResult(incoming)
+        if (result.changed) _revision.update { it + 1L }
+        return result.addedCount
     }
 
     fun readAll(): List<Play> = requireStore().readAll()
