@@ -178,7 +178,19 @@ object YtMusicRepository {
      * Recommended discovery tracks for Quick Picks, strictly excluding listening history and recents.
      */
     suspend fun quickPicks(excludeSongIds: Set<String> = emptySet()): Result<List<Song>> = call("quickPicks") {
-        // Preserve request failures so the UI can distinguish an unavailable
+        // Merge Mylo's imported/local history with the account's current
+        // YouTube Music history. The latter is best-effort: an unavailable
+        // history feed must not make otherwise available recommendations fail.
+        val accountHistoryIds = if (Innertube.cookie != null) {
+            runCatchingCancellable { fetchHistory() }
+                .getOrDefault(emptyList())
+                .mapNotNullTo(HashSet()) { it.videoId.takeIf(String::isNotBlank) }
+        } else {
+            emptySet()
+        }
+        val excludedIds = mergeQuickPickExclusions(excludedIds, accountHistoryIds)
+
+        // Preserve Home request failures so the UI can distinguish an unavailable
         // recommendation source from a genuinely empty set of new tracks.
         val shelves = InnertubeParser.parseHome(Innertube.browse("FEmusic_home"))
 
@@ -200,7 +212,7 @@ object YtMusicRepository {
                     )
                 }
             }.orEmpty(),
-            excludeSongIds,
+            excludedIds,
         )
         if (qpSongs.isNotEmpty()) return@call qpSongs
 
@@ -226,7 +238,7 @@ object YtMusicRepository {
                     }
                 }
             },
-            excludeSongIds,
+            excludedIds,
         )
 
         if (homeShelfSongs.isNotEmpty()) return@call homeShelfSongs
@@ -263,7 +275,7 @@ object YtMusicRepository {
                     }
                 }
             },
-            excludeSongIds,
+            excludedIds,
         )
 
         if (exploreSongs.isNotEmpty()) return@call exploreSongs
@@ -1117,6 +1129,15 @@ internal suspend fun <T> runCatchingCancellable(block: suspend () -> T): Result<
         Result.failure(failure)
     }
 
+
+/** Union local/imported and live account history before filtering Quick Picks. */
+internal fun mergeQuickPickExclusions(
+    localHistoryIds: Set<String>,
+    accountHistoryIds: Set<String>,
+): Set<String> = localHistoryIds.asSequence()
+    .plus(accountHistoryIds.asSequence())
+    .filter(String::isNotBlank)
+    .toSet()
 
 /** Remove played/unplayable rows and duplicate catalogue IDs from a candidate set. */
 internal fun unplayedRecommendations(

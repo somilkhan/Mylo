@@ -8,6 +8,16 @@ import kotlin.test.assertTrue
 class YtMusicRepositoryRecommendationsTest {
 
     @Test
+    fun quickPickExclusionsMergeLocalAndAccountHistory() {
+        val result = mergeQuickPickExclusions(
+            localHistoryIds = setOf("local-played", "shared", ""),
+            accountHistoryIds = setOf("account-played", "shared"),
+        )
+
+        assertEquals(setOf("local-played", "account-played", "shared"), result)
+    }
+
+    @Test
     fun recommendationsDropBlankPlayedAndDuplicateIds() {
         val result = unplayedRecommendations(
             listOf(song("played"), song("fresh"), song("fresh"), song("")),
