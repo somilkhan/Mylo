@@ -115,7 +115,7 @@ internal object ScrobblePlaylistCodec {
                     PlaylistRecord(
                         title = playlist.title,
                         reason = playlist.reason,
-                        songs = playlist.songs.map(Song::toRecord),
+                        songs = playlist.songs.map { it.toRecord() },
                     )
                 },
             ),
@@ -128,7 +128,7 @@ internal object ScrobblePlaylistCodec {
             SavedScrobblePlaylist(
                 title = playlist.title,
                 reason = playlist.reason,
-                songs = playlist.songs.map(SongRecord::toSong),
+                songs = playlist.songs.map { it.toSong() },
             )
         }.filter { it.title.isNotBlank() && it.songs.isNotEmpty() }
     }.getOrNull()
