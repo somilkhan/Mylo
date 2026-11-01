@@ -197,9 +197,9 @@ object YtMusicRepository {
         // YouTube Music history. The latter is best-effort: an unavailable
         // history feed must not make otherwise available recommendations fail.
         val accountHistory = if (Innertube.cookie != null) {
-            // Exclude tracks from every history page, not only the first shelf
-            // returned by browse(HISTORY). The date parser is deliberately
-            // approximate; only the song identities matter to this filter.
+            // Exclude tracks from every history page, including rows whose
+            // date headings cannot be interpreted. This filter needs identities,
+            // not fabricated timestamps.
             runCatchingCancellable { fetchAllHistorySongs() }.getOrDefault(emptyList())
         } else {
             emptyList()

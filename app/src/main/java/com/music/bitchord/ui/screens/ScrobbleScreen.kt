@@ -2,6 +2,21 @@ package com.music.bitchord.ui.screens
 
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.layout.Arrangement
@@ -58,6 +73,7 @@ import com.music.bitchord.data.stats.ReplayPeriod
 import com.music.bitchord.data.stats.ReplaySummary
 import com.music.bitchord.data.model.Song
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.time.ZoneId
@@ -81,6 +97,7 @@ fun ScrobbleScreen(
     onPlayPlaylist: (String, List<Song>) -> Unit,
     onBrowseMoods: () -> Unit,
     modifier: Modifier = Modifier,
+    reduceMotion: Boolean = false,
 ) {
     var summary by remember { mutableStateOf<ReplaySummary?>(null) }
     var loadingStats by remember { mutableStateOf(true) }
@@ -165,56 +182,87 @@ fun ScrobbleScreen(
 
     Column(
         modifier = modifier
-            .fillMaxWidth()
+            .fillMaxSize()
             .background(MaterialTheme.colorScheme.background),
     ) {
-        LazyColumn(
-            contentPadding = PaddingValues(
-                start = 20.dp,
-                end = 20.dp,
-                top = 58.dp,
-                bottom = bottomPadding,
-            ),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            when (selectedSection) {
-                SCROBBLE_TAB_STATS -> statsSection(summary, loadingStats, statsFailed, historyPlays, loadingHistory, historyFailed)
-                SCROBBLE_TAB_GENERATE -> generateSection(
-                    historyPlays = historyPlays,
-                    loadingHistory = loadingHistory,
-                    historyFailed = historyFailed,
-                    recommendations = recommendedSongs,
-                    loadingRecommendations = loadingRecommendations,
-                    recommendationsReady = recommendationsReady,
-                    recommendationsFailed = recommendationsFailed,
-                    onRetryRecommendations = { recommendationRequest += 1 },
-                    onPlayPlaylist = onPlayPlaylist,
-                    onSavePlaylist = ScrobblePlaylistStore::save,
-                    onBrowseMoods = onBrowseMoods,
-                )
-                SCROBBLE_TAB_PLAYLISTS -> {
-                    val openedPlaylist = openedPlaylistTitle?.let { title ->
-                        ScrobblePlaylistStore.playlists.firstOrNull { it.title == title }
-                    }
-                    if (openedPlaylist != null) {
-                        playlistDetailSection(
-                            playlist = openedPlaylist,
-                            onBack = { openedPlaylistTitle = null },
-                            onPlayPlaylist = onPlayPlaylist,
-                        )
-                    } else {
-                        playlistsSection(
-                            playlists = ScrobblePlaylistStore.playlists,
-                            onOpenPlaylist = { openedPlaylistTitle = it },
-                            onPlayPlaylist = onPlayPlaylist,
-                            onRemovePlaylist = { title ->
-                                ScrobblePlaylistStore.remove(title)
-                                if (openedPlaylistTitle == title) openedPlaylistTitle = null
-                            },
-                        )
-                    }
+        AnimatedContent(
+            targetState = selectedSection,
+            modifier = Modifier.fillMaxSize(),
+            transitionSpec = {
+                if (reduceMotion) {
+                    EnterTransition.None togetherWith ExitTransition.None
+                } else {
+                    val direction = if (targetState > initialState) 1 else -1
+                    (
+                        slideInHorizontally(
+                            animationSpec = tween(260),
+                            initialOffsetX = { direction * it / 8 },
+                        ) + fadeIn(tween(140))
+                    ) togetherWith (
+                        slideOutHorizontally(
+                            animationSpec = tween(220),
+                            targetOffsetX = { -direction * it / 8 },
+                        ) + fadeOut(tween(120))
+                    )
                 }
-                else -> statsSection(summary, loadingStats, statsFailed, historyPlays, loadingHistory, historyFailed)
+            },
+            label = "scrobble-section",
+        ) { section ->
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(
+                    start = 20.dp,
+                    end = 20.dp,
+                    top = 58.dp,
+                    bottom = bottomPadding,
+                ),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                when (section) {
+                    SCROBBLE_TAB_STATS -> statsSection(
+                        summary, loadingStats, statsFailed,
+                        historyPlays, loadingHistory, historyFailed, reduceMotion,
+                    )
+                    SCROBBLE_TAB_GENERATE -> generateSection(
+                        historyPlays = historyPlays,
+                        loadingHistory = loadingHistory,
+                        historyFailed = historyFailed,
+                        recommendations = recommendedSongs,
+                        loadingRecommendations = loadingRecommendations,
+                        recommendationsReady = recommendationsReady,
+                        recommendationsFailed = recommendationsFailed,
+                        onRetryRecommendations = { recommendationRequest += 1 },
+                        onPlayPlaylist = onPlayPlaylist,
+                        onSavePlaylist = ScrobblePlaylistStore::save,
+                        onBrowseMoods = onBrowseMoods,
+                    )
+                    SCROBBLE_TAB_PLAYLISTS -> {
+                        val openedPlaylist = openedPlaylistTitle?.let { title ->
+                            ScrobblePlaylistStore.playlists.firstOrNull { it.title == title }
+                        }
+                        if (openedPlaylist != null) {
+                            playlistDetailSection(
+                                playlist = openedPlaylist,
+                                onBack = { openedPlaylistTitle = null },
+                                onPlayPlaylist = onPlayPlaylist,
+                            )
+                        } else {
+                            playlistsSection(
+                                playlists = ScrobblePlaylistStore.playlists,
+                                onOpenPlaylist = { openedPlaylistTitle = it },
+                                onPlayPlaylist = onPlayPlaylist,
+                                onRemovePlaylist = { title ->
+                                    ScrobblePlaylistStore.remove(title)
+                                    if (openedPlaylistTitle == title) openedPlaylistTitle = null
+                                },
+                            )
+                        }
+                    }
+                    else -> statsSection(
+                        summary, loadingStats, statsFailed,
+                        historyPlays, loadingHistory, historyFailed, reduceMotion,
+                    )
+                }
             }
         }
     }
@@ -227,6 +275,7 @@ private fun LazyListScope.statsSection(
     historyPlays: List<Play>,
     loadingHistory: Boolean,
     historyFailed: Boolean,
+    reduceMotion: Boolean,
 ) {
     item(key = "stats-title") {
         Text(
@@ -276,9 +325,9 @@ private fun LazyListScope.statsSection(
                         color = MaterialTheme.colorScheme.onSurface,
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Metric(value = "${summary.minutes}", label = "Minutes")
-                        Metric(value = "${summary.totalPlays}", label = "Plays")
-                        Metric(value = "${summary.distinctSongs}", label = "Tracks")
+                        Metric(value = "${summary.minutes}", label = "Minutes", reduceMotion = reduceMotion)
+                        Metric(value = "${summary.totalPlays}", label = "Plays", reduceMotion = reduceMotion)
+                        Metric(value = "${summary.distinctSongs}", label = "Tracks", reduceMotion = reduceMotion)
                     }
                 }
             }
@@ -336,6 +385,13 @@ private fun LazyListScope.statsSection(
                 )
                 else -> {
                     val sourceCounts = monthlyHistory.groupingBy { it.source }.eachCount()
+                    SourceSplitBar(
+                        myloCount = sourceCounts[PlaySource.MYLO] ?: 0,
+                        youtubeCount = sourceCounts[PlaySource.YOUTUBE_MUSIC] ?: 0,
+                        otherCount = (sourceCounts[PlaySource.LAST_FM] ?: 0) +
+                            (sourceCounts[PlaySource.LISTENBRAINZ] ?: 0),
+                        reduceMotion = reduceMotion,
+                    )
                     listOf(
                         PlaySource.MYLO,
                         PlaySource.YOUTUBE_MUSIC,
@@ -401,6 +457,82 @@ private fun sourceLabel(source: PlaySource): String = when (source) {
 }
 
 @Composable
+private fun SourceSplitBar(
+    myloCount: Int,
+    youtubeCount: Int,
+    otherCount: Int,
+    reduceMotion: Boolean,
+) {
+    val total = myloCount + youtubeCount + otherCount
+    if (total <= 0) return
+    val myloTarget = myloCount.toFloat() / total
+    val youtubeTarget = youtubeCount.toFloat() / total
+    val otherTarget = otherCount.toFloat() / total
+    val myloProgress = remember { Animatable(0f) }
+    val youtubeProgress = remember { Animatable(0f) }
+    val otherProgress = remember { Animatable(0f) }
+
+    LaunchedEffect(myloTarget, youtubeTarget, otherTarget, reduceMotion) {
+        if (reduceMotion) {
+            myloProgress.snapTo(myloTarget)
+            youtubeProgress.snapTo(youtubeTarget)
+            otherProgress.snapTo(otherTarget)
+        } else {
+            myloProgress.snapTo(0f)
+            youtubeProgress.snapTo(0f)
+            otherProgress.snapTo(0f)
+            kotlinx.coroutines.coroutineScope {
+                launch {
+                    myloProgress.animateTo(myloTarget, tween(800, easing = FastOutSlowInEasing))
+                }
+                launch {
+                    youtubeProgress.animateTo(youtubeTarget, tween(800, easing = FastOutSlowInEasing))
+                }
+                launch {
+                    otherProgress.animateTo(otherTarget, tween(800, easing = FastOutSlowInEasing))
+                }
+            }
+        }
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(8.dp)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        if (myloProgress.value > 0f) {
+            Box(
+                modifier = Modifier
+                    .weight(myloProgress.value)
+                    .fillMaxHeight()
+                    .background(MaterialTheme.colorScheme.primary),
+            )
+        }
+        if (youtubeProgress.value > 0f) {
+            Box(
+                modifier = Modifier
+                    .weight(youtubeProgress.value)
+                    .fillMaxHeight()
+                    .background(MaterialTheme.colorScheme.onSurfaceVariant),
+            )
+        }
+        if (otherProgress.value > 0f) {
+            Box(
+                modifier = Modifier
+                    .weight(otherProgress.value)
+                    .fillMaxHeight()
+                    .background(MaterialTheme.colorScheme.tertiary),
+            )
+        }
+        val remaining = (1f - myloProgress.value - youtubeProgress.value - otherProgress.value)
+            .coerceAtLeast(0f)
+        if (remaining > 0f) Spacer(Modifier.weight(remaining).fillMaxHeight())
+    }
+}
+
+@Composable
 private fun EmptyCard(title: String, body: String) {
     Column(
         modifier = Modifier
@@ -425,13 +557,28 @@ private fun EmptyCard(title: String, body: String) {
 }
 
 @Composable
-private fun RowScope.Metric(value: String, label: String) {
+private fun RowScope.Metric(value: String, label: String, reduceMotion: Boolean) {
+    val target = value.toFloatOrNull()
+    val animatedValue = remember { Animatable(0f) }
+    LaunchedEffect(value, reduceMotion) {
+        if (target == null) {
+            animatedValue.snapTo(0f)
+        } else if (reduceMotion) {
+            animatedValue.snapTo(target)
+        } else {
+            animatedValue.snapTo(0f)
+            animatedValue.animateTo(
+                target,
+                animationSpec = tween(800, easing = FastOutSlowInEasing),
+            )
+        }
+    }
     Column(
         modifier = Modifier.weight(1f),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         Text(
-            text = value,
+            text = target?.let { animatedValue.value.toInt().toString() } ?: value,
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface,

@@ -25,6 +25,10 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.fadeIn
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.scaleIn
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeOut
@@ -2693,10 +2697,29 @@ private fun BitChordApp(
                         val libraryTabKey = "$TAB_KEY$TAB_LIBRARY"
                         val libraryShowAllSwap = (initialState == "library_show_all" && targetState == libraryTabKey) ||
                             (targetState == "library_show_all" && initialState == libraryTabKey)
-                        if (tabSwap || libraryShowAllSwap) {
-                            EnterTransition.None togetherWith ExitTransition.None
-                        } else {
-                            fadeIn(tween(180)) togetherWith fadeOut(tween(180))
+                        val scrobbleOpening = targetState == "scrobble" && initialState != "scrobble"
+                        val scrobbleClosing = initialState == "scrobble" && targetState != "scrobble"
+                        when {
+                            reducePlayerMotion -> EnterTransition.None togetherWith ExitTransition.None
+                            scrobbleOpening -> (
+                                fadeIn(tween(140)) +
+                                    scaleIn(
+                                        animationSpec = spring(dampingRatio = 0.78f, stiffness = 280f),
+                                        initialScale = 0.86f,
+                                        transformOrigin = TransformOrigin(0.94f, 0.92f),
+                                    )
+                                ) togetherWith ExitTransition.None
+                            scrobbleClosing -> EnterTransition.None togetherWith (
+                                fadeOut(tween(120)) +
+                                    scaleOut(
+                                        animationSpec = spring(dampingRatio = 0.82f, stiffness = 300f),
+                                        targetScale = 0.86f,
+                                        transformOrigin = TransformOrigin(0.94f, 0.92f),
+                                    )
+                                )
+                            tabSwap || libraryShowAllSwap ->
+                                EnterTransition.None togetherWith ExitTransition.None
+                            else -> fadeIn(tween(180)) togetherWith fadeOut(tween(180))
                         }
                     },
                     modifier = Modifier
@@ -2802,6 +2825,7 @@ private fun BitChordApp(
                                 viewModel.closeMoodGenre()
                                 selectedTab = TAB_EXPLORE
                             },
+                            reduceMotion = reducePlayerMotion,
                         )
                     } else if (key == "replay") {
                         ReplayScreen(
