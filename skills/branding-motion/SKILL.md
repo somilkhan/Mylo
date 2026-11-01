@@ -11,11 +11,11 @@
 ## Current repository state
 
 - Approved composition: `app/src/main/branding/mylo-logo.webp.base64` (lossless WebP source in Git).
-- Build integration: `:app:generateMyloSplashArtwork` validates the RIFF/WEBP payload and generates `R.drawable.mylo_logo`; do not decode it at runtime.
+- Build integration: `:app:generateMyloSplashArtwork` and `:tv:generateMyloSplashArtwork` independently validate the RIFF/WEBP payload and generate a module-local `R.drawable.mylo_logo`; do not decode it at runtime or wire both generated directories into one module.
 - Runtime: `app/src/main/java/com/music/bitchord/MyloSplash.kt` animates the complete flattened artwork from above with a restrained settling swing, black background, logo-only framing and system animator-duration-scale handling.
 - The source is one flattened composition. Separate character/emblem layers are not available; preserve the original image rather than tracing or inventing replacements.
 - `app/src/main/assets/Logo.svg` and `LogoTransparent.svg` are inherited metallic headphone artwork and must not be used for this splash.
-- The phone module already wires the generated drawable. The TV module must also include `../app/build/generated/myloSplash/res` and depend on `:app:generateMyloSplashArtwork` before resource processing.
+- The phone and TV modules each compile the shared splash composable but must consume only their own generated drawable. The TV task reads the same encoded source from the app module and writes to `tv/build/generated/myloSplash/res`; never add the app generated directory to TV's resource sources, or Android resource merging fails with duplicate `mylo_logo`.
 
 ## Implementation guidance
 
