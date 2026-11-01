@@ -58,7 +58,9 @@ object ListeningRecorder {
      */
     @Synchronized
     fun onStarted(song: Song, atMillis: Long = System.currentTimeMillis()) {
-        val trackIdentity = song.localUri?.takeIf { it.isNotBlank() } ?: song.videoId
+        val trackIdentity = song.localUri?.takeIf { it.isNotBlank() }
+            ?: song.localPath?.takeIf { it.isNotBlank() }
+            ?: song.videoId
         playClock.start(trackIdentity, atMillis)
     }
 
@@ -70,7 +72,9 @@ object ListeningRecorder {
     @Synchronized
     fun onSample(song: Song, durationMs: Long) {
         val now = System.currentTimeMillis()
-        val trackIdentity = song.localUri?.takeIf { it.isNotBlank() } ?: song.videoId
+        val trackIdentity = song.localUri?.takeIf { it.isNotBlank() }
+            ?: song.localPath?.takeIf { it.isNotBlank() }
+            ?: song.videoId
         val length = durationMs.takeIf { it > 0 } ?: song.durationMillis()
         val threshold = if (length > 0) {
             min(length / 2, PLAY_CEILING_MS).coerceAtLeast(PLAY_FLOOR_MS)
@@ -94,6 +98,7 @@ object ListeningRecorder {
                 exact = true,
                 localUri = song.localUri,
                 thumbnailUrl = song.thumbnailUrl,
+                localPath = song.localPath,
             )
             // The sampler runs on the playback thread. Persist off-thread so a
             // slow filesystem can never delay audio or the listening counters.

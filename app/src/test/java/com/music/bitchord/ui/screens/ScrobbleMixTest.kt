@@ -19,6 +19,22 @@ class ScrobbleMixTest {
     }
 
     @Test
+    fun interleavesPathBackedLocalFilesByPathWhenUriIsUnavailable() {
+        val first = song("matched-video", localPath = "/storage/music/one.flac")
+        val second = song("matched-video", localPath = "/storage/music/two.flac")
+
+        val mixed = interleaveScrobbleMix(
+            topTracks = listOf(first),
+            recommendations = listOf(second),
+        )
+
+        assertEquals(
+            listOf("/storage/music/one.flac", "/storage/music/two.flac"),
+            mixed.map(Song::localPath),
+        )
+    }
+
+    @Test
     fun preservesLocalFileIdentityAndSkipsRowsThatCannotBePlayed() {
         val firstLocal = song("", localUri = "file:///music/one.flac")
         val secondLocal = song("", localUri = "file:///music/two.flac")
@@ -47,11 +63,16 @@ class ScrobbleMixTest {
         assertEquals(5, mixed.size)
     }
 
-    private fun song(videoId: String, localUri: String? = null) = Song(
+    private fun song(
+        videoId: String,
+        localUri: String? = null,
+        localPath: String? = null,
+    ) = Song(
         videoId = videoId,
         title = videoId.ifBlank { "Local track" },
         artist = "Artist",
         thumbnailUrl = null,
         localUri = localUri,
+        localPath = localPath,
     )
 }

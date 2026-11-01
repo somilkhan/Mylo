@@ -174,6 +174,39 @@ class ScrobbleGeneratorTest {
     }
 
     @Test
+    fun localPathTakesPrecedenceOverMatchedVideoIdWhenUriIsUnavailable() {
+        val first = play("same-video").copy(localPath = "/storage/music/one.flac")
+        val second = play("same-video").copy(localPath = "/storage/music/two.flac")
+
+        assertTrue(first.songKey() != second.songKey())
+        assertEquals(2, dedupePlays(listOf(first, second), zone).size)
+    }
+
+    @Test
+    fun store_roundTripsLocalPathForPathBackedPlayback() {
+        val file = File.createTempFile("local-path-plays", ".tsv")
+        file.deleteOnExit()
+        val store = PlayHistoryStore(file, zone)
+        val original = play("matched-video").copy(localPath = "/storage/music/offline.flac")
+
+        assertEquals(1, store.append(listOf(original)))
+        assertEquals(original, store.readAll().single())
+    }
+
+    @Test
+    fun store_readsLegacyRowsWithoutLocalPath() {
+        val file = File.createTempFile("legacy-local-plays", ".tsv")
+        file.deleteOnExit()
+        file.writeText("x\tTitle x\tA\tMYLO\t${now}\ttrue\tcontent://audio/1\thttps://img.example/cover.jpg\n")
+
+        val stored = PlayHistoryStore(file, zone).readAll()
+
+        assertEquals(1, stored.size)
+        assertEquals(null, stored.single().localPath)
+        assertEquals("content://audio/1", stored.single().localUri)
+    }
+
+    @Test
     fun localUriTakesPrecedenceOverMatchedVideoId() {
         val first = play("same-video").copy(localUri = "content://media/external/audio/1")
         val second = play("same-video").copy(localUri = "content://media/external/audio/2")

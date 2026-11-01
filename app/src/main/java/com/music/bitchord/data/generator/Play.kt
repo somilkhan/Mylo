@@ -25,10 +25,13 @@ data class Play(
     val localUri: String? = null,
     /** Artwork URL captured with the play so history-generated mixes retain their cover art. */
     val thumbnailUrl: String? = null,
+    /** Filesystem fallback for local tracks whose playable identity is path-based. */
+    val localPath: String? = null,
 ) {
     /** Stable identity for a catalogue track or local file, with text as the last resort. */
     fun songKey(): String = when {
         !localUri.isNullOrBlank() -> "local:$localUri"
+        !localPath.isNullOrBlank() -> "local-path:$localPath"
         videoId.isNotBlank() -> "id:$videoId"
         else -> "tx:${normaliseText(title)}|${normaliseText(artist)}"
     }

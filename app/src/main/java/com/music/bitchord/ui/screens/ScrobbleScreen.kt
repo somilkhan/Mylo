@@ -722,6 +722,7 @@ internal fun interleaveScrobbleMix(
     fun append(song: Song?) {
         if (song == null || mixed.size >= limit) return
         val identity = song.localUri?.takeIf { it.isNotBlank() }?.let { "local:$it" }
+            ?: song.localPath?.takeIf { it.isNotBlank() }?.let { "local-path:$it" }
             ?: song.videoId.takeIf { it.isNotBlank() }?.let { "video:$it" }
             ?: return
         if (seen.add(identity)) mixed += song
@@ -742,6 +743,7 @@ private fun Play.toSong(): Song = Song(
     artist = artist,
     thumbnailUrl = thumbnailUrl,
     localUri = localUri,
+    localPath = localPath,
 )
 
 private fun LazyListScope.playlistDetailSection(
