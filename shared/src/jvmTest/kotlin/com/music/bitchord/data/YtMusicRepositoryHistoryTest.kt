@@ -68,8 +68,7 @@ class YtMusicRepositoryHistoryTest {
             {
               "continuationContents": {
                 "musicShelfContinuation": {
-                  "contents": [${historyRow("second", "Second track")}],
-                  "continuations": [{"nextContinuationData": {"continuation": "page-2"}}]
+                  "contents": [${historyRow("second", "Second track")}]
                 }
               }
             }
@@ -84,10 +83,47 @@ class YtMusicRepositoryHistoryTest {
         }
 
         val expectedDayAnchor = yesterday.atTime(12, 0).atZone(zone).toInstant().toEpochMilli()
-        assertEquals(1, requests, "A repeated continuation token must stop pagination")
+        assertEquals(1, requests, "The terminal page must not trigger another request")
         assertEquals(listOf("first", "second"), result.map { it.song.videoId })
         assertEquals(listOf(expectedDayAnchor, expectedDayAnchor), result.map { it.playedAtMillis })
         assertFalse(result.any { it.exact }, "Innertube date buckets never provide exact play times")
+    }
+
+    @Test
+    fun datedHistoryRejectsRepeatedContinuationTokensInsteadOfReturningPartialResults() = runBlocking {
+        val zone = ZoneId.of("UTC")
+        val now = LocalDate.of(2026, 10, 29).atTime(9, 0).atZone(zone).toInstant().toEpochMilli()
+        val firstPage = Json.parseToJsonElement(
+            """
+            {
+              "contents": [{
+                "musicShelfRenderer": {
+                  "title": {"runs": [{"text": "Yesterday"}]},
+                  "contents": [${historyRow("first", "First track")}],
+                  "continuations": [{"nextContinuationData": {"continuation": "page-2"}}]
+                }
+              }]
+            }
+            """.trimIndent(),
+        ) as JsonObject
+        val repeatedPage = Json.parseToJsonElement(
+            """
+            {
+              "continuationContents": {
+                "musicShelfContinuation": {
+                  "contents": [${historyRow("second", "Second track")}],
+                  "continuations": [{"nextContinuationData": {"continuation": "page-2"}}]
+                }
+              }
+            }
+            """.trimIndent(),
+        ) as JsonObject
+
+        val failure = assertFailsWith<IllegalStateException> {
+            collectPagedYtMusicHistory(firstPage, now, zone) { repeatedPage }
+        }
+
+        assertTrue(failure.message.orEmpty().contains("repeated a continuation token"))
     }
 
     @Test
