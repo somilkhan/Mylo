@@ -17,6 +17,15 @@ Always verify the workflow run for the commit under review; a prior green run is
 5. If relevant, run desktop, backend and web checks from `CONTRIBUTING.md`.
 6. Review the diff, generated artifacts, logs and final commit; fix failures and rerun affected checks.
 
+## Scrobble verification matrix
+
+- Fast feedback: ScrobbleFabTest, ScrobbleSessionIdentityTest, ScrobbleHistorySyncPolicyTest, ScrobbleGeneratorTest, ScrobbleMixTest, and ScrobblePlaylistStoreTest. These are JVM regression tests, not Compose rendering or hardware checks.
+- History paging lives in the shared JVM source set; run ./gradlew --no-daemon :shared:jvmTest to cover YtMusicRepositoryHistoryTest and parser/pagination behavior.
+- Required PR CI coverage: Android :tv:compileDevDebugKotlin plus :app:testDevDebugUnitTest; desktop compile; :shared:jvmTest :sharedUi:jvmTest :desktopUi:jvmTest; desktop unit tests; web tests and typecheck. Confirm every job is complete for the exact PR head SHA.
+- APK assembly is opt-in through workflow_dispatch with build_apks=true. Ordinary PR CI deliberately skips app/TV/Wear APK assembly and artifact upload. A green unit-test run does not imply an APK was installed or the app was opened.
+- Physical-device checklist for this feature: Home-only visibility; glass and standard nav placement; 360 dp/small-screen fit; large font; light/dark; reduced motion; scroll/fold behavior; FAB touch clearance; mini-player overlap; Back and tab-switch dismissal; generated queue/selected-row playback; local URI/path playback; background YouTube Music sync, account/profile switching, sign-out, explicit opt-out, reconnect and metered/unmetered constraints.
+- Keep DEVICE VERIFIED as NOT VERIFIED until those interactions are exercised on real hardware. Do not substitute a successful compile, JVM test, emulator screenshot or successful APK assembly for real audio/playback evidence.
+
 ## Private history and backup rules
 
 Scrobble history is stored in `filesDir/scrobble_history.tsv` with an atomic sibling `scrobble_history.tsv.tmp`. Exclude both files from Android cloud backup and device transfer in `backup_rules.xml` and `data_extraction_rules.xml`. Revisit exclusions whenever the history store adds a journal, temporary, or sidecar file. Saved Scrobble mixes are a separate versioned SharedPreferences store; preserve `Song.localUri` and `Song.localPath` in its codec and test round-tripping local-file identity. Do not clear the stored JSON when decoding an unknown future schema.

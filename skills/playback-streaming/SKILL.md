@@ -35,6 +35,16 @@ Confirm exact test class names in `app/src/test` before invoking a focused test.
 - Keep `onStopped` wired to pause/stop/track transitions so paused wall-clock gaps are not counted. Preserve local-file identity via `Song.localUri`.
 - Regression coverage lives in `app/src/test/java/com/music/bitchord/data/stats/ListeningRecorderTest.kt`; run it with `:app:testDevDebugUnitTest --tests com.music.bitchord.data.stats.ListeningRecorderTest`.
 
+## Scrobble recording and track identity
+
+- ListeningRecorder.onStarted is triggered by the player's audible/transition callback. It starts the event clock immediately and launches metadata enrichment early; the five-second progress sampler decides whether the event qualifies, but the persisted play timestamp is the audible start, not the threshold-crossing sample.
+- Qualification threshold is max(30 seconds, min(track duration / 2, 4 minutes)) when runtime is known, otherwise 30 seconds. A qualifying event is recorded once per uninterrupted playback; seeking does not add listening time, and onStopped resets the clock across pause/stop/track changes.
+- Enrichment is non-blocking and process-cached. Only query YtMusicRepository.trackLinks for an 11-character YouTube video ID; local URI/path tracks and other source-module IDs must not generate catalogue requests. The sample is never held while the lookup is in flight.
+- Persist enriched title/artist/artwork/duration/artist ID/album ID/album name/video-origin fields with the Play event. Keep disk writes on the recorder's IO scope, never the playback sampler thread.
+- Track identity precedence is localUri → localPath → YouTube videoId → normalized title/artist fallback. A local file can have a matched YouTube video ID; never merge two distinct local files on that ID.
+- PlayHistoryStore keeps exact Mylo events at distinct timestamps but reconciles overlapping imported records by track/local day. Preserve this asymmetry: it prevents one-day import overlap from inflating imported counts without erasing actual repeat plays.
+- Focused regression tests: ListeningRecorderTest (clock/timestamp semantics), ScrobbleGeneratorTest (identity, dedupe, metadata TSV compatibility), and ScrobbleMixTest (playable Play → Song conversion). Run the complete :app:testDevDebugUnitTest task after changes.
+
 ## Evidence boundaries
 
 Do not treat a selected codec, advertised output capability, DSP format, telemetry event or successful build as proof of sound reaching a physical endpoint. Bluetooth/USB/device routing requires the relevant real hardware to verify. Keep fixes narrow; the playback service and queue are high-risk shared state.
