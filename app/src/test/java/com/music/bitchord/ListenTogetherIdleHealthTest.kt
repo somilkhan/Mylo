@@ -1,11 +1,33 @@
 package com.music.bitchord
 
 import com.music.bitchord.data.listentogether.ListenTogether
+import com.music.bitchord.data.listentogether.runCatchingCancellable
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ListenTogetherIdleHealthTest {
+    @Test
+    fun `health probe fallback preserves cancellation`() = runBlocking {
+        val cancellation = CancellationException("health probe superseded")
+        val thrown = try {
+            runCatchingCancellable { throw cancellation }
+            null
+        } catch (failure: CancellationException) {
+            failure
+        }
+        assertSame(cancellation, thrown)
+    }
+
+    @Test
+    fun `health probe converts ordinary failures into recoverable results`() = runBlocking {
+        val result = runCatchingCancellable<Boolean> { error("server unavailable") }
+        assertTrue(result.isFailure)
+    }
+
     @Test
     fun `screen closed never probes`() {
         assertTrue(ListenTogether.shouldSkipIdleProbe(false, false, false, null))
