@@ -25,7 +25,6 @@ import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -177,20 +176,6 @@ fun ScrobbleScreen(
             ),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item(key = "scrobble-sections") {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    listOf("Statistics", "Generate", "Playlists").forEachIndexed { index, label ->
-                        FilterChip(
-                            selected = selectedSection == index,
-                            onClick = { onSectionChange(index) },
-                            label = { Text(label) },
-                        )
-                    }
-                }
-            }
             when (selectedSection) {
                 SCROBBLE_TAB_STATS -> statsSection(summary, loadingStats, statsFailed, historyPlays, loadingHistory, historyFailed)
                 SCROBBLE_TAB_GENERATE -> generateSection(
