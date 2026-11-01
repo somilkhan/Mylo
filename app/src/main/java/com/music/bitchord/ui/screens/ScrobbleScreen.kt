@@ -732,7 +732,7 @@ private fun Play.toSong(): Song = Song(
     videoId = videoId,
     title = title,
     artist = artist,
-    thumbnailUrl = null,
+    thumbnailUrl = thumbnailUrl,
     localUri = localUri,
 )
 

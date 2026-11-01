@@ -173,6 +173,21 @@ class ScrobbleGeneratorTest {
     }
 
     @Test
+    fun store_roundTripsArtworkUrlWithoutBreakingLegacyLocalUriRows() {
+        val file = File.createTempFile("artwork-plays", ".tsv")
+        file.deleteOnExit()
+        val store = PlayHistoryStore(file, zone)
+        val original = play("artwork").copy(
+            localUri = "content://media/external/audio/7",
+            thumbnailUrl = "https://img.example/cover.jpg",
+        )
+
+        store.append(listOf(original))
+
+        assertEquals(original, store.readAll().single())
+    }
+
+    @Test
     fun store_readsLegacyRowsWithoutLocalUri() {
         val file = File.createTempFile("legacy-plays", ".tsv")
         file.deleteOnExit()

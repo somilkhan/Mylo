@@ -23,6 +23,8 @@ data class Play(
     val exact: Boolean,
     /** Present for local files; lets a generated queue reopen the same device track. */
     val localUri: String? = null,
+    /** Artwork URL captured with the play so history-generated mixes retain their cover art. */
+    val thumbnailUrl: String? = null,
 ) {
     /** Stable identity for a catalogue track or local file, with text as the last resort. */
     fun songKey(): String = when {

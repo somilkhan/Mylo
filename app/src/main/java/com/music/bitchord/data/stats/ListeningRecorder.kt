@@ -93,6 +93,7 @@ object ListeningRecorder {
                 atMillis = startedAtMillis,
                 exact = true,
                 localUri = song.localUri,
+                thumbnailUrl = song.thumbnailUrl,
             )
             // The sampler runs on the playback thread. Persist off-thread so a
             // slow filesystem can never delay audio or the listening counters.

@@ -358,6 +358,7 @@ class ScrobbleHistorySyncWorker(
                     atMillis = entry.playedAtMillis,
                     exact = entry.exact,
                     localUri = entry.song.localUri,
+                    thumbnailUrl = entry.song.thumbnailUrl,
                 )
             }
             val added = withContext(Dispatchers.IO) {
