@@ -1,6 +1,7 @@
 package com.music.bitchord.data
 
 import com.music.bitchord.data.innertube.InnertubeParser
+import com.music.bitchord.data.model.Song
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
@@ -88,6 +89,101 @@ class YtMusicRepositoryHistoryTest {
         assertEquals(listOf("first", "second"), result.map { it.song.videoId })
         assertEquals(listOf(expectedDayAnchor, expectedDayAnchor), result.map { it.playedAtMillis })
         assertFalse(result.any { it.exact }, "Innertube date buckets never provide exact play times")
+    }
+
+    @Test
+    fun quickPickExclusionsIncludeHistoryTracksFoundOnLaterPages() = runBlocking {
+        val zone = ZoneId.of("UTC")
+        val now = LocalDate.of(2026, 10, 29).atTime(9, 0).atZone(zone).toInstant().toEpochMilli()
+        val firstPage = Json.parseToJsonElement(
+            """
+            {
+              "contents": [{
+                "musicShelfRenderer": {
+                  "title": {"runs": [{"text": "Yesterday"}]},
+                  "contents": [${historyRow("first", "First track")}],
+                  "continuations": [{"nextContinuationData": {"continuation": "page-2"}}]
+                }
+              }]
+            }
+            """.trimIndent(),
+        ) as JsonObject
+        val secondPage = Json.parseToJsonElement(
+            """
+            {
+              "continuationContents": {
+                "musicShelfContinuation": {
+                  "contents": [${historyRow("played-on-page-two", "Played later track")}]
+                }
+              }
+            }
+            """.trimIndent(),
+        ) as JsonObject
+
+        val history = collectPagedYtMusicHistory(firstPage, now, zone) { token ->
+            assertEquals("page-2", token)
+            secondPage
+        }
+        val excluded = mergeQuickPickExclusions(
+            localHistoryIds = emptySet(),
+            accountHistoryIds = history.mapNotNullTo(HashSet()) {
+                it.song.videoId.takeIf(String::isNotBlank)
+            },
+        )
+        val recommendations = unplayedRecommendations(
+            listOf(
+                Song("played-on-page-two", "Played later track", "Artist", null),
+                Song("fresh", "Fresh track", "Artist", null),
+            ),
+            excludedSongIds = excluded,
+        )
+
+        assertEquals(listOf("fresh"), recommendations.map(Song::videoId))
+    }
+
+    @Test
+    fun unknownFinalDateBucketDoesNotInheritPreviousDateAcrossContinuation() = runBlocking {
+        val zone = ZoneId.of("UTC")
+        val now = LocalDate.of(2026, 10, 29).atTime(9, 0).atZone(zone).toInstant().toEpochMilli()
+        val firstPage = Json.parseToJsonElement(
+            """
+            {
+              "contents": [
+                {
+                  "musicShelfRenderer": {
+                    "title": {"runs": [{"text": "Yesterday"}]},
+                    "contents": [${historyRow("dated", "Dated track")}]
+                  }
+                },
+                {
+                  "musicShelfRenderer": {
+                    "title": {"runs": [{"text": "Older"}]},
+                    "contents": [${historyRow("unknown", "Unknown date track")}],
+                    "continuations": [{"nextContinuationData": {"continuation": "older-page"}}]
+                  }
+                }
+              ]
+            }
+            """.trimIndent(),
+        ) as JsonObject
+        val continuation = Json.parseToJsonElement(
+            """
+            {
+              "continuationContents": {
+                "musicShelfContinuation": {
+                  "contents": [${historyRow("unknown-next", "Unknown continuation track")}]
+                }
+              }
+            }
+            """.trimIndent(),
+        ) as JsonObject
+
+        val result = collectPagedYtMusicHistory(firstPage, now, zone) { token ->
+            assertEquals("older-page", token)
+            continuation
+        }
+
+        assertEquals(listOf("dated"), result.map { it.song.videoId })
     }
 
     @Test

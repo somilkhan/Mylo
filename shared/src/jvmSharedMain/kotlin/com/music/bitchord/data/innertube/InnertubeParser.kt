@@ -531,17 +531,37 @@ object InnertubeParser {
      * date heading down to each track. The API does not expose a trustworthy
      * timestamp per row; unsupported headings are skipped rather than guessed.
      */
+    data class DatedHistoryPage(
+        val entries: List<YtMusicHistoryEntry>,
+        /** Date context of the final history shelf, including an explicit unknown (null). */
+        val continuationDate: LocalDate?,
+    )
+
     fun collectHistoryEntries(
         root: JsonElement,
         nowMillis: Long,
         zone: ZoneId,
         inheritedDate: LocalDate? = null,
-    ): List<YtMusicHistoryEntry> {
+    ): List<YtMusicHistoryEntry> =
+        collectDatedHistoryPage(root, nowMillis, zone, inheritedDate).entries
+
+    /**
+     * Parses rows and returns the actual final shelf date for pagination.
+     * This must not be inferred from the last emitted row: an unsupported
+     * final heading intentionally emits no rows and must clear prior context.
+     */
+    fun collectDatedHistoryPage(
+        root: JsonElement,
+        nowMillis: Long,
+        zone: ZoneId,
+        inheritedDate: LocalDate? = null,
+    ): DatedHistoryPage {
         requireNoApiError(root, "history")
 
         val today = java.time.Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate()
         val out = ArrayList<YtMusicHistoryEntry>()
         val credit = pageCredit(root)
+        var continuationDate = inheritedDate
 
         fun walk(node: JsonElement, inheritedDate: LocalDate?) {
             when (node) {
@@ -554,6 +574,7 @@ object InnertubeParser {
                         // Only inherit a date when the continuation has no heading. An unknown
                         // heading must stay unknown rather than borrowing another day's date.
                         val date = if (label.isBlank()) inheritedDate else historyDateFromLabel(label, today)
+                        continuationDate = date
                         shelf["contents"]?.let { walk(it, date) }
                         shelf["continuations"]?.let { walk(it, date) }
                         return
@@ -579,7 +600,7 @@ object InnertubeParser {
         }
 
         walk(root, inheritedDate)
-        return out
+        return DatedHistoryPage(out, continuationDate)
     }
 
     private fun historyDateFromLabel(label: String, today: LocalDate): LocalDate? {
