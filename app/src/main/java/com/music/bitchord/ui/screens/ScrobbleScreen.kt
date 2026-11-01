@@ -993,21 +993,11 @@ private fun LazyListScope.playlistsSection(
                     ),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text(
-                    text = playlist.title,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Text(
-                    text = playlist.reason,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    text = "${playlist.songs.size} tracks · Saved on this device",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                ScrobbleRow(
+                    title = playlist.title,
+                    subtitle = "${playlist.reason} · ${playlist.songs.size} tracks · Saved on this device",
+                    artworkUrl = playlist.songs.firstOrNull()?.thumbnailUrl,
+                    onClick = { onOpenPlaylist(playlist.title) },
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     TextButton(onClick = { onOpenPlaylist(playlist.title) }) {
