@@ -202,12 +202,15 @@ object ScrobbleHistorySync {
         prefs.edit().putBoolean(KEY_ENABLED, true).apply()
         if (prefs.getBoolean(KEY_SIGNED_OUT, false) || currentSessionIdentity(appContext) == null) return
 
-        val constraints = Constraints.Builder()
+        val periodicConstraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.UNMETERED)
+            .build()
+        val immediateConstraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
             .build()
         val workManager = WorkManager.getInstance(appContext)
         val periodic = PeriodicWorkRequestBuilder<ScrobbleHistorySyncWorker>(6, TimeUnit.HOURS)
-            .setConstraints(constraints)
+            .setConstraints(periodicConstraints)
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.MINUTES)
             .build()
         workManager.enqueueUniquePeriodicWork(
@@ -217,7 +220,7 @@ object ScrobbleHistorySync {
         )
 
         val immediate = OneTimeWorkRequestBuilder<ScrobbleHistorySyncWorker>()
-            .setConstraints(constraints)
+            .setConstraints(immediateConstraints)
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
             .build()
         workManager.enqueueUniqueWork(IMMEDIATE_WORK_NAME, ExistingWorkPolicy.KEEP, immediate)
@@ -252,7 +255,7 @@ object ScrobbleHistorySync {
         if (!prefs.getBoolean(KEY_ENABLED, false)) return
 
         val constraints = Constraints.Builder()
-            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .setRequiredNetworkType(NetworkType.UNMETERED)
             .build()
         val periodic = PeriodicWorkRequestBuilder<ScrobbleHistorySyncWorker>(6, TimeUnit.HOURS)
             .setConstraints(constraints)
