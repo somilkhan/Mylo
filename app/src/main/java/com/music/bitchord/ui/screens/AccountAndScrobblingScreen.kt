@@ -161,7 +161,7 @@ fun AccountAndScrobblingScreen(
 
         SettingsGroup(
             header = "YouTube Music history",
-            footer = "Imported history stays on this device. The first import runs after sign-in; automatic refresh runs about every six hours on an unmetered connection (usually Wi-Fi). Imported rows are approximate.",
+            footer = "When enabled, imported history stays on this device. Sync uses your existing YouTube Music sign-in; refresh runs about every six hours on an unmetered connection (usually Wi-Fi). Imported rows are approximate.",
         ) {
             SettingsRow(
                 icon = Icons.Rounded.History,
