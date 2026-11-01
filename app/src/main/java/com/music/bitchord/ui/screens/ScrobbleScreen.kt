@@ -217,7 +217,6 @@ fun ScrobbleScreen(
                             onPlayPlaylist = onPlayPlaylist,
                         )
                     } else {
-                        openedPlaylistTitle = null
                         playlistsSection(
                             playlists = ScrobblePlaylistStore.playlists,
                             onOpenPlaylist = { openedPlaylistTitle = it },
@@ -795,10 +794,14 @@ private fun LazyListScope.playlistDetailSection(
             }
         }
     }
-    items(playlist.songs, key = { song ->
-        "pl-detail-${playlist.title}-${song.localUri ?: song.videoId}-${playlist.songs.indexOf(song)}"
-    }) { song ->
-        val index = playlist.songs.indexOf(song)
+    items(
+        count = playlist.songs.size,
+        key = { index ->
+            val song = playlist.songs[index]
+            "pl-detail-${playlist.title}-${song.localUri ?: song.videoId}-$index"
+        },
+    ) { index ->
+        val song = playlist.songs[index]
         ScrobbleRow(
             title = song.title.ifBlank { "Unknown track" },
             subtitle = song.artist.ifBlank { "Unknown artist" },
