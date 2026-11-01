@@ -243,6 +243,32 @@ class ScrobbleGeneratorTest {
     }
 
     @Test
+    fun store_roundTripsGeneratedTrackMetadataAndKeepsLegacyRowsReadable() {
+        val file = File.createTempFile("track-metadata-plays", ".tsv")
+        file.deleteOnExit()
+        val store = PlayHistoryStore(file, zone)
+        val original = play("metadata").copy(
+            thumbnailUrl = "https://img.example/cover.jpg",
+            durationText = "3:42",
+            artistId = "UCartist",
+            albumId = "MPREalbum",
+            albumName = "Album",
+            isVideo = true,
+            isVideoOrigin = true,
+        )
+
+        assertEquals(1, store.append(listOf(original)))
+        assertEquals(original, store.readAll().single())
+
+        file.writeText("legacy\\tLegacy title\\tLegacy artist\\tMYLO\\t${now}\\ttrue\\n")
+        val legacy = store.readAll().single()
+        assertEquals("Legacy title", legacy.title)
+        assertEquals(null, legacy.durationText)
+        assertEquals(null, legacy.albumName)
+        assertEquals(false, legacy.isVideo)
+    }
+
+    @Test
     fun store_readsLegacyRowsWithoutLocalUri() {
         val file = File.createTempFile("legacy-plays", ".tsv")
         file.deleteOnExit()
