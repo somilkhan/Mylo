@@ -236,6 +236,20 @@ class ScrobbleGeneratorTest {
     }
 
     @Test
+    fun store_preservesDistinctMyloRepeatListensOnSameDay() {
+        val file = File.createTempFile("repeat-listens", ".tsv")
+        file.deleteOnExit()
+        val store = PlayHistoryStore(file, zone)
+        val first = play("repeat")
+        val second = first.copy(atMillis = first.atMillis + 60 * 60 * 1000L)
+
+        assertEquals(2, store.append(listOf(first, second)))
+        assertEquals(listOf(first, second), store.readAll())
+        assertEquals(0, store.append(listOf(first, second)))
+        assertEquals(listOf(first, second), store.readAll())
+    }
+
+    @Test
     fun store_roundTripsAndDedupesOnWrite() {
         val file = File.createTempFile("plays", ".tsv")
         file.deleteOnExit()

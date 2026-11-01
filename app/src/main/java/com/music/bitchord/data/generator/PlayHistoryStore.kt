@@ -9,8 +9,9 @@ import java.nio.file.StandardCopyOption
 import java.time.ZoneId
 
 /**
- * Append-only local file of plays, one per line, tab separated. Plays are
- * deduplicated on write, so importing the same history twice adds nothing.
+ * Local file of plays, one per line, tab separated. Exact Mylo events retain
+ * distinct timestamps; overlapping imported rows are reconciled on write so
+ * importing the same history twice adds nothing.
  *
  * The file is plain text on purpose: it can be inspected and deleted without
  * a schema. Android backup and device-transfer rules explicitly exclude it.
@@ -25,7 +26,7 @@ class PlayHistoryStore(private val file: File, private val zone: ZoneId = ZoneId
         return file.readLines().mapNotNull(::decode)
     }
 
-    /** Adds [incoming], keeping one play per song per day. Returns how many were new. */
+    /** Adds [incoming], preserving distinct Mylo events and reconciling imported overlaps. */
     @Synchronized
     fun append(incoming: List<Play>): Int {
         val before = readAll()

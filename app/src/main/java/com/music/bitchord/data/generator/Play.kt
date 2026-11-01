@@ -41,9 +41,9 @@ internal fun normaliseText(s: String): String =
     s.trim().lowercase().split(" ").filter { it.isNotEmpty() }.joinToString(" ")
 
 /**
- * Keeps one play per song per local day. When two sources report the same
- * song on the same day, the exact Mylo play is kept, so a listen is never
- * counted twice.
+ * Reconciles overlapping sources without erasing genuine Mylo repeat listens.
+ * Exact Mylo events retain their distinct timestamps; imported-only overlaps
+ * collapse to the most trustworthy single row per track and local day.
  */
 fun dedupePlays(plays: List<Play>, zone: ZoneId): List<Play> {
     val byTrackAndDay = plays.groupBy { "${it.songKey()}@${it.localDay(zone)}" }
