@@ -56,7 +56,7 @@ object DesktopDownloadQueue {
     private val pending = LinkedHashMap<String, DesktopDownloadItem>()
 
     /** Claimed by a worker; the job is attached once it exists. */
-    private val running = LinkedHashMap<String, Job?>()
+    private val running = LinkedHashMap<String, Job>()
 
     private var workers = 0
 
@@ -139,9 +139,8 @@ object DesktopDownloadQueue {
     private suspend fun work() {
         try {
             while (true) {
-                val item = takeNext() ?: return
+                val item = takeNext(currentJob() ?: error("Download worker has no coroutine Job")) ?: return
                 val id = item.song.videoId
-                if (!onRunning(id, item, currentJob())) return
                 val result = runCatching {
                     DesktopDownloadManager.download(item.song) { downloaded, total ->
                         val fraction = if (total != null && total > 0L) {
@@ -192,34 +191,22 @@ object DesktopDownloadQueue {
      * track is in neither the queue nor the running slot and a [cancel] for it would quietly do
      * nothing.
      */
-    private fun takeNext(): DesktopDownloadItem? = synchronized(lock) {
+    /**
+     * Claims the next item, attaches its worker Job and publishes Running under one lock.
+     *
+     * Keeping all three operations atomic prevents cancel() from landing between dequeue and Job
+     * attachment, where the old nullable running slot could be removed before its worker existed.
+     */
+    private fun takeNext(job: Job): DesktopDownloadItem? = synchronized(lock) {
         val entry = pending.entries.firstOrNull() ?: return null
         pending.remove(entry.key)
-        running[entry.key] = null
+        running[entry.key] = job
+        _active.update { current ->
+            if (entry.key !in current) current
+            else current + (entry.key to entry.value.copy(state = DesktopDownloadState.Running(0f)))
+        }
         entry.value
     }
-
-    /** Attaches the job fetching [videoId], unless it has been cancelled meanwhile. */
-    /**
-     * Attaches the worker and publishes its Running state as one queue transition.
-     *
-     * Cancellation can land after [takeNext] claims an item but before the worker attaches its
-     * Job. In that window [cancel] removes the running slot without a Job to cancel. Publishing
-     * Running outside this lock used to resurrect the cancelled row after it had been removed.
-     */
-    private fun onRunning(videoId: String, item: DesktopDownloadItem, job: Job?): Boolean =
-        synchronized(lock) {
-            if (videoId !in running) {
-                job?.cancel()
-                return@synchronized false
-            }
-            running[videoId] = job
-            _active.update { current ->
-                if (videoId !in current) current
-                else current + (videoId to item.copy(state = DesktopDownloadState.Running(0f)))
-            }
-            true
-        }
 
     private fun onIdle(videoId: String) {
         synchronized(lock) { running.remove(videoId) }
