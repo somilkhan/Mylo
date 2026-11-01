@@ -166,11 +166,13 @@ object YtMusicRepository {
     suspend fun historyWithDates(
         nowMillis: Long = System.currentTimeMillis(),
         zone: ZoneId = ZoneId.systemDefault(),
+        notBeforeMillis: Long? = null,
     ): Result<List<YtMusicHistoryEntry>> = call("history:dated") {
         collectPagedYtMusicHistory(
             firstPage = Innertube.browse(HISTORY),
             nowMillis = nowMillis,
             zone = zone,
+            notBeforeMillis = notBeforeMillis,
         ) { token ->
             Innertube.browseContinuation(token)
         }
@@ -1167,8 +1169,13 @@ internal suspend fun collectPagedYtMusicHistory(
     firstPage: JsonObject,
     nowMillis: Long,
     zone: ZoneId,
+    notBeforeMillis: Long? = null,
     loadNext: suspend (String) -> JsonObject,
 ): List<YtMusicHistoryEntry> {
+    val cutoffDate = notBeforeMillis?.let {
+        java.time.Instant.ofEpochMilli(it).atZone(zone).toLocalDate().minusDays(1)
+    }
+    val cutoffMillis = cutoffDate?.atStartOfDay(zone)?.toInstant()?.toEpochMilli()
     val entries = ArrayList<YtMusicHistoryEntry>()
     val seenTokens = HashSet<String>()
     var response = firstPage
@@ -1181,8 +1188,16 @@ internal suspend fun collectPagedYtMusicHistory(
             zone = zone,
             inheritedDate = inheritedDate,
         )
-        entries += page.entries
+        entries += if (cutoffMillis == null) {
+            page.entries
+        } else {
+            page.entries.filter { it.playedAtMillis >= cutoffMillis }
+        }
         inheritedDate = page.continuationDate
+
+        // History is newest-first. Once a page ends before the overlap window,
+        // older pages cannot contain new listens and need not be downloaded.
+        if (cutoffDate != null && page.continuationDate?.isBefore(cutoffDate) == true) break
 
         val token = InnertubeParser.continuationToken(response)
             ?.takeIf(String::isNotBlank)
