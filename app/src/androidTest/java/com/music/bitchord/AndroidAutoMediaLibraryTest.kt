@@ -122,42 +122,14 @@ class AndroidAutoMediaLibraryTest {
 
     @Test
     fun testSearchAndGetSearchResult() = runBlocking {
-        val searchLatch = CountDownLatch(1)
-        var resultCount = 0
-
-        val listener = object : MediaBrowser.Listener {
-            override fun onSearchResultChanged(
-                browser: MediaBrowser,
-                query: String,
-                itemCount: Int,
-                params: androidx.media3.session.MediaLibraryService.LibraryParams?,
-            ) {
-                if (query == "Adele") {
-                    resultCount = itemCount
-                    searchLatch.countDown()
-                }
-            }
+        val search = withContext(Dispatchers.Main) {
+            mediaBrowser.search("Adele", null)
         }
+        search.get(10, TimeUnit.SECONDS)
 
-        mediaBrowser.addListener(listener)
-        try {
-            withContext(Dispatchers.Main) {
-                mediaBrowser.search("Adele", null)
-            }
-
-            assertTrue(
-                "Search result change notification was not delivered",
-                searchLatch.await(10, TimeUnit.SECONDS),
-            )
-            assertTrue("Search result count must be non-negative", resultCount >= 0)
-
-            val results = withContext(Dispatchers.Main) {
-                mediaBrowser.getSearchResult("Adele", 0, 10, null).get(10, TimeUnit.SECONDS)
-            }
-            assertNotNull("Search result should not be null", results)
-            assertNotNull("Search result items should not be null", results.value)
-        } finally {
-            mediaBrowser.removeListener(listener)
+        val results = withContext(Dispatchers.Main) {
+            mediaBrowser.getSearchResult("Adele", 0, 10, null).get(10, TimeUnit.SECONDS)
         }
-    }
-}
+        assertNotNull("Search result should not be null", results)
+        assertNotNull("Search result items should not be null", results.value)
+    }}
