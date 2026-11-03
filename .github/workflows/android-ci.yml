@@ -88,7 +88,8 @@ jobs:
           # Set userdata size before launch (the action's disk-size input only writes config.ini).
           pre-emulator-launch-script: |
             sed -i 's/^disk.dataPartition.size=.*/disk.dataPartition.size=2048M/' "$ANDROID_AVD_HOME/test.avd/config.ini"
-            grep -q '^disk.dataPartition.size=2048M          script: ./gradlew --no-daemon --stacktrace :app:connectedDevDebugAndroidTest
+            grep -q '^disk.dataPartition.size=2048M$' "$ANDROID_AVD_HOME/test.avd/config.ini"
+          script: ./gradlew --no-daemon --stacktrace :app:connectedDevDebugAndroidTest
 
       - name: Upload debug APKs (manual opt-in only)
         id: upload_apks
