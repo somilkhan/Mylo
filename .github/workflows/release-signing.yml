@@ -26,17 +26,17 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "17"
           cache: gradle
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
         with:
           packages: "platform-tools build-tools;36.0.0 platforms;android-37.0 platforms;android-36 cmake;3.22.1"
 
@@ -99,7 +99,7 @@ jobs:
         id: upload_apks
         if: github.event_name == 'workflow_dispatch' && inputs.upload_apks
         continue-on-error: true
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: mylo-signed-release-apks
           path: |
