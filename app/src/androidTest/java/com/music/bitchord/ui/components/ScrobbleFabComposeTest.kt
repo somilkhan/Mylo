@@ -3,12 +3,13 @@ package com.music.bitchord.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.test.assertDoesNotExist
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
@@ -65,7 +66,7 @@ class ScrobbleFabComposeTest {
             }
         }
 
-        composeRule.onNodeWithContentDescription("Open Scrobble").assertDoesNotExist()
+        composeRule.onAllNodesWithContentDescription("Open Scrobble").assertCountEquals(0)
     }
 
     @Test
