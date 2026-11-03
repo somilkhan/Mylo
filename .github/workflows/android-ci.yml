@@ -84,7 +84,6 @@ jobs:
           # The hosted runner has <3 GB free after SDK setup; the AVD's 7.3 GB
           # default userdata image cannot be created. Keep the test device lean.
           disk-size: 2G
-          pre-emulator-launch-script: bash .github/scripts/configure-avd-userdata.sh
           disable-animations: true
           script: ./gradlew --no-daemon --stacktrace :app:connectedDevDebugAndroidTest
 
