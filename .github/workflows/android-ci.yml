@@ -84,6 +84,7 @@ jobs:
           # API 36 defaults userdata to 7.3 GB, exceeding hosted-runner free space.
           # The action's disk-size input configures userdata before AVD creation.
           disk-size: 2048M
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -partition-size 2048
           disable-animations: true
           script: ./gradlew --no-daemon --stacktrace :app:connectedDevDebugAndroidTest
 
