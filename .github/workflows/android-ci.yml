@@ -174,29 +174,3 @@ jobs:
 
       - name: Typecheck web workspace
         run: pnpm typecheck
- "$ANDROID_AVD_HOME/test.avd/config.ini"
-          script: ./gradlew --no-daemon --stacktrace :app:connectedDevDebugAndroidTest
-
-      - name: Upload debug APKs (manual opt-in only)
-        id: upload_apks
-        if: github.event_name == 'workflow_dispatch' && inputs.build_apks && steps.build_apks.outcome == 'success'
-        continue-on-error: true
-        uses: actions/upload-artifact@v6
-        with:
-          name: mylo-dev-debug-apks
-          path: |
-            app/build/outputs/apk/dev/debug/*.apk
-            tv/build/outputs/apk/dev/debug/*.apk
-            wearos/build/outputs/apk/dev/debug/*.apk
-          if-no-files-found: error
-          retention-days: 3
-
-      - name: Report APK artifact upload failure
-        if: always() && github.event_name == 'workflow_dispatch' && inputs.build_apks && steps.build_apks.outcome == 'success' && steps.upload_apks.outcome == 'failure'
-        shell: bash
-        run: |
-          echo "::warning::Android build succeeded, but GitHub could not store the APK artifacts. Check Actions artifact storage quota."
-          {
-            echo "### APK artifacts unavailable"
-            echo "Android/TV/Wear OS APK builds succeeded, but artifact upload failed. Android unit-test outcome: ${{ steps.test_android.outcome }}. Check the repository's GitHub Actions storage quota."
-          } >> "$GITHUB_STEP_SUMMARY"
