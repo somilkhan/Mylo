@@ -35,7 +35,7 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Explore
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.PlayArrow
@@ -977,7 +977,7 @@ private fun LazyListScope.playlistDetailSection(
 ) {
     item(key = "pl-detail-back") {
         TextButton(onClick = onBack) {
-            Icon(imageVector = Icons.Rounded.ArrowBack, contentDescription = null)
+            Icon(imageVector = Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null)
             Spacer(Modifier.width(6.dp))
             Text("Playlists")
         }
