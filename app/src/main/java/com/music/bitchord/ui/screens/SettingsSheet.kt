@@ -68,15 +68,15 @@ import androidx.compose.material.icons.rounded.MotionPhotosOff
 import androidx.compose.material.icons.rounded.Extension
 import androidx.compose.material.icons.rounded.Draw
 import androidx.compose.material.icons.rounded.Person
-import androidx.compose.material.icons.rounded.PlaylistPlay
+import androidx.compose.material.icons.automirrored.rounded.PlaylistPlay
 import androidx.compose.material.icons.rounded.SignalCellularAlt
 import androidx.compose.material.icons.rounded.SmartDisplay
 import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.material.icons.rounded.SurroundSound
 import androidx.compose.material.icons.rounded.Tune
-import androidx.compose.material.icons.rounded.VolumeOff
+import androidx.compose.material.icons.automirrored.rounded.VolumeOff
 import androidx.compose.material.icons.rounded.WebAssetOff
-import androidx.compose.material.icons.rounded.VolumeUp
+import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.Waves
 import androidx.compose.material.icons.rounded.Wifi
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -606,7 +606,7 @@ fun SettingsScreen(
             val loudnessTitle = stringResource(R.string.loudness_normalization)
             row(loudnessTitle, "loudness", "volume", "normalize", "replaygain", "lufs") {
                 SettingsRow(
-                    icon = Icons.Rounded.VolumeUp,
+                    icon = Icons.AutoMirrored.Rounded.VolumeUp,
                     title = loudnessTitle,
                     subtitle = stringResource(R.string.loudness_normalization_subtitle),
                     trailing = {
@@ -1296,7 +1296,7 @@ fun SettingsScreen(
             val playNextOnSwipeTitle = stringResource(R.string.play_next_on_swipe)
             row(playNextOnSwipeTitle, "swipe", "queue") {
                 SettingsRow(
-                    icon = Icons.Rounded.PlaylistPlay,
+                    icon = Icons.AutoMirrored.Rounded.PlaylistPlay,
                     title = playNextOnSwipeTitle,
                     subtitle = if (swipeToPlayNext) {
                         stringResource(R.string.swipe_plays_next)
@@ -1357,7 +1357,7 @@ fun SettingsScreen(
             val hideVolumeBarTitle = stringResource(R.string.hide_volume_bar)
             row(hideVolumeBarTitle, "volume", "player") {
                 SettingsRow(
-                    icon = Icons.Rounded.VolumeOff,
+                    icon = Icons.AutoMirrored.Rounded.VolumeOff,
                     title = hideVolumeBarTitle,
                     subtitle = stringResource(R.string.hide_volume_bar_subtitle),
                     trailing = {
