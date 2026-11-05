@@ -92,7 +92,17 @@ jobs:
           disk-size: 2048M
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -partition-size 2048
           disable-animations: true
-          script: ./gradlew --no-daemon --stacktrace :app:connectedDevDebugAndroidTest
+          script: |
+            set +e
+            ./gradlew --no-daemon --stacktrace :app:connectedDevDebugAndroidTest
+            test_status=$?
+            if [ "$test_status" -ne 0 ]; then
+              echo '--- Emulator crash diagnostics (AndroidRuntime / instrumentation) ---'
+              adb logcat -d -v threadtime -t 3000 | grep -E -A25 -B5 'FATAL EXCEPTION|AndroidRuntime|Process:|INSTRUMENTATION|am_crash|crash_dump' || true
+              echo '--- App process exit history ---'
+              adb shell dumpsys activity exit-info app.mylo.music.dev || true
+            fi
+            exit "$test_status"
 
       - name: Upload debug APKs (manual opt-in only)
         id: upload_apks
