@@ -36,7 +36,7 @@ internal object OfflineHls {
             }.build()
             val playlist = Http.client.newCall(request(url)).execute().use { response ->
                 if (!response.isSuccessful) error("HLS playlist failed (HTTP ${response.code})")
-                response.body?.string() ?: error("Empty HLS playlist")
+                response.body.string()
             }
             if (!playlist.startsWith("#EXTM3U")) error("Invalid HLS playlist")
             if (playlist.contains("#EXT-X-KEY:") && !playlist.contains("METHOD=NONE")) {
@@ -57,8 +57,7 @@ internal object OfflineHls {
                 val local = "segment-${index.toString().padStart(5, '0')}.m4s"
                 Http.client.newCall(request(target)).execute().use { response ->
                     if (!response.isSuccessful) error("HLS fragment failed (HTTP ${response.code})")
-                    response.body?.byteStream()?.use { input -> File(root, local).outputStream().use(input::copyTo) }
-                        ?: error("Empty HLS fragment")
+                    response.body.byteStream().use { input -> File(root, local).outputStream().use(input::copyTo) }
                 }
                 localNames[remote] = local
                 onProgress((index + 1).toLong(), references.distinct().size.toLong())
