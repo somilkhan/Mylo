@@ -20,7 +20,7 @@ import org.junit.runner.RunWith
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
-@OptIn(UnstableApi::class)
+@UnstableApi
 @RunWith(AndroidJUnit4::class)
 class AndroidAutoMediaLibraryTest {
 
@@ -132,4 +132,5 @@ class AndroidAutoMediaLibraryTest {
         }
         assertNotNull("Search result should not be null", results)
         assertNotNull("Search result items should not be null", results.value)
-    }}
+    }
+}
