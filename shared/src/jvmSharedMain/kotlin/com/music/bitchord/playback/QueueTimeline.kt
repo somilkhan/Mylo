@@ -199,9 +199,9 @@ object QueueTimeline {
                     val followingUserQueue = (targetIndex + 1 until tiers.size).filter { tiers[it] == QueueTier.USER_QUEUE }
                     val allUpcomingUserQueue = crossedUserQueue + followingUserQueue
                     val followingContext = (targetIndex + 1 until tiers.size).filter { tiers[it] == QueueTier.CONTEXT }
-                    val followingAutoplay = (targetIndex + 1 until tiers.size).filter { tiers[it] == QueueTier.AUTOPLAY }
+                    val allUpcomingAutoplay = (currentIndex + 1 until tiers.size).filter { tiers[it] == QueueTier.AUTOPLAY }
 
-                    val order = precedingHistory + bypassedContext + target + allUpcomingUserQueue + followingContext + followingAutoplay
+                    val order = precedingHistory + bypassedContext + target + allUpcomingUserQueue + followingContext + allUpcomingAutoplay
                     val newTarget = precedingHistory.size + bypassedContext.size
                     JumpOrderPlan(isPureSeek = false, newOrderIndices = order, newTargetIndex = newTarget)
                 }
