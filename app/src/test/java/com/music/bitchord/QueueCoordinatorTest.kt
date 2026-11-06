@@ -491,6 +491,10 @@ class QueueCoordinatorTest {
         )
         val plan = requireNotNull(QueueTimeline.computeJumpOrder(tiers, currentIndex = 0, targetIndex = 2))
         assertEquals(listOf(0, 1, 2, 4, 3, 5), plan.newOrderIndices)
+        assertEquals(
+            QueueTimeline.computeJumpOrder(tiers, currentIndex = 0, targetIndex = 2)?.newOrderIndices,
+            QueueTimeline.computeJumpOrder(tiers, currentIndex = 0, targetIndex = 2)?.newOrderIndices,
+        )
         assertEquals(2, plan.newTargetIndex)
         assertEquals(false, plan.isPureSeek)
     }
