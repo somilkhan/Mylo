@@ -1238,7 +1238,7 @@ private fun ArtistHeader(
             // (white paper to transparency, strokes to white); vectors are
             // tinted at draw time instead.
             val isSignatureScan = logoUrl == null && signature != null && !isSignatureSvg
-            val aspect = (if (logoUrl != null) appleArt?.logoAspect else signature?.aspect)
+            val aspect = (if (logoUrl != null) appleArt.logoAspect else signature?.aspect)
                 ?.coerceIn(0.4f, 6f) ?: 1f
             // Remembered, and at the size the URL already names: nothing about the
             // load waits on layout to decide how big to decode, and a recomposition
