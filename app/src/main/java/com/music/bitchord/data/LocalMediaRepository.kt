@@ -387,7 +387,7 @@ object LocalMediaRepository {
 
     private fun String.removeAudioExtension(): String {
         val extension = substringAfterLast('.', "").lowercase(Locale.ROOT)
-        return if (extension in localMusicExtensions || extension == "wav") {
+        return if (extension in localMusicExtensions) {
             substringBeforeLast('.').ifBlank { this }
         } else {
             this

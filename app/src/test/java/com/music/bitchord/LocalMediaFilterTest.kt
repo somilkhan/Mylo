@@ -62,6 +62,13 @@ class LocalMediaFilterTest {
     }
 
     @Test
+    fun filenameFallbackRemovesExtensionCaseInsensitively() {
+        assertTrue(
+            LocalMediaRepository.isEligibleLocalMusic(60_000, "Song.MP3", null),
+        )
+    }
+
+    @Test
     fun filenameFallbackRemovesEverySupportedAudioExtension() {
         for (extension in listOf("mp3", "m4a", "mp4", "flac", "wav", "ogg", "opus", "aac", "webm", "dsf", "dff", "3gp")) {
             assertTrue(
