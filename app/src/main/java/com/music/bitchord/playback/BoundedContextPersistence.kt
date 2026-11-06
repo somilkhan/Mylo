@@ -96,12 +96,18 @@ object BoundedContextPersistence {
     }
 
     fun saveImmediately(state: State) {
-        synchronized(this) {
+        val writeGeneration = synchronized(this) {
             generation += 1
             pending = null
+            generation
         }
         val encoded = encode(state) ?: return
-        synchronized(this) { write(state, encoded).commit() }
+        synchronized(this) {
+            // Encoding happens outside the lock. A clear or a newer immediate
+            // snapshot may win while this one is being serialized; never let
+            // the older snapshot resurrect itself after that operation.
+            if (writeGeneration == generation) write(state, encoded).commit()
+        }
     }
 
     private fun write(state: State, encoded: String): SharedPreferences.Editor =
