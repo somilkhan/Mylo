@@ -279,10 +279,14 @@ object QueueTimeline {
         if (songs.isEmpty()) return songs
         val at = startIndex.coerceIn(songs.indices)
         val rest = songs.filterIndexed { i, _ -> i != at }
+        val contextIndices = rest.indices.filter { rest[it].queueTier == QueueTier.CONTEXT }
+        val autoplayIndices = rest.indices.filter { rest[it].queueTier == QueueTier.AUTOPLAY }
+        val shuffledContext = avoidIdentityShuffle(contextIndices, contextIndices.shuffled()).map(rest::get)
+        val shuffledAutoplay = avoidIdentityShuffle(autoplayIndices, autoplayIndices.shuffled()).map(rest::get)
         return listOf(songs[at]) +
             rest.filter { it.queueTier == QueueTier.USER_QUEUE } +
-            rest.filter { it.queueTier == QueueTier.CONTEXT }.shuffled() +
-            rest.filter { it.queueTier == QueueTier.AUTOPLAY }.shuffled()
+            shuffledContext +
+            shuffledAutoplay
     }
 
     /**
