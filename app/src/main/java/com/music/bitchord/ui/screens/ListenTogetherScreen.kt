@@ -512,7 +512,7 @@ fun ListenTogetherScreen(
         } else {
             InAParty(
                 state = state,
-                onCopy = { clipboard.setText(AnnotatedString(state.code.orEmpty())) },
+                onCopy = { scope.launch { clipboard.setText(AnnotatedString(state.code.orEmpty())) } },
                 onShare = { sheet = PartySheet.Invite },
                 onShareLink = shareInvite,
                 onLeave = { scope.launch { ListenTogether.leaveParty() } },
