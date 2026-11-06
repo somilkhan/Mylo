@@ -1436,4 +1436,11 @@ class QueueCoordinatorTest {
         val byId = songs.associate { it.videoId to it.queueTier }
         return { index -> byId.getValue(items[index].mediaId) }
     }
+
+    @Test
+    fun `identity shuffle rotates sections with movable tracks`() {
+        assertEquals(listOf(1, 2, 0), QueueTimeline.avoidIdentityShuffle(listOf(0, 1, 2), listOf(0, 1, 2)))
+        assertEquals(listOf(0), QueueTimeline.avoidIdentityShuffle(listOf(0), listOf(0)))
+        assertEquals(emptyList<Int>(), QueueTimeline.avoidIdentityShuffle(emptyList(), emptyList()))
+    }
 }
