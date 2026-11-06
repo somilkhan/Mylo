@@ -1443,4 +1443,18 @@ class QueueCoordinatorTest {
         assertEquals(listOf(0), QueueTimeline.avoidIdentityShuffle(listOf(0), listOf(0)))
         assertEquals(emptyList<Int>(), QueueTimeline.avoidIdentityShuffle(emptyList(), emptyList()))
     }
+
+    @Test
+    fun `shared shuffled start rotates identity autoplay order`() {
+        val songs = listOf(
+            testSong("selected", QueueTier.CONTEXT),
+            testSong("auto-1", QueueTier.AUTOPLAY),
+            testSong("auto-2", QueueTier.AUTOPLAY),
+            testSong("auto-3", QueueTier.AUTOPLAY),
+        )
+        val result = QueueTimeline.shuffledStartingOrder(songs, 0)
+        assertEquals("selected", result.first().videoId)
+        assertNotEquals(songs.drop(1).map { it.videoId }, result.drop(1).map { it.videoId })
+        assertEquals(songs.drop(1).map { it.videoId }.toSet(), result.drop(1).map { it.videoId }.toSet())
+    }
 }
