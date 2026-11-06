@@ -1,11 +1,18 @@
 package com.music.bitchord
 
 import com.music.bitchord.data.LocalMediaRepository
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalMediaFilterTest {
+
+    @Test
+    fun disablingNonMusicFilterDoesNotApplyMediaStoreMusicFlagGate() {
+        assertEquals(null, LocalMediaRepository.localMusicSelection(filterNonMusic = false))
+        assertTrue(LocalMediaRepository.localMusicSelection(filterNonMusic = true)!!.contains("IS_MUSIC"))
+    }
 
     @Test
     fun rejectsShortAudio() {
