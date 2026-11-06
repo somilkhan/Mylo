@@ -84,7 +84,7 @@ class LocalMediaFilterTest {
 
     @Test
     fun scannerRecognizesAllEligibleAudioContainers() {
-        for (name in listOf("Song.mp3", "Song.m4a", "Song.mp4", "Song.flac", "Song.ogg", "Song.opus", "Song.aac", "Song.webm", "Song.dsf", "Song.dff")) {
+        for (name in listOf("Song.mp3", "Song.m4a", "Song.mp4", "Song.flac", "Song.ogg", "Song.opus", "Song.aac", "Song.webm", "Song.dsf", "Song.dff", "Song.3gp")) {
             assertTrue(name, LocalMediaRepository.isAudioFileName(name))
         }
         assertFalse(LocalMediaRepository.isAudioFileName("cover.jpg"))
