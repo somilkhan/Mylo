@@ -136,7 +136,7 @@ class ModuleManager {
                         if (!resp.isSuccessful) {
                             throw Exception("HTTP ${resp.code} from ${redactModuleUrl(sourceUrl)}")
                         }
-                        val body = resp.body?.string()
+                        val body = resp.body.string()
                             ?: throw Exception("Empty body from ${redactModuleUrl(sourceUrl)}")
                         val modules = ModuleIndex.parseModules(json, body)
                         TrackLog.d(TAG, "  Parsed ${modules.size} modules")

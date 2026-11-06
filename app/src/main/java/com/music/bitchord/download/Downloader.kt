@@ -111,7 +111,7 @@ object Downloader {
 
             response.use {
                 if (it.code !in 200..299) error("Download failed (HTTP ${it.code})")
-                val body = it.body ?: error("Download failed: empty response")
+                val body = it.body
                 val source = body.byteStream()
                 var readForChunk = 0L
                 while (readForChunk < length) {
