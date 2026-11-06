@@ -1092,6 +1092,21 @@ class QueueShuffleTierTest {
         assertEquals("c1", state.items[1].mediaId)
         assertTrue(state.replaceCalls.all { it.first >= 2 })
     }
+
+    @Test
+    fun `startingOrder avoids identity permutation for autoplay section`() {
+        val selected = testSong("selected", QueueTier.CONTEXT)
+        val autoplay = listOf(
+            testSong("a1", QueueTier.AUTOPLAY),
+            testSong("a2", QueueTier.AUTOPLAY),
+            testSong("a3", QueueTier.AUTOPLAY),
+        )
+        val input = listOf(selected) + autoplay
+        val result = QueueShuffle.startingOrder(input, 0)
+        assertEquals("selected", result.first().videoId)
+        assertNotEquals(autoplay.map { it.videoId }, result.drop(1).map { it.videoId })
+        assertEquals(autoplay.map { it.videoId }.toSet(), result.drop(1).map { it.videoId }.toSet())
+    }
 }
 
 
