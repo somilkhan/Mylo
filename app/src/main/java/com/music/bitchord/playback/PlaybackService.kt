@@ -2071,7 +2071,7 @@ class PlaybackService : MediaLibraryService() {
                 val canCrossfade = standbyPlayer != null &&
                     (activePlayer.isPlaying || activePlayer.playbackState == Player.STATE_READY)
 
-                if (!canCrossfade || standbyPlayer == null) {
+                if (!canCrossfade) {
                     val pos = (activePlayer.currentPosition + alignmentOffsetMs).coerceAtLeast(0L)
                     val wasPlaying = activePlayer.playWhenReady
                     activePlayer.replaceMediaItem(currentIndex, targetMediaItem)
