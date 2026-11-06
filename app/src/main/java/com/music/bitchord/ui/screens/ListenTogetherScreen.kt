@@ -120,11 +120,10 @@ internal fun ServerUrlError.toMessageRes(): Int = when (this) {
  * is that second proof, and it is why this screen ticks: two devices side by
  * side should show the same number.
  *
- * There is no player binding yet. Controls sent from here move the party's
- * state and every other device sees them; nothing starts playing. That join is
- * the next piece of work and is the reason
- * [ListenTogether.partyPositionMs][com.music.bitchord.data.listentogether.ListenTogether.partyPositionMs]
- * exists.
+ * Playback is bound in the playback service by [PartySync]
+ * ([com.music.bitchord.playback.PartySync]), not by this screen. This screen
+ * exposes party membership, controls, and the shared position; the service
+ * keeps playback synchronized while the UI is backgrounded.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
