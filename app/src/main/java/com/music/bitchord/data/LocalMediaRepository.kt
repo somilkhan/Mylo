@@ -30,7 +30,7 @@ object LocalMediaRepository {
     // and Apple music downloads come as (AC-4, E-AC-3, ALAC). `dsf`/`dff` are
     // DSD, which DsdExtractor plays.
     private val localMusicExtensions = setOf(
-        "mp3", "m4a", "mp4", "flac", "ogg", "opus", "aac", "webm", "dsf", "dff",
+        "mp3", "m4a", "mp4", "flac", "wav", "ogg", "opus", "aac", "webm", "dsf", "dff", "3gp",
     )
 
     private val nonMusicPathSegments = listOf(

@@ -62,6 +62,20 @@ class LocalMediaFilterTest {
     }
 
     @Test
+    fun filenameFallbackRemovesEverySupportedAudioExtension() {
+        for (extension in listOf("mp3", "m4a", "mp4", "flac", "wav", "ogg", "opus", "aac", "webm", "dsf", "dff", "3gp")) {
+            assertTrue(
+                extension,
+                LocalMediaRepository.isEligibleLocalMusic(
+                    durationMs = 60_000,
+                    displayName = "Song.$extension",
+                    path = null,
+                ),
+            )
+        }
+    }
+
+    @Test
     fun scannerRecognizesAllEligibleAudioContainers() {
         for (name in listOf("Song.mp3", "Song.m4a", "Song.mp4", "Song.flac", "Song.ogg", "Song.opus", "Song.aac", "Song.webm", "Song.dsf", "Song.dff")) {
             assertTrue(name, LocalMediaRepository.isAudioFileName(name))
