@@ -394,13 +394,13 @@ object LocalMediaRepository {
         }
     }
 
-    private fun isAudioFileName(name: String): Boolean {
+    internal fun isAudioFileName(name: String): Boolean {
         val lower = name.lowercase(Locale.ROOT)
         return lower.endsWith(".mp3") || lower.endsWith(".m4a") ||
-            lower.endsWith(".flac") || lower.endsWith(".wav") ||
+            lower.endsWith(".mp4") || lower.endsWith(".flac") || lower.endsWith(".wav") ||
             lower.endsWith(".ogg") || lower.endsWith(".opus") ||
             lower.endsWith(".aac") || lower.endsWith(".webm") ||
-            lower.endsWith(".3gp")
+            lower.endsWith(".dsf") || lower.endsWith(".dff") || lower.endsWith(".3gp")
     }
 
     /**

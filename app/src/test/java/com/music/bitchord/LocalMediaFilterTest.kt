@@ -62,6 +62,14 @@ class LocalMediaFilterTest {
     }
 
     @Test
+    fun scannerRecognizesAllEligibleAudioContainers() {
+        for (name in listOf("Song.mp3", "Song.m4a", "Song.mp4", "Song.flac", "Song.ogg", "Song.opus", "Song.aac", "Song.webm", "Song.dsf", "Song.dff")) {
+            assertTrue(name, LocalMediaRepository.isAudioFileName(name))
+        }
+        assertFalse(LocalMediaRepository.isAudioFileName("cover.jpg"))
+    }
+
+    @Test
     fun keepsTracksTheScannerCouldNotTime() {
         // Fragmented-MP4 ALAC scans with duration 0, high-rate DSD with NULL
         // (read back as 0): an unknown length, not a short clip.
