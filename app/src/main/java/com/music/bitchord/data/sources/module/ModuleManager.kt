@@ -137,7 +137,7 @@ class ModuleManager {
                             throw Exception("HTTP ${resp.code} from ${redactModuleUrl(sourceUrl)}")
                         }
                         val body = resp.body.string()
-                            ?: throw Exception("Empty body from ${redactModuleUrl(sourceUrl)}")
+                        if (body.isEmpty()) throw Exception("Empty body from ${redactModuleUrl(sourceUrl)}")
                         val modules = ModuleIndex.parseModules(json, body)
                         TrackLog.d(TAG, "  Parsed ${modules.size} modules")
                         modules
@@ -220,7 +220,7 @@ class ModuleManager {
                 if (!resp.isSuccessful) {
                     throw Exception("HTTP ${resp.code} downloading module ${module.id}")
                 }
-                resp.body?.string() ?: throw Exception("Empty body for module ${module.id}")
+                resp.body.string().also { if (it.isEmpty()) throw Exception("Empty body for module ${module.id}") }
             }
             val baseUrl = downloadUrl.substringBeforeLast("/")
 
