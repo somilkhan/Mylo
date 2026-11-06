@@ -1285,8 +1285,7 @@ private fun ArtistHeader(
                     when (state) {
                         is AsyncImagePainter.State.Success -> logoShown = true
                         is AsyncImagePainter.State.Error -> {
-                            val cause = (state as? AsyncImagePainter.State.Error)
-                                ?.result?.throwable?.let { "${it.javaClass.simpleName}: ${it.message}" }
+                            val cause = state.result.throwable?.let { "${it.javaClass.simpleName}: ${it.message}" }
                             Log.d("ArtistHeader", "image load failed: $imageUrl attempt $attempt cause=$cause")
                             failed = true
                         }
