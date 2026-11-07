@@ -25,6 +25,7 @@ class ScrobbleManager(
     private var hasScrobbledCurrentSong = false
     private var scrobbleInFlight = false
     private var playbackActive = false
+    private var trackGeneration = 0L
     var useNowPlaying = true
     var usePrimaryArtistOnly = false
 
@@ -47,6 +48,7 @@ class ScrobbleManager(
         if (song == null) return
         songStartedAt = System.currentTimeMillis() / 1000
         currentSongId = song.videoId
+        trackGeneration++
         hasScrobbledCurrentSong = false
         scrobbleInFlight = false
         playbackActive = true
@@ -142,13 +144,15 @@ class ScrobbleManager(
         scrobbleRemainingMillis = 0L
         scrobbleJob = null
         val scrobbleArtist = song.artist.forScrobble()
+        val generation = trackGeneration
+        val startedAt = songStartedAt
         scope.launch {
             LastFM
                 .scrobble(
                     artist = scrobbleArtist,
                     track = song.title,
                     duration = durationSeconds,
-                    timestamp = songStartedAt,
+                    timestamp = startedAt,
                     album = song.albumName,
                 ).onSuccess {
                     Log.d(TAG, "Scrobbled: ${song.title} by ${song.artist}")
@@ -156,6 +160,7 @@ class ScrobbleManager(
                     if (throwable is CancellationException) throw throwable
                     Log.e(TAG, "Failed to scrobble: ${song.title}", throwable)
                 }.also { result ->
+                    if (generation != trackGeneration) return@also
                     scrobbleInFlight = false
                     if (result.isSuccess) hasScrobbledCurrentSong = true
                     else if (playbackActive && songStarted && currentSongId == song.videoId) {
