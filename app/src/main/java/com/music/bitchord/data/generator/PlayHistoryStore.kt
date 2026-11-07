@@ -45,7 +45,7 @@ class PlayHistoryStore(private val file: File, private val zone: ZoneId = ZoneId
         val normalizedBefore = dedupePlays(before, zone)
         val after = dedupePlays(before + incoming, zone)
         val result = PlayHistoryAppendResult(
-            addedCount = after.size - normalizedBefore.size,
+            addedCount = (after.size - normalizedBefore.size).coerceAtLeast(0),
             changed = after != before,
         )
         if (result.changed) writeAtomically(after)
