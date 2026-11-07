@@ -521,7 +521,7 @@ class ScrobbleHistorySyncWorker(
                     status = status,
                 )
             } ?: return Result.success()
-            DebugLog.i(TAG, "History sync completed: dated=${entries.size}, added=$added, status=$status, cursor=$now")
+            DebugLog.i(TAG, "History sync completed: dated=${entries.size}, raw=${rawHistory.size}, added=$added, status=$status, cursor=$now")
             Result.success()
         } catch (cancelled: CancellationException) {
             throw cancelled
