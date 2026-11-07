@@ -15,6 +15,19 @@ class LocalMediaFilterTest {
     }
 
     @Test
+    fun enabledFilterKeepsUnknownDurationAndExcludesSystemAudioKinds() {
+        val selection = requireNotNull(LocalMediaRepository.localMusicSelection(filterNonMusic = true))
+        assertTrue(selection.contains("IS_MUSIC != 0"))
+        assertTrue(selection.contains("DURATION >= ?"))
+        assertTrue(selection.contains("DURATION <= 0"))
+        assertTrue(selection.contains("DURATION IS NULL"))
+        assertTrue(selection.contains("IS_ALARM = 0"))
+        assertTrue(selection.contains("IS_NOTIFICATION = 0"))
+        assertTrue(selection.contains("IS_RINGTONE = 0"))
+        assertTrue(selection.contains("IS_PODCAST = 0"))
+    }
+
+    @Test
     fun rejectsShortAudio() {
         assertFalse(
             LocalMediaRepository.isEligibleLocalMusic(
