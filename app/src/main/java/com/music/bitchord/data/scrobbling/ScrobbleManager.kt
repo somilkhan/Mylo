@@ -130,6 +130,8 @@ class ScrobbleManager(
         if (hasScrobbledCurrentSong) return
         hasScrobbledCurrentSong = true
         scrobbleTimerStartedAt = 0L
+        scrobbleRemainingMillis = 0L
+        scrobbleJob = null
         val scrobbleArtist = song.artist.forScrobble()
         scope.launch {
             LastFM
