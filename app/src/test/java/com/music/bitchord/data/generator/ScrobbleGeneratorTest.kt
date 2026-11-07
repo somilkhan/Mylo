@@ -325,6 +325,23 @@ class ScrobbleGeneratorTest {
     }
 
     @Test
+    fun store_replacingImportedRowWithMultipleMyloEventsNeverReportsNegativeAddedCount() {
+        val file = File.createTempFile("replace-imported-repeat", ".tsv")
+        file.deleteOnExit()
+        val store = PlayHistoryStore(file, zone)
+        val imported = play("same", source = PlaySource.YOUTUBE_MUSIC, exact = false)
+        val first = imported.copy(source = PlaySource.MYLO, exact = true)
+        val second = first.copy(atMillis = first.atMillis + 60 * 60 * 1000L)
+
+        store.append(listOf(imported))
+        val result = store.appendWithResult(listOf(first, second))
+
+        assertEquals(1, result.addedCount)
+        assertTrue(result.changed)
+        assertEquals(listOf(first, second), store.readAll())
+    }
+
+    @Test
     fun store_roundTripsAndDedupesOnWrite() {
         val file = File.createTempFile("plays", ".tsv")
         file.deleteOnExit()
