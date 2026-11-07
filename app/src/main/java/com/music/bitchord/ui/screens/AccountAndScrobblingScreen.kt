@@ -520,7 +520,7 @@ internal fun historySyncSubtitle(
         ScrobbleHistorySync.STATUS_RETRYING ->
             "Sync failed; will retry on an unmetered connection"
         ScrobbleHistorySync.STATUS_NO_DATED_ROWS ->
-            "YouTube history returned no tracks on last sync"
+            "No date-labelled rows found on last sync"
         ScrobbleHistorySync.STATUS_UNDATED_ROWS ->
             "YouTube history has tracks, but its date headings were not recognized"
         ScrobbleHistorySync.STATUS_SUCCESS -> {
