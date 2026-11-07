@@ -22,6 +22,7 @@ class ScrobbleManager(
     private var songStartedAt: Long = 0L
     private var songStarted = false
     private var currentSongId: String? = null
+    private var hasScrobbledCurrentSong = false
     var useNowPlaying = true
     var usePrimaryArtistOnly = false
 
@@ -32,6 +33,7 @@ class ScrobbleManager(
         songStartedAt = 0L
         songStarted = false
         currentSongId = null
+        hasScrobbledCurrentSong = false
     }
 
     fun onSongStart(
@@ -41,6 +43,7 @@ class ScrobbleManager(
         if (song == null) return
         songStartedAt = System.currentTimeMillis() / 1000
         currentSongId = song.videoId
+        hasScrobbledCurrentSong = false
         songStarted = true
         startScrobbleTimer(song, durationMs)
         if (useNowPlaying) {
@@ -60,6 +63,7 @@ class ScrobbleManager(
         stopScrobbleTimer()
         songStarted = false
         currentSongId = null
+        hasScrobbledCurrentSong = false
     }
 
     private fun startScrobbleTimer(
@@ -91,6 +95,10 @@ class ScrobbleManager(
 
     private fun pauseScrobbleTimer() {
         scrobbleJob?.cancel()
+        if (hasScrobbledCurrentSong) {
+            scrobbleTimerStartedAt = 0L
+            return
+        }
         if (scrobbleTimerStartedAt != 0L) {
             val elapsed = System.currentTimeMillis() - scrobbleTimerStartedAt
             scrobbleRemainingMillis -= elapsed
@@ -100,7 +108,7 @@ class ScrobbleManager(
     }
 
     private fun resumeScrobbleTimer(song: Song) {
-        if (scrobbleRemainingMillis <= 0) return
+        if (hasScrobbledCurrentSong || scrobbleRemainingMillis <= 0) return
         scrobbleJob?.cancel()
         scrobbleTimerStartedAt = System.currentTimeMillis()
         scrobbleJob =
@@ -119,6 +127,9 @@ class ScrobbleManager(
     }
 
     private fun scrobbleSong(song: Song, durationSeconds: Int) {
+        if (hasScrobbledCurrentSong) return
+        hasScrobbledCurrentSong = true
+        scrobbleTimerStartedAt = 0L
         val scrobbleArtist = song.artist.forScrobble()
         scope.launch {
             LastFM
