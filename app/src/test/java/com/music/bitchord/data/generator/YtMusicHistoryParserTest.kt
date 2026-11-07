@@ -63,6 +63,39 @@ class YtMusicHistoryParserTest {
 
 
     @Test
+    fun historyDateBucketsSupportSimpleTextTitles() {
+        val json = Json.parseToJsonElement(
+            """
+            {
+              "contents": [
+                {
+                  "musicShelfRenderer": {
+                    "title": {"simpleText": "Today"},
+                    "contents": [${row("simple", "Simple Title", "Artist")}]
+                  }
+                },
+                {
+                  "musicShelfRenderer": {
+                    "header": {"musicHeaderRenderer": {"title": {"simpleText": "Yesterday"}}},
+                    "contents": [${row("header", "Header Title", "Artist")}]
+                  }
+                }
+              ]
+            }
+            """.trimIndent(),
+        )
+
+        val entries = InnertubeParser.collectHistoryEntries(json, now, zone)
+
+        assertEquals(listOf("simple", "header"), entries.map { it.song.videoId })
+        assertEquals(now, entries.first().playedAtMillis)
+        assertEquals(
+            LocalDate.of(2026, 10, 28).atTime(12, 0).atZone(zone).toInstant().toEpochMilli(),
+            entries.last().playedAtMillis,
+        )
+    }
+
+    @Test
     fun historyApiAuthenticationErrorIsNotReportedAsEmptyHistory() {
         val response = Json.parseToJsonElement(
             """{"error":{"code":401,"status":"UNAUTHENTICATED","message":"Invalid credentials"}}""",
