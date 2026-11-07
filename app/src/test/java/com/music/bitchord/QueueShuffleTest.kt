@@ -1,5 +1,7 @@
 package com.music.bitchord
 
+import com.music.bitchord.data.model.QueueTier
+import com.music.bitchord.data.model.Song
 import com.music.bitchord.playback.QueueShuffle
 import com.music.bitchord.playback.queueStartIndex
 import org.junit.Assert.assertEquals
@@ -14,6 +16,40 @@ class QueueShuffleTest {
     /** The upcoming stretch of the queue as turning shuffle off leaves it. */
     private fun restored(upcoming: List<String>, original: List<String>): List<String> =
         QueueShuffle.restoreOrder(upcoming, original).map { upcoming[it] }
+
+    @Test
+    fun `startup shuffle keeps selected track and tier sections in order`() {
+        fun song(id: String, tier: QueueTier) = Song(
+            videoId = id,
+            title = id,
+            artist = "artist",
+            thumbnailUrl = null,
+            queueTier = tier,
+        )
+        val songs = listOf(
+            song("selected", QueueTier.CONTEXT),
+            song("user", QueueTier.USER_QUEUE),
+            song("context-a", QueueTier.CONTEXT),
+            song("context-b", QueueTier.CONTEXT),
+            song("auto-a", QueueTier.AUTOPLAY),
+            song("auto-b", QueueTier.AUTOPLAY),
+        )
+
+        val ordered = QueueShuffle.startingOrder(songs, startIndex = 0)
+
+        assertEquals("selected", ordered.first().videoId)
+        assertEquals(
+            listOf(
+                QueueTier.USER_QUEUE,
+                QueueTier.CONTEXT,
+                QueueTier.CONTEXT,
+                QueueTier.AUTOPLAY,
+                QueueTier.AUTOPLAY,
+            ),
+            ordered.drop(1).map { it.queueTier },
+        )
+        assertEquals(songs.map { it.videoId }.toSet(), ordered.map { it.videoId }.toSet())
+    }
 
     @Test
     fun `a shuffled queue starts at the tapped track moved to its head`() {
