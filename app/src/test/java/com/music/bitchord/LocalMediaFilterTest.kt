@@ -24,7 +24,9 @@ class LocalMediaFilterTest {
         assertTrue(selection.contains("is_alarm = 0"))
         assertTrue(selection.contains("is_notification = 0"))
         assertTrue(selection.contains("is_ringtone = 0"))
-        assertTrue(selection.contains("is_podcast = 0"))
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            assertTrue(selection.contains("is_podcast = 0"))
+        }
     }
 
     @Test
