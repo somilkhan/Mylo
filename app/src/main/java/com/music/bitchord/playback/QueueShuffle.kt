@@ -202,7 +202,9 @@ object QueueShuffle {
             if (s == context) s.drop(1) + s.first() else s
         } else context
         val autoplay = rest.filter { it.queueTier == QueueTier.AUTOPLAY }
-        val shuffledAutoplay = avoidIdentityShuffleMediaItems(autoplay, autoplay.shuffled())
+        val shuffledAutoplay = autoplay.shuffled().let { shuffled ->
+            if (autoplay.size > 1 && shuffled == autoplay) shuffled.drop(1) + shuffled.first() else shuffled
+        }
         return listOf(songs[startIndex]) + userQueue + shuffledContext + shuffledAutoplay
     }
 
