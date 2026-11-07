@@ -10,7 +10,7 @@ import kotlinx.coroutines.launch
 import kotlin.math.min
 import kotlin.math.roundToLong
 
-class ScrobbleManager(
+internal fun shouldRetryScrobbleSubmission(success: Boolean, playbackActive: Boolean, songStarted: Boolean, sameTrack: Boolean): Boolean =\n    !success && playbackActive && songStarted && sameTrack\n\nclass ScrobbleManager(
     private val scope: CoroutineScope,
     var minSongDuration: Int = 30,
     var scrobbleDelayPercent: Float = 0.5f,
@@ -165,7 +165,7 @@ class ScrobbleManager(
                     if (generation != trackGeneration) return@also
                     scrobbleInFlight = false
                     if (result.isSuccess) hasScrobbledCurrentSong = true
-                    else if (playbackActive && songStarted && currentSongId == song.videoId) {
+                    else if (shouldRetryScrobbleSubmission(result.isSuccess, playbackActive, songStarted, currentSongId == song.videoId)) {
                         scrobbleRemainingMillis = RETRY_DELAY_MS
                         scrobbleTimerStartedAt = System.currentTimeMillis()
                         scrobbleJob = scope.launch {
