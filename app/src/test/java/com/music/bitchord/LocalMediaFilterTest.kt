@@ -11,20 +11,20 @@ class LocalMediaFilterTest {
     @Test
     fun disablingNonMusicFilterDoesNotApplyMediaStoreMusicFlagGate() {
         assertEquals(null, LocalMediaRepository.localMusicSelection(filterNonMusic = false))
-        assertTrue(LocalMediaRepository.localMusicSelection(filterNonMusic = true)!!.contains("IS_MUSIC"))
+        assertTrue(LocalMediaRepository.localMusicSelection(filterNonMusic = true)!!.contains("is_music"))
     }
 
     @Test
     fun enabledFilterKeepsUnknownDurationAndExcludesSystemAudioKinds() {
         val selection = requireNotNull(LocalMediaRepository.localMusicSelection(filterNonMusic = true))
-        assertTrue(selection.contains("IS_MUSIC != 0"))
-        assertTrue(selection.contains("DURATION >= ?"))
-        assertTrue(selection.contains("DURATION <= 0"))
-        assertTrue(selection.contains("DURATION IS NULL"))
-        assertTrue(selection.contains("IS_ALARM = 0"))
-        assertTrue(selection.contains("IS_NOTIFICATION = 0"))
-        assertTrue(selection.contains("IS_RINGTONE = 0"))
-        assertTrue(selection.contains("IS_PODCAST = 0"))
+        assertTrue(selection.contains("is_music != 0"))
+        assertTrue(selection.contains("duration >= ?"))
+        assertTrue(selection.contains("duration <= 0"))
+        assertTrue(selection.contains("duration IS NULL"))
+        assertTrue(selection.contains("is_alarm = 0"))
+        assertTrue(selection.contains("is_notification = 0"))
+        assertTrue(selection.contains("is_ringtone = 0"))
+        assertTrue(selection.contains("is_podcast = 0"))
     }
 
     @Test
