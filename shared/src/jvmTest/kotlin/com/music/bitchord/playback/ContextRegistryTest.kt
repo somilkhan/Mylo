@@ -91,8 +91,9 @@ class ContextRegistryTest {
     }
 
     @Test
-    fun emptyPageIsBlockedAsNoProgress() {
-        val registry = ContextRegistry()
+    fun emptyPageBlockIsVersionedAndNotifiesPersistenceOwner() {
+        val growth = mutableListOf<ContextSnapshot>()
+        val registry = ContextRegistry { growth += it }
         registry.register("context-a", "playlist:one", "VLone", listOf(song("a")), "page-1")
         val request = assertNotNull(registry.claimContinuation())
 
@@ -100,7 +101,10 @@ class ContextRegistryTest {
 
         assertEquals(ContinuationResultStatus.REJECTED_NO_PROGRESS, rejected.status)
         assertEquals(ContinuationDiagnostic.NO_PROGRESS, rejected.diagnostic)
-        assertEquals(ContinuationState.BLOCKED, registry.snapshot()!!.continuationState)
+        assertEquals(ContinuationState.BLOCKED, rejected.snapshot!!.continuationState)
+        assertEquals(3L, rejected.snapshot.version)
+        assertEquals(1, growth.size)
+        assertEquals(ContinuationState.BLOCKED, growth.single().continuationState)
         assertNull(registry.claimContinuation())
     }
 
