@@ -6,6 +6,13 @@ import org.junit.Test
 
 class ScrobbleHistorySyncPolicyTest {
     @Test
+    fun emptyOrFailedHistoryResponsesNeverAdvanceTheIncrementalCursor() {
+        assertFalse(shouldAdvanceScrobbleHistoryCursor(ScrobbleHistorySync.STATUS_NO_DATED_ROWS))
+        assertFalse(shouldAdvanceScrobbleHistoryCursor(ScrobbleHistorySync.STATUS_RETRYING))
+        assertTrue(shouldAdvanceScrobbleHistoryCursor(ScrobbleHistorySync.STATUS_SUCCESS))
+    }
+
+    @Test
     fun firstSuccessfulLoginDoesNotEnableHistoryImportWithoutConsent() {
         assertFalse(shouldResumeScrobbleHistorySync(hasExplicitConsent = false, enabled = false))
     }
