@@ -23,6 +23,10 @@ import java.util.concurrent.TimeUnit
 internal fun shouldResumeScrobbleHistorySync(hasExplicitConsent: Boolean, enabled: Boolean): Boolean =
     hasExplicitConsent && enabled
 
+/** Only a dated, non-empty import may move the incremental history cursor. */
+internal fun shouldAdvanceScrobbleHistoryCursor(status: String): Boolean =
+    status == ScrobbleHistorySync.STATUS_SUCCESS
+
 /** Explicitly opt-in sync of date-labelled YouTube history whenever a network is connected. */
 object ScrobbleHistorySync {
     const val PREFS_NAME = "scrobble_history_sync"
@@ -244,13 +248,17 @@ object ScrobbleHistorySync {
         ) return@synchronized null
 
         val added = ScrobbleHistory.append(incoming)
-        prefs.edit()
-            .putLong(expectedIdentity.historySyncCursorPreferenceKey(), syncedAtMillis)
-            .putLong(KEY_LAST_SYNC_AT, syncedAtMillis)
-            .putLong(KEY_LAST_ATTEMPT_AT, syncedAtMillis)
-            .putInt(KEY_LAST_ADDED, added)
-            .putString(KEY_LAST_STATUS, status)
-            .apply()
+        prefs.edit().apply {
+            // Empty/unparseable dated responses are not completed imports.
+            // Advancing here can permanently skip history if date headings recover.
+            if (shouldAdvanceScrobbleHistoryCursor(status)) {
+                putLong(expectedIdentity.historySyncCursorPreferenceKey(), syncedAtMillis)
+                putLong(KEY_LAST_SYNC_AT, syncedAtMillis)
+            }
+            putLong(KEY_LAST_ATTEMPT_AT, syncedAtMillis)
+            putInt(KEY_LAST_ADDED, added)
+            putString(KEY_LAST_STATUS, status)
+        }.apply()
         added
     }
 
