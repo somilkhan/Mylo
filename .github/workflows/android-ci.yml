@@ -26,7 +26,7 @@ concurrency:
 jobs:
   android:
     name: Android unit tests (optional APK build)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
       - name: Check out source
@@ -120,7 +120,7 @@ jobs:
 
   desktop:
     name: Desktop compile and tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
       - name: Check out source
@@ -144,7 +144,7 @@ jobs:
 
   web:
     name: Web tests and typecheck
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     defaults:
       run:
