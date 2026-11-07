@@ -544,7 +544,12 @@ object InnertubeParser {
     /** All track identities on a history page, even when its date heading is unsupported. */
     fun collectHistorySongs(root: JsonElement): List<Song> {
         requireNoApiError(root, "history")
-        return collectSongsDeep(root)
+        // History is an event list, not a library: repeated listens to the same
+        // video are distinct rows and must not be collapsed by collectSongsDeep's
+        // videoId-keyed map. Match InterTune's typed shelf-row traversal.
+        val credit = pageCredit(root)
+        return collectRenderers(root, "musicResponsiveListItemRenderer")
+            .mapNotNull { parseResponsiveListItem(it, credit) }
     }
 
     fun collectHistoryEntries(
