@@ -72,6 +72,7 @@ object ScrobbleHistorySync {
     const val STATUS_SUCCESS = "success"
     const val STATUS_SYNCING = "syncing"
     const val STATUS_NO_DATED_ROWS = "no_dated_rows"
+    const val STATUS_UNDATED_ROWS = "undated_rows"
     const val STATUS_WAITING_FOR_SIGN_IN = "waiting_for_sign_in"
     const val STATUS_WAITING_FOR_WIFI = "waiting_for_wifi"
     const val STATUS_RETRYING = "retrying"
@@ -455,6 +456,17 @@ class ScrobbleHistorySyncWorker(
             }
 
             val entries = response.getOrThrow()
+            // Distinguish a genuinely empty account history from a live history
+            // feed whose date headings our dated parser cannot understand.
+            val status = if (entries.isEmpty()) {
+                val rawHistory = YtMusicRepository.history().getOrElse { error ->
+                    if (error is CancellationException) throw error
+                    DebugLog.w(TAG, "Could not verify undated history rows", error)
+                    emptyList()
+                }
+                if (rawHistory.isNotEmpty()) ScrobbleHistorySync.STATUS_UNDATED_ROWS
+                else ScrobbleHistorySync.STATUS_NO_DATED_ROWS
+            } else ScrobbleHistorySync.STATUS_SUCCESS
             val incoming = entries.map { entry ->
                 Play(
                     videoId = entry.song.videoId,
@@ -481,11 +493,10 @@ class ScrobbleHistorySyncWorker(
                     identity,
                     incoming,
                     syncedAtMillis = now,
-                    status = if (entries.isEmpty()) ScrobbleHistorySync.STATUS_NO_DATED_ROWS
-                    else ScrobbleHistorySync.STATUS_SUCCESS,
+                    status = status,
                 )
             } ?: return Result.success()
-            DebugLog.i(TAG, "History sync completed: fetched=${entries.size}, added=$added, cursor=$now")
+            DebugLog.i(TAG, "History sync completed: dated=${entries.size}, added=$added, status=$status, cursor=$now")
             Result.success()
         } catch (cancelled: CancellationException) {
             throw cancelled

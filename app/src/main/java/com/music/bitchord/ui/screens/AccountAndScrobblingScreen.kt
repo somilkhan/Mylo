@@ -520,7 +520,9 @@ internal fun historySyncSubtitle(
         ScrobbleHistorySync.STATUS_RETRYING ->
             "Sync failed; will retry on an unmetered connection"
         ScrobbleHistorySync.STATUS_NO_DATED_ROWS ->
-            "No date-labelled rows found on last sync"
+            "YouTube history returned no tracks on last sync"
+        ScrobbleHistorySync.STATUS_UNDATED_ROWS ->
+            "YouTube history has tracks, but its date headings were not recognized"
         ScrobbleHistorySync.STATUS_SUCCESS -> {
             val time = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
                 .format(Date(lastSyncAt))

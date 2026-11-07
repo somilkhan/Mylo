@@ -8,6 +8,7 @@ class ScrobbleHistorySyncPolicyTest {
     @Test
     fun emptyOrFailedHistoryResponsesNeverAdvanceTheIncrementalCursor() {
         assertFalse(shouldAdvanceScrobbleHistoryCursor(ScrobbleHistorySync.STATUS_NO_DATED_ROWS))
+        assertFalse(shouldAdvanceScrobbleHistoryCursor(ScrobbleHistorySync.STATUS_UNDATED_ROWS))
         assertFalse(shouldAdvanceScrobbleHistoryCursor(ScrobbleHistorySync.STATUS_RETRYING))
         assertTrue(shouldAdvanceScrobbleHistoryCursor(ScrobbleHistorySync.STATUS_SUCCESS))
     }
