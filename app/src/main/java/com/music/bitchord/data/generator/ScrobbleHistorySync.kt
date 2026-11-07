@@ -454,7 +454,7 @@ class ScrobbleHistorySyncWorker(
                     isVideoOrigin = entry.song.isVideoOrigin,
                 )
             }
-            withContext(Dispatchers.IO) {
+            val added = withContext(Dispatchers.IO) {
                 ScrobbleHistorySync.appendIfCurrentSession(
                     applicationContext,
                     generation,
@@ -465,6 +465,7 @@ class ScrobbleHistorySyncWorker(
                     else ScrobbleHistorySync.STATUS_SUCCESS,
                 )
             } ?: return Result.success()
+            DebugLog.i(TAG, "History sync completed: fetched=${entries.size}, added=$added, cursor=$now")
             Result.success()
         } catch (cancelled: CancellationException) {
             throw cancelled
