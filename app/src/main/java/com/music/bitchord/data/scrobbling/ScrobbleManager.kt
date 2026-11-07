@@ -30,6 +30,7 @@ class ScrobbleManager(
     var usePrimaryArtistOnly = false
 
     fun destroy() {
+        trackGeneration++
         scrobbleJob?.cancel()
         scrobbleRemainingMillis = 0L
         scrobbleTimerStartedAt = 0L
@@ -69,6 +70,7 @@ class ScrobbleManager(
     }
 
     fun onSongStop() {
+        trackGeneration++
         stopScrobbleTimer()
         songStarted = false
         currentSongId = null
