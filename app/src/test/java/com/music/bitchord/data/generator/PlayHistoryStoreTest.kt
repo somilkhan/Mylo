@@ -9,7 +9,7 @@ import org.junit.Test
 
 class PlayHistoryStoreTest {
     private val zone = ZoneId.of("UTC")
-    private val day = 1_798_761_600_000L // 2026-12-01T00:00:00Z
+    private val day = 1_798_761_600_000L // 2027-01-01T00:00:00Z
 
     private fun store() = PlayHistoryStore(
         Files.createTempDirectory("mylo-history-test").resolve("history.tsv").toFile(),
