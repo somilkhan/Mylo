@@ -66,6 +66,7 @@ object ScrobbleHistorySync {
     }
 
     const val STATUS_SUCCESS = "success"
+    const val STATUS_SYNCING = "syncing"
     const val STATUS_NO_DATED_ROWS = "no_dated_rows"
     const val STATUS_WAITING_FOR_SIGN_IN = "waiting_for_sign_in"
     const val STATUS_WAITING_FOR_WIFI = "waiting_for_wifi"
@@ -289,6 +290,8 @@ object ScrobbleHistorySync {
         prefs.edit()
             .putBoolean(KEY_CONSENT_RECORDED, true)
             .putBoolean(KEY_ENABLED, true)
+            .putLong(KEY_LAST_ATTEMPT_AT, System.currentTimeMillis())
+            .putString(KEY_LAST_STATUS, STATUS_SYNCING)
             .apply()
         onSessionChanged(appContext)
     }
