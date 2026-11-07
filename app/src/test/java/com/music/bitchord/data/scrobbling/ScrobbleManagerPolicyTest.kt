@@ -6,11 +6,11 @@ import org.junit.Test
 
 class ScrobbleManagerPolicyTest {
     @Test
-    fun failedSubmissionRetriesOnlyForTheStillActiveOriginatingTrack() {
+    fun failedSubmissionRetriesForTheStillCurrentTrackEvenWhenPaused() {
         assertTrue(shouldRetryScrobbleSubmission(success = false, playbackActive = true, songStarted = true, sameTrack = true))
+        assertTrue(shouldRetryScrobbleSubmission(success = false, playbackActive = false, songStarted = true, sameTrack = true))
         assertFalse(shouldRetryScrobbleSubmission(success = true, playbackActive = true, songStarted = true, sameTrack = true))
-        assertFalse(shouldRetryScrobbleSubmission(success = false, playbackActive = false, songStarted = true, sameTrack = true))
-        assertFalse(shouldRetryScrobbleSubmission(success = false, playbackActive = true, songStarted = false, sameTrack = true))
+        assertFalse(shouldRetryScrobbleSubmission(success = false, playbackActive = false, songStarted = false, sameTrack = true))
         assertFalse(shouldRetryScrobbleSubmission(success = false, playbackActive = true, songStarted = true, sameTrack = false))
     }
 }
