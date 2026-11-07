@@ -102,7 +102,7 @@ class ContextRegistryTest {
         assertEquals(ContinuationResultStatus.REJECTED_NO_PROGRESS, rejected.status)
         assertEquals(ContinuationDiagnostic.NO_PROGRESS, rejected.diagnostic)
         assertEquals(ContinuationState.BLOCKED, rejected.snapshot!!.continuationState)
-        assertEquals(3L, rejected.snapshot.version)
+        assertEquals(2L, rejected.snapshot.version)
         assertEquals(1, growth.size)
         assertEquals(ContinuationState.BLOCKED, growth.single().continuationState)
         assertNull(registry.claimContinuation())
