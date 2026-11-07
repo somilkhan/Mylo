@@ -355,9 +355,14 @@ class ContextRegistry(
                 state.request = null
                 state.continuationState = ContinuationState.BLOCKED
                 state.diagnostic = noProgressDiagnostic
+                // Blocking continuation is durable state too. Advance the version
+                // and notify the owner so it persists the terminal diagnostic even
+                // when the page contributes no canonical tracks.
+                state.version = newVersionLocked()
+                callbackSnapshot = state.snapshot()
                 return@synchronized ContinuationResult(
                     status = ContinuationResultStatus.REJECTED_NO_PROGRESS,
-                    snapshot = state.snapshot(),
+                    snapshot = callbackSnapshot,
                     diagnostic = noProgressDiagnostic,
                 )
             }
