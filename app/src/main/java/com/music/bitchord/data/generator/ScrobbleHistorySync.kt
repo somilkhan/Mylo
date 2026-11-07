@@ -115,11 +115,18 @@ object ScrobbleHistorySync {
         // The single UI summary follows the active account/profile even while
         // syncing is paused. The import cursor remains identity-scoped below.
         if (identity != null) {
-            prefs.edit()
-                .putLong(KEY_LAST_SYNC_AT, prefs.getLong(identity.historySyncCursorPreferenceKey(), 0L))
-                .putInt(KEY_LAST_ADDED, 0)
-                .remove(KEY_LAST_STATUS)
-                .apply()
+            val identityCursor = prefs.getLong(identity.historySyncCursorPreferenceKey(), 0L)
+            val displayedSyncAt = prefs.getLong(KEY_LAST_SYNC_AT, 0L)
+            // Process/app recreation must not erase the last successful result.
+            // Reset the summary only when the active account/profile has a
+            // different cursor (or has never completed a dated import).
+            if (identityCursor != displayedSyncAt || identityCursor == 0L) {
+                prefs.edit()
+                    .putLong(KEY_LAST_SYNC_AT, identityCursor)
+                    .putInt(KEY_LAST_ADDED, 0)
+                    .remove(KEY_LAST_STATUS)
+                    .apply()
+            }
         }
         if (!enabled || identity == null) return
         enqueuePeriodicWork(appContext)
