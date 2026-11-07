@@ -290,7 +290,7 @@ object ScrobbleHistorySync {
             .putBoolean(KEY_CONSENT_RECORDED, true)
             .putBoolean(KEY_ENABLED, true)
             .apply()
-        scheduleWork(appContext)
+        onSessionChanged(appContext)
     }
 
     /** Resume already-consented work without changing the user's choice. */
