@@ -21,6 +21,7 @@ class ScrobbleManager(
     private var scrobbleTimerStartedAt: Long = 0L
     private var songStartedAt: Long = 0L
     private var songStarted = false
+    private var currentSongId: String? = null
     var useNowPlaying = true
     var usePrimaryArtistOnly = false
 
@@ -30,6 +31,7 @@ class ScrobbleManager(
         scrobbleTimerStartedAt = 0L
         songStartedAt = 0L
         songStarted = false
+        currentSongId = null
     }
 
     fun onSongStart(
@@ -38,6 +40,7 @@ class ScrobbleManager(
     ) {
         if (song == null) return
         songStartedAt = System.currentTimeMillis() / 1000
+        currentSongId = song.videoId
         songStarted = true
         startScrobbleTimer(song, durationMs)
         if (useNowPlaying) {
@@ -56,6 +59,7 @@ class ScrobbleManager(
     fun onSongStop() {
         stopScrobbleTimer()
         songStarted = false
+        currentSongId = null
     }
 
     private fun startScrobbleTimer(
@@ -158,7 +162,9 @@ class ScrobbleManager(
     ) {
         if (song == null) return
         if (isPlaying) {
-            if (!songStarted) {
+            // Player callbacks can report a track transition without an intervening
+            // paused/stopped state. Restart timing and now-playing for the new track.
+            if (!songStarted || currentSongId != song.videoId) {
                 onSongStart(song, durationMs)
             } else {
                 onSongResume(song)
