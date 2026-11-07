@@ -344,41 +344,54 @@ class ContextRegistry(
 
             val nextToken = page.continuationToken.normalizedToken()
             val added = newSongs(state.songs, page.songs)
-            val diagnostic = when {
+            val noProgressDiagnostic = when {
                 added.isEmpty() && page.songs.isEmpty() -> ContinuationDiagnostic.NO_PROGRESS
                 added.isEmpty() -> ContinuationDiagnostic.DUPLICATE_PAGE
-                nextToken != null && nextToken in state.seenContinuationTokens ->
-                    ContinuationDiagnostic.REPEATED_CONTINUATION
                 else -> null
             }
+            val repeatedToken = nextToken != null && nextToken in state.seenContinuationTokens
 
-            if (diagnostic != null) {
+            if (noProgressDiagnostic != null) {
                 state.request = null
                 state.continuationState = ContinuationState.BLOCKED
-                state.diagnostic = diagnostic
+                state.diagnostic = noProgressDiagnostic
                 return@synchronized ContinuationResult(
                     status = ContinuationResultStatus.REJECTED_NO_PROGRESS,
                     snapshot = state.snapshot(),
-                    diagnostic = diagnostic,
+                    diagnostic = noProgressDiagnostic,
                 )
             }
 
+            // A repeated token stops the continuation walk, but a page can still
+            // contain valid new songs. Keep those songs in canonical order rather
+            // than throwing away useful content with the loop-prevention signal.
             state.request = null
             state.songs = immutableSongs(state.songs + added)
             state.continuationToken = nextToken
-            state.continuationState = if (nextToken == null) {
-                ContinuationState.EXHAUSTED
-            } else {
-                state.seenContinuationTokens += nextToken
-                ContinuationState.AVAILABLE
+            state.continuationState = when {
+                repeatedToken -> ContinuationState.BLOCKED
+                nextToken == null -> ContinuationState.EXHAUSTED
+                else -> {
+                    state.seenContinuationTokens += nextToken
+                    ContinuationState.AVAILABLE
+                }
             }
             state.version = newVersionLocked()
-            state.diagnostic = null
+            state.diagnostic = if (repeatedToken) {
+                ContinuationDiagnostic.REPEATED_CONTINUATION
+            } else {
+                null
+            }
             callbackSnapshot = state.snapshot()
             ContinuationResult(
-                status = ContinuationResultStatus.COMPLETED,
+                status = if (repeatedToken) {
+                    ContinuationResultStatus.REJECTED_NO_PROGRESS
+                } else {
+                    ContinuationResultStatus.COMPLETED
+                },
                 snapshot = callbackSnapshot,
                 addedSongs = immutableSongs(added),
+                diagnostic = callbackSnapshot?.diagnostic,
             )
         }
         callbackSnapshot?.let(::notifyGrowth)
