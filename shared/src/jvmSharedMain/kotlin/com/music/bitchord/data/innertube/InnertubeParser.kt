@@ -575,7 +575,11 @@ object InnertubeParser {
                     val shelf = node["musicShelfRenderer"] as? JsonObject
                     if (shelf != null) {
                         val label = shelf.o("title").runs().ifBlank {
+                            shelf.o("title").s("simpleText").orEmpty()
+                        }.ifBlank {
                             shelf.o("header").o("musicHeaderRenderer").o("title").runs()
+                        }.ifBlank {
+                            shelf.o("header").o("musicHeaderRenderer").o("title").s("simpleText").orEmpty()
                         }
                         // Only inherit a date when the continuation has no heading. An unknown
                         // heading must stay unknown rather than borrowing another day's date.
