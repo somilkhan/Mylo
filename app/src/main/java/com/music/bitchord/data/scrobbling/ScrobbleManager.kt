@@ -23,6 +23,8 @@ class ScrobbleManager(
     private var songStarted = false
     private var currentSongId: String? = null
     private var hasScrobbledCurrentSong = false
+    private var scrobbleInFlight = false
+    private var playbackActive = false
     var useNowPlaying = true
     var usePrimaryArtistOnly = false
 
@@ -34,6 +36,8 @@ class ScrobbleManager(
         songStarted = false
         currentSongId = null
         hasScrobbledCurrentSong = false
+        scrobbleInFlight = false
+        playbackActive = false
     }
 
     fun onSongStart(
@@ -44,6 +48,8 @@ class ScrobbleManager(
         songStartedAt = System.currentTimeMillis() / 1000
         currentSongId = song.videoId
         hasScrobbledCurrentSong = false
+        scrobbleInFlight = false
+        playbackActive = true
         songStarted = true
         startScrobbleTimer(song, durationMs)
         if (useNowPlaying) {
@@ -56,6 +62,7 @@ class ScrobbleManager(
     }
 
     fun onSongPause() {
+        playbackActive = false
         pauseScrobbleTimer()
     }
 
@@ -64,6 +71,8 @@ class ScrobbleManager(
         songStarted = false
         currentSongId = null
         hasScrobbledCurrentSong = false
+        scrobbleInFlight = false
+        playbackActive = false
     }
 
     private fun startScrobbleTimer(
@@ -127,8 +136,8 @@ class ScrobbleManager(
     }
 
     private fun scrobbleSong(song: Song, durationSeconds: Int) {
-        if (hasScrobbledCurrentSong) return
-        hasScrobbledCurrentSong = true
+        if (hasScrobbledCurrentSong || scrobbleInFlight) return
+        scrobbleInFlight = true
         scrobbleTimerStartedAt = 0L
         scrobbleRemainingMillis = 0L
         scrobbleJob = null
@@ -146,6 +155,17 @@ class ScrobbleManager(
                 }.onFailure { throwable ->
                     if (throwable is CancellationException) throw throwable
                     Log.e(TAG, "Failed to scrobble: ${song.title}", throwable)
+                }.also { result ->
+                    scrobbleInFlight = false
+                    if (result.isSuccess) hasScrobbledCurrentSong = true
+                    else if (playbackActive && songStarted && currentSongId == song.videoId) {
+                        scrobbleRemainingMillis = RETRY_DELAY_MS
+                        scrobbleTimerStartedAt = System.currentTimeMillis()
+                        scrobbleJob = scope.launch {
+                            delay(RETRY_DELAY_MS)
+                            if (playbackActive && songStarted && currentSongId == song.videoId) scrobbleSong(song, durationSeconds)
+                        }
+                    }
                 }
         }
     }
@@ -175,6 +195,7 @@ class ScrobbleManager(
     ) {
         if (song == null) return
         if (isPlaying) {
+            playbackActive = true
             // Player callbacks can report a track transition without an intervening
             // paused/stopped state. Restart timing and now-playing for the new track.
             if (!songStarted || currentSongId != song.videoId) {
@@ -202,5 +223,6 @@ class ScrobbleManager(
 
     companion object {
         private const val TAG = "ScrobbleManager"
+        private const val RETRY_DELAY_MS = 30_000L
     }
 }
