@@ -458,16 +458,23 @@ class ScrobbleHistorySyncWorker(
             val entries = response.getOrThrow()
             // Distinguish a genuinely empty account history from a live history
             // feed whose date headings our dated parser cannot understand.
-            val status = if (entries.isEmpty()) {
-                val rawHistory = YtMusicRepository.history().getOrElse { error ->
+            // If YouTube returns history rows but its date headings are new/unsupported,
+            // still import the tracks. Their actual play dates are unavailable, so
+            // timestamp them at import time and mark them approximate; never advance
+            // the dated cursor from this fallback.
+            val rawHistory = if (entries.isEmpty()) {
+                YtMusicRepository.history().getOrElse { error ->
                     if (error is CancellationException) throw error
                     DebugLog.w(TAG, "Could not verify undated history rows", error)
                     emptyList()
                 }
-                if (rawHistory.isNotEmpty()) ScrobbleHistorySync.STATUS_UNDATED_ROWS
-                else ScrobbleHistorySync.STATUS_NO_DATED_ROWS
-            } else ScrobbleHistorySync.STATUS_SUCCESS
-            val incoming = entries.map { entry ->
+            } else emptyList()
+            val status = when {
+                entries.isNotEmpty() -> ScrobbleHistorySync.STATUS_SUCCESS
+                rawHistory.isNotEmpty() -> ScrobbleHistorySync.STATUS_UNDATED_ROWS
+                else -> ScrobbleHistorySync.STATUS_NO_DATED_ROWS
+            }
+            val incoming = if (entries.isNotEmpty()) entries.map { entry ->
                 Play(
                     videoId = entry.song.videoId,
                     title = entry.song.title,
@@ -484,6 +491,24 @@ class ScrobbleHistorySyncWorker(
                     albumName = entry.song.albumName,
                     isVideo = entry.song.isVideo,
                     isVideoOrigin = entry.song.isVideoOrigin,
+                )
+            } else rawHistory.map { song ->
+                Play(
+                    videoId = song.videoId,
+                    title = song.title,
+                    artist = song.artist,
+                    source = PlaySource.YOUTUBE_MUSIC,
+                    atMillis = now,
+                    exact = false,
+                    localUri = song.localUri,
+                    thumbnailUrl = song.thumbnailUrl,
+                    localPath = song.localPath,
+                    durationText = song.durationText,
+                    artistId = song.artistId,
+                    albumId = song.albumId,
+                    albumName = song.albumName,
+                    isVideo = song.isVideo,
+                    isVideoOrigin = song.isVideoOrigin,
                 )
             }
             val added = withContext(Dispatchers.IO) {
