@@ -171,6 +171,8 @@ fun AccountAndScrobblingScreen(
                     Switch(
                         checked = historySyncEnabled,
                         onCheckedChange = { enabled ->
+                            // Keep Compose responsive; SharedPreferences.apply/listeners are asynchronous.
+                            historySyncEnabled = enabled
                             if (enabled) ScrobbleHistorySync.schedule(appContext)
                             else ScrobbleHistorySync.cancel(appContext)
                         },
@@ -181,8 +183,10 @@ fun AccountAndScrobblingScreen(
                     )
                 },
                 onClick = {
-                    if (historySyncEnabled) ScrobbleHistorySync.cancel(appContext)
-                    else ScrobbleHistorySync.schedule(appContext)
+                    val enabled = !historySyncEnabled
+                    historySyncEnabled = enabled
+                    if (enabled) ScrobbleHistorySync.schedule(appContext)
+                    else ScrobbleHistorySync.cancel(appContext)
                 },
             )
             if (shouldOfferYouTubeReconnect(signedIn, historySyncEnabled, historySyncStatus)) {
