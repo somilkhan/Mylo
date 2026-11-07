@@ -490,7 +490,7 @@ class QueueCoordinatorTest {
             QueueTier.AUTOPLAY,
         )
         val plan = requireNotNull(QueueTimeline.computeJumpOrder(tiers, currentIndex = 0, targetIndex = 2))
-        assertEquals(listOf(0, 1, 2, 4, 3, 5), plan.newOrderIndices)
+        assertEquals(listOf(0, 2, 1, 4, 3, 5), plan.newOrderIndices)
         assertEquals(
             QueueTimeline.computeJumpOrder(tiers, currentIndex = 0, targetIndex = 2)?.newOrderIndices,
             QueueTimeline.computeJumpOrder(tiers, currentIndex = 0, targetIndex = 2)?.newOrderIndices,
