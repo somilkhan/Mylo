@@ -125,7 +125,10 @@ object ScrobbleHistorySync {
             // Process/app recreation must not erase the last successful result.
             // Reset the summary only when the active account/profile has a
             // different cursor (or has never completed a dated import).
-            if (identityCursor != displayedSyncAt || identityCursor == 0L) {
+            if (
+                (identityCursor != displayedSyncAt || identityCursor == 0L) &&
+                prefs.getString(KEY_LAST_STATUS, null) != STATUS_SYNCING
+            ) {
                 prefs.edit()
                     .putLong(KEY_LAST_SYNC_AT, identityCursor)
                     .putInt(KEY_LAST_ADDED, 0)
