@@ -129,7 +129,13 @@ object ScrobbleHistorySync {
                     .apply()
             }
         }
-        if (!enabled || identity == null) return
+        if (!enabled) return
+        if (identity == null) {
+            prefs.edit()
+                .putString(KEY_LAST_STATUS, STATUS_WAITING_FOR_SIGN_IN)
+                .apply()
+            return
+        }
         enqueuePeriodicWork(appContext)
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
