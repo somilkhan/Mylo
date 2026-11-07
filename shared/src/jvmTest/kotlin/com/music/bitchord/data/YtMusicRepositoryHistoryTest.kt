@@ -313,6 +313,29 @@ class YtMusicRepositoryHistoryTest {
         assertEquals(true, failure.message.orEmpty().contains("401"))
     }
 
+    @Test
+    fun rawHistoryPreservesRepeatedRowsForTheSameVideo() {
+        val response = Json.parseToJsonElement(
+            """
+            {
+              "contents": [{
+                "musicShelfRenderer": {
+                  "title": {"runs": [{"text": "Today"}]},
+                  "contents": [
+                    ${historyRow("same-video", "Repeated track")},
+                    ${historyRow("same-video", "Repeated track")}
+                  ]
+                }
+              }]
+            }
+            """.trimIndent(),
+        )
+
+        val songs = InnertubeParser.collectHistorySongs(response)
+
+        assertEquals(listOf("same-video", "same-video"), songs.map { it.videoId })
+    }
+
     private fun historyRow(videoId: String, title: String): String =
         """
         {
@@ -329,7 +352,8 @@ class YtMusicRepositoryHistoryTest {
                   "text": {"runs": [{"text": "Artist"}]}
                 }
               }
-            ]
+            ],
+            "thumbnail": {"musicThumbnailRenderer": {"thumbnail": {"thumbnails": [{"url": "https://example.test/thumb", "width": 120, "height": 120}]}}}
           }
         }
         """.trimIndent()
