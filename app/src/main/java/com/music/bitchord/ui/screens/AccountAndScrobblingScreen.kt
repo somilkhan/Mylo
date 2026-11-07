@@ -189,6 +189,15 @@ fun AccountAndScrobblingScreen(
                     else ScrobbleHistorySync.cancel(appContext)
                 },
             )
+            if (historySyncEnabled) {
+                FullWidthDivider()
+                SettingsRow(
+                    icon = Icons.Rounded.History,
+                    title = "Sync history now",
+                    subtitle = "Fetch the latest date-labelled listens immediately.",
+                    onClick = { ScrobbleHistorySync.schedule(appContext) },
+                )
+            }
             if (shouldOfferYouTubeReconnect(signedIn, historySyncEnabled, historySyncStatus)) {
                 FullWidthDivider()
                 SettingsRow(
@@ -503,6 +512,7 @@ private fun historySyncSubtitle(
 ): String {
     if (!enabled) return "Paused"
     return when (status) {
+        ScrobbleHistorySync.STATUS_SYNCING -> "Syncing YouTube Music history…"
         ScrobbleHistorySync.STATUS_WAITING_FOR_SIGN_IN ->
             "Reconnect YouTube Music to resume history sync"
         ScrobbleHistorySync.STATUS_WAITING_FOR_WIFI ->
