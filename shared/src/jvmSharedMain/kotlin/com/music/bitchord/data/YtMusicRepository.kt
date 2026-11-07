@@ -1244,7 +1244,8 @@ internal suspend fun collectPagedYtMusicHistorySongs(
         }
         response = loadNext(token)
     }
-    return songs.distinctBy { it.videoId }
+    // History is an event feed: the same video can occur multiple times for separate listens.
+    return songs
 }
 
 /** Union local/imported and live account history before filtering Quick Picks. */
