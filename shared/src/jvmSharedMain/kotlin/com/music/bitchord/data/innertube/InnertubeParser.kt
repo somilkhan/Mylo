@@ -145,6 +145,10 @@ object InnertubeParser {
             }
             .distinct()
 
+    /** Safe diagnostic count; excludes titles, IDs, and payload values. */
+    fun countHistoryTrackRows(root: JsonElement): Int =
+        collectRenderers(root, "musicResponsiveListItemRenderer").size
+
     /** Depth-first collection of a named renderer, preserving document order. */
     private fun collectRenderers(root: JsonElement, name: String): List<JsonObject> {
         val out = mutableListOf<JsonObject>()
