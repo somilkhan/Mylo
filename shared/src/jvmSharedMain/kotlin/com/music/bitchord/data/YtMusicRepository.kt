@@ -1183,17 +1183,25 @@ internal suspend fun collectPagedYtMusicHistory(
     }
     val cutoffMillis = cutoffDate?.atStartOfDay(zone)?.toInstant()?.toEpochMilli()
     val entries = ArrayList<YtMusicHistoryEntry>()
+    var pageNumber = 0
+    var rawTrackRows = 0
+    var datedTrackRows = 0
+    Log.i("YtMusicHistory", "History fetch start: cutoff=$cutoffDate, firstPageKeys=${firstPage.keys}")
     val seenTokens = HashSet<String>()
     var response = firstPage
     var inheritedDate: java.time.LocalDate? = null
 
     while (true) {
+        pageNumber++
         val page = InnertubeParser.collectDatedHistoryPage(
             root = response,
             nowMillis = nowMillis,
             zone = zone,
             inheritedDate = inheritedDate,
         )
+        rawTrackRows += InnertubeParser.countHistoryTrackRows(response)
+        datedTrackRows += page.entries.size
+        Log.i("YtMusicHistory", "History page=$pageNumber keys=${response.keys}, rawRows=$rawTrackRows, datedRows=$datedTrackRows, shelfDate=${page.continuationDate}, continuation=${InnertubeParser.continuationToken(response)!=null}")
         entries += if (cutoffMillis == null) {
             page.entries
         } else {
@@ -1214,6 +1222,7 @@ internal suspend fun collectPagedYtMusicHistory(
         response = loadNext(token)
     }
 
+    Log.i("YtMusicHistory", "History fetch finished: pages=$pageNumber, rawRows=$rawTrackRows, datedRows=$datedTrackRows, returned=${entries.size}")
     return entries
 }
 
