@@ -11,7 +11,9 @@ import kotlin.math.min
 import kotlin.math.roundToLong
 
 internal fun shouldRetryScrobbleSubmission(success: Boolean, playbackActive: Boolean, songStarted: Boolean, sameTrack: Boolean): Boolean =
-    !success && playbackActive && songStarted && sameTrack\n\nclass ScrobbleManager(
+    !success && playbackActive && songStarted && sameTrack
+
+class ScrobbleManager(
     private val scope: CoroutineScope,
     var minSongDuration: Int = 30,
     var scrobbleDelayPercent: Float = 0.5f,
