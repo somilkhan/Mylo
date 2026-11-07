@@ -504,7 +504,7 @@ internal fun shouldOfferYouTubeReconnect(
     status: String?,
 ): Boolean = signedIn && syncEnabled && status == ScrobbleHistorySync.STATUS_WAITING_FOR_SIGN_IN
 
-private fun historySyncSubtitle(
+internal fun historySyncSubtitle(
     enabled: Boolean,
     status: String?,
     lastSyncAt: Long,
