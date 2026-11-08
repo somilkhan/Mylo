@@ -550,10 +550,16 @@ object InnertubeParser {
         // recommendation/related rows elsewhere in the browse response.
         // Keep row order and repeated video IDs (each row is a separate listen).
         val credit = pageCredit(root)
-        return collectRenderers(root, "musicShelfRenderer").flatMap { shelf ->
+        val shelfRows = collectRenderers(root, "musicShelfRenderer").flatMap { shelf ->
             collectRenderers(shelf["contents"] ?: JsonNull, "musicResponsiveListItemRenderer")
-                .mapNotNull { parseResponsiveListItem(it, credit) }
         }
+        // Innertube continuation responses use MusicShelfContinuation rather
+        // than MusicShelfRenderer. InterTune's page parser handles the first
+        // page; Mylo also follows continuations, so parse that shape explicitly.
+        val continuationRows = collectRenderers(root, "musicShelfContinuation").flatMap { shelf ->
+            collectRenderers(shelf["contents"] ?: JsonNull, "musicResponsiveListItemRenderer")
+        }
+        return (shelfRows + continuationRows).mapNotNull { parseResponsiveListItem(it, credit) }
     }
 
     fun collectHistoryEntries(
