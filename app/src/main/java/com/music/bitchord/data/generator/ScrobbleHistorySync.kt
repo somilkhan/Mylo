@@ -434,115 +434,42 @@ class ScrobbleHistorySyncWorker(
             return Result.success()
         }
         return try {
-            // First import is complete; later runs refetch only the newest date
-            // buckets plus a one-day overlap for late-arriving history rows.
-            val cursorKey = identity.historySyncCursorPreferenceKey()
-            val lastSyncAt = prefs.getLong(cursorKey, 0L).takeIf { it > 0L }
-            DebugLog.i(TAG, "History sync request started: initial=${lastSyncAt == null}, cursorPresent=${lastSyncAt != null}")
-            val response = YtMusicRepository.historyWithDates(notBeforeMillis = lastSyncAt)
+            // Ported to InterTune's account-history import model: fetch the complete
+            // YouTube Music history feed on each run, preserve event rows, and let
+            // PlayHistoryStore reconcile repeat imports. Do not use date-bucket cursors:
+            // those headings are presentation metadata, not reliable event timestamps.
+            DebugLog.i(TAG, "InterTune-style history import started: full account feed")
+            val response = YtMusicRepository.history()
             if (response.isFailure) {
                 val error = response.exceptionOrNull()
-                    ?: IllegalStateException("YouTube history import failed without an exception")
+                    ?: IllegalStateException("YouTube Music history import failed without an exception")
                 if (error is CancellationException) throw error
                 if (!ScrobbleHistorySync.isCurrentSession(applicationContext, generation, identity)) {
                     return Result.success()
                 }
                 if (error.isYouTubeAuthenticationFailure()) {
                     ScrobbleHistorySync.pauseForAuthentication(
-                        applicationContext,
-                        generation,
-                        identity,
-                        attemptedAtMillis = now,
+                        applicationContext, generation, identity, attemptedAtMillis = now,
                     )
-                    DebugLog.w(TAG, "YouTube history sync needs the account to reconnect", error)
+                    DebugLog.w(TAG, "YouTube Music history import needs account reconnect", error)
                     return Result.success()
                 }
-                if (
-                    !ScrobbleHistorySync.updateStatusIfCurrentSession(
-                        applicationContext,
-                        generation,
-                        identity,
-                        attemptedAtMillis = now,
-                        status = ScrobbleHistorySync.STATUS_RETRYING,
-                    )
-                ) return Result.success()
-                DebugLog.w(TAG, "Background YouTube history sync failed; WorkManager will retry", error)
+                if (!ScrobbleHistorySync.updateStatusIfCurrentSession(
+                    applicationContext, generation, identity,
+                    attemptedAtMillis = now, status = ScrobbleHistorySync.STATUS_RETRYING,
+                )) return Result.success()
+                DebugLog.w(TAG, "YouTube Music history import failed; WorkManager will retry", error)
                 return Result.retry()
             }
 
-            val entries = response.getOrThrow()
-            DebugLog.i(TAG, "History dated response parsed: entries=${entries.size}")
-            // Distinguish a genuinely empty account history from a live history
-            // feed whose date headings our dated parser cannot understand.
-            // If YouTube returns history rows but its date headings are new/unsupported,
-            // still import the tracks. Their actual play dates are unavailable, so
-            // timestamp them at import time and mark them approximate; never advance
-            // the dated cursor from this fallback.
-            // The date parser can recognize some shelves while newer/older shelf labels remain
-            // unsupported. Fetch the full raw feed and reconcile by occurrence, not set membership:
-            // repeated listens to one video are separate history events.
-            // Raw history is full-feed scoped; dated entries are cursor-limited after
-            // the initial sync. Comparing these scopes would stamp all older plays as today.
-            // Reconcile the full raw feed only during the initial full-history import.
-            val rawSongs = if (shouldFetchUndatedHistoryFallback(lastSyncAt)) {
-                val rawHistory = YtMusicRepository.history()
-                if (rawHistory.isFailure) {
-                    val error = rawHistory.exceptionOrNull()
-                        ?: IllegalStateException("YouTube raw history failed without an exception")
-                    if (error is CancellationException) throw error
-                    if (!ScrobbleHistorySync.isCurrentSession(applicationContext, generation, identity)) {
-                        return Result.success()
-                    }
-                    if (
-                        !ScrobbleHistorySync.updateStatusIfCurrentSession(
-                            applicationContext,
-                            generation,
-                            identity,
-                            attemptedAtMillis = now,
-                            status = ScrobbleHistorySync.STATUS_RETRYING,
-                        )
-                    ) return Result.success()
-                    DebugLog.w(TAG, "Initial history sync could not verify undated rows; retrying without advancing cursor", error)
-                    return Result.retry()
-                }
-                rawHistory.getOrThrow().also { songs ->
-                    DebugLog.i(TAG, "History raw fallback parsed: songs=${songs.size}")
-                }
-            } else emptyList()
-            val undatedIds = unmatchedHistoryVideoIds(
-                datedVideoIds = entries.map { it.song.videoId },
-                rawVideoIds = rawSongs.map { it.videoId },
-            )
-            val rawById = rawSongs.groupBy { it.videoId }.mapValues { it.value.toMutableList() }
-            val undatedSongs = undatedIds.mapNotNull { id -> rawById[id]?.removeAt(0) }
-            val status = when {
-                entries.isNotEmpty() -> ScrobbleHistorySync.STATUS_SUCCESS
-                undatedSongs.isNotEmpty() -> ScrobbleHistorySync.STATUS_UNDATED_ROWS
-                else -> ScrobbleHistorySync.STATUS_NO_DATED_ROWS
+            val songs = response.getOrThrow()
+            if (!ScrobbleHistorySync.isCurrentSession(applicationContext, generation, identity)) {
+                DebugLog.i(TAG, "History import discarded: account changed during fetch")
+                return Result.success()
             }
-            val datedPlays = entries.map { entry ->
-                Play(
-                    videoId = entry.song.videoId,
-                    title = entry.song.title,
-                    artist = entry.song.artist,
-                    source = PlaySource.YOUTUBE_MUSIC,
-                    atMillis = entry.playedAtMillis,
-                    exact = entry.exact,
-                    localUri = entry.song.localUri,
-                    thumbnailUrl = entry.song.thumbnailUrl,
-                    localPath = entry.song.localPath,
-                    durationText = entry.song.durationText,
-                    artistId = entry.song.artistId,
-                    albumId = entry.song.albumId,
-                    albumName = entry.song.albumName,
-                    isVideo = entry.song.isVideo,
-                    isVideoOrigin = entry.song.isVideoOrigin,
-                )
-            }
-            // Unrecognized date buckets are retained as approximate import-time events. They are
-            // never presented as exact timestamps; PlayHistoryStore's overlap reconciliation keeps
-            // repeated imports idempotent at track/day granularity.
-            val undatedPlays = undatedSongs.map { song ->
+            // InterTune's HistoryPage exposes track metadata, not per-listen timestamps.
+            // Imported rows are explicitly approximate; never fabricate historical dates.
+            val incoming = songs.map { song ->
                 Play(
                     videoId = song.videoId,
                     title = song.title,
@@ -550,9 +477,7 @@ class ScrobbleHistorySyncWorker(
                     source = PlaySource.YOUTUBE_MUSIC,
                     atMillis = now,
                     exact = false,
-                    localUri = song.localUri,
                     thumbnailUrl = song.thumbnailUrl,
-                    localPath = song.localPath,
                     durationText = song.durationText,
                     artistId = song.artistId,
                     albumId = song.albumId,
@@ -561,19 +486,14 @@ class ScrobbleHistorySyncWorker(
                     isVideoOrigin = song.isVideoOrigin,
                 )
             }
-            val incoming = datedPlays + undatedPlays
-            DebugLog.i(TAG, "History import prepared: dated=${datedPlays.size}, undated=${undatedPlays.size}, incoming=${incoming.size}, status=$status")
+            DebugLog.i(TAG, "InterTune-style history parsed: rows=${songs.size}")
             val added = withContext(Dispatchers.IO) {
                 ScrobbleHistorySync.appendIfCurrentSession(
-                    applicationContext,
-                    generation,
-                    identity,
-                    incoming,
-                    syncedAtMillis = now,
-                    status = status,
+                    applicationContext, generation, identity, incoming,
+                    syncedAtMillis = now, status = ScrobbleHistorySync.STATUS_SUCCESS,
                 )
             } ?: return Result.success()
-            DebugLog.i(TAG, "History sync completed: dated=${entries.size}, undated=${undatedSongs.size}, added=$added, status=$status, cursor=$now")
+            DebugLog.i(TAG, "InterTune-style history import finished: rows=${songs.size}, added=$added")
             Result.success()
         } catch (cancelled: CancellationException) {
             throw cancelled
