@@ -5,9 +5,10 @@ package com.music.bitchord.data.generator
  * Match by video ID as Innertube history rows do not expose a stable per-play ID.
  */
 internal fun unmatchedHistoryVideoIds(datedVideoIds: List<String>, rawVideoIds: List<String>): List<String> {
-    val represented = datedVideoIds.filter(String::isNotBlank).groupingBy { it }.eachCount().toMutableMap()
+    val represented = datedVideoIds.map(String::trim).filter(String::isNotEmpty)
+        .groupingBy { it }.eachCount().toMutableMap()
     return buildList {
-        rawVideoIds.filter(String::isNotBlank).forEach { id ->
+        rawVideoIds.map(String::trim).filter(String::isNotEmpty).forEach { id ->
             val count = represented[id] ?: 0
             if (count > 0) represented[id] = count - 1 else add(id)
         }
