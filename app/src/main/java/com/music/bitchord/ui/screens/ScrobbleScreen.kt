@@ -449,6 +449,10 @@ private fun LazyListScope.statsSection(
     }
 }
 
+/** Stable Compose identity for individual listens, including same-track/same-day imports. */
+internal fun scrobbleHistoryRowKey(play: Play): String =
+    "history-${play.source}-${play.songKey()}-${play.atMillis}-${play.sourceEventKey.orEmpty()}"
+
 private fun sourceLabel(source: PlaySource): String = when (source) {
     PlaySource.MYLO -> "Mylo"
     PlaySource.YOUTUBE_MUSIC -> "YouTube Music"
