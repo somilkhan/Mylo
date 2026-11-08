@@ -411,7 +411,17 @@ class ScrobbleHistorySyncWorker(
         val generation = ScrobbleHistorySync.currentSessionGeneration(applicationContext)
         val identity = ScrobbleHistorySync.currentSessionIdentity(applicationContext)
         if (identity == null) {
-            DebugLog.w(TAG, "History worker blocked: no active YouTube session identity")
+            val session = AuthStore(applicationContext).activeSession
+            val blockReason = when {
+                prefs.getBoolean(ScrobbleHistorySync.KEY_SESSION_SUSPENDED, false) -> "session transition suspended"
+                prefs.getBoolean(ScrobbleHistorySync.KEY_SIGNED_OUT, false) -> "explicit sign-out"
+                prefs.getBoolean(ScrobbleHistorySync.KEY_AUTH_REQUIRED, false) -> "account reconnect required"
+                session == null -> "AuthStore has no active session"
+                !AuthStore.hasApiSid(session.cookie) -> "active session cookie has no API SID"
+                Innertube.cookie != session.cookie -> "Innertube cookie differs from AuthStore active session"
+                else -> "unknown identity validation failure"
+            }
+            DebugLog.w(TAG, "History worker blocked: $blockReason")
             if (
                 !prefs.getBoolean(ScrobbleHistorySync.KEY_SESSION_SUSPENDED, false) &&
                 !prefs.getBoolean(ScrobbleHistorySync.KEY_SIGNED_OUT, false)
