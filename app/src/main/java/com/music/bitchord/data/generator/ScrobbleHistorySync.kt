@@ -434,12 +434,16 @@ class ScrobbleHistorySyncWorker(
             return Result.success()
         }
         return try {
-            // Ported to InterTune's account-history import model: fetch the complete
-            // YouTube Music history feed on each run, preserve event rows, and let
-            // PlayHistoryStore reconcile repeat imports. Do not use date-bucket cursors:
-            // those headings are presentation metadata, not reliable event timestamps.
-            DebugLog.i(TAG, "InterTune-style history import started: full account feed")
-            val response = YtMusicRepository.history()
+            // Import the feed's dated listen entries (not a track-only list).
+            // Each row keeps its Today/Yesterday day anchor and repeated plays;
+            // a one-day overlap catches late-arriving history without re-fetching
+            // the complete account feed every six hours.
+            val cursor = prefs.getLong(identity.historySyncCursorPreferenceKey(), 0L)
+            DebugLog.i(TAG, "InterTune-style dated history import started: cursor=$cursor")
+            val response = YtMusicRepository.historyWithDates(
+                nowMillis = now,
+                notBeforeMillis = cursor.takeIf { it > 0L },
+            )
             if (response.isFailure) {
                 val error = response.exceptionOrNull()
                     ?: IllegalStateException("YouTube Music history import failed without an exception")
@@ -462,21 +466,20 @@ class ScrobbleHistorySyncWorker(
                 return Result.retry()
             }
 
-            val songs = response.getOrThrow()
+            val entries = response.getOrThrow()
             if (!ScrobbleHistorySync.isCurrentSession(applicationContext, generation, identity)) {
                 DebugLog.i(TAG, "History import discarded: account changed during fetch")
                 return Result.success()
             }
-            // InterTune's HistoryPage exposes track metadata, not per-listen timestamps.
-            // Imported rows are explicitly approximate; never fabricate historical dates.
-            val incoming = songs.map { song ->
+            val incoming = entries.map { entry ->
+                val song = entry.song
                 Play(
                     videoId = song.videoId,
                     title = song.title,
                     artist = song.artist,
                     source = PlaySource.YOUTUBE_MUSIC,
-                    atMillis = now,
-                    exact = false,
+                    atMillis = entry.playedAtMillis,
+                    exact = entry.exact,
                     thumbnailUrl = song.thumbnailUrl,
                     durationText = song.durationText,
                     artistId = song.artistId,
@@ -486,14 +489,19 @@ class ScrobbleHistorySyncWorker(
                     isVideoOrigin = song.isVideoOrigin,
                 )
             }
-            DebugLog.i(TAG, "InterTune-style history parsed: rows=${songs.size}")
+            val importStatus = if (incoming.isEmpty()) {
+                ScrobbleHistorySync.STATUS_NO_DATED_ROWS
+            } else {
+                ScrobbleHistorySync.STATUS_SUCCESS
+            }
+            DebugLog.i(TAG, "InterTune-style dated history parsed: rows=${incoming.size}")
             val added = withContext(Dispatchers.IO) {
                 ScrobbleHistorySync.appendIfCurrentSession(
                     applicationContext, generation, identity, incoming,
-                    syncedAtMillis = now, status = ScrobbleHistorySync.STATUS_SUCCESS,
+                    syncedAtMillis = now, status = importStatus,
                 )
             } ?: return Result.success()
-            DebugLog.i(TAG, "InterTune-style history import finished: rows=${songs.size}, added=$added")
+            DebugLog.i(TAG, "InterTune-style dated history import finished: rows=${incoming.size}, added=$added, status=$importStatus")
             Result.success()
         } catch (cancelled: CancellationException) {
             throw cancelled
