@@ -144,13 +144,17 @@ class YtMusicHistoryParserTest {
                     "contents": [${row("repeat", "Track", "Artist")}, ${row("repeat", "Track", "Artist")}]
                   }
                 },
-                "musicShelfRenderer": {
-                  "title": {"runs": [{"text": "Related"}]},
-                  "contents": [${row("related", "Related track", "Artist")}]
+                {
+                  "musicShelfRenderer": {
+                    "title": {"runs": [{"text": "Related"}]},
+                    "contents": [${row("related", "Related track", "Artist")}]
+                  }
                 },
-                "musicResponsiveListItemRenderer": {
-                  "playlistItemData": {"videoId": "outside"},
-                  "flexColumns": [{"musicResponsiveListItemFlexColumnRenderer":{"text":{"runs":[{"text":"Outside"}]}}}]
+                {
+                  "musicResponsiveListItemRenderer": {
+                    "playlistItemData": {"videoId": "outside"},
+                    "flexColumns": [{"musicResponsiveListItemFlexColumnRenderer":{"text":{"runs":[{"text":"Outside"}]}}}]
+                  }
                 }
               ]
             }
