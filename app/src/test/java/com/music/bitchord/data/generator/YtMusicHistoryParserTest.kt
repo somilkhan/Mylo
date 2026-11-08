@@ -132,6 +132,36 @@ class YtMusicHistoryParserTest {
         assertTrue(entries.isEmpty())
     }
 
+    @Test
+    fun historyImportMatchesInterTuneShelfTraversalAndPreservesRepeatEvents() {
+        val json = Json.parseToJsonElement(
+            """
+            {
+              "contents": [
+                {
+                  "musicShelfRenderer": {
+                    "title": {"runs": [{"text": "Today"}]},
+                    "contents": [${row("repeat", "Track", "Artist")}, ${row("repeat", "Track", "Artist")}]
+                  }
+                },
+                "musicShelfRenderer": {
+                  "title": {"runs": [{"text": "Related"}]},
+                  "contents": [${row("related", "Related track", "Artist")}]
+                },
+                "musicResponsiveListItemRenderer": {
+                  "playlistItemData": {"videoId": "outside"},
+                  "flexColumns": [{"musicResponsiveListItemFlexColumnRenderer":{"text":{"runs":[{"text":"Outside"}]}}}]
+                }
+              ]
+            }
+            """.trimIndent(),
+        )
+
+        val songs = InnertubeParser.collectHistorySongs(json)
+
+        assertEquals(listOf("repeat", "repeat", "related"), songs.map { it.videoId })
+    }
+
     private fun row(id: String, title: String, artist: String): String =
         """
         {
