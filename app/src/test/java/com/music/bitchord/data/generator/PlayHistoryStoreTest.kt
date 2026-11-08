@@ -55,6 +55,31 @@ class PlayHistoryStoreTest {
     }
 
     @Test
+    fun keyedImportedRepeatListensSurviveAndReimportIdempotently() {
+        val store = store()
+        val repeated = listOf(
+            play(id = "repeat").copy(sourceEventKey = "account:day:0"),
+            play(id = "repeat", at = day + 1).copy(sourceEventKey = "account:day:1"),
+        )
+
+        assertEquals(2, store.append(repeated))
+        assertEquals(0, store.append(repeated))
+        assertEquals(2, store.readAll().size)
+        assertEquals(setOf("account:day:0", "account:day:1"), store.readAll().mapNotNull { it.sourceEventKey }.toSet())
+    }
+
+    @Test
+    fun legacyImportedRowsStillCollapseAndExactMyloOverridesImportedEvents() {
+        val store = store()
+        store.append(listOf(play(), play(at = day + 1)))
+        assertEquals(1, store.readAll().size)
+
+        store.append(listOf(play(PlaySource.MYLO, day + 90_000, true)))
+        assertEquals(1, store.readAll().size)
+        assertEquals(PlaySource.MYLO, store.readAll().single().source)
+    }
+
+    @Test
     fun forgetImportedKeepsMyloEvents() {
         val store = store()
         store.append(listOf(play(), play(PlaySource.MYLO, day + 60_000, true, "mylo")))
