@@ -80,6 +80,20 @@ class PlayHistoryStoreTest {
     }
 
     @Test
+    fun exactMyloPlayDoesNotEraseKeyedYoutubeRepeatEvents() {
+        val store = store()
+        store.append(listOf(
+            play(id = "repeat").copy(sourceEventKey = "account:day:0"),
+            play(id = "repeat", at = day + 1).copy(sourceEventKey = "account:day:1"),
+        ))
+
+        assertEquals(1, store.append(listOf(play(PlaySource.MYLO, day + 90_000, true, "repeat"))))
+        assertEquals(3, store.readAll().size)
+        assertEquals(2, store.readAll().count { it.source == PlaySource.YOUTUBE_MUSIC })
+        assertEquals(1, store.readAll().count { it.source == PlaySource.MYLO })
+    }
+
+    @Test
     fun forgetImportedKeepsMyloEvents() {
         val store = store()
         store.append(listOf(play(), play(PlaySource.MYLO, day + 60_000, true, "mylo")))
