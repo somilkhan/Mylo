@@ -39,7 +39,7 @@ object ScrobbleHistorySync {
     private const val KEY_SESSION_GENERATION = "youtube_sync_session_generation"
     internal const val KEY_SESSION_SUSPENDED = "youtube_sync_session_suspended"
     internal const val KEY_SIGNED_OUT = "youtube_sync_signed_out"
-    private const val KEY_AUTH_REQUIRED = "youtube_sync_auth_required"
+    internal const val KEY_AUTH_REQUIRED = "youtube_sync_auth_required"
 
     private val sessionLock = Any()
 
