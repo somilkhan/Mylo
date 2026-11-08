@@ -69,9 +69,16 @@ fun dedupePlays(plays: List<Play>, zone: ZoneId): List<Play> {
         if (myloEvents.isNotEmpty()) {
             myloEvents
         } else {
-            // Imported sources may overlap. Keep the most trustworthy single
-            // row for that track/day so the same listen is not counted twice.
-            listOf(sameDay.maxBy { rank(it) })
+            // New YouTube feed rows carry stable occurrence keys, so repeated
+            // listens of one track on one day remain distinct across refreshes.
+            // Legacy and other unkeyed imports still collapse to one overlap.
+            val keyed = sameDay.filter { it.sourceEventKey != null }
+                .distinctBy { it.sourceEventKey }
+            if (keyed.isNotEmpty()) {
+                keyed
+            } else {
+                listOf(sameDay.maxBy { rank(it) })
+            }
         }
     }.sortedBy { it.atMillis }
 }
