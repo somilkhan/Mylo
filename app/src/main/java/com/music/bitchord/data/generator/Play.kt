@@ -34,6 +34,8 @@ data class Play(
     val albumName: String? = null,
     val isVideo: Boolean = false,
     val isVideoOrigin: Boolean = isVideo,
+    /** Stable identity for a source-feed event; null for legacy/unkeyed listens. */
+    val sourceEventKey: String? = null,
 ) {
     /** Stable identity for a catalogue track or local file, with text as the last resort. */
     fun songKey(): String = when {
