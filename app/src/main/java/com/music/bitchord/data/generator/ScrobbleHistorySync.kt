@@ -19,6 +19,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
+import java.time.Instant
+import java.time.ZoneId
 
 internal fun shouldResumeScrobbleHistorySync(hasExplicitConsent: Boolean, enabled: Boolean): Boolean =
     hasExplicitConsent && enabled
@@ -471,8 +473,20 @@ class ScrobbleHistorySyncWorker(
                 DebugLog.i(TAG, "History import discarded: account changed during fetch")
                 return Result.success()
             }
+            val zone = ZoneId.systemDefault()
+            // Feed order is newest-first. Numbering occurrences from the oldest
+            // end keeps existing keys stable when a new listen is prepended.
+            fun occurrenceGroup(entry: com.music.bitchord.data.model.YtMusicHistoryEntry): String =
+                "${entry.song.videoId}@\${Instant.ofEpochMilli(entry.playedAtMillis).atZone(zone).toLocalDate()}"
+            val occurrenceCounts = entries.groupingBy(::occurrenceGroup).eachCount()
+            val occurrenceSeen = HashMap<String, Int>()
+            val importedIdentity = identity.historySyncCursorPreferenceKey()
             val incoming = entries.map { entry ->
                 val song = entry.song
+                val group = occurrenceGroup(entry)
+                val seen = occurrenceSeen.getOrDefault(group, 0)
+                occurrenceSeen[group] = seen + 1
+                val ordinal = occurrenceCounts.getValue(group) - 1 - seen
                 Play(
                     videoId = song.videoId,
                     title = song.title,
@@ -487,6 +501,7 @@ class ScrobbleHistorySyncWorker(
                     albumName = song.albumName,
                     isVideo = song.isVideo,
                     isVideoOrigin = song.isVideoOrigin,
+                    sourceEventKey = "$importedIdentity:$group:$ordinal",
                 )
             }
             val importStatus = if (incoming.isEmpty()) {
