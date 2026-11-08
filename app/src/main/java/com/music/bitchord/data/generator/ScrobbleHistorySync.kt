@@ -477,7 +477,7 @@ class ScrobbleHistorySyncWorker(
             // Feed order is newest-first. Numbering occurrences from the oldest
             // end keeps existing keys stable when a new listen is prepended.
             fun occurrenceGroup(entry: com.music.bitchord.data.model.YtMusicHistoryEntry): String =
-                "${entry.song.videoId}@\${Instant.ofEpochMilli(entry.playedAtMillis).atZone(zone).toLocalDate()}"
+                "${entry.song.videoId}@${Instant.ofEpochMilli(entry.playedAtMillis).atZone(zone).toLocalDate()}"
             val occurrenceCounts = entries.groupingBy(::occurrenceGroup).eachCount()
             val occurrenceSeen = HashMap<String, Int>()
             val importedIdentity = identity.historySyncCursorPreferenceKey()
