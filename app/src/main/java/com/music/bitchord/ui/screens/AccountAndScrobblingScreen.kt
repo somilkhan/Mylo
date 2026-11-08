@@ -516,9 +516,9 @@ internal fun historySyncSubtitle(
         ScrobbleHistorySync.STATUS_WAITING_FOR_SIGN_IN ->
             "Reconnect YouTube Music to resume history sync"
         ScrobbleHistorySync.STATUS_WAITING_FOR_WIFI ->
-            "Waiting for an unmetered connection"
+            "Waiting for a network connection"
         ScrobbleHistorySync.STATUS_RETRYING ->
-            "Sync failed; will retry on an unmetered connection"
+            "Sync failed; will retry when connected"
         ScrobbleHistorySync.STATUS_NO_DATED_ROWS ->
             "No date-labelled rows found on last sync"
         ScrobbleHistorySync.STATUS_UNDATED_ROWS ->
@@ -528,7 +528,7 @@ internal fun historySyncSubtitle(
                 .format(Date(lastSyncAt))
             "Last sync $time · $lastAdded new listens"
         }
-        else -> "Sync about every six hours on an unmetered connection"
+        else -> "Sync about every six hours when connected"
     }
 }
 
