@@ -402,7 +402,10 @@ class ScrobbleHistorySyncWorker(
             ScrobbleHistorySync.PREFS_NAME,
             Context.MODE_PRIVATE,
         )
-        if (!ScrobbleHistorySync.isSyncEnabled(applicationContext)) return Result.success()
+        if (!ScrobbleHistorySync.isSyncEnabled(applicationContext)) {
+            DebugLog.i(TAG, "History worker skipped: consent disabled")
+            return Result.success()
+        }
 
         val now = System.currentTimeMillis()
         val generation = ScrobbleHistorySync.currentSessionGeneration(applicationContext)
