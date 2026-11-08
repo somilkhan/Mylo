@@ -15,7 +15,7 @@ class HistoryImportReconciliationTest {
     @Test
     fun preservesRepeatedListensAndOnlyRemovesRepresentedOccurrences() {
         assertEquals(
-            listOf("b", "a", "c"),
+            listOf("b", "c"),
             unmatchedHistoryVideoIds(
                 datedVideoIds = listOf("a", "a", "b"),
                 rawVideoIds = listOf("a", "b", "a", "b", "c"),
@@ -26,7 +26,7 @@ class HistoryImportReconciliationTest {
     @Test
     fun blankVideoIdsAreIgnoredAndWhitespaceIsNormalized() {
         assertEquals(
-            listOf("valid"),
+            emptyList<String>(),
             unmatchedHistoryVideoIds(listOf(" valid "), listOf("", "valid", "  ")),
         )
     }
