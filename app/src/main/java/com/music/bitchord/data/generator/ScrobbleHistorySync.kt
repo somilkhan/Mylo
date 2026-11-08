@@ -27,7 +27,7 @@ internal fun shouldResumeScrobbleHistorySync(hasExplicitConsent: Boolean, enable
 internal fun shouldAdvanceScrobbleHistoryCursor(status: String): Boolean =
     status == ScrobbleHistorySync.STATUS_SUCCESS
 
-/** Explicitly opt-in sync of date-labelled YouTube history whenever a network is connected. */
+/** Explicitly opt-in sync of YouTube listening history on any connected network. */
 object ScrobbleHistorySync {
     const val PREFS_NAME = "scrobble_history_sync"
     const val KEY_ENABLED = "youtube_auto_sync_enabled"
@@ -333,7 +333,7 @@ object ScrobbleHistorySync {
 
     private fun enqueuePeriodicWork(appContext: Context) {
         val constraints = Constraints.Builder()
-            .setRequiredNetworkType(NetworkType.UNMETERED)
+            .setRequiredNetworkType(NetworkType.CONNECTED)
             .build()
         val periodic = PeriodicWorkRequestBuilder<ScrobbleHistorySyncWorker>(6, TimeUnit.HOURS)
             .setConstraints(constraints)
