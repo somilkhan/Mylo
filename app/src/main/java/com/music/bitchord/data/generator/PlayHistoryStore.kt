@@ -101,12 +101,12 @@ class PlayHistoryStore(private val file: File, private val zone: ZoneId = ZoneId
             p.videoId, p.title, p.artist, p.source.name, p.atMillis.toString(), p.exact.toString(),
             p.localUri.orEmpty(), p.thumbnailUrl.orEmpty(), p.localPath.orEmpty(),
             p.durationText.orEmpty(), p.artistId.orEmpty(), p.albumId.orEmpty(), p.albumName.orEmpty(),
-            p.isVideo.toString(), p.isVideoOrigin.toString(),
+            p.isVideo.toString(), p.isVideoOrigin.toString(), p.sourceEventKey.orEmpty(),
         ).joinToString("\t") { it.replace('\t', ' ').replace('\n', ' ').replace('\r', ' ') }
 
     private fun decode(line: String): Play? {
         val parts = line.split('\t')
-        if (parts.size !in 6..15) return null
+        if (parts.size !in 6..16) return null
         val source = runCatching { PlaySource.valueOf(parts[3]) }.getOrNull() ?: return null
         val at = parts[4].toLongOrNull() ?: return null
         return Play(
@@ -126,6 +126,7 @@ class PlayHistoryStore(private val file: File, private val zone: ZoneId = ZoneId
             isVideo = parts.getOrNull(13)?.toBooleanStrictOrNull() ?: false,
             isVideoOrigin = parts.getOrNull(14)?.toBooleanStrictOrNull()
                 ?: (parts.getOrNull(13)?.toBooleanStrictOrNull() ?: false),
+            sourceEventKey = parts.getOrNull(15)?.takeIf(String::isNotBlank),
         )
     }
 }
