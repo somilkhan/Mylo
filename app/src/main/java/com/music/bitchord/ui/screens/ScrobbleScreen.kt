@@ -436,7 +436,7 @@ private fun LazyListScope.statsSection(
         }
         else -> items(
             historyPlays.sortedByDescending { it.atMillis }.take(10),
-            key = { "history-${it.source}-${it.songKey()}-${it.atMillis}" },
+            key = { scrobbleHistoryRowKey(it) },
         ) { play ->
             val date = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
                 .format(Date(play.atMillis))
