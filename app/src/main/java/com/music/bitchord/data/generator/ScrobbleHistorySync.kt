@@ -469,11 +469,27 @@ class ScrobbleHistorySyncWorker(
             // the initial sync. Comparing these scopes would stamp all older plays as today.
             // Reconcile the full raw feed only during the initial full-history import.
             val rawSongs = if (shouldFetchUndatedHistoryFallback(lastSyncAt)) {
-                YtMusicRepository.history().getOrElse { error ->
+                val rawHistory = YtMusicRepository.history()
+                if (rawHistory.isFailure) {
+                    val error = rawHistory.exceptionOrNull()
+                        ?: IllegalStateException("YouTube raw history failed without an exception")
                     if (error is CancellationException) throw error
-                    DebugLog.w(TAG, "Could not verify undated history rows", error)
-                    emptyList()
+                    if (!ScrobbleHistorySync.isCurrentSession(applicationContext, generation, identity)) {
+                        return Result.success()
+                    }
+                    if (
+                        !ScrobbleHistorySync.updateStatusIfCurrentSession(
+                            applicationContext,
+                            generation,
+                            identity,
+                            attemptedAtMillis = now,
+                            status = ScrobbleHistorySync.STATUS_RETRYING,
+                        )
+                    ) return Result.success()
+                    DebugLog.w(TAG, "Initial history sync could not verify undated rows; retrying without advancing cursor", error)
+                    return Result.retry()
                 }
+                rawHistory.getOrThrow()
             } else emptyList()
             val undatedIds = unmatchedHistoryVideoIds(
                 datedVideoIds = entries.map { it.song.videoId },
