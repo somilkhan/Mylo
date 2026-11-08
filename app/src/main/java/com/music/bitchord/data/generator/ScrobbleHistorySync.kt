@@ -411,6 +411,7 @@ class ScrobbleHistorySyncWorker(
         val generation = ScrobbleHistorySync.currentSessionGeneration(applicationContext)
         val identity = ScrobbleHistorySync.currentSessionIdentity(applicationContext)
         if (identity == null) {
+            DebugLog.w(TAG, "History worker blocked: no active YouTube session identity")
             if (
                 !prefs.getBoolean(ScrobbleHistorySync.KEY_SESSION_SUSPENDED, false) &&
                 !prefs.getBoolean(ScrobbleHistorySync.KEY_SIGNED_OUT, false)
@@ -427,6 +428,7 @@ class ScrobbleHistorySyncWorker(
             // buckets plus a one-day overlap for late-arriving history rows.
             val cursorKey = identity.historySyncCursorPreferenceKey()
             val lastSyncAt = prefs.getLong(cursorKey, 0L).takeIf { it > 0L }
+            DebugLog.i(TAG, "History sync request started: initial=${lastSyncAt == null}, cursorPresent=${lastSyncAt != null}")
             val response = YtMusicRepository.historyWithDates(notBeforeMillis = lastSyncAt)
             if (response.isFailure) {
                 val error = response.exceptionOrNull()
@@ -459,6 +461,7 @@ class ScrobbleHistorySyncWorker(
             }
 
             val entries = response.getOrThrow()
+            DebugLog.i(TAG, "History dated response parsed: entries=${entries.size}")
             // Distinguish a genuinely empty account history from a live history
             // feed whose date headings our dated parser cannot understand.
             // If YouTube returns history rows but its date headings are new/unsupported,
@@ -492,7 +495,9 @@ class ScrobbleHistorySyncWorker(
                     DebugLog.w(TAG, "Initial history sync could not verify undated rows; retrying without advancing cursor", error)
                     return Result.retry()
                 }
-                rawHistory.getOrThrow()
+                rawHistory.getOrThrow().also { songs ->
+                    DebugLog.i(TAG, "History raw fallback parsed: songs=${songs.size}")
+                }
             } else emptyList()
             val undatedIds = unmatchedHistoryVideoIds(
                 datedVideoIds = entries.map { it.song.videoId },
@@ -547,6 +552,7 @@ class ScrobbleHistorySyncWorker(
                 )
             }
             val incoming = datedPlays + undatedPlays
+            DebugLog.i(TAG, "History import prepared: dated=${datedPlays.size}, undated=${undatedPlays.size}, incoming=${incoming.size}, status=$status")
             val added = withContext(Dispatchers.IO) {
                 ScrobbleHistorySync.appendIfCurrentSession(
                     applicationContext,
