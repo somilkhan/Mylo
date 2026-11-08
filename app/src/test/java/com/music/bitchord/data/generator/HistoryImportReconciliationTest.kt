@@ -1,9 +1,17 @@
 package com.music.bitchord.data.generator
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class HistoryImportReconciliationTest {
+    @Test
+    fun rawFallbackRunsOnlyForFullInitialImport() {
+        assertTrue(shouldFetchUndatedHistoryFallback(null))
+        assertFalse(shouldFetchUndatedHistoryFallback(1L))
+    }
+
     @Test
     fun preservesRepeatedListensAndOnlyRemovesRepresentedOccurrences() {
         assertEquals(
@@ -16,10 +24,10 @@ class HistoryImportReconciliationTest {
     }
 
     @Test
-    fun blankVideoIdsAreIgnored() {
+    fun blankVideoIdsAreIgnoredAndWhitespaceIsNormalized() {
         assertEquals(
             listOf("valid"),
-            unmatchedHistoryVideoIds(listOf("valid"), listOf("", "valid", "  ")),
+            unmatchedHistoryVideoIds(listOf(" valid "), listOf("", "valid", "  ")),
         )
     }
 

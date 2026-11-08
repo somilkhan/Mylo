@@ -465,11 +465,16 @@ class ScrobbleHistorySyncWorker(
             // The date parser can recognize some shelves while newer/older shelf labels remain
             // unsupported. Fetch the full raw feed and reconcile by occurrence, not set membership:
             // repeated listens to one video are separate history events.
-            val rawSongs = YtMusicRepository.history().getOrElse { error ->
-                if (error is CancellationException) throw error
-                DebugLog.w(TAG, "Could not verify undated history rows", error)
-                emptyList()
-            }
+            // Raw history is full-feed scoped; dated entries are cursor-limited after
+            // the initial sync. Comparing these scopes would stamp all older plays as today.
+            // Reconcile the full raw feed only during the initial full-history import.
+            val rawSongs = if (shouldFetchUndatedHistoryFallback(lastSyncAt)) {
+                YtMusicRepository.history().getOrElse { error ->
+                    if (error is CancellationException) throw error
+                    DebugLog.w(TAG, "Could not verify undated history rows", error)
+                    emptyList()
+                }
+            } else emptyList()
             val undatedIds = unmatchedHistoryVideoIds(
                 datedVideoIds = entries.map { it.song.videoId },
                 rawVideoIds = rawSongs.map { it.videoId },

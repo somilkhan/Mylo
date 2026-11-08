@@ -1,8 +1,12 @@
 package com.music.bitchord.data.generator
 
+/** Raw history is full-feed scoped; only compare it against a full dated import. */
+internal fun shouldFetchUndatedHistoryFallback(lastSyncAtMillis: Long?): Boolean =
+    lastSyncAtMillis == null
+
 /**
  * Returns raw history rows not represented by the dated parser, preserving duplicate listens.
- * Match by video ID as Innertube history rows do not expose a stable per-play ID.
+ * Match by video ID occurrence count because Innertube history rows lack stable per-play IDs.
  */
 internal fun unmatchedHistoryVideoIds(datedVideoIds: List<String>, rawVideoIds: List<String>): List<String> {
     val represented = datedVideoIds.map(String::trim).filter(String::isNotEmpty)
