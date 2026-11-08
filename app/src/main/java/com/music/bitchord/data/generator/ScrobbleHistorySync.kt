@@ -462,19 +462,31 @@ class ScrobbleHistorySyncWorker(
             // still import the tracks. Their actual play dates are unavailable, so
             // timestamp them at import time and mark them approximate; never advance
             // the dated cursor from this fallback.
-            val rawHistory = if (entries.isEmpty()) {
+            // The date parser can recognize some shelves while newer/older shelf labels remain
+            // unsupported. Fetch the full raw feed and reconcile by occurrence, not set membership:
+            // repeated listens to one video are separate history events.
+            // Raw history is full-feed scoped; dated entries are cursor-limited after
+            // the initial sync. Comparing these scopes would stamp all older plays as today.
+            // Reconcile the full raw feed only during the initial full-history import.
+            val rawSongs = if (shouldFetchUndatedHistoryFallback(lastSyncAt)) {
                 YtMusicRepository.history().getOrElse { error ->
                     if (error is CancellationException) throw error
                     DebugLog.w(TAG, "Could not verify undated history rows", error)
                     emptyList()
                 }
             } else emptyList()
+            val undatedIds = unmatchedHistoryVideoIds(
+                datedVideoIds = entries.map { it.song.videoId },
+                rawVideoIds = rawSongs.map { it.videoId },
+            )
+            val rawById = rawSongs.groupBy { it.videoId }.mapValues { it.value.toMutableList() }
+            val undatedSongs = undatedIds.mapNotNull { id -> rawById[id]?.removeAt(0) }
             val status = when {
                 entries.isNotEmpty() -> ScrobbleHistorySync.STATUS_SUCCESS
-                rawHistory.isNotEmpty() -> ScrobbleHistorySync.STATUS_UNDATED_ROWS
+                undatedSongs.isNotEmpty() -> ScrobbleHistorySync.STATUS_UNDATED_ROWS
                 else -> ScrobbleHistorySync.STATUS_NO_DATED_ROWS
             }
-            val incoming = if (entries.isNotEmpty()) entries.map { entry ->
+            val datedPlays = entries.map { entry ->
                 Play(
                     videoId = entry.song.videoId,
                     title = entry.song.title,
@@ -492,7 +504,11 @@ class ScrobbleHistorySyncWorker(
                     isVideo = entry.song.isVideo,
                     isVideoOrigin = entry.song.isVideoOrigin,
                 )
-            } else rawHistory.map { song ->
+            }
+            // Unrecognized date buckets are retained as approximate import-time events. They are
+            // never presented as exact timestamps; PlayHistoryStore's overlap reconciliation keeps
+            // repeated imports idempotent at track/day granularity.
+            val undatedPlays = undatedSongs.map { song ->
                 Play(
                     videoId = song.videoId,
                     title = song.title,
@@ -511,6 +527,7 @@ class ScrobbleHistorySyncWorker(
                     isVideoOrigin = song.isVideoOrigin,
                 )
             }
+            val incoming = datedPlays + undatedPlays
             val added = withContext(Dispatchers.IO) {
                 ScrobbleHistorySync.appendIfCurrentSession(
                     applicationContext,
@@ -521,7 +538,7 @@ class ScrobbleHistorySyncWorker(
                     status = status,
                 )
             } ?: return Result.success()
-            DebugLog.i(TAG, "History sync completed: dated=${entries.size}, raw=${rawHistory.size}, added=$added, status=$status, cursor=$now")
+            DebugLog.i(TAG, "History sync completed: dated=${entries.size}, undated=${undatedSongs.size}, added=$added, status=$status, cursor=$now")
             Result.success()
         } catch (cancelled: CancellationException) {
             throw cancelled

@@ -336,6 +336,29 @@ class YtMusicRepositoryHistoryTest {
         assertEquals(listOf("same-video", "same-video"), songs.map { it.videoId })
     }
 
+    @Test
+    fun pagedRawHistoryKeepsRepeatedListenRows() = runBlocking {
+        val response = Json.parseToJsonElement(
+            """
+            {
+              "contents": [{
+                "musicShelfRenderer": {
+                  "title": {"runs": [{"text": "Today"}]},
+                  "contents": [
+                    ${historyRow("repeat", "Repeated track")},
+                    ${historyRow("repeat", "Repeated track")}
+                  ]
+                }
+              }]
+            }
+            """.trimIndent(),
+        ) as JsonObject
+
+        val songs = collectPagedYtMusicHistorySongs(response) { error("No continuation expected") }
+
+        assertEquals(listOf("repeat", "repeat"), songs.map { it.videoId })
+    }
+
     private fun historyRow(videoId: String, title: String): String =
         """
         {
