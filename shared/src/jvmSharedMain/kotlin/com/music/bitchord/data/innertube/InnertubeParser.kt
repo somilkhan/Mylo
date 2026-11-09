@@ -676,10 +676,11 @@ object InnertubeParser {
             if (parsed != null) return parsed
         }
 
+        val monthDayLabel = clean.replace(Regex("^[A-Za-z]+,\\s+"), "")
         val monthDayPatterns = listOf("MMM d", "MMMM d")
         for (pattern in monthDayPatterns) {
             val parsed = runCatching {
-                MonthDay.parse(clean, DateTimeFormatter.ofPattern(pattern, Locale.US)).atYear(today.year)
+                MonthDay.parse(monthDayLabel, DateTimeFormatter.ofPattern(pattern, Locale.US)).atYear(today.year)
             }.getOrNull() ?: continue
             return if (parsed.isAfter(today)) parsed.minusYears(1) else parsed
         }
