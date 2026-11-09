@@ -10,9 +10,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
@@ -47,6 +52,7 @@ fun HistoryScreen(
     isLocal: Boolean,
     onSelectLocal: () -> Unit,
     onSelectRemote: () -> Unit,
+    onClearLocalHistory: () -> Unit,
     listState: LazyListState,
     onSongClick: (List<Song>, Int) -> Unit,
     onSongLongPress: (Song) -> Unit,
@@ -62,6 +68,7 @@ fun HistoryScreen(
     modifier: Modifier = Modifier,
 ) {
     val songs = (state as? UiState.Success)?.data.orEmpty()
+    var confirmClear by remember { mutableStateOf(false) }
     LaunchedEffect(listState, songs.size, hasMore, loadMoreFailed, state is UiState.Success) {
         snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1 }
             .collect { lastVisible ->
@@ -86,6 +93,11 @@ fun HistoryScreen(
                 }
                 TextButton(onClick = onSelectRemote) {
                     androidx.compose.material3.Text(if (!isLocal) "✓ YouTube Music" else "YouTube Music")
+                }
+                if (isLocal && songs.isNotEmpty()) {
+                    TextButton(onClick = { confirmClear = true }) {
+                        androidx.compose.material3.Text("Clear")
+                    }
                 }
             }
         }
@@ -159,6 +171,25 @@ fun HistoryScreen(
                 }
             }
         }
+    }
+
+    if (confirmClear) {
+        AlertDialog(
+            onDismissRequest = { confirmClear = false },
+            title = { androidx.compose.material3.Text("Clear device history?") },
+            text = { androidx.compose.material3.Text("This removes listening history stored on this device. Your YouTube Music history is not changed.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmClear = false
+                    onClearLocalHistory()
+                }) { androidx.compose.material3.Text("Clear") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmClear = false }) {
+                    androidx.compose.material3.Text("Cancel")
+                }
+            },
+        )
     }
 }
 

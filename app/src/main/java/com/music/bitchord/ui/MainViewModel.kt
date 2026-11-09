@@ -1843,6 +1843,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             else UiState.Success(entries.map { it.song })
     }
 
+    fun clearLocalHistory() {
+        if (!_historyIsLocal.value) return
+        viewModelScope.launch(Dispatchers.IO) {
+            ListeningHistory.clear()
+            if (_historyIsLocal.value) loadLocalHistory()
+        }
+    }
+
     fun retryHistory() {
         if (_historyIsLocal.value) loadLocalHistory() else loadHistory()
     }

@@ -15,6 +15,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 /** Device-local listening log, separate from YouTube's account history. */
 object ListeningHistory {
@@ -51,6 +52,15 @@ object ListeningHistory {
                 for (i in start until rows.length()) trimmed.put(rows.getJSONObject(i))
                 prefs.edit().putString(KEY_ENTRIES, trimmed.toString()).apply()
             }
+        }
+    }
+
+    /** Clears only this device's listening log; YouTube Music history is untouched. */
+    suspend fun clear() = withContext(Dispatchers.IO) {
+        if (!this@ListeningHistory::appContext.isInitialized) return@withContext
+        writeLock.withLock {
+            appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit().remove(KEY_ENTRIES).apply()
         }
     }
 

@@ -2735,6 +2735,7 @@ private fun BitChordApp(
                             isLocal = historyIsLocal,
                             onSelectLocal = { viewModel.selectHistorySource(true) },
                             onSelectRemote = { viewModel.selectHistorySource(false) },
+                            onClearLocalHistory = viewModel::clearLocalHistory,
                             listState = historyListState,
                             currentSong = player.song,
                             isPlaying = player.isPlaying,
