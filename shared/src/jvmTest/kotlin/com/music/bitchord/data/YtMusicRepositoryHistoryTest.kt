@@ -2,6 +2,8 @@ package com.music.bitchord.data
 
 import com.music.bitchord.data.innertube.InnertubeParser
 import com.music.bitchord.data.innertube.buildPlaybackTrackingRequestBody
+import com.music.bitchord.data.innertube.potoken.PoTokenGenerator
+import com.music.bitchord.data.innertube.potoken.PoTokenMinter
 import com.music.bitchord.data.model.Song
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
@@ -445,6 +447,25 @@ class YtMusicRepositoryHistoryTest {
                 ?.get("contentPlaybackContext")?.jsonObject
                 ?.get("signatureTimestamp"),
         )
+    }
+
+    @Test
+    fun webPoTokensAreAssignedToTheCorrectRequestScopes() = runBlocking {
+        val generator = PoTokenGenerator(
+            createMinter = {
+                object : PoTokenMinter {
+                    override val isExpired = false
+                    override val isDead = false
+                    override suspend fun generatePoToken(identifier: String) = "token-for-$identifier"
+                    override fun close() = Unit
+                }
+            },
+        )
+
+        val tokens = generator.getWebClientPoToken("video-id", "visitor-id")
+        assertEquals("token-for-video-id", tokens?.playerRequestPoToken)
+        assertEquals("token-for-visitor-id", tokens?.streamingDataPoToken)
+        generator.close()
     }
 
 }
