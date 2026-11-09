@@ -150,6 +150,16 @@ object YtMusicRepository {
      */
     suspend fun history(): Result<List<Song>> = call("history") { fetchHistory() }
 
+    /** One page of account history, retaining repeated plays and day headings. */
+    suspend fun historyPage(): Result<InnertubeParser.HistoryPage> =
+        call("history") { InnertubeParser.parseHistoryPage(Innertube.browse(HISTORY)) }
+
+    /** Continue account history with YouTube's opaque continuation token. */
+    suspend fun moreHistory(token: String): Result<InnertubeParser.HistoryPage> =
+        call("history:more") {
+            InnertubeParser.parseHistoryPage(Innertube.browseContinuation(token))
+        }
+
     /** Account listening history for the Recents feed. */
     suspend fun recents(): Result<List<Song>> = call("recents") {
         if (Innertube.cookie != null) {

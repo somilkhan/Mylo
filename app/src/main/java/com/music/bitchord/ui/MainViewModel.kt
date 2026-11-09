@@ -15,6 +15,8 @@ import com.music.bitchord.data.AppUpdateChecker
 import com.music.bitchord.data.LocalMediaRepository
 import com.music.bitchord.data.LikeState
 import com.music.bitchord.data.YtMusicRepository
+import com.music.bitchord.data.ListeningHistory
+import com.music.bitchord.data.ListeningHistory
 import com.music.bitchord.data.model.SPOTIFY_MISSING_PREFIX
 import com.music.bitchord.data.model.SPOTIFY_PENDING_PREFIX
 import com.music.bitchord.data.spotify.SPOTIFY_PAGE_PREFIX
@@ -564,6 +566,18 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _history = MutableStateFlow<UiState<List<Song>>>(UiState.Loading)
     val history: StateFlow<UiState<List<Song>>> = _history.asStateFlow()
+    private val _historyIsLocal = MutableStateFlow(true)
+    val historyIsLocal: StateFlow<Boolean> = _historyIsLocal.asStateFlow()
+    private val _historyIsLocal = MutableStateFlow(false)
+    val historyIsLocal: StateFlow<Boolean> = _historyIsLocal.asStateFlow()
+    private val _historySections = MutableStateFlow<List<InnertubeParser.HistorySection>>(emptyList())
+    val historySections: StateFlow<List<InnertubeParser.HistorySection>> = _historySections.asStateFlow()
+    private val _historyContinuation = MutableStateFlow<String?>(null)
+    val historyContinuation: StateFlow<String?> = _historyContinuation.asStateFlow()
+    private val _historyLoadingMore = MutableStateFlow(false)
+    val historyLoadingMore: StateFlow<Boolean> = _historyLoadingMore.asStateFlow()
+    private val _historyLoadMoreFailed = MutableStateFlow(false)
+    val historyLoadMoreFailed: StateFlow<Boolean> = _historyLoadMoreFailed.asStateFlow()
 
     private val _library = MutableStateFlow<UiState<LibraryPage>>(UiState.Loading)
     val library: StateFlow<UiState<LibraryPage>> = _library.asStateFlow()
@@ -571,7 +585,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     /** In-memory cache is partitioned by account and profile; it is never shared. */
     private data class ListenerSnapshot(
         val account: Account?, val library: UiState<LibraryPage>,
-        val history: UiState<List<Song>>, val playlists: List<UserPlaylist>,
+        val history: UiState<List<Song>>, val historySections: List<InnertubeParser.HistorySection>,
+        val playlists: List<UserPlaylist>,
         val owned: Map<String, Boolean>,
     )
     private val listenerCache = mutableMapOf<String, ListenerSnapshot>()
@@ -1813,22 +1828,97 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      * signed-out message straight away, since there is no account to have a
      * history on.
      */
+    fun selectHistorySource(local: Boolean) {
+        if (_historyIsLocal.value == local) return
+        _historyIsLocal.value = local
+        if (local) loadLocalHistory() else loadHistory()
+    }
+
+    fun loadLocalHistory() {
+        _historyIsLocal.value = true
+        _historyContinuation.value = null
+        _historyLoadingMore.value = false
+        _historyLoadMoreFailed.value = false
+        val entries = ListeningHistory.read(getApplication())
+        _historySections.value = ListeningHistory.sections(entries)
+        _history.value = if (entries.isEmpty()) UiState.Error(text(R.string.history_empty))
+            else UiState.Success(entries.map { it.song })
+    }
+
+    fun retryHistory() {
+        if (_historyIsLocal.value) loadLocalHistory() else loadHistory()
+    }
+
     fun loadHistory() {
+        _historyIsLocal.value = false
         if (!_signedIn.value) {
+            _historyContinuation.value = null
+            _historySections.value = emptyList()
+            _historyLoadingMore.value = false
+            _historyLoadMoreFailed.value = false
             _history.value = UiState.Error(text(R.string.history_sign_in_required))
             return
         }
         val identity = listenerKey()
         _history.value = UiState.Loading
+        _historyContinuation.value = null
+        _historySections.value = emptyList()
+        _historyLoadingMore.value = false
+        _historyLoadMoreFailed.value = false
         viewModelScope.launch {
-            val next = YtMusicRepository.history().fold(
-                onSuccess = { songs ->
-                    if (songs.isEmpty()) UiState.Error(text(R.string.history_empty))
-                    else UiState.Success(songs)
+            val result = YtMusicRepository.historyPage()
+            if (identity != listenerKey()) return@launch
+            _history.value = result.fold(
+                onSuccess = { page ->
+                    _historySections.value = page.sections
+                    _historyContinuation.value = page.continuation
+                    if (page.songs.isEmpty()) UiState.Error(text(R.string.history_empty))
+                    else UiState.Success(page.songs)
                 },
                 onFailure = { UiState.Error(it.friendly()) },
             )
-            if (identity == listenerKey()) _history.value = next
+        }
+    }
+
+    /** Fetches the next remote history page without collapsing repeated plays. */
+    fun loadMoreHistory() {
+        val token = _historyContinuation.value ?: return
+        if (_historyLoadingMore.value || !_signedIn.value) return
+        val identity = listenerKey()
+        _historyLoadingMore.value = true
+        _historyLoadMoreFailed.value = false
+        viewModelScope.launch {
+            try {
+                YtMusicRepository.moreHistory(token).onSuccess { page ->
+                    if (identity != listenerKey()) return@onSuccess
+                    val current = (_history.value as? UiState.Success)?.data.orEmpty()
+                    _history.value = UiState.Success(current + page.songs)
+                    if (page.sections.isNotEmpty()) {
+                        val updated = _historySections.value.toMutableList()
+                        val first = page.sections.first()
+                        if (first.title.isBlank() && updated.isNotEmpty()) {
+                            val tail = updated.last()
+                            updated[updated.lastIndex] = tail.copy(
+                                songs = tail.songs + page.sections.flatMap { it.songs },
+                            )
+                        } else {
+                            updated += page.sections
+                        }
+                        _historySections.value = updated
+                    }
+                    // A repeated token means the service did not advance; stop
+                    // rather than requesting the same page forever.
+                    _historyContinuation.value = page.continuation?.takeIf { it != token && page.songs.isNotEmpty() }
+                }.onFailure {
+                    if (identity == listenerKey()) {
+                        // Keep already loaded rows and the token so the user can retry.
+                        _historyContinuation.value = token
+                        _historyLoadMoreFailed.value = true
+                    }
+                }
+            } finally {
+                if (identity == listenerKey()) _historyLoadingMore.value = false
+            }
         }
     }
 
@@ -3312,7 +3402,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private fun cacheCurrentListener() {
         val key = listenerKey() ?: return
         listenerCache[key] = ListenerSnapshot(
-            _account.value, _library.value, _history.value, _playlists.value, _playlistOwned.value,
+            _account.value, _library.value, _history.value, _historySections.value, _playlists.value, _playlistOwned.value,
         )
     }
 
@@ -3330,11 +3420,20 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         ownershipInFlight.clear()
         _songMenu.value = null
         _library.value = UiState.Loading
-        _history.value = UiState.Loading
-        if (restoreCached) listenerCache[listenerKey()]?.let { cached ->
+        _historyContinuation.value = null
+        _historyLoadingMore.value = false
+        _historyLoadMoreFailed.value = false
+        if (_historyIsLocal.value) {
+            loadLocalHistory()
+        } else {
+            _history.value = UiState.Loading
+            _historySections.value = emptyList()
+        }
+        if (restoreCached && !_historyIsLocal.value) listenerCache[listenerKey()]?.let { cached ->
             _account.value = cached.account
             _library.value = cached.library
             _history.value = cached.history
+            _historySections.value = cached.historySections
             _playlists.value = cached.playlists
             _playlistOwned.value = cached.owned
         }

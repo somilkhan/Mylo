@@ -1,6 +1,7 @@
 package com.music.bitchord.data.stats
 
 import com.music.bitchord.data.YtMusicRepository
+import com.music.bitchord.data.ListeningHistory
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.model.durationMillis
 import kotlinx.coroutines.CoroutineScope
@@ -45,6 +46,7 @@ object ListeningRecorder {
 
     private var currentId: String? = null
     private var lastSampleAt: Long = 0L
+    private var trackStartedAt: Long = 0L
     private var playedThisTrack: Long = 0L
     private var playCounted = false
     private var samplesSinceFlush = 0
@@ -64,6 +66,7 @@ object ListeningRecorder {
             // the class note on undercounting.
             currentId = song.videoId
             lastSampleAt = now
+            trackStartedAt = now
             playedThisTrack = 0L
             playCounted = false
             return
@@ -80,7 +83,10 @@ object ListeningRecorder {
             PLAY_FLOOR_MS
         }
         val counts = !playCounted && playedThisTrack >= threshold
-        if (counts) playCounted = true
+        if (counts) {
+            playCounted = true
+            ListeningHistory.record(song, trackStartedAt)
+        }
 
         ListeningStats.record(enriched(song), step, counts)
 
@@ -100,6 +106,7 @@ object ListeningRecorder {
     @Synchronized
     fun onStopped() {
         currentId = null
+        trackStartedAt = 0L
         playedThisTrack = 0L
         playCounted = false
         samplesSinceFlush = 0

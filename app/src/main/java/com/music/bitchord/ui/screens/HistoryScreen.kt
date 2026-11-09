@@ -4,15 +4,22 @@ import com.music.bitchord.R
 
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.flow.collect
+import com.music.bitchord.data.innertube.InnertubeParser.HistorySection
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.model.UiState
 import com.music.bitchord.data.model.playingRowMatcher
@@ -36,21 +43,52 @@ import com.music.bitchord.ui.components.songListSkeleton
 @Composable
 fun HistoryScreen(
     state: UiState<List<Song>>,
+    sections: List<HistorySection>,
+    isLocal: Boolean,
+    onSelectLocal: () -> Unit,
+    onSelectRemote: () -> Unit,
     listState: LazyListState,
     onSongClick: (List<Song>, Int) -> Unit,
     onSongLongPress: (Song) -> Unit,
     onSongSwipe: (Song) -> Unit,
     onRetry: () -> Unit,
+    onLoadMore: () -> Unit,
+    hasMore: Boolean,
+    loadingMore: Boolean,
+    loadMoreFailed: Boolean,
     contentPadding: PaddingValues,
     currentSong: Song? = null,
     isPlaying: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
+    val songs = (state as? UiState.Success)?.data.orEmpty()
+    LaunchedEffect(listState, songs.size, hasMore, loadMoreFailed, state is UiState.Success) {
+        snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1 }
+            .collect { lastVisible ->
+                if (state is UiState.Success && hasMore && !loadMoreFailed && songs.isNotEmpty() && lastVisible >= songs.lastIndex - 4) {
+                    onLoadMore()
+                }
+            }
+    }
+
     LazyColumn(
         state = listState,
         modifier = modifier.fillMaxSize(),
         contentPadding = contentPadding,
     ) {
+        item(key = "history:source-switch") {
+            androidx.compose.foundation.layout.Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
+            ) {
+                TextButton(onClick = onSelectLocal) {
+                    androidx.compose.material3.Text(if (isLocal) "✓ On this device" else "On this device")
+                }
+                TextButton(onClick = onSelectRemote) {
+                    androidx.compose.material3.Text(if (!isLocal) "✓ YouTube Music" else "YouTube Music")
+                }
+            }
+        }
         when (state) {
             is UiState.Loading -> songListSkeleton(count = 10, keyPrefix = "skeleton:history")
 
@@ -64,27 +102,59 @@ fun HistoryScreen(
 
             is UiState.Success -> {
                 val songs = state.data
+                val displaySections = sections.ifEmpty { listOf(HistorySection("", songs)) }
                 val isCurrentRow = playingRowMatcher(songs, currentSong)
                 // The videoId alone is not a key here: the feed is deduplicated
                 // on it, but a list keyed on something that could repeat is one
                 // bad response away from a crash. The index makes it total.
-                itemsIndexed(songs) { index, song ->
-                    SongRow(
-                        song = song,
-                        onClick = { onSongClick(songs, index) },
-                        onLongPress = { onSongLongPress(song) },
-                        onSwipeToQueue = { onSongSwipe(song) },
-                        isCurrent = isCurrentRow(song),
-                        isPlaying = isCurrentRow(song) && isPlaying,
-                        searchPlayingStyle = true,
-                        activeTint = PlayingAccent,
-                    )
-                    if (index < songs.lastIndex) {
-                        HorizontalDivider(
-                            modifier = Modifier.padding(start = ROW_DIVIDER_INSET),
-                            thickness = 0.5.dp,
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                var offset = 0
+                displaySections.forEachIndexed { sectionIndex, section ->
+                    if (section.title.isNotBlank()) {
+                        item(key = "history:section:$sectionIndex") {
+                            androidx.compose.material3.Text(
+                                text = section.title,
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                            )
+                        }
+                    }
+                    val sectionOffset = offset
+                    itemsIndexed(section.songs, keyPrefix = "history:$sectionIndex:") { index, song ->
+                        val absoluteIndex = sectionOffset + index
+                        SongRow(
+                            song = song,
+                            onClick = { onSongClick(songs, absoluteIndex) },
+                            onLongPress = { onSongLongPress(song) },
+                            onSwipeToQueue = { onSongSwipe(song) },
+                            isCurrent = isCurrentRow(song),
+                            isPlaying = isCurrentRow(song) && isPlaying,
+                            searchPlayingStyle = true,
+                            activeTint = PlayingAccent,
                         )
+                        if (absoluteIndex < songs.lastIndex) {
+                            HorizontalDivider(
+                                modifier = Modifier.padding(start = ROW_DIVIDER_INSET),
+                                thickness = 0.5.dp,
+                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                            )
+                        }
+                    }
+                    offset += section.songs.size
+                }
+                if (hasMore || loadingMore) {
+                    item(key = "history:load-more") {
+                        androidx.compose.foundation.layout.Box(
+                            modifier = Modifier.fillMaxWidth().padding(20.dp),
+                            contentAlignment = androidx.compose.ui.Alignment.Center,
+                        ) {
+                            when {
+                                loadingMore -> CircularProgressIndicator()
+                                loadMoreFailed -> TextButton(onClick = onLoadMore) {
+                                    androidx.compose.material3.Text(stringResource(R.string.try_again))
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -95,8 +165,9 @@ fun HistoryScreen(
 /** Keyed on both, for the reason given at the call site. */
 private fun androidx.compose.foundation.lazy.LazyListScope.itemsIndexed(
     songs: List<Song>,
+    keyPrefix: String = "",
     row: @Composable (Int, Song) -> Unit,
 ) = items(
     count = songs.size,
-    key = { "${songs[it].videoId}:$it" },
+    key = { "$keyPrefix${songs[it].videoId}:$it" },
 ) { index -> row(index, songs[index]) }

@@ -792,6 +792,12 @@ private fun BitChordApp(
     val activeAccountId by viewModel.activeAccountId.collectAsStateWithLifecycle()
     val activeProfileId by viewModel.activeProfileId.collectAsStateWithLifecycle()
     val historyState by viewModel.history.collectAsStateWithLifecycle()
+    val historySections by viewModel.historySections.collectAsStateWithLifecycle()
+    val historyIsLocal by viewModel.historyIsLocal.collectAsStateWithLifecycle()
+    val historyIsLocal by viewModel.historyIsLocal.collectAsStateWithLifecycle()
+    val historyContinuation by viewModel.historyContinuation.collectAsStateWithLifecycle()
+    val historyLoadingMore by viewModel.historyLoadingMore.collectAsStateWithLifecycle()
+    val historyLoadMoreFailed by viewModel.historyLoadMoreFailed.collectAsStateWithLifecycle()
     val lyrics by viewModel.lyrics.collectAsStateWithLifecycle()
     val lyricsSource by viewModel.lyricsSource.collectAsStateWithLifecycle()
     val lyricsChecked by viewModel.lyricsChecked.collectAsStateWithLifecycle()
@@ -2726,6 +2732,10 @@ private fun BitChordApp(
                     if (key == "history") {
                         HistoryScreen(
                             state = historyState,
+                            sections = historySections,
+                            isLocal = historyIsLocal,
+                            onSelectLocal = { viewModel.selectHistorySource(true) },
+                            onSelectRemote = { viewModel.selectHistorySource(false) },
                             listState = historyListState,
                             currentSong = player.song,
                             isPlaying = player.isPlaying,
@@ -2734,7 +2744,11 @@ private fun BitChordApp(
                             },
                             onSongLongPress = openSongMenu,
                             onSongSwipe = onSongSwipe,
-                            onRetry = viewModel::loadHistory,
+                            onRetry = viewModel::retryHistory,
+                            onLoadMore = viewModel::loadMoreHistory,
+                            hasMore = historyContinuation != null,
+                            loadingMore = historyLoadingMore,
+                            loadMoreFailed = historyLoadMoreFailed,
                             contentPadding = listPadding,
                         )
                     } else if (key == "library_show_all") {
@@ -3752,7 +3766,7 @@ private fun BitChordApp(
                                 IconButton(
                                     onClick = {
                                         showHistory = true
-                                        viewModel.loadHistory()
+                                        viewModel.loadLocalHistory()
                                     },
                                 ) {
                                     Icon(

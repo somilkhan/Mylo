@@ -42,6 +42,38 @@ object InnertubeParser {
     fun parseSearchSongs(response: JsonObject): List<Song> =
         parseSearch(response).filterIsInstance<SearchResult.Track>().map { it.song }
 
+    /** A YouTube Music history page, preserving repeated plays and day-section headings. */
+    data class HistoryPage(val sections: List<HistorySection>, val continuation: String?) {
+        val songs: List<Song> get() = sections.flatMap { it.songs }
+    }
+
+    data class HistorySection(val title: String, val songs: List<Song>)
+
+    /** Mirrors InterTune's HistoryPage: keep each shelf and repeated play separate. */
+    fun parseHistoryPage(root: JsonElement): HistoryPage {
+        val shelves = collectRenderers(root, "musicShelfRenderer")
+        val sections = shelves.mapNotNull { shelf ->
+            val title = shelf.o("title").runs().ifBlank {
+                shelf.o("title").firstRunText().orEmpty()
+            }
+            val songs = collectRenderers(shelf, "musicResponsiveListItemRenderer")
+                .mapNotNull { parseResponsiveListItem(it) }
+            if (songs.isEmpty()) null else HistorySection(title, songs)
+        }.toMutableList()
+
+        // Continuation responses switch from musicShelfRenderer to
+        // musicShelfContinuation and no longer repeat the original heading.
+        if (sections.isEmpty()) {
+            val continuedSongs = collectRenderers(root, "musicShelfContinuation")
+                .flatMap { continuation ->
+                    collectRenderers(continuation, "musicResponsiveListItemRenderer")
+                }
+                .mapNotNull { parseResponsiveListItem(it) }
+            if (continuedSongs.isNotEmpty()) sections += HistorySection("", continuedSongs)
+        }
+        return HistoryPage(sections, continuationToken(root))
+    }
+
     /** One page of search rows, plus the token for the next page if YouTube offers one. */
     data class SearchPage(val rows: List<SearchResult>, val continuation: String?)
 
