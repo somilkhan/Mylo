@@ -268,7 +268,8 @@ object Innertube {
         }
         Log.d(
             TAG,
-            "acting as channel pageId=${pageId ?: "none"} authUser=${authUser ?: "as-is"} " +
+            "acting as channel pageId=${if (pageId.isNullOrBlank()) "none" else "present"} " +
+                "authUser=${if (authUser.isNullOrBlank()) "default" else "selected"} " +
                 "(override=${channelOverride != null})",
         )
     }
@@ -317,7 +318,8 @@ object Innertube {
             this.visitorData = it
             visitorDataIsSessionBound = true
         }
-        Log.d(TAG, "adopted page scope: pageId=${pageId ?: "none"} authUser=${authUser ?: "0"}")
+        Log.d(TAG, "adopted page scope: pageId=${if (pageId.isNullOrBlank()) "none" else "present"} " +
+                "authUser=${if (authUser.isNullOrBlank()) "default" else "selected"}")
     }
 
     /** The brand channel to send, chosen one first. */
@@ -383,8 +385,8 @@ object Innertube {
                     }
                     Log.d(
                         TAG,
-                        "session scope: authUser=${fresh.authUser} " +
-                            "pageId=${fresh.pageId ?: "none"} " +
+                        "session scope: authUser=${if (fresh.authUser == "0") "default" else "selected"} " +
+                            "pageId=${if (fresh.pageId == null) "none" else "present"} " +
                             "dataSyncId=${if (fresh.dataSyncId != null) "present" else "none"} " +
                             "cver=${fresh.clientVersion ?: WEB_REMIX_VERSION}",
                     )
