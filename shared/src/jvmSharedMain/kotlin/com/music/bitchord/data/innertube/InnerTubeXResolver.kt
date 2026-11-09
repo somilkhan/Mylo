@@ -252,6 +252,16 @@ object InnerTubeXResolver {
         return extracted
     }
 
+    /**
+     * Mint the WEB_REMIX player-request PoToken for account playback tracking.
+     * Uses the provider already shared with stream extraction, so its
+     * BotGuard page and visitor/session binding are reused.
+     */
+    suspend fun playerRequestPoToken(videoId: String, visitorData: String): String? {
+        if (visitorData.isBlank()) return null
+        return tokenProvider.getPoToken(videoId, visitorData, Innertube.cookie)?.playerRequestToken
+    }
+
     /** Headers the media fetch for [url] must carry, when InnerTubeX minted it. */
     fun headersFor(url: String): Map<String, String>? = minted[url]?.headers
 

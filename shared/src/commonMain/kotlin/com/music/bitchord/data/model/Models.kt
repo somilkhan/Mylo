@@ -669,3 +669,15 @@ sealed interface UiState<out T> {
     data class Success<T>(val data: T) : UiState<T>
     data class Error(val message: String) : UiState<Nothing>
 }
+
+
+/**
+ * One row from YouTube Music's account history. YouTube groups rows by day
+ * rather than exposing a reliable play timestamp, so these timestamps point
+ * into the labelled day and are always marked approximate.
+ */
+data class YtMusicHistoryEntry(
+    val song: Song,
+    val playedAtMillis: Long,
+    val exact: Boolean = false,
+)

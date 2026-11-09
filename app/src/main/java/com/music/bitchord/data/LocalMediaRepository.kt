@@ -30,7 +30,7 @@ object LocalMediaRepository {
     // and Apple music downloads come as (AC-4, E-AC-3, ALAC). `dsf`/`dff` are
     // DSD, which DsdExtractor plays.
     private val localMusicExtensions = setOf(
-        "mp3", "m4a", "mp4", "flac", "ogg", "opus", "aac", "webm", "dsf", "dff",
+        "mp3", "m4a", "mp4", "flac", "wav", "ogg", "opus", "aac", "webm", "dsf", "dff", "3gp",
     )
 
     private val nonMusicPathSegments = listOf(
@@ -230,29 +230,7 @@ object LocalMediaRepository {
         )
 
         val filterNonMusic = AppSettings.filterNonMusicAudio.value
-        val selection = if (filterNonMusic) {
-            buildString {
-                append("${MediaStore.Audio.Media.IS_MUSIC} != 0")
-                // A duration of 0 or NULL is the scanner failing to read one,
-                // not a short clip — fragmented MP4 (how ALAC downloads often
-                // come) reads as 0, high-rate DSD as NULL — so it is let
-                // through to the extension and path checks rather than
-                // dropped as too short.
-                append(
-                    " AND (${MediaStore.Audio.Media.DURATION} >= ?" +
-                        " OR ${MediaStore.Audio.Media.DURATION} <= 0" +
-                        " OR ${MediaStore.Audio.Media.DURATION} IS NULL)",
-                )
-                append(" AND ${MediaStore.Audio.Media.IS_ALARM} = 0")
-                append(" AND ${MediaStore.Audio.Media.IS_NOTIFICATION} = 0")
-                append(" AND ${MediaStore.Audio.Media.IS_RINGTONE} = 0")
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    append(" AND ${MediaStore.Audio.Media.IS_PODCAST} = 0")
-                }
-            }
-        } else {
-            "${MediaStore.Audio.Media.IS_MUSIC} != 0"
-        }
+        val selection = localMusicSelection(filterNonMusic)
         val selectionArgs = if (filterNonMusic) {
             arrayOf(MIN_LOCAL_MUSIC_DURATION_MS.toString())
         } else {
@@ -365,6 +343,27 @@ object LocalMediaRepository {
     private fun String.normalizedPath(): String =
         replace('\\', '/').trimEnd('/').lowercase(Locale.ROOT)
 
+    /** MediaStore Audio queries must not always gate on IS_MUSIC: disabling the
+     * non-music filter is meant to include audio rows whose advisory flag is 0.
+     */
+    internal fun localMusicSelection(filterNonMusic: Boolean): String? {
+        if (!filterNonMusic) return null
+        return buildString {
+            append("${MediaStore.Audio.Media.IS_MUSIC} != 0")
+            append(
+                " AND (${MediaStore.Audio.Media.DURATION} >= ?" +
+                    " OR ${MediaStore.Audio.Media.DURATION} <= 0" +
+                    " OR ${MediaStore.Audio.Media.DURATION} IS NULL)",
+            )
+            append(" AND ${MediaStore.Audio.Media.IS_ALARM} = 0")
+            append(" AND ${MediaStore.Audio.Media.IS_NOTIFICATION} = 0")
+            append(" AND ${MediaStore.Audio.Media.IS_RINGTONE} = 0")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                append(" AND ${MediaStore.Audio.Media.IS_PODCAST} = 0")
+            }
+        }
+    }
+
     /**
      * MediaStore's `IS_MUSIC` flag is advisory and often includes notification
      * sounds, voice notes and recorder output. Keep this second gate independent
@@ -387,20 +386,20 @@ object LocalMediaRepository {
 
     private fun String.removeAudioExtension(): String {
         val extension = substringAfterLast('.', "").lowercase(Locale.ROOT)
-        return if (extension in localMusicExtensions || extension == "wav") {
+        return if (extension in localMusicExtensions) {
             substringBeforeLast('.').ifBlank { this }
         } else {
             this
         }
     }
 
-    private fun isAudioFileName(name: String): Boolean {
+    internal fun isAudioFileName(name: String): Boolean {
         val lower = name.lowercase(Locale.ROOT)
         return lower.endsWith(".mp3") || lower.endsWith(".m4a") ||
-            lower.endsWith(".flac") || lower.endsWith(".wav") ||
+            lower.endsWith(".mp4") || lower.endsWith(".flac") || lower.endsWith(".wav") ||
             lower.endsWith(".ogg") || lower.endsWith(".opus") ||
             lower.endsWith(".aac") || lower.endsWith(".webm") ||
-            lower.endsWith(".3gp")
+            lower.endsWith(".dsf") || lower.endsWith(".dff") || lower.endsWith(".3gp")
     }
 
     /**

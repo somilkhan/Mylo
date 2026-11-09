@@ -111,6 +111,20 @@ sealed interface ServerConnectionState {
 
 data class ProbeResult(val isOnline: Boolean, val latencyMs: Long = 0L)
 
+/**
+ * Like stdlib runCatching for suspending operations, but preserves structured cancellation.
+ * A cancelled health probe or party transition must not be converted into an offline result,
+ * a fallback-server attempt, or a user-visible failure.
+ */
+internal suspend fun <T> runCatchingCancellable(block: suspend () -> T): Result<T> =
+    try {
+        Result.success(block())
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (failure: Throwable) {
+        Result.failure(failure)
+    }
+
 val ServerConnectionState.latencyMs: Long?
     get() = when (this) {
         is ServerConnectionState.DefaultOnline -> latencyMs
@@ -625,12 +639,12 @@ object ListenTogether {
         val raw = resolveHttpBase(serverUrl)
         if (raw.isBlank()) return ProbeResult(isOnline = false, latencyMs = 0L)
         val start = clock.nowMs()
-        val isOnline = runCatching {
+        val isOnline = runCatchingCancellable {
             val response = http.get("$raw/healthz") {
                 timeout { requestTimeoutMillis = timeoutMs }
             }
-            if (!response.status.isSuccess()) return@runCatching false
-            val body = runCatching { response.bodyAsText() }.getOrDefault("")
+            if (!response.status.isSuccess()) return@runCatchingCancellable false
+            val body = runCatchingCancellable { response.bodyAsText() }.getOrDefault("")
             body.contains("\"ok\":true")
         }.getOrElse {
             Log.w(TAG, "health check failed for ${redact(raw)}: ${redact(it.message)}")
@@ -746,7 +760,7 @@ object ListenTogether {
     private fun releaseStaleSlotOnServer(serverBase: String, code: String, held: String) {
         if (serverBase.isBlank() || code.isBlank() || held.isBlank()) return
         scope.launch {
-            runCatching {
+            runCatchingCancellable {
                 http.post("$serverBase/api/parties/$code/leave") {
                     header("Authorization", "Bearer $held")
                 }
@@ -806,7 +820,7 @@ object ListenTogether {
     suspend fun createParty(nickname: String = nickname(), maxMembers: Int = 5): Result<String> = switchMutex.withLock {
         val primary = effectiveIdleServerBase()
         val primaryNormalized = resolveHttpBase(primary)
-        val attempt = runCatching {
+        val attempt = runCatchingCancellable {
             doCreateOnServer(primaryNormalized, nickname, maxMembers)
         }
 
@@ -819,7 +833,7 @@ object ListenTogether {
         if (normalizeServerBase(primary) != defaultServer && isEligibleForFallback(failure)) {
             Log.w(TAG, "createParty failed on custom server, falling back to default: ${redact(failure.message)}")
             val fallbackNormalized = resolveHttpBase(defaultServer)
-            val fallbackAttempt = runCatching {
+            val fallbackAttempt = runCatchingCancellable {
                 doCreateOnServer(fallbackNormalized, nickname, maxMembers)
             }
             if (fallbackAttempt.isSuccess) {
@@ -881,7 +895,7 @@ object ListenTogether {
      */
     suspend fun joinParty(code: String, nickname: String = nickname()): Result<String> = switchMutex.withLock {
         val targetServer = resolveHttpBase(effectiveIdleServerBase())
-        runCatching {
+        runCatchingCancellable {
             doJoinOnServer(targetServer, code, nickname)
         }.onFailure { failure ->
             Log.w(TAG, "could not enter a party: ${redact(failure.message)}")
@@ -1002,7 +1016,7 @@ object ListenTogether {
             val oldToken = token
 
             // Step 1: Join Target First while old party stays connected & playing
-            val targetJoinResult = runCatching {
+            val targetJoinResult = runCatchingCancellable {
                 post(
                     "$targetBase/api/parties/$cleanedTargetCode/join",
                     JoinRequest(who.userId, who.deviceId, who.name, who.avatar),
@@ -1152,7 +1166,7 @@ object ListenTogether {
     private fun send(frame: JsonObject) {
         val live = session ?: return
         scope.launch {
-            runCatching { live.send(Frame.Text(frame.toString())) }
+            runCatchingCancellable { live.send(Frame.Text(frame.toString())) }
                 .onFailure { Log.w(TAG, "control not sent: ${redact(it.message)}") }
         }
     }
@@ -1303,7 +1317,7 @@ object ListenTogether {
             put("type", "ping")
             put("clientMs", sentAt)
         }
-        runCatching { send(Frame.Text(frame.toString())) }
+        runCatchingCancellable { send(Frame.Text(frame.toString())) }
     }
 
     /**
@@ -1323,7 +1337,7 @@ object ListenTogether {
                 put("positionMs", position)
                 put("isPlaying", _state.value.playback.isPlaying)
             }
-            runCatching { send(Frame.Text(frame.toString())) }
+            runCatchingCancellable { send(Frame.Text(frame.toString())) }
         }
     }
 
@@ -1607,7 +1621,7 @@ object ListenTogether {
         if (cleaned.length != CODE_LENGTH) {
             return Result.failure(PartyException("bad_code", "A party code is six letters or digits."))
         }
-        return runCatching {
+        return runCatchingCancellable {
             refuseIfRecentlyKicked(cleaned)
             val base = resolveHttpBase(server ?: effectiveIdleServerBase())
             if (base.isBlank()) throw PartyException("no_server", "Set the party server address first.")
@@ -1627,7 +1641,7 @@ object ListenTogether {
                 // party that cannot be joined. Without a face to show, the
                 // confirmation is still a confirmation.
                 if (problem.statusCode == 404 && problem.code == "http_404") {
-                    return@runCatching PartyPreview(code = cleaned)
+                    return@runCatchingCancellable PartyPreview(code = cleaned)
                 }
                 throw problem
             }
@@ -1647,7 +1661,7 @@ object ListenTogether {
     }
 
     private suspend fun HttpResponse.toPartyException(): PartyException {
-        val body = runCatching { bodyAsText() }.getOrDefault("")
+        val body = runCatchingCancellable { bodyAsText() }.getOrDefault("")
         val parsed = runCatching { json.decodeFromString(ApiError.serializer(), body) }.getOrNull()
         return PartyException(
             code = parsed?.code.orEmpty().ifBlank { "http_${status.value}" },

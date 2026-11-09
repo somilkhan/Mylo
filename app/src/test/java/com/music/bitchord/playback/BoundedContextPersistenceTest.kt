@@ -143,6 +143,29 @@ class BoundedContextPersistenceTest {
     }
 
     @Test
+    fun `projection preserves autoplay after restored context lookahead`() {
+        val source = QueueSource("Release", PlaybackSourceType.BROWSE, "release-1")
+        val canonical = List(6) { song("track-$it") }
+        val window = QueueWindow(6).startAt(1, shuffle = false)
+        val state = state(
+            canonical = canonical,
+            source = source,
+            window = window.snapshot(),
+            entries = listOf(
+                entry("current", QueueTier.CONTEXT, 1, 0L),
+                entry("auto-1", QueueTier.AUTOPLAY),
+                entry("auto-2", QueueTier.AUTOPLAY),
+            ),
+            currentIndex = 0,
+            sourceSnapshot = context(canonical, source),
+        )
+        val projected = requireNotNull(BoundedContextPersistence.restoreProjection(state))
+        assertEquals(listOf("track-1", "track-2", "track-3", "track-4", "track-5", "auto-1-song", "auto-2-song"),
+            projected.entries.map { it.song.videoId })
+        assertEquals(listOf("auto-1", "auto-2"), projected.entries.takeLast(2).map { it.song.queueEntryId })
+    }
+
+    @Test
     fun `repeat-all restore does not expose next cycle before active cycle ends`() {
         val source = QueueSource("Release", PlaybackSourceType.BROWSE, "release-1")
         val canonical = List(4) { song("track-$it") }

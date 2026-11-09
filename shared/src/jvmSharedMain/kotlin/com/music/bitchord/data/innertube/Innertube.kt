@@ -47,6 +47,31 @@ import java.util.Base64
 import java.util.Locale
 
 /**
+ * Account-scoped WEB_REMIX /player payload used to obtain history tracking URLs.
+ * Kept pure so the required signature timestamp and BotGuard token stay covered
+ * by JVM regression tests without making a live YouTube request.
+ */
+internal fun buildPlaybackTrackingRequestBody(
+    videoId: String,
+    signatureTimestamp: Int?,
+    playerPoToken: String,
+): JsonObject = buildJsonObject {
+    put("videoId", videoId)
+    put("contentCheckOk", true)
+    put("racyCheckOk", true)
+    putJsonObject("playbackContext") {
+        putJsonObject("contentPlaybackContext") {
+            put("html5Preference", "HTML5_PREF_WANTS")
+            put("referer", "https://music.youtube.com/watch?v=$videoId")
+            signatureTimestamp?.let { put("signatureTimestamp", it) }
+        }
+    }
+    putJsonObject("serviceIntegrityDimensions") {
+        put("poToken", playerPoToken)
+    }
+}
+
+/**
  * Minimal Innertube (youtubei) client.
  *
  * WEB_REMIX against music.youtube.com for browse/search/library. It returns
@@ -268,7 +293,8 @@ object Innertube {
         }
         Log.d(
             TAG,
-            "acting as channel pageId=${pageId ?: "none"} authUser=${authUser ?: "as-is"} " +
+            "acting as channel pageId=${if (pageId.isNullOrBlank()) "none" else "present"} " +
+                "authUser=${if (authUser.isNullOrBlank()) "default" else "selected"} " +
                 "(override=${channelOverride != null})",
         )
     }
@@ -317,7 +343,8 @@ object Innertube {
             this.visitorData = it
             visitorDataIsSessionBound = true
         }
-        Log.d(TAG, "adopted page scope: pageId=${pageId ?: "none"} authUser=${authUser ?: "0"}")
+        Log.d(TAG, "adopted page scope: pageId=${if (pageId.isNullOrBlank()) "none" else "present"} " +
+                "authUser=${if (authUser.isNullOrBlank()) "default" else "selected"}")
     }
 
     /** The brand channel to send, chosen one first. */
@@ -383,8 +410,8 @@ object Innertube {
                     }
                     Log.d(
                         TAG,
-                        "session scope: authUser=${fresh.authUser} " +
-                            "pageId=${fresh.pageId ?: "none"} " +
+                        "session scope: authUser=${if (fresh.authUser == "0") "default" else "selected"} " +
+                            "pageId=${if (fresh.pageId == null) "none" else "present"} " +
                             "dataSyncId=${if (fresh.dataSyncId != null) "present" else "none"} " +
                             "cver=${fresh.clientVersion ?: WEB_REMIX_VERSION}",
                     )
@@ -522,11 +549,14 @@ object Innertube {
 
     // ---- Public API ---------------------------------------------------------
 
-    suspend fun browse(browseId: String, params: String? = null): JsonObject =
-        postMusic("browse") {
-            put("browseId", browseId)
-            params?.let { put("params", it) }
-        }
+    suspend fun browse(
+        browseId: String,
+        params: String? = null,
+        languageOverride: String? = null,
+    ): JsonObject = postMusic("browse", languageOverride = languageOverride) {
+        put("browseId", browseId)
+        params?.let { put("params", it) }
+    }
 
     /**
      * The next page of a paged browse response — playlists and library feeds
@@ -534,8 +564,12 @@ object Innertube {
      * query parameters rather than in the body, and answers with a bare
      * continuation envelope carrying the same row renderers.
      */
-    suspend fun browseContinuation(token: String): JsonObject = postMusic(
+    suspend fun browseContinuation(
+        token: String,
+        languageOverride: String? = null,
+    ): JsonObject = postMusic(
         endpoint = "browse",
+        languageOverride = languageOverride,
         // The web client passes the token in the body and the older query-string
         // form is still honoured; both are sent so either is enough.
         query = mapOf("ctoken" to token, "continuation" to token, "type" to "next"),
@@ -676,40 +710,25 @@ object Innertube {
      * clients are answered at all, so it never sees this block. Null for
      * guests: there's no account history to update.
      *
-     * [signatureTimestamp] is not optional in practice, and that is the bug
-     * this whole file was reported for.
-     *
-     * WEB_REMIX is a browser identity, and a browser proves it is running
-     * YouTube's current player by quoting that player's timestamp. Without one
-     * — or with a stale one — Google does not refuse the request in any way a
-     * caller would notice: it answers HTTP 200, `playabilityStatus` `UNPLAYABLE`,
-     * reason "Video unavailable", subreason "The page needs to be reloaded",
-     * and simply omits `playbackTracking` entirely. So every play registration
-     * this app made returned null here, logged one line, and stopped. No ping
-     * was ever sent; no history was ever written. Nothing failed loudly enough
-     * to notice, which is why it read as working.
-     *
-     * It is the *only* gate. Verified against the live endpoint: with a current
-     * timestamp and nothing else — no visitor id, no referer, no
-     * `html5Preference` — the block comes back. With every one of those and a
-     * timestamp one revision old, it does not.
+     * WEB_REMIX requires both the current player signature timestamp and
+     * the Web player-request PoToken. The latter is minted by the same
+     * BotGuard provider used by InnerTubeX's stream resolver. Without it,
+     * YouTube can answer HTTP 200 with `UNPLAYABLE` and omit
+     * `playbackTracking`, so no account-history ping can be sent.
      */
     suspend fun playbackTracking(videoId: String, signatureTimestamp: Int?): PlaybackTracking? {
         if (cookie == null) return null
         ensureSessionScope()
+        val visitor = ensureVisitorData()
+            ?: throw IOException("account history tracking is waiting for YouTube visitor data")
+        // Share the exact BotGuard provider and visitor binding used by stream
+        // extraction. A separately-created WebView would duplicate its cold
+        // start and could mint a token for a different session.
+        val playerPoToken = InnerTubeXResolver.playerRequestPoToken(videoId, visitor)
+            ?: throw IOException("account history tracking is waiting for a Web player PoToken")
+        val requestBody = buildPlaybackTrackingRequestBody(videoId, signatureTimestamp, playerPoToken)
         val response = postMusic("player") {
-            put("videoId", videoId)
-            put("contentCheckOk", true)
-            put("racyCheckOk", true)
-            // Real clients always describe where playback is happening; the
-            // response's tracking block is scoped to it.
-            putJsonObject("playbackContext") {
-                putJsonObject("contentPlaybackContext") {
-                    put("html5Preference", "HTML5_PREF_WANTS")
-                    put("referer", "$MUSIC_ORIGIN/watch?v=$videoId")
-                    signatureTimestamp?.let { put("signatureTimestamp", it) }
-                }
-            }
+            requestBody.forEach { (key, value) -> put(key, value) }
         }
         val tracking = response["playbackTracking"]?.jsonObject
         if (tracking == null) {
@@ -1097,6 +1116,7 @@ object Innertube {
     private suspend fun postMusic(
         endpoint: String,
         query: Map<String, String> = emptyMap(),
+        languageOverride: String? = null,
         bodyExtras: JsonObjectBuilder.() -> Unit,
     ): JsonObject {
         // This is the common authenticated request path: Home, Library,
@@ -1106,12 +1126,14 @@ object Innertube {
         if (cookie != null) ensureSessionScope()
         val session = scope
         val clientVersion = webRemixVersion
+        val requestLanguage = languageOverride ?: currentLanguage
+        val requestAcceptLanguage = if (languageOverride == null) acceptLanguageHeader else "en-US,en;q=0.9"
         val response = withRetry {
             client.post("$MUSIC_BASE/$endpoint") {
                 contentType(ContentType.Application.Json)
                 parameter("prettyPrint", "false")
-                parameter("hl", currentLanguage)
-                header("Accept-Language", acceptLanguageHeader)
+                parameter("hl", requestLanguage)
+                header("Accept-Language", requestAcceptLanguage)
                 query.forEach { (key, value) -> parameter(key, value) }
                 header("X-Origin", MUSIC_ORIGIN)
                 header("Origin", MUSIC_ORIGIN)
@@ -1137,7 +1159,7 @@ object Innertube {
                             putJsonObject("client") {
                                 put("clientName", "WEB_REMIX")
                                 put("clientVersion", clientVersion)
-                                put("hl", currentLanguage)
+                                put("hl", requestLanguage)
                                 put("gl", currentRegion)
                                 visitorData?.let { put("visitorData", it) }
                             }

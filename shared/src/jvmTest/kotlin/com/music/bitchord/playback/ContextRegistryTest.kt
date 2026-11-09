@@ -91,8 +91,9 @@ class ContextRegistryTest {
     }
 
     @Test
-    fun emptyPageIsBlockedAsNoProgress() {
-        val registry = ContextRegistry()
+    fun emptyPageBlockIsVersionedAndNotifiesPersistenceOwner() {
+        val growth = mutableListOf<ContextSnapshot>()
+        val registry = ContextRegistry { growth += it }
         registry.register("context-a", "playlist:one", "VLone", listOf(song("a")), "page-1")
         val request = assertNotNull(registry.claimContinuation())
 
@@ -100,7 +101,10 @@ class ContextRegistryTest {
 
         assertEquals(ContinuationResultStatus.REJECTED_NO_PROGRESS, rejected.status)
         assertEquals(ContinuationDiagnostic.NO_PROGRESS, rejected.diagnostic)
-        assertEquals(ContinuationState.BLOCKED, registry.snapshot()!!.continuationState)
+        assertEquals(ContinuationState.BLOCKED, rejected.snapshot!!.continuationState)
+        assertEquals(2L, rejected.snapshot.version)
+        assertEquals(1, growth.size)
+        assertEquals(ContinuationState.BLOCKED, growth.single().continuationState)
         assertNull(registry.claimContinuation())
     }
 
@@ -117,7 +121,9 @@ class ContextRegistryTest {
 
         assertEquals(ContinuationResultStatus.REJECTED_NO_PROGRESS, rejected.status)
         assertEquals(ContinuationDiagnostic.REPEATED_CONTINUATION, rejected.diagnostic)
-        assertEquals(listOf("a"), registry.snapshot()!!.songs.map(Song::videoId))
+        assertEquals(listOf("a", "b"), registry.snapshot()!!.songs.map(Song::videoId))
+        assertEquals(listOf("b"), rejected.addedSongs.map(Song::videoId))
+        assertEquals(ContinuationState.BLOCKED, rejected.snapshot!!.continuationState)
         assertNull(registry.claimContinuation())
     }
 
@@ -318,7 +324,8 @@ class ContextRegistryTest {
         assertEquals(ContinuationResultStatus.REJECTED_NO_PROGRESS, repeated.status)
         assertEquals(ContinuationDiagnostic.REPEATED_CONTINUATION, repeated.diagnostic)
         assertEquals(ContinuationState.BLOCKED, repeated.snapshot!!.continuationState)
-        assertEquals(listOf("a", "b"), repeated.snapshot.songs.map(Song::videoId))
+        assertEquals(listOf("a", "b", "c"), repeated.snapshot.songs.map(Song::videoId))
+        assertEquals(listOf("c"), repeated.addedSongs.map(Song::videoId))
     }
 
     private fun song(id: String, title: String = id) = Song(

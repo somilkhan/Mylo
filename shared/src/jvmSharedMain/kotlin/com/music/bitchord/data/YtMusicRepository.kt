@@ -23,6 +23,7 @@ import com.music.bitchord.data.model.ShelfItem
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.model.SongMenu
 import com.music.bitchord.data.model.UserPlaylist
+import com.music.bitchord.data.model.YtMusicHistoryEntry
 import com.music.bitchord.data.sources.TrackMatcher
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -31,6 +32,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonObject
+import java.time.ZoneId
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 
@@ -106,7 +108,7 @@ object YtMusicRepository {
      */
     private suspend fun recentlyPlayed(): HomeShelf? {
         val ytSongs = if (Innertube.cookie != null) {
-            runCatching { fetchHistory() }.getOrDefault(emptyList())
+            runCatchingCancellable { fetchHistory() }.getOrDefault(emptyList())
         } else {
             emptyList()
         }
@@ -139,7 +141,13 @@ object YtMusicRepository {
      * through either.
      */
     private suspend fun fetchHistory(): List<Song> =
-        InnertubeParser.collectSongsDeep(Innertube.browse(HISTORY)).distinctBy { it.videoId }
+        InnertubeParser.collectSongsDeep(Innertube.browse(HISTORY, languageOverride = "en")).distinctBy { it.videoId }
+
+    /** Full account history for pages and recommendation exclusion; the Home shelf stays first-page only. */
+    private suspend fun fetchAllHistorySongs(): List<Song> =
+        collectPagedYtMusicHistorySongs(Innertube.browse(HISTORY, languageOverride = "en")) { token ->
+            Innertube.browseContinuation(token, languageOverride = "en")
+        }
 
     /**
      * The account's listening history, in the order YouTube Music keeps it.
@@ -148,12 +156,33 @@ object YtMusicRepository {
      * a shelf on the home page and stops at [RECENT_LIMIT] so it stays a shelf,
      * whereas this is the page you open when twenty is not enough.
      */
-    suspend fun history(): Result<List<Song>> = call("history") { fetchHistory() }
+    suspend fun history(): Result<List<Song>> = call("history") { fetchAllHistorySongs() }
+
+    /**
+     * The same account feed, retaining the date group each row belongs to.
+     * Times are approximate day anchors because Innertube does not provide a
+     * reliable timestamp per history row.
+     */
+    suspend fun historyWithDates(
+        nowMillis: Long = System.currentTimeMillis(),
+        zone: ZoneId = ZoneId.systemDefault(),
+        notBeforeMillis: Long? = null,
+    ): Result<List<YtMusicHistoryEntry>> = call("history:dated") {
+        collectPagedYtMusicHistory(
+            firstPage = Innertube.browse(HISTORY, languageOverride = "en"),
+            nowMillis = nowMillis,
+            zone = zone,
+            notBeforeMillis = notBeforeMillis,
+        ) { token ->
+            Innertube.browseContinuation(token, languageOverride = "en")
+        }
+    }
 
     /** Account listening history for the Recents feed. */
     suspend fun recents(): Result<List<Song>> = call("recents") {
-        if (Innertube.cookie != null) {
-            val history = runCatching { fetchHistory() }.getOrDefault(emptyList())
+        val cookie = Innertube.cookie
+        if (cookie != null) {
+            val history = fetchRecentHistory(cookie) { fetchHistory() }
             if (history.isNotEmpty()) return@call history
         }
         emptyList()
@@ -162,9 +191,32 @@ object YtMusicRepository {
     /**
      * Recommended discovery tracks for Quick Picks, strictly excluding listening history and recents.
      */
-    suspend fun quickPicks(excludeSongIds: Set<String> = emptySet()): Result<List<Song>> = call("quickPicks") {
-        val homeRaw = runCatching { Innertube.browse("FEmusic_home") }.getOrNull()
-        val shelves = if (homeRaw != null) InnertubeParser.parseHome(homeRaw) else emptyList()
+    suspend fun quickPicks(
+        excludeSongIds: Set<String> = emptySet(),
+        excludeTitleArtistPairs: Set<Pair<String, String>> = emptySet(),
+    ): Result<List<Song>> = call("quickPicks") {
+        // Merge Mylo's imported/local history with the account's current
+        // YouTube Music history. The latter is best-effort: an unavailable
+        // history feed must not make otherwise available recommendations fail.
+        val accountHistory = if (Innertube.cookie != null) {
+            // Exclude tracks from every history page, including rows whose
+            // date headings cannot be interpreted. This filter needs identities,
+            // not fabricated timestamps.
+            runCatchingCancellable { fetchAllHistorySongs() }.getOrDefault(emptyList())
+        } else {
+            emptyList()
+        }
+        val excludedIds = mergeQuickPickExclusions(
+            excludeSongIds,
+            accountHistory.mapNotNullTo(HashSet()) { it.videoId.takeIf(String::isNotBlank) },
+        )
+        val excludedMetadataKeys = excludeTitleArtistPairs
+            .mapTo(HashSet()) { (title, artist) -> quickPickMetadataKey(title, artist) }
+            .apply { accountHistory.forEach { add(quickPickMetadataKey(it.title, it.artist)) } }
+
+        // Preserve Home request failures so the UI can distinguish an unavailable
+        // recommendation source from a genuinely empty set of new tracks.
+        val shelves = InnertubeParser.parseHome(Innertube.browse("FEmusic_home"))
 
         // 1. Direct "Quick picks" or "Mix" or "Recommendations" shelf
         val qpShelf = shelves.firstOrNull {
@@ -173,16 +225,20 @@ object YtMusicRepository {
                 it.title.contains("mix", ignoreCase = true) ||
                 it.title.contains("recommend", ignoreCase = true)
         }
-        val qpSongs = qpShelf?.items?.mapNotNull { item ->
-            item.videoId?.takeUnless { it in excludeSongIds }?.let { vid ->
-                Song(
-                    videoId = vid,
-                    title = item.title,
-                    artist = InnertubeParser.artistFromSubtitle(item.subtitle),
-                    thumbnailUrl = item.thumbnailUrl,
-                )
-            }
-        }.orEmpty()
+        val qpSongs = unplayedRecommendations(
+            qpShelf?.items?.mapNotNull { item ->
+                item.videoId?.let { vid ->
+                    Song(
+                        videoId = vid,
+                        title = item.title,
+                        artist = InnertubeParser.artistFromSubtitle(item.subtitle),
+                        thumbnailUrl = item.thumbnailUrl,
+                    )
+                }
+            }.orEmpty(),
+            excludedIds,
+            excludedMetadataKeys,
+        )
         if (qpSongs.isNotEmpty()) return@call qpSongs
 
         // 2. All shelves on Home (excluding shelves mentioning recent/history, and skipping top shelf if multiple exist)
@@ -194,18 +250,22 @@ object YtMusicRepository {
             }
         } else shelves
 
-        val homeShelfSongs = candidateShelves.flatMap { shelf ->
-            shelf.items.mapNotNull { item ->
-                item.videoId?.takeUnless { it in excludeSongIds }?.let { vid ->
-                    Song(
-                        videoId = vid,
-                        title = item.title,
-                        artist = InnertubeParser.artistFromSubtitle(item.subtitle),
-                        thumbnailUrl = item.thumbnailUrl,
-                    )
+        val homeShelfSongs = unplayedRecommendations(
+            candidateShelves.flatMap { shelf ->
+                shelf.items.mapNotNull { item ->
+                    item.videoId?.let { vid ->
+                        Song(
+                            videoId = vid,
+                            title = item.title,
+                            artist = InnertubeParser.artistFromSubtitle(item.subtitle),
+                            thumbnailUrl = item.thumbnailUrl,
+                        )
+                    }
                 }
-            }
-        }.distinctBy { it.videoId }
+            },
+            excludedIds,
+            excludedMetadataKeys,
+        )
 
         if (homeShelfSongs.isNotEmpty()) return@call homeShelfSongs
 
@@ -223,28 +283,33 @@ object YtMusicRepository {
             }
         }.distinctBy { it.videoId }
 
-        val uniqueAllHome = allHomeTrackSongs.filterNot { it.videoId in excludeSongIds }
+        val uniqueAllHome = unplayedRecommendations(allHomeTrackSongs, excludedIds, excludedMetadataKeys)
         if (uniqueAllHome.isNotEmpty()) return@call uniqueAllHome
 
         // 4. Explore / New releases
-        val explore = runCatching { shelvesOf("FEmusic_new_releases") }.getOrDefault(emptyList())
-        val exploreSongs = explore.flatMap { shelf ->
-            shelf.items.mapNotNull { item ->
-                item.videoId?.takeUnless { it in excludeSongIds }?.let { vid ->
-                    Song(
-                        videoId = vid,
-                        title = item.title,
-                        artist = InnertubeParser.artistFromSubtitle(item.subtitle),
-                        thumbnailUrl = item.thumbnailUrl,
-                    )
+        val explore = shelvesOf("FEmusic_new_releases")
+        val exploreSongs = unplayedRecommendations(
+            explore.flatMap { shelf ->
+                shelf.items.mapNotNull { item ->
+                    item.videoId?.let { vid ->
+                        Song(
+                            videoId = vid,
+                            title = item.title,
+                            artist = InnertubeParser.artistFromSubtitle(item.subtitle),
+                            thumbnailUrl = item.thumbnailUrl,
+                        )
+                    }
                 }
-            }
-        }.distinctBy { it.videoId }
+            },
+            excludedIds,
+            excludedMetadataKeys,
+        )
 
         if (exploreSongs.isNotEmpty()) return@call exploreSongs
 
-        // 5. Fallback if everything was filtered out
-        allHomeTrackSongs.ifEmpty { exploreSongs }
+        // 5. Reapply exclusions at the boundary so a future fallback cannot
+        // accidentally reintroduce played or unplayable rows.
+        selectQuickPickFallback(allHomeTrackSongs, exploreSongs, excludedIds, excludedMetadataKeys)
     }
 
     private const val HISTORY = "FEmusic_history"
@@ -459,7 +524,7 @@ object YtMusicRepository {
      * treated the same as a failure and the other route is tried.
      */
     suspend fun accountChannels(): Result<List<AccountChannel>> = call("channels") {
-        val viaInnertube = runCatching {
+        val viaInnertube = runCatchingCancellable {
             InnertubeParser.parseAccountChannels(Innertube.accountsList())
         }.onFailure { Log.w(TAG, "accounts_list unavailable: ${it.message}") }
             .getOrNull()
@@ -486,11 +551,11 @@ object YtMusicRepository {
             // liked without holding this page open behind the whole list —
             // see [syncLikedMusic] and MainViewModel's fetchLibrary.
             val liked = async { browseSongs(LIKED_MUSIC).getOrNull() }
-            val added = async { runCatching { songsPaged(LIBRARY_SONGS) }.getOrDefault(emptyList()) }
+            val added = async { runCatchingCancellable { songsPaged(LIBRARY_SONGS) }.getOrDefault(emptyList()) }
             val shelves = LIBRARY_FEEDS
                 .map { (title, browseId) ->
                     async {
-                        HomeShelf(title, runCatching { libraryItemsPaged(browseId) }.getOrDefault(emptyList()))
+                        HomeShelf(title, runCatchingCancellable { libraryItemsPaged(browseId) }.getOrDefault(emptyList()))
                     }
                 }
                 .awaitAll()
@@ -793,7 +858,7 @@ object YtMusicRepository {
             (shelf?.songs ?: InnertubeParser.collectSongsDeep(response)).forEach { out[it.videoId] = it }
             val token = shelf?.continuation ?: InnertubeParser.continuationToken(response)
             if (token == null || page++ >= MAX_PAGES) break
-            response = runCatching { Innertube.browseContinuation(token) }.getOrNull() ?: break
+            response = runCatchingCancellable { Innertube.browseContinuation(token) }.getOrNull() ?: break
         }
         return out.values.toList()
     }
@@ -819,7 +884,7 @@ object YtMusicRepository {
             }
             val token = parsed.continuation ?: break
             if (page++ >= MAX_PAGES) break
-            response = runCatching { Innertube.browseContinuation(token) }.getOrNull() ?: break
+            response = runCatchingCancellable { Innertube.browseContinuation(token) }.getOrNull() ?: break
         }
         return out.values.toList()
     }
@@ -1017,14 +1082,14 @@ object YtMusicRepository {
         coroutineScope {
             val fullSongsDeferred = async {
                 page.moreSongsBrowseId?.let { playlistId ->
-                    runCatching { songsPaged(playlistId) }.getOrNull()
+                    runCatchingCancellable { songsPaged(playlistId) }.getOrNull()
                 }
             }
             val shelvesDeferred = page.sections.map { shelf ->
                 async {
                     val moreBrowseId = shelf.moreBrowseId
                     if (moreBrowseId != null) {
-                        val fullItems = runCatching {
+                        val fullItems = runCatchingCancellable {
                             itemsPaged(moreBrowseId, shelf.moreParams)
                         }.getOrNull()
                         if (!fullItems.isNullOrEmpty()) {
@@ -1046,7 +1111,8 @@ object YtMusicRepository {
 
     private suspend fun <T> call(label: String, block: suspend () -> T): Result<T> =
         withContext(Dispatchers.IO) {
-            runCatching { block() }.recoverCatching { failure ->
+            runCatchingCancellable { block() }.recoverCatching { failure ->
+                if (failure is CancellationException) throw failure
                 // Context cookies can rotate while a process is alive. Refresh
                 // once and retry; never loop or silently sign the listener out.
                 val rejected = failure.message?.contains("401") == true ||
@@ -1057,12 +1123,165 @@ object YtMusicRepository {
                 Innertube.refreshSessionScope()
                 block()
             }
-                // runCatching catches Throwable, cancellation included, which
-                // would turn "the user typed another letter" into a failed
-                // Result and put the abandoned request's error on screen.
-                // Cancellation isn't this call's to answer for.
+                // The initial request uses runCatchingCancellable. Keep this
+                // guard for cancellation raised during the one-time session
+                // refresh/retry path: it must never become an ordinary Result.
                 .onFailure { if (it is CancellationException) throw it }
                 .onSuccess { Log.d(TAG, "$label ok") }
                 .onFailure { Log.w(TAG, "$label failed: ${it.message}") }
         }
 }
+
+/**
+ * Read account history only for an authenticated session. A failed request is
+ * deliberately propagated: an unavailable history feed is not an empty one.
+ */
+internal suspend fun <T> fetchRecentHistory(
+    cookie: String?,
+    fetch: suspend () -> List<T>,
+): List<T> = if (cookie == null) emptyList() else fetch()
+
+
+/**
+ * Like [runCatching], but never turns structured-concurrency cancellation into
+ * a fallback value or a partial-success Result. Use around every suspending
+ * operation whose ordinary failures are intentionally recoverable.
+ */
+internal suspend fun <T> runCatchingCancellable(block: suspend () -> T): Result<T> =
+    try {
+        Result.success(block())
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (failure: Throwable) {
+        Result.failure(failure)
+    }
+
+
+/**
+ * Read the supported date-labelled history buckets.
+ *
+ * A null [notBeforeMillis] performs the initial full paginated import. Later
+ * imports filter against the local date one day before the last successful
+ * sync, retaining an overlap for rows that arrive late. Paging stops only when
+ * a page exposes a known continuation date older than that cutoff; an unknown
+ * heading cannot prove that older pages are safe to skip.
+ *
+ * Continuation shelves with no heading inherit the previous bucket, while an
+ * unsupported heading clears that context rather than borrowing a wrong date.
+ * Repeated tokens fail the import instead of looping or returning partial data.
+ * Fetch failures deliberately propagate for the same reason.
+ */
+internal suspend fun collectPagedYtMusicHistory(
+    firstPage: JsonObject,
+    nowMillis: Long,
+    zone: ZoneId,
+    notBeforeMillis: Long? = null,
+    loadNext: suspend (String) -> JsonObject,
+): List<YtMusicHistoryEntry> {
+    val cutoffDate = notBeforeMillis?.let {
+        java.time.Instant.ofEpochMilli(it).atZone(zone).toLocalDate().minusDays(1)
+    }
+    val cutoffMillis = cutoffDate?.atStartOfDay(zone)?.toInstant()?.toEpochMilli()
+    val entries = ArrayList<YtMusicHistoryEntry>()
+    var pageNumber = 0
+    var rawTrackRows = 0
+    var datedTrackRows = 0
+    Log.i("YtMusicHistory", "History fetch start: cutoff=$cutoffDate, firstPageKeys=${firstPage.keys}")
+    val seenTokens = HashSet<String>()
+    var response = firstPage
+    var inheritedDate: java.time.LocalDate? = null
+
+    while (true) {
+        pageNumber++
+        val page = InnertubeParser.collectDatedHistoryPage(
+            root = response,
+            nowMillis = nowMillis,
+            zone = zone,
+            inheritedDate = inheritedDate,
+        )
+        rawTrackRows += InnertubeParser.countHistoryTrackRows(response)
+        datedTrackRows += page.entries.size
+        Log.i("YtMusicHistory", "History page=$pageNumber keys=${response.keys}, rawRows=$rawTrackRows, datedRows=$datedTrackRows, shelfDate=${page.continuationDate}, continuation=${InnertubeParser.continuationToken(response)!=null}")
+        entries += if (cutoffMillis == null) {
+            page.entries
+        } else {
+            page.entries.filter { it.playedAtMillis >= cutoffMillis }
+        }
+        inheritedDate = page.continuationDate
+
+        // History is newest-first. Once a page ends before the overlap window,
+        // older pages cannot contain new listens and need not be downloaded.
+        if (cutoffDate != null && page.continuationDate?.isBefore(cutoffDate) == true) break
+
+        val token = InnertubeParser.continuationToken(response)
+            ?.takeIf(String::isNotBlank)
+            ?: break
+        check(seenTokens.add(token)) {
+            "YouTube Music history pagination repeated a continuation token; refusing to import an incomplete history"
+        }
+        response = loadNext(token)
+    }
+
+    Log.i("YtMusicHistory", "History fetch finished: pages=$pageNumber, rawRows=$rawTrackRows, datedRows=$datedTrackRows, returned=${entries.size}")
+    return entries
+}
+
+/** Read every history page without requiring a supported date heading. */
+internal suspend fun collectPagedYtMusicHistorySongs(
+    firstPage: JsonObject,
+    loadNext: suspend (String) -> JsonObject,
+): List<Song> {
+    val songs = ArrayList<Song>()
+    val seenTokens = HashSet<String>()
+    var response = firstPage
+    while (true) {
+        songs += InnertubeParser.collectHistorySongs(response)
+        val token = InnertubeParser.continuationToken(response)
+            ?.takeIf(String::isNotBlank)
+            ?: break
+        check(seenTokens.add(token)) {
+            "YouTube Music history pagination repeated a continuation token; refusing to return incomplete history"
+        }
+        response = loadNext(token)
+    }
+    // History is an event feed: the same video can occur multiple times for separate listens.
+    return songs
+}
+
+/** Union local/imported and live account history before filtering Quick Picks. */
+internal fun mergeQuickPickExclusions(
+    localHistoryIds: Set<String>,
+    accountHistoryIds: Set<String>,
+): Set<String> = localHistoryIds.asSequence()
+    .plus(accountHistoryIds.asSequence())
+    .filter(String::isNotBlank)
+    .toSet()
+
+/** Remove played/unplayable rows and duplicate catalogue IDs from a candidate set. */
+internal fun quickPickMetadataKey(title: String, artist: String): String =
+    "${normaliseQuickPickText(title)}|${normaliseQuickPickText(artist)}"
+
+private fun normaliseQuickPickText(value: String): String =
+    value.trim().lowercase(Locale.ROOT).split(Regex("\\s+")).filter(String::isNotBlank).joinToString(" ")
+
+internal fun unplayedRecommendations(
+    songs: List<Song>,
+    excludedSongIds: Set<String>,
+    excludedMetadataKeys: Set<String> = emptySet(),
+): List<Song> = songs.asSequence()
+    .filter { song ->
+        song.videoId.isNotBlank() &&
+            song.videoId !in excludedSongIds &&
+            quickPickMetadataKey(song.title, song.artist) !in excludedMetadataKeys
+    }
+    .distinctBy { it.videoId }
+    .toList()
+
+/** Last-resort selection that never falls back to the unfiltered source list. */
+internal fun selectQuickPickFallback(
+    homeSongs: List<Song>,
+    exploreSongs: List<Song>,
+    excludedSongIds: Set<String>,
+    excludedMetadataKeys: Set<String> = emptySet(),
+): List<Song> = unplayedRecommendations(homeSongs, excludedSongIds, excludedMetadataKeys)
+    .ifEmpty { unplayedRecommendations(exploreSongs, excludedSongIds, excludedMetadataKeys) }

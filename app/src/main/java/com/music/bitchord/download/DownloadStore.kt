@@ -18,7 +18,7 @@ import java.util.Locale
 /**
  * Where a downloaded track goes, and how it gets there.
  *
- * The destination is the device's own Music folder, in a `BitChord`
+ * The destination is the device's own Music folder, in a `Mylo`
  * subfolder — somewhere the file manager lists, other players can open, and a
  * user can back up or delete without going through this app. That choice is
  * what makes this class necessary at all: an app-private directory would be
@@ -53,12 +53,14 @@ import java.util.Locale
  */
 object DownloadStore {
 
-    private const val TAG = "BitChord"
+    private const val TAG = "Mylo"
 
     /** The subfolder of Music that everything lands in. */
-    const val FOLDER = "BitChord"
+    const val FOLDER = "Mylo"
+    private const val LEGACY_FOLDER = "BitChord"
 
     private val relativePath = "${Environment.DIRECTORY_MUSIC}/$FOLDER"
+    private val legacyRelativePath = "${Environment.DIRECTORY_MUSIC}/$LEGACY_FOLDER"
 
     /**
      * Whether saving needs `WRITE_EXTERNAL_STORAGE` asked for at runtime.
@@ -154,7 +156,9 @@ object DownloadStore {
         } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             mediaStoreEntry(context, name)
         } else {
-            legacyFile(name).takeIf { it.exists() }?.let(Uri::fromFile)
+            (legacyFile(name).takeIf { it.exists() }
+                ?: legacyFile(name, LEGACY_FOLDER).takeIf { it.exists() })
+                ?.let(Uri::fromFile)
         }
 
     @RequiresApi(Build.VERSION_CODES.Q)
@@ -162,9 +166,10 @@ object DownloadStore {
         context.contentResolver.query(
             MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
             arrayOf(MediaStore.MediaColumns._ID),
-            "${MediaStore.MediaColumns.DISPLAY_NAME} = ? AND " +
-                "${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ?",
-            arrayOf(name, "%$FOLDER%"),
+            "${MediaStore.MediaColumns.DISPLAY_NAME} = ? AND (" +
+                "${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ? OR " +
+                "${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ?)",
+            arrayOf(name, "%$relativePath%", "%$legacyRelativePath%"),
             null,
         )?.use { cursor ->
             if (!cursor.moveToFirst()) return@use null
@@ -304,8 +309,8 @@ object DownloadStore {
     }
 
     @Suppress("DEPRECATION")
-    private fun legacyFile(name: String) = File(
-        File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC), FOLDER),
+    private fun legacyFile(name: String, folder: String = FOLDER) = File(
+        File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC), folder),
         name,
     )
 

@@ -20,7 +20,7 @@ import org.junit.runner.RunWith
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
-@OptIn(UnstableApi::class)
+@UnstableApi
 @RunWith(AndroidJUnit4::class)
 class AndroidAutoMediaLibraryTest {
 
@@ -122,29 +122,10 @@ class AndroidAutoMediaLibraryTest {
 
     @Test
     fun testSearchAndGetSearchResult() = runBlocking {
-        val searchLatch = CountDownLatch(1)
-        var resultCount = 0
-
-        val listener = object : MediaBrowser.Listener {
-            override fun onSearchResultChanged(
-                browser: MediaBrowser,
-                query: String,
-                itemCount: Int,
-                params: androidx.media3.session.MediaLibraryService.LibraryParams?,
-            ) {
-                if (query == "Adele") {
-                    resultCount = itemCount
-                    searchLatch.countDown()
-                }
-            }
-        }
-
-        withContext(Dispatchers.Main) {
+        val search = withContext(Dispatchers.Main) {
             mediaBrowser.search("Adele", null)
         }
-
-        // Wait for search result notification
-        searchLatch.await(10, TimeUnit.SECONDS)
+        search.get(10, TimeUnit.SECONDS)
 
         val results = withContext(Dispatchers.Main) {
             mediaBrowser.getSearchResult("Adele", 0, 10, null).get(10, TimeUnit.SECONDS)

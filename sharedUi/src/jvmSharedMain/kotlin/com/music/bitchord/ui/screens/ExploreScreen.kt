@@ -66,6 +66,8 @@ fun ExploreScreen(
     pullState: PullToRefreshState,
     contentPadding: PaddingValues,
     modifier: Modifier = Modifier,
+    /** Replay lives in Explore; callers supply the platform-specific card row. */
+    replay: @Composable () -> Unit = {},
     /** The big "Explore" heading; the desktop's pages carry none. */
     showTitle: Boolean = true,
 ) {
@@ -99,6 +101,7 @@ fun ExploreScreen(
                         )
                     }
                 }
+                item(key = "replay") { replay() }
                 when (state) {
                     UiState.Loading -> item { ExploreSkeletonRows(columns) }
                     is UiState.Error -> item {

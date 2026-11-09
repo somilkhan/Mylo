@@ -37,6 +37,8 @@ import com.music.bitchord.data.settings.SearchHistory
 import com.music.bitchord.data.sources.SourceRegistry
 import com.music.bitchord.data.stats.ArtistFacts
 import com.music.bitchord.data.stats.ListeningStats
+import com.music.bitchord.data.generator.ScrobbleHistory
+import com.music.bitchord.data.generator.ScrobbleHistorySync
 import com.music.bitchord.download.Downloads
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -139,6 +141,10 @@ class BitChordApplication : Application(), SingletonImageLoader.Factory {
         // PlaybackService because the Replay page reads it from the UI side and
         // both live in this process — one owner, one directory.
         ListeningStats.init(this)
+        // Shared private history used by the Scrobble generator and playback recorder.
+        ScrobbleHistory.init(this)
+        // Generated Scrobble mixes are user-saved device data, separate from play history.
+        com.music.bitchord.ui.screens.ScrobblePlaylistStore.init(this)
         // After AppSettings, whose switch decides whether half of it runs.
         ArtistFacts.init(this)
         // One cache directory can only be opened once per process, and
@@ -166,6 +172,8 @@ class BitChordApplication : Application(), SingletonImageLoader.Factory {
         // The public "apps open right now" count; see Presence.
         com.music.bitchord.data.presence.AndroidPresence.install(this)
         backgroundInit.join()
+        // Schedule only after the shared Innertube client and startup stores are ready.
+        ScrobbleHistorySync.ensurePeriodic(this)
     }
 
     /**

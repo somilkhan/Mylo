@@ -65,9 +65,8 @@ fun HistoryScreen(
             is UiState.Success -> {
                 val songs = state.data
                 val isCurrentRow = playingRowMatcher(songs, currentSong)
-                // The videoId alone is not a key here: the feed is deduplicated
-                // on it, but a list keyed on something that could repeat is one
-                // bad response away from a crash. The index makes it total.
+                // One video can occur more than once: each row represents a listen.
+                // Include the index so repeated events remain distinct in LazyColumn.
                 itemsIndexed(songs) { index, song ->
                     SongRow(
                         song = song,

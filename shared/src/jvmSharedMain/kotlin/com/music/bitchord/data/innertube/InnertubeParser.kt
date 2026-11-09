@@ -20,12 +20,20 @@ import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.model.SongMenu
 import com.music.bitchord.data.model.SubscriptionState
 import com.music.bitchord.data.model.UserPlaylist
+import com.music.bitchord.data.model.YtMusicHistoryEntry
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
+import java.time.DayOfWeek
+import java.time.LocalDate
+import java.time.MonthDay
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.TextStyle
 import java.util.Locale
 
 /**
@@ -138,6 +146,10 @@ object InnertubeParser {
             }
             .distinct()
 
+    /** Safe diagnostic count; excludes titles, IDs, and payload values. */
+    fun countHistoryTrackRows(root: JsonElement): Int =
+        collectRenderers(root, "musicResponsiveListItemRenderer").size
+
     /** Depth-first collection of a named renderer, preserving document order. */
     private fun collectRenderers(root: JsonElement, name: String): List<JsonObject> {
         val out = mutableListOf<JsonObject>()
@@ -190,9 +202,31 @@ object InnertubeParser {
         )
     }
 
+    /**
+     * Innertube can return an API error envelope with HTTP 200. Parsers must
+     * reject it instead of translating an authentication or service failure
+     * into a valid-but-empty feed.
+     */
+    private fun requireNoApiError(root: JsonElement, endpoint: String) {
+        val apiError = (root as? JsonObject)?.get("error") ?: return
+        val errorObject = apiError as? JsonObject
+        val code = (errorObject?.get("code") as? JsonPrimitive)?.contentOrNull
+        val status = (errorObject?.get("status") as? JsonPrimitive)?.contentOrNull
+        val message = (errorObject?.get("message") as? JsonPrimitive)?.contentOrNull
+        val details = listOfNotNull(
+            code?.let { "code=$it" },
+            status?.let { "status=$it" },
+            message?.let { "message=$it" },
+        ).joinToString(", ")
+        throw IllegalStateException(
+            "Innertube $endpoint request rejected${details.takeIf(String::isNotBlank)?.let { ": $it" }.orEmpty()}",
+        )
+    }
+
     // ---- Home feed ----------------------------------------------------------
 
     fun parseHome(response: JsonObject): List<HomeShelf> {
+        requireNoApiError(response, "home")
         val sections = response.o("contents")
             .o("singleColumnBrowseResultsRenderer").a("tabs")?.firstOrNull()
             .o("tabRenderer").o("content").o("sectionListRenderer").a("contents")
@@ -216,6 +250,7 @@ object InnertubeParser {
      * section's button, with the English title as a backstop.
      */
     fun parseMoodAndGenres(response: JsonObject): List<MoodGenreSection> {
+        requireNoApiError(response, "moods and genres")
         val sections = response.o("contents")
             .o("singleColumnBrowseResultsRenderer").a("tabs")?.firstOrNull()
             .o("tabRenderer").o("content").o("sectionListRenderer").a("contents")
@@ -494,6 +529,162 @@ object InnertubeParser {
         }
         walk(root)
         return out.values.toList()
+    }
+
+    /**
+     * Reads the account history without collapsing repeated rows, carrying the
+     * date heading down to each track. The API does not expose a trustworthy
+     * timestamp per row; unsupported headings are skipped rather than guessed.
+     */
+    data class DatedHistoryPage(
+        val entries: List<YtMusicHistoryEntry>,
+        /** Date context of the final history shelf, including an explicit unknown (null). */
+        val continuationDate: LocalDate?,
+    )
+
+    /** All track identities on a history page, even when its date heading is unsupported. */
+    fun collectHistorySongs(root: JsonElement): List<Song> {
+        requireNoApiError(root, "history")
+        // Port InterTune HistoryPage's traversal: only rows inside history
+        // MusicShelfRenderer sections are events. Do not accidentally import
+        // recommendation/related rows elsewhere in the browse response.
+        // Keep row order and repeated video IDs (each row is a separate listen).
+        val credit = pageCredit(root)
+        val shelfRows = collectRenderers(root, "musicShelfRenderer").flatMap { shelf ->
+            collectRenderers(shelf["contents"] ?: JsonNull, "musicResponsiveListItemRenderer")
+        }
+        // Innertube continuation responses use MusicShelfContinuation rather
+        // than MusicShelfRenderer. InterTune's page parser handles the first
+        // page; Mylo also follows continuations, so parse that shape explicitly.
+        val continuationRows = collectRenderers(root, "musicShelfContinuation").flatMap { shelf ->
+            collectRenderers(shelf["contents"] ?: JsonNull, "musicResponsiveListItemRenderer")
+        }
+        return (shelfRows + continuationRows).mapNotNull { parseResponsiveListItem(it, credit) }
+    }
+
+    fun collectHistoryEntries(
+        root: JsonElement,
+        nowMillis: Long,
+        zone: ZoneId,
+        inheritedDate: LocalDate? = null,
+    ): List<YtMusicHistoryEntry> =
+        collectDatedHistoryPage(root, nowMillis, zone, inheritedDate).entries
+
+    /**
+     * Parses rows and returns the actual final shelf date for pagination.
+     * This must not be inferred from the last emitted row: an unsupported
+     * final heading intentionally emits no rows and must clear prior context.
+     */
+    fun collectDatedHistoryPage(
+        root: JsonElement,
+        nowMillis: Long,
+        zone: ZoneId,
+        inheritedDate: LocalDate? = null,
+    ): DatedHistoryPage {
+        requireNoApiError(root, "history")
+
+        val today = java.time.Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate()
+        val out = ArrayList<YtMusicHistoryEntry>()
+        val credit = pageCredit(root)
+        var continuationDate = inheritedDate
+
+        fun walk(node: JsonElement, inheritedDate: LocalDate?) {
+            when (node) {
+                is JsonObject -> {
+                    val shelf = node["musicShelfRenderer"] as? JsonObject
+                    if (shelf != null) {
+                        val label = shelf.o("title").runs().ifBlank {
+                            shelf.o("title").s("simpleText").orEmpty()
+                        }.ifBlank {
+                            shelf.o("header").o("musicHeaderRenderer").o("title").runs()
+                        }.ifBlank {
+                            shelf.o("header").o("musicHeaderRenderer").o("title").s("simpleText").orEmpty()
+                        }
+                        // A headingless continuation belongs to the previous shelf. If YouTube
+                        // adds a new/locale-specific heading we cannot parse, do not discard its
+                        // tracks: history is newest-first, so anchor that bucket to the day before
+                        // the preceding bucket. These are approximate day anchors, never exact times.
+                        val parsedDate = if (label.isBlank()) null else historyDateFromLabel(label, today)
+                        val date = when {
+                            label.isBlank() -> inheritedDate
+                            parsedDate != null -> parsedDate
+                            else -> (inheritedDate ?: today).minusDays(1)
+                        }
+                        continuationDate = date
+                        shelf["contents"]?.let { walk(it, date) }
+                        shelf["continuations"]?.let { walk(it, date) }
+                        return
+                    }
+
+                    val row = node["musicResponsiveListItemRenderer"] as? JsonObject
+                    if (row != null) {
+                        val song = parseResponsiveListItem(row, credit)
+                        if (song != null && inheritedDate != null && !inheritedDate.isAfter(today)) {
+                            val noon = inheritedDate.atTime(12, 0).atZone(zone).toInstant().toEpochMilli()
+                            // A "Today" bucket can be viewed before noon. Never invent a future listen.
+                            val timestamp = if (inheritedDate == today) minOf(noon, nowMillis) else noon
+                            out += YtMusicHistoryEntry(song, timestamp, exact = false)
+                        }
+                        return
+                    }
+
+                    node.values.forEach { walk(it, inheritedDate) }
+                }
+                is JsonArray -> node.forEach { walk(it, inheritedDate) }
+                else -> Unit
+            }
+        }
+
+        walk(root, inheritedDate)
+        return DatedHistoryPage(out, continuationDate)
+    }
+
+    private fun historyDateFromLabel(label: String, today: LocalDate): LocalDate? {
+        val clean = label.trim()
+            .substringBefore(" · ")
+            .substringBefore(" • ")
+            .substringBefore(" (")
+            .trim()
+        when (clean.lowercase(Locale.ROOT)) {
+            "today" -> return today
+            "yesterday" -> return today.minusDays(1)
+        }
+
+        val weekday = DayOfWeek.values().firstOrNull {
+            it.getDisplayName(TextStyle.FULL, Locale.US).equals(clean, ignoreCase = true) ||
+                it.getDisplayName(TextStyle.SHORT, Locale.US).equals(clean, ignoreCase = true)
+        }
+        if (weekday != null) {
+            val difference = (today.dayOfWeek.value - weekday.value + 7) % 7
+            // Weekday-only headings mean the most recent past occurrence; Today has its own label.
+            return today.minusDays((if (difference == 0) 7 else difference).toLong())
+        }
+
+        val explicitPatterns = listOf(
+            "EEEE, MMMM d, uuuu",
+            "EEEE, MMM d, uuuu",
+            "EEEE, MMMM d",
+            "EEEE, MMM d",
+            "MMM d, uuuu",
+            "MMMM d, uuuu",
+            "M/d/uuuu",
+        )
+        for (pattern in explicitPatterns) {
+            val parsed = runCatching {
+                LocalDate.parse(clean, DateTimeFormatter.ofPattern(pattern, Locale.US))
+            }.getOrNull()
+            if (parsed != null) return parsed
+        }
+
+        val monthDayLabel = clean.replace(Regex("^[A-Za-z]+,\\s+"), "")
+        val monthDayPatterns = listOf("MMM d", "MMMM d")
+        for (pattern in monthDayPatterns) {
+            val parsed = runCatching {
+                MonthDay.parse(monthDayLabel, DateTimeFormatter.ofPattern(pattern, Locale.US)).atYear(today.year)
+            }.getOrNull() ?: continue
+            return if (parsed.isAfter(today)) parsed.minusYears(1) else parsed
+        }
+        return null
     }
 
     /** A playlist page's own tracks, the ones YouTube suggests adding, and the token for the rest. */

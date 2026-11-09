@@ -199,9 +199,9 @@ object QueueTimeline {
                     val followingUserQueue = (targetIndex + 1 until tiers.size).filter { tiers[it] == QueueTier.USER_QUEUE }
                     val allUpcomingUserQueue = crossedUserQueue + followingUserQueue
                     val followingContext = (targetIndex + 1 until tiers.size).filter { tiers[it] == QueueTier.CONTEXT }
-                    val followingAutoplay = (targetIndex + 1 until tiers.size).filter { tiers[it] == QueueTier.AUTOPLAY }
+                    val allUpcomingAutoplay = (currentIndex + 1 until tiers.size).filter { tiers[it] == QueueTier.AUTOPLAY }
 
-                    val order = precedingHistory + bypassedContext + target + allUpcomingUserQueue + followingContext + followingAutoplay
+                    val order = precedingHistory + bypassedContext + target + allUpcomingUserQueue + followingContext + allUpcomingAutoplay
                     val newTarget = precedingHistory.size + bypassedContext.size
                     JumpOrderPlan(isPureSeek = false, newOrderIndices = order, newTargetIndex = newTarget)
                 }
@@ -279,10 +279,14 @@ object QueueTimeline {
         if (songs.isEmpty()) return songs
         val at = startIndex.coerceIn(songs.indices)
         val rest = songs.filterIndexed { i, _ -> i != at }
+        val contextIndices = rest.indices.filter { rest[it].queueTier == QueueTier.CONTEXT }
+        val autoplayIndices = rest.indices.filter { rest[it].queueTier == QueueTier.AUTOPLAY }
+        val shuffledContext = avoidIdentityShuffle(contextIndices, contextIndices.shuffled()).map(rest::get)
+        val shuffledAutoplay = avoidIdentityShuffle(autoplayIndices, autoplayIndices.shuffled()).map(rest::get)
         return listOf(songs[at]) +
             rest.filter { it.queueTier == QueueTier.USER_QUEUE } +
-            rest.filter { it.queueTier == QueueTier.CONTEXT }.shuffled() +
-            rest.filter { it.queueTier == QueueTier.AUTOPLAY }.shuffled()
+            shuffledContext +
+            shuffledAutoplay
     }
 
     /**

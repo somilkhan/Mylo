@@ -3,6 +3,16 @@ package com.music.bitchord.auth
 import android.content.Context
 import android.content.SharedPreferences
 
+/** Keep the selected account when removing a different account; otherwise use the first remaining account. */
+internal fun remainingAccountIdAfterRemoval(
+    accountIds: List<String>,
+    activeAccountId: String?,
+    removedAccountId: String,
+): String? {
+    val remaining = accountIds.filterNot { it == removedAccountId }
+    return remaining.firstOrNull { it == activeAccountId } ?: remaining.firstOrNull()
+}
+
 /**
  * Encrypted-at-rest storage for credentials.
  *
@@ -86,12 +96,20 @@ class AuthStore(context: Context) {
     }
 
     fun removeAccount(accountId: String): GoogleAccountSession? {
-        val remaining = sessions.filterNot { it.accountId == accountId }
+        val current = sessions
+        val currentActiveAccountId = activeSession?.accountId
+        val removingActiveAccount = accountId == currentActiveAccountId
+        val remaining = current.filterNot { it.accountId == accountId }
         replaceSessions(remaining)
-        val fallback = remaining.firstOrNull()
+        val selectedId = remainingAccountIdAfterRemoval(
+            accountIds = current.map { it.accountId },
+            activeAccountId = currentActiveAccountId,
+            removedAccountId = accountId,
+        )
+        val fallback = remaining.firstOrNull { it.accountId == selectedId }
         select(fallback?.accountId.orEmpty(), fallback?.activeProfileId)
         prefs.edit().putString(KEY_COOKIE, fallback?.cookie).apply()
-        BrowserSession.clearGoogleCookies()
+        if (removingActiveAccount) BrowserSession.clearGoogleCookies()
         return fallback
     }
 

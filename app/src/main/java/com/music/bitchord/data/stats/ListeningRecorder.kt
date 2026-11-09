@@ -1,8 +1,13 @@
 package com.music.bitchord.data.stats
 
 import com.music.bitchord.data.YtMusicRepository
+import com.music.bitchord.data.DebugLog as Log
+import com.music.bitchord.data.generator.Play
+import com.music.bitchord.data.generator.PlaySource
+import com.music.bitchord.data.generator.ScrobbleHistory
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.model.durationMillis
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -43,46 +48,80 @@ import kotlin.math.min
  */
 object ListeningRecorder {
 
-    private var currentId: String? = null
-    private var lastSampleAt: Long = 0L
-    private var playedThisTrack: Long = 0L
-    private var playCounted = false
+    private val playClock = ListeningPlayClock()
     private var samplesSinceFlush = 0
 
     /**
-     * One tick of the player's sampler.
-     *
-     * [durationMs] is the decoder's figure when it has one; the row's stated
-     * runtime stands in until it does, and a track with neither simply has to
-     * clear the thirty-second floor to count as a play.
+     * Called by Media3 when the track first becomes audible. Unlike the progress
+     * sampler, this event is not delayed by its five-second sampling interval.
+     * Repeated notifications for the same uninterrupted track do not reset it.
+     */
+    @Synchronized
+    fun onStarted(song: Song, atMillis: Long = System.currentTimeMillis()) {
+        val trackIdentity = song.localUri?.takeIf { it.isNotBlank() }
+            ?: song.localPath?.takeIf { it.isNotBlank() }
+            ?: song.videoId
+        playClock.start(trackIdentity, atMillis)
+        // Start the lightweight catalogue lookup before the first qualifying
+        // play event so its album/artist metadata can be captured with history.
+        enriched(song)
+    }
+
+    /**
+     * One tick of the player's sampler. [durationMs] is the decoder's figure
+     * when it has one; the row's stated runtime stands in until it does, and a
+     * track with neither simply has to clear the thirty-second floor to count.
      */
     @Synchronized
     fun onSample(song: Song, durationMs: Long) {
         val now = System.currentTimeMillis()
-        if (song.videoId != currentId) {
-            // A new track anchors the clock and contributes nothing yet — see
-            // the class note on undercounting.
-            currentId = song.videoId
-            lastSampleAt = now
-            playedThisTrack = 0L
-            playCounted = false
-            return
-        }
-        val step = (now - lastSampleAt).coerceIn(0L, MAX_STEP_MS)
-        lastSampleAt = now
-        if (step <= 0L) return
-        playedThisTrack += step
-
+        val trackIdentity = song.localUri?.takeIf { it.isNotBlank() }
+            ?: song.localPath?.takeIf { it.isNotBlank() }
+            ?: song.videoId
         val length = durationMs.takeIf { it > 0 } ?: song.durationMillis()
         val threshold = if (length > 0) {
             min(length / 2, PLAY_CEILING_MS).coerceAtLeast(PLAY_FLOOR_MS)
         } else {
             PLAY_FLOOR_MS
         }
-        val counts = !playCounted && playedThisTrack >= threshold
-        if (counts) playCounted = true
+        val sample = playClock.sample(trackIdentity, now, threshold)
+        val step = sample.elapsedMillis
+        if (step <= 0L) return
+        val counts = sample.playStartedAtMillis != null
 
-        ListeningStats.record(enriched(song), step, counts)
+        val recordedSong = enriched(song)
+        ListeningStats.record(recordedSong, step, counts)
+
+        sample.playStartedAtMillis?.let { startedAtMillis ->
+            val play = Play(
+                videoId = recordedSong.videoId,
+                title = recordedSong.title,
+                artist = recordedSong.artist,
+                source = PlaySource.MYLO,
+                atMillis = startedAtMillis,
+                exact = true,
+                localUri = recordedSong.localUri,
+                thumbnailUrl = recordedSong.thumbnailUrl,
+                localPath = recordedSong.localPath,
+                durationText = recordedSong.durationText,
+                artistId = recordedSong.artistId,
+                albumId = recordedSong.albumId,
+                albumName = recordedSong.albumName,
+                isVideo = recordedSong.isVideo,
+                isVideoOrigin = recordedSong.isVideoOrigin,
+            )
+            // The sampler runs on the playback thread. Persist off-thread so a
+            // slow filesystem can never delay audio or the listening counters.
+            scope.launch {
+                try {
+                    ScrobbleHistory.append(listOf(play))
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    Log.w(TAG, "Could not persist Scrobble history", error)
+                }
+            }
+        }
 
         if (++samplesSinceFlush >= FLUSH_EVERY) {
             samplesSinceFlush = 0
@@ -99,9 +138,7 @@ object ListeningRecorder {
      */
     @Synchronized
     fun onStopped() {
-        currentId = null
-        playedThisTrack = 0L
-        playCounted = false
+        playClock.reset()
         samplesSinceFlush = 0
         ListeningStats.flush()
     }
@@ -154,7 +191,7 @@ object ListeningRecorder {
         // Only tracks YouTube can answer for. A file on the device and a
         // source-module track both carry ids this endpoint has never heard of,
         // and asking would be a failed request per play, forever.
-        if (song.localUri != null || song.videoId.length != YOUTUBE_ID_LENGTH) return song
+        if (song.localUri != null || song.localPath != null || song.videoId.length != YOUTUBE_ID_LENGTH) return song
         if (asked.add(song.videoId)) {
             scope.launch {
                 YtMusicRepository.trackLinks(song.videoId).getOrNull()?.let {
@@ -172,6 +209,8 @@ object ListeningRecorder {
      * — a busy main thread, a device coming out of doze — is still counted in
      * full, while the unbounded gap across a pause is not.
      */
+    private const val TAG = "ListeningRecorder"
+
     private const val MAX_STEP_MS = 8_000L
 
     /** Under half a minute is not a listen, however it ended. */
@@ -186,3 +225,58 @@ object ListeningRecorder {
     /** What a YouTube video id looks like, and nothing else this app plays does. */
     private const val YOUTUBE_ID_LENGTH = 11
 }
+
+/**
+ * Tracks one uninterrupted audible segment. The start instant comes from the
+ * player's audible-state/transition callbacks; the progress sampler only
+ * contributes elapsed listening time and decides when the play qualifies.
+ */
+internal class ListeningPlayClock(
+    private val maxStepMillis: Long = 8_000L,
+) {
+    private var trackIdentity: String? = null
+    private var lastSampleAtMillis = 0L
+    private var startedAtMillis = 0L
+    private var playedMillis = 0L
+    private var counted = false
+
+    fun start(identity: String, atMillis: Long) {
+        if (identity == trackIdentity) return
+        trackIdentity = identity
+        lastSampleAtMillis = atMillis
+        startedAtMillis = atMillis
+        playedMillis = 0L
+        counted = false
+    }
+
+    fun sample(identity: String, nowMillis: Long, thresholdMillis: Long): ListeningSample {
+        if (identity != trackIdentity) {
+            start(identity, nowMillis)
+            return ListeningSample(elapsedMillis = 0L)
+        }
+
+        val step = (nowMillis - lastSampleAtMillis).coerceIn(0L, maxStepMillis)
+        lastSampleAtMillis = nowMillis
+        if (step <= 0L) return ListeningSample(elapsedMillis = step)
+
+        playedMillis += step
+        if (!counted && playedMillis >= thresholdMillis.coerceAtLeast(1L)) {
+            counted = true
+            return ListeningSample(step, startedAtMillis)
+        }
+        return ListeningSample(elapsedMillis = step)
+    }
+
+    fun reset() {
+        trackIdentity = null
+        lastSampleAtMillis = 0L
+        startedAtMillis = 0L
+        playedMillis = 0L
+        counted = false
+    }
+}
+
+internal data class ListeningSample(
+    val elapsedMillis: Long,
+    val playStartedAtMillis: Long? = null,
+)

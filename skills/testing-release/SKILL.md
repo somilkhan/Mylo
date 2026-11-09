@@ -11,10 +11,24 @@ Always verify the workflow run for the commit under review; a prior green run is
 ## Local verification order
 
 1. Run the narrow regression test.
-2. Run `./gradlew --no-daemon :app:testDevDebugUnitTest`.
-3. Run `./gradlew --no-daemon :app:assembleDevDebug :tv:assembleDevDebug :wearos:assembleDevDebug`.
-4. If relevant, run desktop, backend and web checks from `CONTRIBUTING.md`.
-5. Review the diff, generated artifacts, logs and final commit; fix failures and rerun affected checks.
+2. Run `./gradlew --no-daemon :tv:compileDevDebugKotlin` to verify the shared phone-source TV variant and generated splash drawable without assembling an APK.
+3. Run `./gradlew --no-daemon :app:testDevDebugUnitTest`.
+4. When device/release artifacts are needed, run `./gradlew --no-daemon :app:assembleDevDebug :tv:assembleDevDebug :wearos:assembleDevDebug`.
+5. If relevant, run desktop, backend and web checks from `CONTRIBUTING.md`.
+6. Review the diff, generated artifacts, logs and final commit; fix failures and rerun affected checks.
+
+## Scrobble verification matrix
+
+- Fast feedback: ScrobbleFabTest, ScrobbleSessionIdentityTest, ScrobbleHistorySyncPolicyTest, ScrobbleGeneratorTest, ScrobbleMixTest, and ScrobblePlaylistStoreTest. These are JVM regression tests, not Compose rendering or hardware checks.
+- History paging lives in the shared JVM source set; run ./gradlew --no-daemon :shared:jvmTest to cover YtMusicRepositoryHistoryTest and parser/pagination behavior.
+- Required PR CI coverage: Android :tv:compileDevDebugKotlin plus :app:testDevDebugUnitTest, followed by :app:connectedDevDebugAndroidTest on the API 36 emulator; desktop compile; :shared:jvmTest :sharedUi:jvmTest :desktopUi:jvmTest; desktop unit tests; web tests and typecheck. Confirm every job is complete for the exact PR head SHA.
+- APK assembly is opt-in through workflow_dispatch with build_apks=true. Ordinary PR CI deliberately skips app/TV/Wear APK assembly and artifact upload. A green unit-test run does not imply an APK was installed or the app was opened.
+- Physical-device checklist for this feature: Home-only visibility; glass and standard nav placement; 360 dp/small-screen fit; large font; light/dark; reduced motion; scroll/fold behavior; FAB touch clearance; mini-player overlap; Back and tab-switch dismissal; generated queue/selected-row playback; local URI/path playback; background YouTube Music sync, account/profile switching, sign-out, explicit opt-out, reconnect and metered/unmetered constraints.
+- Keep DEVICE VERIFIED as NOT VERIFIED until those interactions are exercised on real hardware. Do not substitute a successful compile, JVM test, emulator screenshot or successful APK assembly for real audio/playback evidence.
+
+## Private history and backup rules
+
+Scrobble history is stored in `filesDir/scrobble_history.tsv` with an atomic sibling `scrobble_history.tsv.tmp`. Exclude both files from Android cloud backup and device transfer in `backup_rules.xml` and `data_extraction_rules.xml`. Revisit exclusions whenever the history store adds a journal, temporary, or sidecar file. Saved Scrobble mixes are a separate versioned SharedPreferences store; preserve `Song.localUri` and `Song.localPath` in its codec and test round-tripping local-file identity. Do not clear the stored JSON when decoding an unknown future schema.
 
 ## Report statuses independently
 
@@ -28,3 +42,8 @@ Always verify the workflow run for the commit under review; a prior green run is
 - NOT VERIFIED: evidence is unavailable or incomplete.
 
 Do not infer playback correctness, UI quality, installability, physical audio behavior or device performance from compilation alone. Release signing uses local `keystore.properties`; never commit signing material. Preserve GPL-3.0 notices and release source obligations.
+
+## Kotlin Multiplatform JVM test coverage
+
+- The desktop app test task does not execute test tasks from its project dependencies. CI and local verification must run :shared:jvmTest :sharedUi:jvmTest :desktopUi:jvmTest explicitly before :desktopApp:test.
+- The Android app suite is separate: run :app:testDevDebugUnitTest. A successful desktop test task does not cover Android-only code, and an Android unit-test pass does not execute the shared JVM-only test source sets.

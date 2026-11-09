@@ -1,11 +1,33 @@
 package com.music.bitchord
 
 import com.music.bitchord.data.LocalMediaRepository
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalMediaFilterTest {
+
+    @Test
+    fun disablingNonMusicFilterDoesNotApplyMediaStoreMusicFlagGate() {
+        assertEquals(null, LocalMediaRepository.localMusicSelection(filterNonMusic = false))
+        assertTrue(LocalMediaRepository.localMusicSelection(filterNonMusic = true)!!.contains("is_music"))
+    }
+
+    @Test
+    fun enabledFilterKeepsUnknownDurationAndExcludesSystemAudioKinds() {
+        val selection = requireNotNull(LocalMediaRepository.localMusicSelection(filterNonMusic = true))
+        assertTrue(selection.contains("is_music != 0"))
+        assertTrue(selection.contains("duration >= ?"))
+        assertTrue(selection.contains("duration <= 0"))
+        assertTrue(selection.contains("duration IS NULL"))
+        assertTrue(selection.contains("is_alarm = 0"))
+        assertTrue(selection.contains("is_notification = 0"))
+        assertTrue(selection.contains("is_ringtone = 0"))
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            assertTrue(selection.contains("is_podcast = 0"))
+        }
+    }
 
     @Test
     fun rejectsShortAudio() {
@@ -59,6 +81,35 @@ class LocalMediaFilterTest {
                 ),
             )
         }
+    }
+
+    @Test
+    fun filenameFallbackRemovesExtensionCaseInsensitively() {
+        assertTrue(
+            LocalMediaRepository.isEligibleLocalMusic(60_000, "Song.MP3", null),
+        )
+    }
+
+    @Test
+    fun filenameFallbackRemovesEverySupportedAudioExtension() {
+        for (extension in listOf("mp3", "m4a", "mp4", "flac", "wav", "ogg", "opus", "aac", "webm", "dsf", "dff", "3gp")) {
+            assertTrue(
+                extension,
+                LocalMediaRepository.isEligibleLocalMusic(
+                    durationMs = 60_000,
+                    displayName = "Song.$extension",
+                    path = null,
+                ),
+            )
+        }
+    }
+
+    @Test
+    fun scannerRecognizesAllEligibleAudioContainers() {
+        for (name in listOf("Song.mp3", "Song.m4a", "Song.mp4", "Song.flac", "Song.ogg", "Song.opus", "Song.aac", "Song.webm", "Song.dsf", "Song.dff", "Song.3gp")) {
+            assertTrue(name, LocalMediaRepository.isAudioFileName(name))
+        }
+        assertFalse(LocalMediaRepository.isAudioFileName("cover.jpg"))
     }
 
     @Test

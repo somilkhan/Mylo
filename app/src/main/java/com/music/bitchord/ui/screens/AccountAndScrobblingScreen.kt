@@ -20,6 +20,21 @@ import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.SwitchAccount
 import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import com.music.bitchord.data.generator.ScrobbleHistory
+import com.music.bitchord.data.generator.ScrobbleHistorySync
+import java.text.DateFormat
+import java.util.Date
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -68,6 +83,47 @@ fun AccountAndScrobblingScreen(
     val discordUsername by AppSettings.discordUsername.collectAsStateWithLifecycle()
     val discordRpcEnabled by AppSettings.discordRpcEnabled.collectAsStateWithLifecycle()
     val spotifyConnected by AppSettings.spotifySpdcToken.collectAsStateWithLifecycle()
+    val appContext = LocalContext.current.applicationContext
+    val historySyncPrefs = remember(appContext) {
+        appContext.getSharedPreferences(ScrobbleHistorySync.PREFS_NAME, android.content.Context.MODE_PRIVATE)
+    }
+    var historySyncEnabled by remember(historySyncPrefs) {
+        mutableStateOf(historySyncPrefs.getBoolean(ScrobbleHistorySync.KEY_ENABLED, false))
+    }
+    var historySyncStatus by remember(historySyncPrefs) {
+        mutableStateOf(historySyncPrefs.getString(ScrobbleHistorySync.KEY_LAST_STATUS, null))
+    }
+    var historyLastSyncAt by remember(historySyncPrefs) {
+        mutableStateOf(historySyncPrefs.getLong(ScrobbleHistorySync.KEY_LAST_SYNC_AT, 0L))
+    }
+    var historyLastAdded by remember(historySyncPrefs) {
+        mutableStateOf(historySyncPrefs.getInt(ScrobbleHistorySync.KEY_LAST_ADDED, 0))
+    }
+    var historyFetchedRows by remember(historySyncPrefs) {
+        mutableStateOf(historySyncPrefs.getInt(ScrobbleHistorySync.KEY_LAST_FETCHED_ROWS, 0))
+    }
+    var showForgetImportedHistory by remember { mutableStateOf(false) }
+    var historyActionMessage by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+
+    DisposableEffect(historySyncPrefs) {
+        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { prefs, key ->
+            when (key) {
+                ScrobbleHistorySync.KEY_ENABLED ->
+                    historySyncEnabled = prefs.getBoolean(ScrobbleHistorySync.KEY_ENABLED, false)
+                ScrobbleHistorySync.KEY_LAST_STATUS ->
+                    historySyncStatus = prefs.getString(ScrobbleHistorySync.KEY_LAST_STATUS, null)
+                ScrobbleHistorySync.KEY_LAST_SYNC_AT ->
+                    historyLastSyncAt = prefs.getLong(ScrobbleHistorySync.KEY_LAST_SYNC_AT, 0L)
+                ScrobbleHistorySync.KEY_LAST_ADDED ->
+                    historyLastAdded = prefs.getInt(ScrobbleHistorySync.KEY_LAST_ADDED, 0)
+                ScrobbleHistorySync.KEY_LAST_FETCHED_ROWS ->
+                    historyFetchedRows = prefs.getInt(ScrobbleHistorySync.KEY_LAST_FETCHED_ROWS, 0)
+            }
+        }
+        historySyncPrefs.registerOnSharedPreferenceChangeListener(listener)
+        onDispose { historySyncPrefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
 
     Column(
         modifier = modifier
@@ -105,6 +161,71 @@ fun AccountAndScrobblingScreen(
                 )
                 FullWidthDivider()
                 DestructiveRow(label = stringResource(R.string.sign_out), onClick = onSignOut)
+            }
+        }
+
+        SettingsGroup(
+            header = "YouTube Music history",
+            footer = "When enabled, imported history stays on this device. Sync uses your existing YouTube Music sign-in; refresh runs about every six hours whenever a network connection is available (Wi-Fi or mobile data). Imported rows are approximate.",
+        ) {
+            SettingsRow(
+                icon = Icons.Rounded.History,
+                title = "Background history sync",
+                subtitle = historySyncSubtitle(historySyncEnabled, historySyncStatus, historyLastSyncAt, historyLastAdded, historyFetchedRows),
+                trailing = {
+                    Switch(
+                        checked = historySyncEnabled,
+                        onCheckedChange = { enabled ->
+                            // Keep Compose responsive; SharedPreferences.apply/listeners are asynchronous.
+                            historySyncEnabled = enabled
+                            if (enabled) ScrobbleHistorySync.schedule(appContext)
+                            else ScrobbleHistorySync.cancel(appContext)
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedTrackColor = MaterialTheme.colorScheme.primary,
+                            checkedBorderColor = MaterialTheme.colorScheme.primary,
+                        ),
+                    )
+                },
+                onClick = {
+                    val enabled = !historySyncEnabled
+                    historySyncEnabled = enabled
+                    if (enabled) ScrobbleHistorySync.schedule(appContext)
+                    else ScrobbleHistorySync.cancel(appContext)
+                },
+            )
+            if (historySyncEnabled) {
+                FullWidthDivider()
+                SettingsRow(
+                    icon = Icons.Rounded.History,
+                    title = "Sync history now",
+                    subtitle = "Fetch the latest date-labelled listens immediately.",
+                    onClick = { ScrobbleHistorySync.schedule(appContext) },
+                )
+            }
+            if (shouldOfferYouTubeReconnect(signedIn, historySyncEnabled, historySyncStatus)) {
+                FullWidthDivider()
+                SettingsRow(
+                    icon = Icons.Rounded.History,
+                    title = "Reconnect YouTube Music",
+                    subtitle = "Use your existing YouTube Music sign-in to resume history sync.",
+                    onClick = onSignIn,
+                )
+            }
+            FullWidthDivider()
+            SettingsRow(
+                icon = Icons.Rounded.History,
+                title = "Forget imported history",
+                subtitle = "Remove imported listens only. Mylo's own listening history is kept.",
+                onClick = { showForgetImportedHistory = true },
+            )
+            if (historyActionMessage != null) {
+                Text(
+                    text = historyActionMessage.orEmpty(),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
             }
         }
 
@@ -352,6 +473,68 @@ fun AccountAndScrobblingScreen(
         }
 
         Spacer(Modifier.height(24.dp))
+    }
+
+    if (showForgetImportedHistory) {
+        AlertDialog(
+            onDismissRequest = { showForgetImportedHistory = false },
+            title = { Text("Forget imported history?") },
+            text = { Text("This removes imported YouTube Music and other external listening rows from this device. Mylo-recorded listens will remain.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showForgetImportedHistory = false
+                        scope.launch {
+                            withContext(Dispatchers.IO) { ScrobbleHistory.forgetImported() }
+                            historyActionMessage = "Imported history cleared."
+                        }
+                    },
+                ) { Text("Forget imported history") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showForgetImportedHistory = false }) { Text("Cancel") }
+            },
+        )
+    }
+}
+
+/**
+ * Expired sessions keep their stored account visible, so the ordinary signed-out
+ * action is hidden. Offer the existing sign-in flow only while sync is enabled
+ * and the worker has explicitly requested reconnection.
+ */
+internal fun shouldOfferYouTubeReconnect(
+    signedIn: Boolean,
+    syncEnabled: Boolean,
+    status: String?,
+): Boolean = signedIn && syncEnabled && status == ScrobbleHistorySync.STATUS_WAITING_FOR_SIGN_IN
+
+internal fun historySyncSubtitle(
+    enabled: Boolean,
+    status: String?,
+    lastSyncAt: Long,
+    lastAdded: Int,
+    fetchedRows: Int = 0,
+): String {
+    if (!enabled) return "Paused"
+    return when (status) {
+        ScrobbleHistorySync.STATUS_SYNCING -> "Syncing YouTube Music history…"
+        ScrobbleHistorySync.STATUS_WAITING_FOR_SIGN_IN ->
+            "Reconnect YouTube Music to resume history sync"
+        ScrobbleHistorySync.STATUS_WAITING_FOR_WIFI ->
+            "Waiting for a network connection"
+        ScrobbleHistorySync.STATUS_RETRYING ->
+            "Sync failed; will retry when connected"
+        ScrobbleHistorySync.STATUS_NO_DATED_ROWS ->
+            "No date-labelled rows found on last sync"
+        ScrobbleHistorySync.STATUS_UNDATED_ROWS ->
+            "YouTube history has tracks, but its date headings were not recognized"
+        ScrobbleHistorySync.STATUS_SUCCESS -> {
+            val time = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
+                .format(Date(lastSyncAt))
+            "Last sync $time · fetched $fetchedRows, added $lastAdded"
+        }
+        else -> "Sync about every six hours when connected"
     }
 }
 

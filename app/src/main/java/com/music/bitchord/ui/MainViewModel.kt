@@ -15,6 +15,7 @@ import com.music.bitchord.data.AppUpdateChecker
 import com.music.bitchord.data.LocalMediaRepository
 import com.music.bitchord.data.LikeState
 import com.music.bitchord.data.YtMusicRepository
+import com.music.bitchord.data.generator.ScrobbleHistorySync
 import com.music.bitchord.data.model.SPOTIFY_MISSING_PREFIX
 import com.music.bitchord.data.model.SPOTIFY_PENDING_PREFIX
 import com.music.bitchord.data.spotify.SPOTIFY_PAGE_PREFIX
@@ -102,6 +103,7 @@ import java.util.concurrent.atomic.AtomicLong
 /** What the Search tab searches: YouTube Music, or the Local Music folder on this device. */
 enum class SearchSource { YOUTUBE, LIBRARY, ADDONS }
 
+@OptIn(FlowPreview::class)
 class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private val authStore = AuthStore(app)
@@ -3122,6 +3124,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val oldAccountId = _activeAccountId.value
         val oldProfileId = _activeProfileId.value
         viewModelScope.launch {
+            ScrobbleHistorySync.onSessionChanging(getApplication())
             // Validate the exact cookie/profile pair before writing any of it.
             // The old implementation persisted first and unconditionally set
             // signedIn=true; a half-finished channel chooser therefore became
@@ -3147,6 +3150,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             }
             if (account == null) {
                 restoreActiveSession(oldAccountId, oldProfileId)
+                ScrobbleHistorySync.onSessionChanged(getApplication())
                 onComplete(false)
                 return@launch
             }
@@ -3163,6 +3167,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             }
             if (accountId == null) {
                 restoreActiveSession(oldAccountId, oldProfileId)
+                ScrobbleHistorySync.onSessionChanged(getApplication())
                 onComplete(false)
                 return@launch
             }
@@ -3211,6 +3216,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             if (wasSignedIn) clearListenerState()
             reloadForAccount()
             loadChannels(force = true)
+            ScrobbleHistorySync.onSessionChanged(getApplication())
+            // Login resumes history import only when the listener has enabled
+            // background sync in Settings; signing in alone is not consent.
+            ScrobbleHistorySync.onLogin(getApplication())
             onComplete(true)
         }
     }
@@ -3228,6 +3237,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val source = _googleAccounts.value.firstOrNull { it.accountId == accountId } ?: return
         val profile = supplied ?: source.profiles.firstOrNull { it.profileId == selectedProfileId } ?: return
         if (accountId == _activeAccountId.value && profile.profileId == _activeProfileId.value) return
+        ScrobbleHistorySync.onSessionChanging(getApplication())
         cacheCurrentListener()
         val index = source.profiles.indexOfFirst { it.profileId == profile.profileId }
         val updatedProfiles = if (index >= 0) {
@@ -3252,6 +3262,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         StreamResolver.onSessionChanged()
         clearListenerState(restoreCached = true)
         reloadForAccount()
+        ScrobbleHistorySync.onSessionChanged(getApplication())
     }
 
     /** Returns false at an edge, allowing the avatar to play its elastic cue. */
@@ -3263,9 +3274,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun removeAccount(accountId: String) {
+        val currentActiveAccountId = _activeAccountId.value ?: authStore.activeSession?.accountId
+        val removingActiveAccount = accountId == currentActiveAccountId
+        if (removingActiveAccount) ScrobbleHistorySync.onSessionChanging(getApplication())
         val fallback = authStore.removeAccount(accountId)
         _googleAccounts.value = authStore.sessions
         if (fallback == null) { signOut(); return }
+        // Removing an inactive account must not disturb the active listener or
+        // fence its background history worker. AuthStore preserves that session.
+        if (!removingActiveAccount) return
         selectProfile(fallback.accountId, fallback.activeProfileId ?: fallback.profiles.firstOrNull()?.profileId ?: return)
     }
 
@@ -3368,6 +3385,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             removeAccount(current)
             return
         }
+        ScrobbleHistorySync.onSignedOut(getApplication())
         authStore.signOut()
         Innertube.cookie = null
         // The mirror image: verdicts reached with a session in hand say nothing
