@@ -1,6 +1,7 @@
 package com.music.bitchord.ui.screens
 
 import com.music.bitchord.R
+import com.music.bitchord.data.ListeningHistory
 
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,6 +15,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -68,6 +70,7 @@ fun HistoryScreen(
     modifier: Modifier = Modifier,
 ) {
     val songs = (state as? UiState.Success)?.data.orEmpty()
+    val recordingEnabled by ListeningHistory.recordingEnabled.collectAsState()
     var confirmClear by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
     LaunchedEffect(listState, songs.size, hasMore, loadMoreFailed, state is UiState.Success) {
@@ -95,9 +98,14 @@ fun HistoryScreen(
                 TextButton(onClick = onSelectRemote) {
                     androidx.compose.material3.Text(if (!isLocal) "✓ YouTube Music" else "YouTube Music")
                 }
-                if (isLocal && songs.isNotEmpty()) {
-                    TextButton(onClick = { confirmClear = true }) {
-                        androidx.compose.material3.Text("Clear")
+                if (isLocal) {
+                    TextButton(onClick = { ListeningHistory.setRecordingEnabled(!recordingEnabled) }) {
+                        androidx.compose.material3.Text(if (recordingEnabled) "Pause recording" else "Resume recording")
+                    }
+                    if (songs.isNotEmpty()) {
+                        TextButton(onClick = { confirmClear = true }) {
+                            androidx.compose.material3.Text("Clear")
+                        }
                     }
                 }
             }
