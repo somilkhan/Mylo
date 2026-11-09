@@ -1,11 +1,15 @@
 package com.music.bitchord.data
 
 import com.music.bitchord.data.innertube.InnertubeParser
+import com.music.bitchord.data.innertube.buildPlaybackTrackingRequestBody
 import com.music.bitchord.data.model.Song
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.content
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import java.time.LocalDate
 import java.time.ZoneId
 import kotlin.test.Test
@@ -400,4 +404,47 @@ class YtMusicRepositoryHistoryTest {
 
         assertEquals(failure, result.exceptionOrNull())
     }
+    @Test
+    fun accountPlaybackTrackingRequestIncludesCurrentSignatureAndWebPoToken() {
+        val body = buildPlaybackTrackingRequestBody(
+            videoId = "abcdefghijk",
+            signatureTimestamp = 12345,
+            playerPoToken = "player-request-token",
+        )
+
+        assertEquals("abcdefghijk", body["videoId"]?.jsonPrimitive?.content)
+        assertEquals(
+            12345,
+            body["playbackContext"]?.jsonObject
+                ?.get("contentPlaybackContext")?.jsonObject
+                ?.get("signatureTimestamp")?.jsonPrimitive?.content?.toInt(),
+        )
+        assertEquals(
+            "player-request-token",
+            body["serviceIntegrityDimensions"]?.jsonObject
+                ?.get("poToken")?.jsonPrimitive?.content,
+        )
+    }
+
+    @Test
+    fun accountPlaybackTrackingRequestKeepsPoTokenWhenSignatureTimestampIsUnavailable() {
+        val body = buildPlaybackTrackingRequestBody(
+            videoId = "abcdefghijk",
+            signatureTimestamp = null,
+            playerPoToken = "player-request-token",
+        )
+
+        assertEquals(
+            "player-request-token",
+            body["serviceIntegrityDimensions"]?.jsonObject
+                ?.get("poToken")?.jsonPrimitive?.content,
+        )
+        assertEquals(
+            null,
+            body["playbackContext"]?.jsonObject
+                ?.get("contentPlaybackContext")?.jsonObject
+                ?.get("signatureTimestamp"),
+        )
+    }
+
 }
