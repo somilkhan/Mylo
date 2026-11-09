@@ -1582,7 +1582,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             when (feed) {
                 Feed.HOME -> refreshHome(identity)
                 Feed.EXPLORE -> fetchExplore()
-                Feed.LIBRARY -> fetchLibrary(identity)
+                Feed.LIBRARY -> {
+                    syncAccountLibrary(force = true)
+                    accountSyncJob?.join()
+                }
             }
             _refreshing.value = _refreshing.value - feed
         }
