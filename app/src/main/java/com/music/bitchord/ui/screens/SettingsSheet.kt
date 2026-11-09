@@ -195,6 +195,7 @@ fun SettingsScreen(
     onSyncNow: () -> Unit,
     accountSyncing: Boolean,
     accountSyncResult: SyncResult,
+    accountSyncStatus: String,
     contentPadding: PaddingValues,
     modifier: Modifier = Modifier,
 ) {
@@ -442,7 +443,7 @@ fun SettingsScreen(
                 }
                 val syncTitle = "Sync YouTube Music"
                 val syncSubtitle = when {
-                    accountSyncing -> "Syncing liked songs, albums, artists, playlists and history…"
+                    accountSyncing -> accountSyncStatus.ifBlank { "Syncing account library and history…" }
                     accountSyncResult == SyncResult.SYNCED -> "Library and listening history synced"
                     accountSyncResult == SyncResult.FAILED -> "Sync failed · tap to retry"
                     else -> "Refresh your library and listening history"
