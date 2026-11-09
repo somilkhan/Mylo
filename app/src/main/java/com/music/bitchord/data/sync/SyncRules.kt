@@ -99,7 +99,7 @@ class LikedSnapshotStore(private val directory: File) {
         val temporary = File(directory, file.name + ".tmp")
         temporary.writeText(buildString {
             appendLine(accountKey)
-            ids.forEach(::appendLine)
+            ids.forEach { appendLine(it) }
         })
         if (!temporary.renameTo(file)) {
             temporary.copyTo(file, overwrite = true)
