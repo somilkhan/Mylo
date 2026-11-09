@@ -9,7 +9,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.content
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.time.LocalDate
@@ -449,12 +449,12 @@ class YtMusicRepositoryHistoryTest {
             12345,
             body["playbackContext"]?.jsonObject
                 ?.get("contentPlaybackContext")?.jsonObject
-                ?.get("signatureTimestamp")?.jsonPrimitive?.content?.toInt(),
+                ?.get("signatureTimestamp")?.jsonPrimitive?.contentOrNull?.toInt(),
         )
         assertEquals(
             "player-request-token",
             body["serviceIntegrityDimensions"]?.jsonObject
-                ?.get("poToken")?.jsonPrimitive?.content,
+                ?.get("poToken")?.jsonPrimitive?.contentOrNull,
         )
     }
 
