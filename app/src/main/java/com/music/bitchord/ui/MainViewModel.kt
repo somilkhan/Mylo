@@ -1910,7 +1910,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 accountSnapshotStore.write(identity, snapshot)
                 if (identity != listenerKey()) return@launch
 
-                LikeState.seedLiked(likedSongs.mapTo(HashSet()) { it.videoId })
+                LikeState.replaceSeededLiked(likedSongs.mapTo(HashSet()) { it.videoId })
                 _library.value = if (snapshot.library.isEmpty) {
                     UiState.Error(text(R.string.library_empty))
                 } else {

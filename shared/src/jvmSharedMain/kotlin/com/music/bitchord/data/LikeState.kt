@@ -14,9 +14,11 @@ import kotlinx.coroutines.flow.asStateFlow
  */
 object LikeState {
     private val _overrides = MutableStateFlow<Map<String, LikeStatus>>(emptyMap())
+    private val seededLikedIds = mutableSetOf<String>()
     val overrides: StateFlow<Map<String, LikeStatus>> = _overrides.asStateFlow()
 
     fun set(videoId: String, status: LikeStatus) {
+        seededLikedIds.remove(videoId)
         _overrides.value += (videoId to status)
     }
 
@@ -37,11 +39,36 @@ object LikeState {
     fun seedLiked(videoIds: Set<String>) {
         if (videoIds.isEmpty()) return
         val next = _overrides.value.toMutableMap()
-        videoIds.forEach { next.putIfAbsent(it, LikeStatus.LIKE) }
+        videoIds.forEach { id ->
+            if (!next.containsKey(id)) {
+                next[id] = LikeStatus.LIKE
+                seededLikedIds += id
+            }
+        }
+        if (next != _overrides.value) _overrides.value = next
+    }
+
+    /**
+     * Replaces only the previous remote-seeded portion after a complete sync.
+     * Explicit menu/player changes in this session always survive the refresh.
+     */
+    fun replaceSeededLiked(videoIds: Set<String>) {
+        val next = _overrides.value.toMutableMap()
+        seededLikedIds.forEach { id ->
+            if (next[id] == LikeStatus.LIKE) next.remove(id)
+        }
+        seededLikedIds.clear()
+        videoIds.forEach { id ->
+            if (!next.containsKey(id)) {
+                next[id] = LikeStatus.LIKE
+                seededLikedIds += id
+            }
+        }
         if (next != _overrides.value) _overrides.value = next
     }
 
     fun clear() {
+        seededLikedIds.clear()
         _overrides.value = emptyMap()
     }
 }
