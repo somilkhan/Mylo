@@ -199,6 +199,7 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    val autoAccountSync by AppSettings.autoAccountSync.collectAsStateWithLifecycle()
 
     val wifiQuality by AppSettings.audioQualityWifi.collectAsStateWithLifecycle()
     val cellularQuality by AppSettings.audioQualityCellular.collectAsStateWithLifecycle()
@@ -425,6 +426,20 @@ fun SettingsScreen(
                 )
             }
             if (signedIn) {
+                val autoSyncTitle = "Automatic library sync"
+                row(autoSyncTitle, "automatic", "background", "library", "history") {
+                    SettingsRow(
+                        icon = Icons.Rounded.Cached,
+                        title = autoSyncTitle,
+                        subtitle = "Refresh your library and listening history in the background",
+                        trailing = {
+                            Switch(
+                                checked = autoAccountSync,
+                                onCheckedChange = AppSettings::setAutoAccountSync,
+                            )
+                        },
+                    )
+                }
                 val syncTitle = "Sync YouTube Music"
                 val syncSubtitle = when {
                     accountSyncing -> "Syncing liked songs, albums, artists, playlists and history…"

@@ -1447,6 +1447,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         startSearchPipeline()
         startSuggestPipeline()
         startTypeaheadMediaPipeline()
+        viewModelScope.launch {
+            AppSettings.autoAccountSync.drop(1).collect { enabled ->
+                if (enabled && _signedIn.value) syncAccountLibrary(force = false)
+            }
+        }
         loadHome()
         loadExplore()
         if (_signedIn.value) {
@@ -1823,6 +1828,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     if (!_historyIsLocal.value) publishCachedHistory(cached.historySections)
                 }
                 val now = System.currentTimeMillis()
+                if (!force && !AppSettings.autoAccountSync.value) {
+                    _accountSyncResult.value = SyncResult.NOTHING
+                    return@launch
+                }
                 if (!force && cached != null && now - cached.savedAt < ACCOUNT_SYNC_COOLDOWN_MS) {
                     _accountSyncResult.value = SyncResult.NOTHING
                     return@launch
@@ -3612,7 +3621,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             Innertube.ensureSessionScope()
             loadHome()
-            loadLibrary()
+            syncAccountLibrary(force = false)
             loadAccount()
             loadPlaylists()
         }
