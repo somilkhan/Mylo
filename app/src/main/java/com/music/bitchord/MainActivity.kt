@@ -797,6 +797,8 @@ private fun BitChordApp(
     val historyContinuation by viewModel.historyContinuation.collectAsStateWithLifecycle()
     val historyLoadingMore by viewModel.historyLoadingMore.collectAsStateWithLifecycle()
     val historyLoadMoreFailed by viewModel.historyLoadMoreFailed.collectAsStateWithLifecycle()
+    val accountSyncing by viewModel.accountSyncing.collectAsStateWithLifecycle()
+    val accountSyncResult by viewModel.accountSyncResult.collectAsStateWithLifecycle()
     val lyrics by viewModel.lyrics.collectAsStateWithLifecycle()
     val lyricsSource by viewModel.lyricsSource.collectAsStateWithLifecycle()
     val lyricsChecked by viewModel.lyricsChecked.collectAsStateWithLifecycle()
@@ -2911,6 +2913,9 @@ private fun BitChordApp(
                             onSpotifyCanvasAuth = { showSpotifyCanvasAuth = true },
                             onAppLanguage = { showAppLanguage = true },
                             onEditSignatureApi = { editingSignatureApi = true },
+                            onSyncNow = { viewModel.syncAccountLibrary(force = true) },
+                            accountSyncing = accountSyncing,
+                            accountSyncResult = accountSyncResult,
                             contentPadding = listPadding,
                         )
                     } else if (page != null) {

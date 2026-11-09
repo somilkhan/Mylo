@@ -149,6 +149,7 @@ import com.music.bitchord.data.NerdStats
 import com.music.bitchord.data.scrobbling.LastFM
 import com.music.bitchord.data.listentogether.ListenTogether
 import com.music.bitchord.data.settings.AppSettings
+import com.music.bitchord.data.sync.SyncResult
 import com.music.bitchord.data.settings.OutputPcmMode
 import com.music.bitchord.playback.AudioOutputStatus
 import com.music.bitchord.data.settings.AutomixPerformanceMode
@@ -191,6 +192,9 @@ fun SettingsScreen(
     onSpotifyCanvasAuth: () -> Unit,
     onAppLanguage: () -> Unit,
     onEditSignatureApi: () -> Unit,
+    onSyncNow: () -> Unit,
+    accountSyncing: Boolean,
+    accountSyncResult: SyncResult,
     contentPadding: PaddingValues,
     modifier: Modifier = Modifier,
 ) {
@@ -419,6 +423,24 @@ fun SettingsScreen(
                         ?: stringResource(if (signedIn) R.string.signed_in else R.string.not_signed_in),
                     onClick = onAccountScrobbling,
                 )
+            }
+            if (signedIn) {
+                val syncTitle = "Sync YouTube Music"
+                val syncSubtitle = when {
+                    accountSyncing -> "Syncing liked songs, albums, artists, playlists and history…"
+                    accountSyncResult == SyncResult.SYNCED -> "Library and listening history synced"
+                    accountSyncResult == SyncResult.FAILED -> "Sync failed · tap to retry"
+                    else -> "Refresh your library and listening history"
+                }
+                row(syncTitle, "sync", "library", "history", "albums", "artists", "playlists") {
+                    SettingsRow(
+                        icon = Icons.Rounded.Cached,
+                        title = syncTitle,
+                        subtitle = syncSubtitle,
+                        badge = "…" .takeIf { accountSyncing },
+                        onClick = onSyncNow,
+                    )
+                }
             }
             // Sits with the account rather than with Playback: a party is up to
             // five signed-in people, and being signed in is the whole of what
