@@ -166,7 +166,7 @@ fun AccountAndScrobblingScreen(
             SettingsRow(
                 icon = Icons.Rounded.History,
                 title = "Background history sync",
-                subtitle = historySyncSubtitle(historySyncEnabled, historySyncStatus, historyLastSyncAt, historyLastAdded),
+                subtitle = historySyncSubtitle(historySyncEnabled, historySyncStatus, historyLastSyncAt, historyLastAdded, historyFetchedRows),
                 trailing = {
                     Switch(
                         checked = historySyncEnabled,
@@ -526,7 +526,7 @@ internal fun historySyncSubtitle(
         ScrobbleHistorySync.STATUS_SUCCESS -> {
             val time = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
                 .format(Date(lastSyncAt))
-            "Last sync $time · $lastAdded new listens"
+            "Last sync $time · fetched $fetchedRows, added $lastAdded"
         }
         else -> "Sync about every six hours when connected"
     }
