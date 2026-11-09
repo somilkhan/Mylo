@@ -16,6 +16,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 /** Device-local listening log, separate from YouTube's account history. */
 object ListeningHistory {
@@ -23,7 +26,10 @@ object ListeningHistory {
 
     private const val PREFS = "listening_history"
     private const val KEY_ENTRIES = "entries"
+    private const val KEY_RECORDING_ENABLED = "recording_enabled"
     const val MIN_HEARD_MS = 2_000L
+    private val _recordingEnabled = MutableStateFlow(true)
+    val recordingEnabled: StateFlow<Boolean> = _recordingEnabled.asStateFlow()
 
     /** History includes a short skip after two seconds, independently of play-count thresholds. */
     fun shouldRecord(playedMs: Long, counted: Boolean): Boolean =
@@ -36,10 +42,20 @@ object ListeningHistory {
 
     fun init(context: Context) {
         appContext = context.applicationContext
+        _recordingEnabled.value = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getBoolean(KEY_RECORDING_ENABLED, true)
+    }
+
+    /** Pause/resume device-local logging without affecting YouTube Music account history. */
+    fun setRecordingEnabled(enabled: Boolean) {
+        if (!this::appContext.isInitialized) return
+        appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().putBoolean(KEY_RECORDING_ENABLED, enabled).apply()
+        _recordingEnabled.value = enabled
     }
 
     fun record(song: Song, startedAt: Long) {
-        if (!this::appContext.isInitialized || song.videoId.isBlank()) return
+        if (!this::appContext.isInitialized || !_recordingEnabled.value || song.videoId.isBlank()) return
         writer.launch {
             writeLock.withLock {
                 val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
