@@ -37,6 +37,7 @@ object ScrobbleHistorySync {
     const val KEY_LAST_SYNC_AT = "youtube_last_sync_at"
     const val KEY_LAST_ATTEMPT_AT = "youtube_last_sync_attempt_at"
     const val KEY_LAST_ADDED = "youtube_last_sync_added"
+    const val KEY_LAST_FETCHED_ROWS = "youtube_last_sync_fetched_rows"
     const val KEY_LAST_STATUS = "youtube_last_sync_status"
     private const val KEY_SESSION_GENERATION = "youtube_sync_session_generation"
     internal const val KEY_SESSION_SUSPENDED = "youtube_sync_session_suspended"
@@ -242,6 +243,7 @@ object ScrobbleHistorySync {
         expectedGeneration: Long,
         expectedIdentity: ScrobbleSessionIdentity,
         incoming: List<Play>,
+        fetchedRows: Int,
         syncedAtMillis: Long,
         status: String,
     ): Int? = synchronized(sessionLock) {
@@ -513,6 +515,7 @@ class ScrobbleHistorySyncWorker(
             val added = withContext(Dispatchers.IO) {
                 ScrobbleHistorySync.appendIfCurrentSession(
                     applicationContext, generation, identity, incoming,
+                    fetchedRows = entries.size,
                     syncedAtMillis = now, status = importStatus,
                 )
             } ?: return Result.success()
