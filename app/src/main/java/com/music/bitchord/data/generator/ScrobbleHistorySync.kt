@@ -136,6 +136,7 @@ object ScrobbleHistorySync {
                 prefs.edit()
                     .putLong(KEY_LAST_SYNC_AT, identityCursor)
                     .putInt(KEY_LAST_ADDED, 0)
+                    .putInt(KEY_LAST_FETCHED_ROWS, 0)
                     .remove(KEY_LAST_STATUS)
                     .apply()
             }
