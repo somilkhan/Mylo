@@ -17,6 +17,7 @@ object LikeState {
     private val seededLikedIds = mutableSetOf<String>()
     val overrides: StateFlow<Map<String, LikeStatus>> = _overrides.asStateFlow()
 
+    @Synchronized
     fun set(videoId: String, status: LikeStatus) {
         seededLikedIds.remove(videoId)
         _overrides.value += (videoId to status)
@@ -29,6 +30,7 @@ object LikeState {
      * rather than INDIFFERENT so the two stay distinct — and an explicit
      * override already made this session always wins.
      */
+    @Synchronized
     fun rememberStated(videoId: String, stated: LikeStatus?) {
         if (stated != null && stated != LikeStatus.INDIFFERENT && videoId !in _overrides.value) {
             set(videoId, stated)
@@ -36,6 +38,7 @@ object LikeState {
     }
 
     /** Seeds only ratings not already changed explicitly during this session. */
+    @Synchronized
     fun seedLiked(videoIds: Set<String>) {
         if (videoIds.isEmpty()) return
         val next = _overrides.value.toMutableMap()
@@ -52,6 +55,7 @@ object LikeState {
      * Replaces only the previous remote-seeded portion after a complete sync.
      * Explicit menu/player changes in this session always survive the refresh.
      */
+    @Synchronized
     fun replaceSeededLiked(videoIds: Set<String>) {
         val next = _overrides.value.toMutableMap()
         seededLikedIds.forEach { id ->
@@ -67,6 +71,7 @@ object LikeState {
         if (next != _overrides.value) _overrides.value = next
     }
 
+    @Synchronized
     fun clear() {
         seededLikedIds.clear()
         _overrides.value = emptyMap()
