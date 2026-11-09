@@ -69,6 +69,7 @@ fun HistoryScreen(
 ) {
     val songs = (state as? UiState.Success)?.data.orEmpty()
     var confirmClear by remember { mutableStateOf(false) }
+    var query by remember { mutableStateOf("") }
     LaunchedEffect(listState, songs.size, hasMore, loadMoreFailed, state is UiState.Success) {
         snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1 }
             .collect { lastVisible ->
@@ -101,6 +102,22 @@ fun HistoryScreen(
                 }
             }
         }
+        if (state is UiState.Success && songs.isNotEmpty()) {
+            item(key = "history:search") {
+                androidx.compose.material3.OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                    singleLine = true,
+                    placeholder = { androidx.compose.material3.Text("Search history") },
+                    trailingIcon = {
+                        if (query.isNotEmpty()) TextButton(onClick = { query = "" }) {
+                            androidx.compose.material3.Text("Clear")
+                        }
+                    },
+                )
+            }
+        }
         when (state) {
             is UiState.Loading -> songListSkeleton(count = 10, keyPrefix = "skeleton:history")
 
@@ -113,9 +130,17 @@ fun HistoryScreen(
             }
 
             is UiState.Success -> {
-                val songs = state.data
-                val displaySections = sections.ifEmpty { listOf(HistorySection("", songs)) }
-                val isCurrentRow = playingRowMatcher(songs, currentSong)
+                val allSongs = state.data
+                val sourceSections = sections.ifEmpty { listOf(HistorySection("", allSongs)) }
+                val displaySections = if (query.isBlank()) sourceSections else sourceSections.mapNotNull { section ->
+                    val matches = section.songs.filter { song ->
+                        song.title.contains(query, ignoreCase = true) ||
+                            song.artist.contains(query, ignoreCase = true)
+                    }
+                    matches.takeIf { it.isNotEmpty() }?.let { section.copy(songs = it) }
+                }
+                val visibleSongs = displaySections.flatMap { it.songs }
+                val isCurrentRow = playingRowMatcher(visibleSongs, currentSong)
                 // The videoId alone is not a key here: the feed is deduplicated
                 // on it, but a list keyed on something that could repeat is one
                 // bad response away from a crash. The index makes it total.
@@ -136,7 +161,7 @@ fun HistoryScreen(
                         val absoluteIndex = sectionOffset + index
                         SongRow(
                             song = song,
-                            onClick = { onSongClick(songs, absoluteIndex) },
+                            onClick = { onSongClick(visibleSongs, absoluteIndex) },
                             onLongPress = { onSongLongPress(song) },
                             onSwipeToQueue = { onSongSwipe(song) },
                             isCurrent = isCurrentRow(song),
@@ -144,7 +169,7 @@ fun HistoryScreen(
                             searchPlayingStyle = true,
                             activeTint = PlayingAccent,
                         )
-                        if (absoluteIndex < songs.lastIndex) {
+                        if (absoluteIndex < visibleSongs.lastIndex) {
                             HorizontalDivider(
                                 modifier = Modifier.padding(start = ROW_DIVIDER_INSET),
                                 thickness = 0.5.dp,
