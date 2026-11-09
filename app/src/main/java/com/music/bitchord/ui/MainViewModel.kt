@@ -1878,6 +1878,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 _accountSyncStatus.value = "Fetching account library…"
                 val remoteLibrary = YtMusicRepository.library().getOrElse {
                     _accountSyncResult.value = SyncResult.FAILED
+                    _accountSyncStatus.value = "Sync incomplete · previous saved data kept"
                     return@launch
                 }
                 val likedSongs = remoteLibrary.likedSongs.toMutableList()
@@ -1932,12 +1933,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 if (!complete) {
                     _accountSyncResult.value = SyncResult.FAILED
+                    _accountSyncStatus.value = "Sync incomplete · previous saved data kept"
                     return@launch
                 }
                 val remoteCount = likedSongs.size + remoteLibrary.librarySongs.size +
                     remoteLibrary.shelves.sumOf { it.items.size }
                 if (cached != null && !mayRemoveMissing(complete = true, remoteCount = remoteCount)) {
                     _accountSyncResult.value = SyncResult.FAILED
+                    _accountSyncStatus.value = "Sync incomplete · previous saved data kept"
                     return@launch
                 }
                 if (identity != listenerKey()) return@launch
@@ -1965,6 +1968,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 throw cancelled
             } catch (_: Exception) {
                 _accountSyncResult.value = SyncResult.FAILED
+                    _accountSyncStatus.value = "Sync incomplete · previous saved data kept"
             } finally {
                 if (identity == listenerKey()) _accountSyncing.value = false
             }
