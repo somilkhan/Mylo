@@ -21,6 +21,19 @@ class AccountAndScrobblingScreenTest {
     }
 
     @Test
+    fun successfulSyncDistinguishesFetchedRowsFromNewlyAddedRows() {
+        val subtitle = historySyncSubtitle(
+            enabled = true,
+            status = ScrobbleHistorySync.STATUS_SUCCESS,
+            lastSyncAt = 1_762_000_000_000L,
+            lastAdded = 0,
+            fetchedRows = 7,
+        )
+
+        assertTrue(subtitle.contains("fetched 7, added 0"))
+    }
+
+    @Test
     fun reconnectActionIsOnlyOfferedForAnEnabledSignedInSessionNeedingAuth() {
         assertTrue(
             shouldOfferYouTubeReconnect(
