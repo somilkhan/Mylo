@@ -600,9 +600,16 @@ object InnertubeParser {
                         }.ifBlank {
                             shelf.o("header").o("musicHeaderRenderer").o("title").s("simpleText").orEmpty()
                         }
-                        // Only inherit a date when the continuation has no heading. An unknown
-                        // heading must stay unknown rather than borrowing another day's date.
-                        val date = if (label.isBlank()) inheritedDate else historyDateFromLabel(label, today)
+                        // A headingless continuation belongs to the previous shelf. If YouTube
+                        // adds a new/locale-specific heading we cannot parse, do not discard its
+                        // tracks: history is newest-first, so anchor that bucket to the day before
+                        // the preceding bucket. These are approximate day anchors, never exact times.
+                        val parsedDate = if (label.isBlank()) null else historyDateFromLabel(label, today)
+                        val date = when {
+                            label.isBlank() -> inheritedDate
+                            parsedDate != null -> parsedDate
+                            else -> (inheritedDate ?: today).minusDays(1)
+                        }
                         continuationDate = date
                         shelf["contents"]?.let { walk(it, date) }
                         shelf["continuations"]?.let { walk(it, date) }
@@ -653,7 +660,15 @@ object InnertubeParser {
             return today.minusDays((if (difference == 0) 7 else difference).toLong())
         }
 
-        val explicitPatterns = listOf("MMM d, uuuu", "MMMM d, uuuu", "M/d/uuuu")
+        val explicitPatterns = listOf(
+            "EEEE, MMMM d, uuuu",
+            "EEEE, MMM d, uuuu",
+            "EEEE, MMMM d",
+            "EEEE, MMM d",
+            "MMM d, uuuu",
+            "MMMM d, uuuu",
+            "M/d/uuuu",
+        )
         for (pattern in explicitPatterns) {
             val parsed = runCatching {
                 LocalDate.parse(clean, DateTimeFormatter.ofPattern(pattern, Locale.US))
