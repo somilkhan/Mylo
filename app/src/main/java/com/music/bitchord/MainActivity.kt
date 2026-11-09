@@ -794,7 +794,6 @@ private fun BitChordApp(
     val historyState by viewModel.history.collectAsStateWithLifecycle()
     val historySections by viewModel.historySections.collectAsStateWithLifecycle()
     val historyIsLocal by viewModel.historyIsLocal.collectAsStateWithLifecycle()
-    val historyIsLocal by viewModel.historyIsLocal.collectAsStateWithLifecycle()
     val historyContinuation by viewModel.historyContinuation.collectAsStateWithLifecycle()
     val historyLoadingMore by viewModel.historyLoadingMore.collectAsStateWithLifecycle()
     val historyLoadMoreFailed by viewModel.historyLoadMoreFailed.collectAsStateWithLifecycle()

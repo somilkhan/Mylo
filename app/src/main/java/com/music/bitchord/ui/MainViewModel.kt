@@ -16,7 +16,6 @@ import com.music.bitchord.data.LocalMediaRepository
 import com.music.bitchord.data.LikeState
 import com.music.bitchord.data.YtMusicRepository
 import com.music.bitchord.data.ListeningHistory
-import com.music.bitchord.data.ListeningHistory
 import com.music.bitchord.data.model.SPOTIFY_MISSING_PREFIX
 import com.music.bitchord.data.model.SPOTIFY_PENDING_PREFIX
 import com.music.bitchord.data.spotify.SPOTIFY_PAGE_PREFIX
@@ -29,6 +28,7 @@ import com.music.bitchord.data.lyrics.LyricsRepository
 import com.music.bitchord.data.lyrics.LyricsSource
 import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.data.innertube.Innertube
+import com.music.bitchord.data.innertube.InnertubeParser
 import com.music.bitchord.data.innertube.PlaybackTracker
 import com.music.bitchord.data.innertube.StreamResolver
 import com.music.bitchord.auth.CapturedSession
@@ -567,8 +567,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val _history = MutableStateFlow<UiState<List<Song>>>(UiState.Loading)
     val history: StateFlow<UiState<List<Song>>> = _history.asStateFlow()
     private val _historyIsLocal = MutableStateFlow(true)
-    val historyIsLocal: StateFlow<Boolean> = _historyIsLocal.asStateFlow()
-    private val _historyIsLocal = MutableStateFlow(false)
     val historyIsLocal: StateFlow<Boolean> = _historyIsLocal.asStateFlow()
     private val _historySections = MutableStateFlow<List<InnertubeParser.HistorySection>>(emptyList())
     val historySections: StateFlow<List<InnertubeParser.HistorySection>> = _historySections.asStateFlow()
