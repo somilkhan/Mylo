@@ -61,18 +61,27 @@ object ListeningHistory {
             prefs.edit().remove(KEY_ENTRIES).apply()
             return
         }
+        val temporary = File(historyFile.parentFile, FILE_NAME + ".migration")
         runCatching {
             val rows = JSONArray(legacy)
             historyFile.parentFile?.mkdirs()
-            historyFile.bufferedWriter().use { writer ->
+            temporary.bufferedWriter().use { writer ->
                 for (i in 0 until rows.length()) {
                     val row = rows.optJSONObject(i) ?: continue
                     writer.append(row.toString())
                     writer.newLine()
                 }
             }
+            if (!temporary.renameTo(historyFile)) {
+                temporary.copyTo(historyFile, overwrite = true)
+                temporary.delete()
+            }
+            // Remove the legacy value only after the complete file is in place.
             prefs.edit().remove(KEY_ENTRIES).apply()
-        }.onFailure { android.util.Log.e("ListeningHistory", "Legacy history migration failed", it) }
+        }.onFailure {
+            temporary.delete()
+            android.util.Log.e("ListeningHistory", "Legacy history migration failed", it)
+        }
     }
 
     /** Pause/resume device-local logging without affecting YouTube Music account history. */
