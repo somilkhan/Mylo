@@ -141,12 +141,12 @@ object YtMusicRepository {
      * through either.
      */
     private suspend fun fetchHistory(): List<Song> =
-        InnertubeParser.collectSongsDeep(Innertube.browse(HISTORY)).distinctBy { it.videoId }
+        InnertubeParser.collectSongsDeep(Innertube.browse(HISTORY, languageOverride = "en")).distinctBy { it.videoId }
 
     /** Full account history for pages and recommendation exclusion; the Home shelf stays first-page only. */
     private suspend fun fetchAllHistorySongs(): List<Song> =
-        collectPagedYtMusicHistorySongs(Innertube.browse(HISTORY)) { token ->
-            Innertube.browseContinuation(token)
+        collectPagedYtMusicHistorySongs(Innertube.browse(HISTORY, languageOverride = "en")) { token ->
+            Innertube.browseContinuation(token, languageOverride = "en")
         }
 
     /**
@@ -169,12 +169,12 @@ object YtMusicRepository {
         notBeforeMillis: Long? = null,
     ): Result<List<YtMusicHistoryEntry>> = call("history:dated") {
         collectPagedYtMusicHistory(
-            firstPage = Innertube.browse(HISTORY),
+            firstPage = Innertube.browse(HISTORY, languageOverride = "en"),
             nowMillis = nowMillis,
             zone = zone,
             notBeforeMillis = notBeforeMillis,
         ) { token ->
-            Innertube.browseContinuation(token)
+            Innertube.browseContinuation(token, languageOverride = "en")
         }
     }
 
