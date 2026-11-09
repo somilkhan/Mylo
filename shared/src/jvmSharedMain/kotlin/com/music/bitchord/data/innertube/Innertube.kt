@@ -47,6 +47,31 @@ import java.util.Base64
 import java.util.Locale
 
 /**
+ * Account-scoped WEB_REMIX /player payload used to obtain history tracking URLs.
+ * Kept pure so the required signature timestamp and BotGuard token stay covered
+ * by JVM regression tests without making a live YouTube request.
+ */
+internal fun buildPlaybackTrackingRequestBody(
+    videoId: String,
+    signatureTimestamp: Int?,
+    playerPoToken: String,
+): JsonObject = buildJsonObject {
+    put("videoId", videoId)
+    put("contentCheckOk", true)
+    put("racyCheckOk", true)
+    putJsonObject("playbackContext") {
+        putJsonObject("contentPlaybackContext") {
+            put("html5Preference", "HTML5_PREF_WANTS")
+            put("referer", "https://music.youtube.com/watch?v=$videoId")
+            signatureTimestamp?.let { put("signatureTimestamp", it) }
+        }
+    }
+    putJsonObject("serviceIntegrityDimensions") {
+        put("poToken", playerPoToken)
+    }
+}
+
+/**
  * Minimal Innertube (youtubei) client.
  *
  * WEB_REMIX against music.youtube.com for browse/search/library. It returns
@@ -694,22 +719,9 @@ object Innertube {
         // start and could mint a token for a different session.
         val playerPoToken = InnerTubeXResolver.playerRequestPoToken(videoId, visitor)
             ?: throw IOException("account history tracking is waiting for a Web player PoToken")
+        val requestBody = buildPlaybackTrackingRequestBody(videoId, signatureTimestamp, playerPoToken)
         val response = postMusic("player") {
-            put("videoId", videoId)
-            put("contentCheckOk", true)
-            put("racyCheckOk", true)
-            putJsonObject("playbackContext") {
-                putJsonObject("contentPlaybackContext") {
-                    put("html5Preference", "HTML5_PREF_WANTS")
-                    put("referer", "$MUSIC_ORIGIN/watch?v=$videoId")
-                    signatureTimestamp?.let { put("signatureTimestamp", it) }
-                }
-            }
-            // WEB_REMIX's account-scoped /player endpoint rejects requests
-            // without this BotGuard player-request token.
-            putJsonObject("serviceIntegrityDimensions") {
-                put("poToken", playerPoToken)
-            }
+            requestBody.forEach { (key, value) -> put(key, value) }
         }
         val tracking = response["playbackTracking"]?.jsonObject
         if (tracking == null) {
