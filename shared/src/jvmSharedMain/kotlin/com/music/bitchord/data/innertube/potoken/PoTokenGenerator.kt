@@ -141,9 +141,12 @@ class PoTokenGenerator(
             }
         }
         TrackLog.d(TAG, "PO token generated successfully")
+        // The player request token is bound to the video id; the streaming
+        // token is bound to the visitor/session identifier. Keep this order
+        // aligned with YouTube's WEB_REMIX request contract.
         return PoTokenResult(
-            playerRequestPoToken = streamingPot,
-            streamingDataPoToken = playerPot,
+            playerRequestPoToken = playerPot,
+            streamingDataPoToken = streamingPot,
         )
     }
 
