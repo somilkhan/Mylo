@@ -687,15 +687,13 @@ object Innertube {
     suspend fun playbackTracking(videoId: String, signatureTimestamp: Int?): PlaybackTracking? {
         if (cookie == null) return null
         ensureSessionScope()
-        val visitor = ensureVisitorData() ?: return null
+        val visitor = ensureVisitorData()
+            ?: throw IOException("account history tracking is waiting for YouTube visitor data")
         // Share the exact BotGuard provider and visitor binding used by stream
         // extraction. A separately-created WebView would duplicate its cold
         // start and could mint a token for a different session.
         val playerPoToken = InnerTubeXResolver.playerRequestPoToken(videoId, visitor)
-            ?: run {
-                Log.w(TAG, "account history tracking unavailable: Web player PoToken could not be obtained")
-                return null
-            }
+            ?: throw IOException("account history tracking is waiting for a Web player PoToken")
         val response = postMusic("player") {
             put("videoId", videoId)
             put("contentCheckOk", true)
