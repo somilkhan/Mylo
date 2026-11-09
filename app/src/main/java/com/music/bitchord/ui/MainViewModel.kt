@@ -73,6 +73,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -2011,24 +2012,27 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             _history.value = UiState.Error(text(R.string.history_sign_in_required))
             return
         }
-        val identity = listenerKey()
+        val identity = listenerKey() ?: return
         _history.value = UiState.Loading
         _historyContinuation.value = null
         _historySections.value = emptyList()
         _historyLoadingMore.value = false
         _historyLoadMoreFailed.value = false
         viewModelScope.launch {
+            val cached = withContext(Dispatchers.IO) { accountSnapshotStore.read(identity) }
+            if (identity != listenerKey()) return@launch
+            cached?.let { publishCachedHistory(it.historySections) }
             val result = YtMusicRepository.historyPage()
             if (identity != listenerKey()) return@launch
-            _history.value = result.fold(
-                onSuccess = { page ->
-                    _historySections.value = page.sections
-                    _historyContinuation.value = page.continuation
-                    if (page.songs.isEmpty()) UiState.Error(text(R.string.history_empty))
+            result.onSuccess { page ->
+                _historySections.value = page.sections
+                _historyContinuation.value = page.continuation
+                _history.value = if (page.songs.isEmpty()) UiState.Error(text(R.string.history_empty))
                     else UiState.Success(page.songs)
-                },
-                onFailure = { UiState.Error(it.friendly()) },
-            )
+            }.onFailure {
+                // A failed refresh must not blank a complete history snapshot already on disk.
+                if (cached == null) _history.value = UiState.Error(it.friendly())
+            }
         }
     }
 
