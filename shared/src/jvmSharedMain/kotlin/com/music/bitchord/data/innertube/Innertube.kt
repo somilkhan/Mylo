@@ -1127,12 +1127,13 @@ object Innertube {
         val session = scope
         val clientVersion = webRemixVersion
         val requestLanguage = languageOverride ?: currentLanguage
+        val requestAcceptLanguage = if (languageOverride == null) acceptLanguageHeader else "en-US,en;q=0.9"
         val response = withRetry {
             client.post("$MUSIC_BASE/$endpoint") {
                 contentType(ContentType.Application.Json)
                 parameter("prettyPrint", "false")
                 parameter("hl", requestLanguage)
-                header("Accept-Language", acceptLanguageHeader)
+                header("Accept-Language", requestAcceptLanguage)
                 query.forEach { (key, value) -> parameter(key, value) }
                 header("X-Origin", MUSIC_ORIGIN)
                 header("Origin", MUSIC_ORIGIN)
