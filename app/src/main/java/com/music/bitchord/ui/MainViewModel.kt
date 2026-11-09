@@ -63,9 +63,12 @@ import com.music.bitchord.data.settings.SearchHistory
 import com.music.bitchord.download.Downloads
 import android.util.LruCache
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
@@ -117,6 +120,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private val authStore = AuthStore(app)
     private val accountSnapshotStore = AccountLibrarySnapshotStore(File(app.filesDir, "account-library-snapshots"))
+    private val accountSyncFailureHandler = CoroutineExceptionHandler { _, failure ->
+        android.util.Log.e("AccountSync", "Background account sync failed", failure)
+    }
+    private val accountSyncScope = CoroutineScope(SupervisorJob() + Dispatchers.IO + accountSyncFailureHandler)
     private var accountSyncJob: Job? = null
 
     // Process-wide, so the playback service offers Like on the same tracks.
@@ -1764,8 +1771,33 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 .filter { homeSeenTitles.add(it.title.lowercase(Locale.ROOT)) }
             if (shelves.isNotEmpty()) _home.value = UiState.Success(shelves)
         }
-        recent?.await()?.onSuccess { shelf ->
-            if (identity == listenerKey()) shelf?.let { publishHomeShelves(listOf(it), prepend = true) }
+        val recentShelf = recent?.await()?.getOrNull()
+        if (identity == listenerKey()) {
+            if (recentShelf != null) {
+                publishHomeShelves(listOf(recentShelf), prepend = true)
+            } else if (identity != null) {
+                // Recent activity is part of the account snapshot too, so Home
+                // can still show it when the live endpoint is unavailable.
+                val cached = withContext(Dispatchers.IO) { accountSnapshotStore.read(identity) }
+                val recentSongs = cached?.recentSongs.orEmpty()
+                if (identity == listenerKey() && recentSongs.isNotEmpty()) {
+                    publishHomeShelves(
+                        listOf(HomeShelf(
+                            title = "Recently played",
+                            items = recentSongs.map { song ->
+                                ShelfItem(
+                                    title = song.title,
+                                    subtitle = song.artist,
+                                    thumbnailUrl = song.thumbnailUrl,
+                                    videoId = song.videoId,
+                                    browseId = null,
+                                )
+                            },
+                        )),
+                        prepend = true,
+                    )
+                }
+            }
         }
     }
 
@@ -1817,7 +1849,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             _accountSyncResult.value = SyncResult.BUSY
             return
         }
-        accountSyncJob = viewModelScope.launch(Dispatchers.IO) {
+        accountSyncJob = accountSyncScope.launch {
             _accountSyncing.value = true
             _accountSyncResult.value = SyncResult.BUSY
             try {
