@@ -799,6 +799,7 @@ private fun BitChordApp(
     val historyLoadMoreFailed by viewModel.historyLoadMoreFailed.collectAsStateWithLifecycle()
     val accountSyncing by viewModel.accountSyncing.collectAsStateWithLifecycle()
     val accountSyncResult by viewModel.accountSyncResult.collectAsStateWithLifecycle()
+    val accountSyncStatus by viewModel.accountSyncStatus.collectAsStateWithLifecycle()
     val lyrics by viewModel.lyrics.collectAsStateWithLifecycle()
     val lyricsSource by viewModel.lyricsSource.collectAsStateWithLifecycle()
     val lyricsChecked by viewModel.lyricsChecked.collectAsStateWithLifecycle()
@@ -2916,6 +2917,7 @@ private fun BitChordApp(
                             onSyncNow = { viewModel.syncAccountLibrary(force = true) },
                             accountSyncing = accountSyncing,
                             accountSyncResult = accountSyncResult,
+                            accountSyncStatus = accountSyncStatus,
                             contentPadding = listPadding,
                         )
                     } else if (page != null) {
