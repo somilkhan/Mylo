@@ -2065,7 +2065,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val cached = withContext(Dispatchers.IO) { accountSnapshotStore.read(identity) }
             if (identity != listenerKey()) return@launch
-            cached?.let { publishCachedHistory(it.historySections) }
+            // A completed account sync already followed every history continuation and
+            // persisted the full remote feed. Do not replace that complete snapshot with the
+            // first page returned by historyPage(): doing so made older weeks/months disappear
+            // every time the History screen opened after Sync Now.
+            if (cached?.historySections?.isNotEmpty() == true) {
+                publishCachedHistory(cached.historySections)
+                return@launch
+            }
             val result = YtMusicRepository.historyPage()
             if (identity != listenerKey()) return@launch
             result.onSuccess { page ->
