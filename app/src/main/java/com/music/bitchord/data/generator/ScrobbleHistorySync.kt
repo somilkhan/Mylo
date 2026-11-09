@@ -265,6 +265,7 @@ object ScrobbleHistorySync {
             }
             putLong(KEY_LAST_ATTEMPT_AT, syncedAtMillis)
             putInt(KEY_LAST_ADDED, added)
+            putInt(KEY_LAST_FETCHED_ROWS, fetchedRows)
             putString(KEY_LAST_STATUS, status)
         }.apply()
         added
