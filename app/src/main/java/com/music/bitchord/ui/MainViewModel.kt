@@ -73,7 +73,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -1842,10 +1841,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                         break
                     }
                     if (identity != listenerKey()) return@launch
-                    val page = YtMusicRepository.moreSongs(likedToken).getOrElse {
+                    val pageResult = YtMusicRepository.moreSongs(likedToken)
+                    if (pageResult.isFailure) {
                         complete = false
                         break
                     }
+                    val page = pageResult.getOrThrow()
                     likedSongs += page.songs
                     likedToken = page.continuation
                 }
@@ -1864,10 +1865,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                         break
                     }
                     if (identity != listenerKey()) return@launch
-                    val page = YtMusicRepository.moreHistory(historyToken).getOrElse {
+                    val pageResult = YtMusicRepository.moreHistory(historyToken)
+                    if (pageResult.isFailure) {
                         complete = false
                         break
                     }
+                    val page = pageResult.getOrThrow()
                     appendHistorySections(historySections, page.sections)
                     historyToken = page.continuation
                 }
