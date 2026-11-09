@@ -9,6 +9,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -27,6 +28,7 @@ object ListeningHistory {
     private const val PREFS = "listening_history"
     private const val KEY_ENTRIES = "entries"
     private const val KEY_RECORDING_ENABLED = "recording_enabled"
+    private const val FILE_NAME = "listening-history.jsonl"
     const val MIN_HEARD_MS = 2_000L
     private val _recordingEnabled = MutableStateFlow(true)
     val recordingEnabled: StateFlow<Boolean> = _recordingEnabled.asStateFlow()
@@ -35,8 +37,8 @@ object ListeningHistory {
     fun shouldRecord(playedMs: Long, counted: Boolean): Boolean =
         counted || playedMs >= MIN_HEARD_MS
 
-    private const val MAX_ENTRIES = 2_000
     private lateinit var appContext: Context
+    private val historyFile: File get() = File(appContext.filesDir, FILE_NAME)
     private val writer = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val writeLock = Mutex()
 
@@ -44,6 +46,33 @@ object ListeningHistory {
         appContext = context.applicationContext
         _recordingEnabled.value = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .getBoolean(KEY_RECORDING_ENABLED, true)
+        migrateLegacyPreferences()
+    }
+
+    /**
+     * Move the old capped SharedPreferences array into an append-only private file.
+     * JSON-lines avoids the SharedPreferences XML size limit and avoids rewriting the
+     * complete listening log every time a track is played.
+     */
+    private fun migrateLegacyPreferences() {
+        val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val legacy = prefs.getString(KEY_ENTRIES, null) ?: return
+        if (historyFile.exists()) {
+            prefs.edit().remove(KEY_ENTRIES).apply()
+            return
+        }
+        runCatching {
+            val rows = JSONArray(legacy)
+            historyFile.parentFile?.mkdirs()
+            historyFile.bufferedWriter().use { writer ->
+                for (i in 0 until rows.length()) {
+                    val row = rows.optJSONObject(i) ?: continue
+                    writer.append(row.toString())
+                    writer.newLine()
+                }
+            }
+            prefs.edit().remove(KEY_ENTRIES).apply()
+        }.onFailure { android.util.Log.e("ListeningHistory", "Legacy history migration failed", it) }
     }
 
     /** Pause/resume device-local logging without affecting YouTube Music account history. */
@@ -58,21 +87,15 @@ object ListeningHistory {
         if (!this::appContext.isInitialized || !_recordingEnabled.value || song.videoId.isBlank()) return
         writer.launch {
             writeLock.withLock {
-                val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                val rows = runCatching { JSONArray(prefs.getString(KEY_ENTRIES, "[]")) }.getOrDefault(JSONArray())
-                rows.put(
-                    JSONObject()
-                        .put("id", song.videoId)
-                        .put("title", song.title)
-                        .put("artist", song.artist)
-                        .put("art", song.thumbnailUrl)
-                        .put("duration", song.durationText)
-                        .put("at", startedAt),
-                )
-                val trimmed = JSONArray()
-                val start = (rows.length() - MAX_ENTRIES).coerceAtLeast(0)
-                for (i in start until rows.length()) trimmed.put(rows.getJSONObject(i))
-                prefs.edit().putString(KEY_ENTRIES, trimmed.toString()).apply()
+                historyFile.parentFile?.mkdirs()
+                val row = JSONObject()
+                    .put("id", song.videoId)
+                    .put("title", song.title)
+                    .put("artist", song.artist)
+                    .put("art", song.thumbnailUrl)
+                    .put("duration", song.durationText)
+                    .put("at", startedAt)
+                historyFile.appendText(row.toString() + "\n")
             }
         }
     }
@@ -81,31 +104,42 @@ object ListeningHistory {
     suspend fun clear() = withContext(Dispatchers.IO) {
         if (!this@ListeningHistory::appContext.isInitialized) return@withContext
         writeLock.withLock {
+            historyFile.delete()
             appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                 .edit().remove(KEY_ENTRIES).apply()
         }
     }
 
     fun read(context: Context): List<Entry> {
-        val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val rows = runCatching { JSONArray(prefs.getString(KEY_ENTRIES, "[]")) }.getOrDefault(JSONArray())
-        return buildList(rows.length()) {
-            for (i in rows.length() - 1 downTo 0) {
-                val row = rows.optJSONObject(i) ?: continue
-                val id = row.optString("id").takeIf(String::isNotBlank) ?: continue
-                add(
-                    Entry(
-                        Song(
-                            videoId = id,
-                            title = row.optString("title", "Unknown title"),
-                            artist = row.optString("artist", "Unknown artist"),
-                            thumbnailUrl = row.optString("art").takeIf(String::isNotBlank),
-                            durationText = row.optString("duration").takeIf(String::isNotBlank),
-                        ),
-                        row.optLong("at"),
-                    ),
-                )
+        val file = File(context.applicationContext.filesDir, FILE_NAME)
+        if (!file.isFile) {
+            // Before init/migration has run, still expose any legacy entries.
+            val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            val rows = runCatching { JSONArray(prefs.getString(KEY_ENTRIES, "[]")) }.getOrDefault(JSONArray())
+            return parseRows((0 until rows.length()).mapNotNull { rows.optJSONObject(it) })
+        }
+        return runCatching {
+            file.useLines { lines ->
+                parseRows(lines.mapNotNull { line -> runCatching { JSONObject(line) }.getOrNull() }.toList())
             }
+        }.getOrDefault(emptyList())
+    }
+
+    private fun parseRows(rows: List<JSONObject>): List<Entry> = buildList(rows.size) {
+        for (row in rows.asReversed()) {
+            val id = row.optString("id").takeIf(String::isNotBlank) ?: continue
+            add(
+                Entry(
+                    Song(
+                        videoId = id,
+                        title = row.optString("title", "Unknown title"),
+                        artist = row.optString("artist", "Unknown artist"),
+                        thumbnailUrl = row.optString("art").takeIf(String::isNotBlank),
+                        durationText = row.optString("duration").takeIf(String::isNotBlank),
+                    ),
+                    row.optLong("at"),
+                ),
+            )
         }
     }
 
