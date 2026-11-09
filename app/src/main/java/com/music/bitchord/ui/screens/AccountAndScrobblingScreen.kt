@@ -99,6 +99,9 @@ fun AccountAndScrobblingScreen(
     var historyLastAdded by remember(historySyncPrefs) {
         mutableStateOf(historySyncPrefs.getInt(ScrobbleHistorySync.KEY_LAST_ADDED, 0))
     }
+    var historyFetchedRows by remember(historySyncPrefs) {
+        mutableStateOf(historySyncPrefs.getInt(ScrobbleHistorySync.KEY_LAST_FETCHED_ROWS, 0))
+    }
     var showForgetImportedHistory by remember { mutableStateOf(false) }
     var historyActionMessage by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
@@ -114,6 +117,8 @@ fun AccountAndScrobblingScreen(
                     historyLastSyncAt = prefs.getLong(ScrobbleHistorySync.KEY_LAST_SYNC_AT, 0L)
                 ScrobbleHistorySync.KEY_LAST_ADDED ->
                     historyLastAdded = prefs.getInt(ScrobbleHistorySync.KEY_LAST_ADDED, 0)
+                ScrobbleHistorySync.KEY_LAST_FETCHED_ROWS ->
+                    historyFetchedRows = prefs.getInt(ScrobbleHistorySync.KEY_LAST_FETCHED_ROWS, 0)
             }
         }
         historySyncPrefs.registerOnSharedPreferenceChangeListener(listener)
@@ -509,6 +514,7 @@ internal fun historySyncSubtitle(
     status: String?,
     lastSyncAt: Long,
     lastAdded: Int,
+    fetchedRows: Int = 0,
 ): String {
     if (!enabled) return "Paused"
     return when (status) {
