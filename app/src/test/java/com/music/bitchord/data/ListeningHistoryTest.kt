@@ -8,6 +8,13 @@ import org.junit.Assert.assertEquals
 
 class ListeningHistoryTest {
     @Test
+    fun shortSkipsAppearInHistoryWithoutCountingAsPlays() {
+        assertFalse(ListeningHistory.shouldRecord(1_999L, counted = false))
+        assertTrue(ListeningHistory.shouldRecord(2_000L, counted = false))
+        assertTrue(ListeningHistory.shouldRecord(500L, counted = true))
+    }
+
+    @Test
     fun groupsLocalPlaysByDayWithoutDeduplicatingRepeatedTracks() {
         val today = LocalDate.of(2026, 11, 9)
         val zone = ZoneId.systemDefault()

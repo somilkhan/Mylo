@@ -49,6 +49,7 @@ object ListeningRecorder {
     private var trackStartedAt: Long = 0L
     private var playedThisTrack: Long = 0L
     private var playCounted = false
+    private var historyRecorded = false
     private var samplesSinceFlush = 0
 
     /**
@@ -69,6 +70,7 @@ object ListeningRecorder {
             trackStartedAt = now
             playedThisTrack = 0L
             playCounted = false
+            historyRecorded = false
             return
         }
         val step = (now - lastSampleAt).coerceIn(0L, MAX_STEP_MS)
@@ -83,8 +85,11 @@ object ListeningRecorder {
             PLAY_FLOOR_MS
         }
         val counts = !playCounted && playedThisTrack >= threshold
-        if (counts) {
-            playCounted = true
+        if (counts) playCounted = true
+        // History is a listening log, not a play-count list: a two-second skip
+        // belongs here even though it is too short to count toward Replay stats.
+        if (!historyRecorded && ListeningHistory.shouldRecord(playedThisTrack, counts)) {
+            historyRecorded = true
             ListeningHistory.record(song, trackStartedAt)
         }
 
@@ -109,6 +114,7 @@ object ListeningRecorder {
         trackStartedAt = 0L
         playedThisTrack = 0L
         playCounted = false
+        historyRecorded = false
         samplesSinceFlush = 0
         ListeningStats.flush()
     }

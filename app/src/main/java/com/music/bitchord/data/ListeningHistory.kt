@@ -23,6 +23,12 @@ object ListeningHistory {
 
     private const val PREFS = "listening_history"
     private const val KEY_ENTRIES = "entries"
+    const val MIN_HEARD_MS = 2_000L
+
+    /** History includes a short skip after two seconds, independently of play-count thresholds. */
+    fun shouldRecord(playedMs: Long, counted: Boolean): Boolean =
+        counted || playedMs >= MIN_HEARD_MS
+
     private const val MAX_ENTRIES = 2_000
     private lateinit var appContext: Context
     private val writer = CoroutineScope(SupervisorJob() + Dispatchers.IO)
