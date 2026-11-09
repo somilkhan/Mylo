@@ -281,7 +281,7 @@ class YtMusicRepositoryHistoryTest {
     }
 
     @Test
-    fun unsupportedHistoryHeadingDoesNotInheritAnotherPagesDate() {
+    fun unrecognizedOlderHeadingStillImportsRowsWithAnApproximateDay() {
         val zone = ZoneId.of("UTC")
         val now = LocalDate.of(2026, 10, 29).atTime(9, 0).atZone(zone).toInstant().toEpochMilli()
         val yesterday = LocalDate.of(2026, 10, 28)
@@ -300,7 +300,37 @@ class YtMusicRepositoryHistoryTest {
 
         val entries = InnertubeParser.collectHistoryEntries(response, now, zone, yesterday)
 
-        assertEquals(emptyList(), entries)
+        assertEquals(listOf("unknown"), entries.map { it.song.videoId })
+        assertEquals(
+            LocalDate.of(2026, 10, 27).atTime(12, 0).atZone(zone).toInstant().toEpochMilli(),
+            entries.single().playedAtMillis,
+        )
+    }
+
+    @Test
+    fun weekdayAndMonthDateHeadingIsParsed() {
+        val zone = ZoneId.of("UTC")
+        val now = LocalDate.of(2026, 10, 29).atTime(9, 0).atZone(zone).toInstant().toEpochMilli()
+        val response = Json.parseToJsonElement(
+            """
+            {
+              "contents": [{
+                "musicShelfRenderer": {
+                  "title": {"runs": [{"text": "Sunday, October 25"}]},
+                  "contents": [${historyRow("weekday-date", "Weekday date track")}]
+                }
+              }]
+            }
+            """.trimIndent(),
+        )
+
+        val entries = InnertubeParser.collectHistoryEntries(response, now, zone)
+
+        assertEquals(listOf("weekday-date"), entries.map { it.song.videoId })
+        assertEquals(
+            LocalDate.of(2026, 10, 25).atTime(12, 0).atZone(zone).toInstant().toEpochMilli(),
+            entries.single().playedAtMillis,
+        )
     }
 
     @Test
