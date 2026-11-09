@@ -549,11 +549,14 @@ object Innertube {
 
     // ---- Public API ---------------------------------------------------------
 
-    suspend fun browse(browseId: String, params: String? = null): JsonObject =
-        postMusic("browse") {
-            put("browseId", browseId)
-            params?.let { put("params", it) }
-        }
+    suspend fun browse(
+        browseId: String,
+        params: String? = null,
+        languageOverride: String? = null,
+    ): JsonObject = postMusic("browse", languageOverride = languageOverride) {
+        put("browseId", browseId)
+        params?.let { put("params", it) }
+    }
 
     /**
      * The next page of a paged browse response — playlists and library feeds
@@ -561,8 +564,12 @@ object Innertube {
      * query parameters rather than in the body, and answers with a bare
      * continuation envelope carrying the same row renderers.
      */
-    suspend fun browseContinuation(token: String): JsonObject = postMusic(
+    suspend fun browseContinuation(
+        token: String,
+        languageOverride: String? = null,
+    ): JsonObject = postMusic(
         endpoint = "browse",
+        languageOverride = languageOverride,
         // The web client passes the token in the body and the older query-string
         // form is still honoured; both are sent so either is enough.
         query = mapOf("ctoken" to token, "continuation" to token, "type" to "next"),
@@ -1109,6 +1116,7 @@ object Innertube {
     private suspend fun postMusic(
         endpoint: String,
         query: Map<String, String> = emptyMap(),
+        languageOverride: String? = null,
         bodyExtras: JsonObjectBuilder.() -> Unit,
     ): JsonObject {
         // This is the common authenticated request path: Home, Library,
@@ -1118,11 +1126,12 @@ object Innertube {
         if (cookie != null) ensureSessionScope()
         val session = scope
         val clientVersion = webRemixVersion
+        val requestLanguage = languageOverride ?: currentLanguage
         val response = withRetry {
             client.post("$MUSIC_BASE/$endpoint") {
                 contentType(ContentType.Application.Json)
                 parameter("prettyPrint", "false")
-                parameter("hl", currentLanguage)
+                parameter("hl", requestLanguage)
                 header("Accept-Language", acceptLanguageHeader)
                 query.forEach { (key, value) -> parameter(key, value) }
                 header("X-Origin", MUSIC_ORIGIN)
@@ -1149,7 +1158,7 @@ object Innertube {
                             putJsonObject("client") {
                                 put("clientName", "WEB_REMIX")
                                 put("clientVersion", clientVersion)
-                                put("hl", currentLanguage)
+                                put("hl", requestLanguage)
                                 put("gl", currentRegion)
                                 visitorData?.let { put("visitorData", it) }
                             }
