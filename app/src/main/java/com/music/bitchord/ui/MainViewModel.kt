@@ -602,6 +602,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val accountSyncing: StateFlow<Boolean> = _accountSyncing.asStateFlow()
     private val _accountSyncResult = MutableStateFlow(SyncResult.NOTHING)
     val accountSyncResult: StateFlow<SyncResult> = _accountSyncResult.asStateFlow()
+    private val _accountSyncStatus = MutableStateFlow("")
+    val accountSyncStatus: StateFlow<String> = _accountSyncStatus.asStateFlow()
 
     /** In-memory cache is partitioned by account and profile; it is never shared. */
     private data class ListenerSnapshot(
@@ -1852,6 +1854,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         accountSyncJob = accountSyncScope.launch {
             _accountSyncing.value = true
             _accountSyncResult.value = SyncResult.BUSY
+            _accountSyncStatus.value = "Starting sync…"
             try {
                 val cached = accountSnapshotStore.read(identity)
                 if (identity != listenerKey()) return@launch
@@ -1872,6 +1875,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     return@launch
                 }
 
+                _accountSyncStatus.value = "Fetching account library…"
                 val remoteLibrary = YtMusicRepository.library().getOrElse {
                     _accountSyncResult.value = SyncResult.FAILED
                     return@launch
@@ -1896,6 +1900,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     likedToken = page.continuation
                 }
 
+                _accountSyncStatus.value = "Importing complete listening history…"
                 val firstHistory = YtMusicRepository.historyPage().getOrElse {
                     complete = false
                     null
@@ -1920,6 +1925,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     historyToken = page.continuation
                 }
 
+                _accountSyncStatus.value = "Fetching recently played tracks…"
                 val recentSongs = YtMusicRepository.recents().getOrElse {
                     complete = false
                     emptyList()
@@ -1936,6 +1942,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 if (identity != listenerKey()) return@launch
 
+                _accountSyncStatus.value = "Saving offline account snapshot…"
                 val snapshot = AccountLibrarySnapshot(
                     library = remoteLibrary.copy(likedSongs = likedSongs, likedContinuation = null),
                     historySections = historySections,
@@ -1953,6 +1960,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 if (!_historyIsLocal.value) publishCachedHistory(historySections)
                 _accountSyncResult.value = SyncResult.SYNCED
+                _accountSyncStatus.value = "Synced " + historySections.sumOf { it.songs.size } + " history plays"
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
