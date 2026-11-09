@@ -16,6 +16,10 @@ import com.music.bitchord.data.LocalMediaRepository
 import com.music.bitchord.data.LikeState
 import com.music.bitchord.data.YtMusicRepository
 import com.music.bitchord.data.ListeningHistory
+import com.music.bitchord.data.sync.AccountLibrarySnapshot
+import com.music.bitchord.data.sync.AccountLibrarySnapshotStore
+import com.music.bitchord.data.sync.SyncResult
+import com.music.bitchord.data.sync.mayRemoveMissing
 import com.music.bitchord.data.model.SPOTIFY_MISSING_PREFIX
 import com.music.bitchord.data.model.SPOTIFY_PENDING_PREFIX
 import com.music.bitchord.data.spotify.SPOTIFY_PAGE_PREFIX
@@ -58,6 +62,7 @@ import com.music.bitchord.data.model.EntityType
 import com.music.bitchord.data.settings.SearchHistory
 import com.music.bitchord.download.Downloads
 import android.util.LruCache
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
@@ -68,6 +73,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -97,6 +103,7 @@ import com.music.bitchord.ui.screens.CACHE_FOLDER_BROWSE_ID
 import com.music.bitchord.data.LocalGroup
 import com.music.bitchord.data.LocalGroups
 import com.music.bitchord.data.matchesSearch
+import java.io.File
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
@@ -104,9 +111,13 @@ import java.util.concurrent.atomic.AtomicLong
 /** What the Search tab searches: YouTube Music, or the Local Music folder on this device. */
 enum class SearchSource { YOUTUBE, LIBRARY, ADDONS }
 
+private const val ACCOUNT_SYNC_COOLDOWN_MS = 30 * 60 * 1000L
+
 class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private val authStore = AuthStore(app)
+    private val accountSnapshotStore = AccountLibrarySnapshotStore(File(app.filesDir, "account-library-snapshots"))
+    private var accountSyncJob: Job? = null
 
     // Process-wide, so the playback service offers Like on the same tracks.
     private val _signedIn = SignedIn.state(app)
@@ -579,6 +590,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _library = MutableStateFlow<UiState<LibraryPage>>(UiState.Loading)
     val library: StateFlow<UiState<LibraryPage>> = _library.asStateFlow()
+
+    private val _accountSyncing = MutableStateFlow(false)
+    val accountSyncing: StateFlow<Boolean> = _accountSyncing.asStateFlow()
+    private val _accountSyncResult = MutableStateFlow(SyncResult.NOTHING)
+    val accountSyncResult: StateFlow<SyncResult> = _accountSyncResult.asStateFlow()
 
     /** In-memory cache is partitioned by account and profile; it is never shared. */
     private data class ListenerSnapshot(
@@ -1434,7 +1450,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         loadHome()
         loadExplore()
         if (_signedIn.value) {
-            loadLibrary()
+            syncAccountLibrary(force = false)
             loadAccount()
             loadPlaylists()
         }
@@ -1772,27 +1788,154 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun loadLibrary() {
-        if (!_signedIn.value) return
-        val identity = listenerKey()
-        _library.value = UiState.Loading
-        viewModelScope.launch { fetchLibrary(identity) }
+    /** Refresh the account mirror, bypassing the automatic-sync cooldown. */
+    fun loadLibrary() = syncAccountLibrary(force = true)
+
+    /**
+     * Mirrors all account library shelves, the complete liked-song continuation chain,
+     * remote listening history and recent tracks into an account/profile-scoped local snapshot.
+     *
+     * Mylo has no Room library database: YouTube Music remains the source of truth, and this
+     * snapshot is an offline read-through cache. A failed, repeated-token or empty destructive
+     * response never replaces a previously populated snapshot.
+     */
+    fun syncAccountLibrary(force: Boolean = true) {
+        if (!_signedIn.value) {
+            _accountSyncResult.value = SyncResult.NOTHING
+            return
+        }
+        val identity = listenerKey() ?: return
+        if (accountSyncJob?.isActive == true) {
+            _accountSyncResult.value = SyncResult.BUSY
+            return
+        }
+        accountSyncJob = viewModelScope.launch(Dispatchers.IO) {
+            _accountSyncing.value = true
+            _accountSyncResult.value = SyncResult.BUSY
+            try {
+                val cached = accountSnapshotStore.read(identity)
+                if (identity != listenerKey()) return@launch
+                if (cached != null) {
+                    _library.value = if (cached.library.isEmpty) {
+                        UiState.Error(text(R.string.library_empty))
+                    } else UiState.Success(cached.library)
+                    LikeState.seedLiked(cached.library.likedSongs.mapTo(HashSet()) { it.videoId })
+                    if (!_historyIsLocal.value) publishCachedHistory(cached.historySections)
+                }
+                val now = System.currentTimeMillis()
+                if (!force && cached != null && now - cached.savedAt < ACCOUNT_SYNC_COOLDOWN_MS) {
+                    _accountSyncResult.value = SyncResult.NOTHING
+                    return@launch
+                }
+
+                val remoteLibrary = YtMusicRepository.library().getOrElse {
+                    _accountSyncResult.value = SyncResult.FAILED
+                    return@launch
+                }
+                val likedSongs = remoteLibrary.likedSongs.toMutableList()
+                var likedToken = remoteLibrary.likedContinuation
+                val seenLikedTokens = HashSet<String>()
+                var complete = true
+                while (likedToken != null) {
+                    if (!seenLikedTokens.add(likedToken)) {
+                        complete = false
+                        break
+                    }
+                    if (identity != listenerKey()) return@launch
+                    val page = YtMusicRepository.moreSongs(likedToken).getOrElse {
+                        complete = false
+                        break
+                    }
+                    likedSongs += page.songs
+                    likedToken = page.continuation
+                }
+
+                val firstHistory = YtMusicRepository.historyPage().getOrElse {
+                    complete = false
+                    null
+                }
+                val historySections = mutableListOf<InnertubeParser.HistorySection>()
+                var historyToken = firstHistory?.continuation
+                if (firstHistory != null) appendHistorySections(historySections, firstHistory.sections)
+                val seenHistoryTokens = HashSet<String>()
+                while (historyToken != null) {
+                    if (!seenHistoryTokens.add(historyToken)) {
+                        complete = false
+                        break
+                    }
+                    if (identity != listenerKey()) return@launch
+                    val page = YtMusicRepository.moreHistory(historyToken).getOrElse {
+                        complete = false
+                        break
+                    }
+                    appendHistorySections(historySections, page.sections)
+                    historyToken = page.continuation
+                }
+
+                val recentSongs = YtMusicRepository.recents().getOrElse {
+                    complete = false
+                    emptyList()
+                }
+                if (!complete) {
+                    _accountSyncResult.value = SyncResult.FAILED
+                    return@launch
+                }
+                val remoteCount = likedSongs.size + remoteLibrary.librarySongs.size +
+                    remoteLibrary.shelves.sumOf { it.items.size }
+                if (cached != null && !mayRemoveMissing(complete = true, remoteCount = remoteCount)) {
+                    _accountSyncResult.value = SyncResult.FAILED
+                    return@launch
+                }
+                if (identity != listenerKey()) return@launch
+
+                val snapshot = AccountLibrarySnapshot(
+                    library = remoteLibrary.copy(likedSongs = likedSongs, likedContinuation = null),
+                    historySections = historySections,
+                    recentSongs = recentSongs,
+                    savedAt = now,
+                )
+                accountSnapshotStore.write(identity, snapshot)
+                if (identity != listenerKey()) return@launch
+
+                LikeState.seedLiked(likedSongs.mapTo(HashSet()) { it.videoId })
+                _library.value = if (snapshot.library.isEmpty) {
+                    UiState.Error(text(R.string.library_empty))
+                } else {
+                    UiState.Success(snapshot.library)
+                }
+                if (!_historyIsLocal.value) publishCachedHistory(historySections)
+                _accountSyncResult.value = SyncResult.SYNCED
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                _accountSyncResult.value = SyncResult.FAILED
+            } finally {
+                if (identity == listenerKey()) _accountSyncing.value = false
+            }
+        }
     }
 
-    private suspend fun fetchLibrary(identity: String?) {
-        val next = YtMusicRepository.library().fold(
-            onSuccess = { page ->
-                // Liked Music is published with just its first page on the tab;
-                // the rest of the collection is synced into LikeState here, in
-                // this ViewModel's scope, so it is cancelled with the screen and
-                // a liked track past the first page still reads as liked.
-                page.likedContinuation?.let { token -> syncLikedMusic(identity, token) }
-                if (page.isEmpty) UiState.Error(text(R.string.library_empty))
-                else UiState.Success(page.copy(likedContinuation = null))
-            },
-            onFailure = { UiState.Error(it.friendly()) },
-        )
-        if (identity == listenerKey()) _library.value = next
+    private fun publishCachedHistory(sections: List<InnertubeParser.HistorySection>) {
+        val songs = sections.flatMap { it.songs }
+        _historySections.value = sections
+        _historyContinuation.value = null
+        _historyLoadingMore.value = false
+        _historyLoadMoreFailed.value = false
+        _history.value = if (songs.isEmpty()) UiState.Error(text(R.string.history_empty))
+            else UiState.Success(songs)
+    }
+
+    private fun appendHistorySections(
+        target: MutableList<InnertubeParser.HistorySection>,
+        incoming: List<InnertubeParser.HistorySection>,
+    ) {
+        if (incoming.isEmpty()) return
+        if (incoming.first().title.isBlank() && target.isNotEmpty()) {
+            val tail = target.last()
+            target[target.lastIndex] = tail.copy(songs = tail.songs + incoming.flatMap { it.songs })
+        } else {
+            target += incoming
+        }
     }
 
     /**
@@ -3417,6 +3560,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun clearListenerState(restoreCached: Boolean = false) {
+        accountSyncJob?.cancel()
+        accountSyncJob = null
+        _accountSyncing.value = false
+        _accountSyncResult.value = SyncResult.NOTHING
         _account.value = null
         likedSyncJob?.cancel()
         LikeState.clear()
