@@ -559,7 +559,7 @@ object YtMusicRepository {
                 }.distinctBy { it.videoId }
             }
             val shelves = LIBRARY_FEEDS
-                .filter { it.category != null && it.category in categories }
+                .filter { it.category == null || it.category in categories }
                 .map { feed ->
                     async {
                         HomeShelf(feed.title, buildList {

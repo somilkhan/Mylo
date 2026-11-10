@@ -1956,6 +1956,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     if (LibrarySyncCategory.ALBUMS in syncCategories) add("Albums")
                     if (LibrarySyncCategory.ARTISTS in syncCategories) add("Artists")
                     if (LibrarySyncCategory.PLAYLISTS in syncCategories) add(YtMusicRepository.PLAYLISTS_SHELF)
+                    add("Podcasts")
                 }
                 val syncedLibrarySongs = preserveNonEmptyOnEmptyRemote(
                     cached?.library?.librarySongs.orEmpty(),
