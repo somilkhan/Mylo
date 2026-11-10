@@ -1938,11 +1938,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     complete = false
                 }
 
-                _accountSyncStatus.value = "Fetching recently played tracks…"
-                val recentSongs = YtMusicRepository.recents().getOrElse {
-                    complete = false
-                    emptyList()
-                }
+                // Recents is a projection of the same account history feed in
+                // this repository. Derive it from the fully paged history rather
+                // than making a second request whose failure can masquerade as
+                // a successful empty result.
+                val recentSongs = historySections.flatMap { it.songs }.take(20)
                 if (!complete) {
                     _accountSyncResult.value = SyncResult.FAILED
                     _accountSyncStatus.value = "Sync incomplete · previous saved data kept"
