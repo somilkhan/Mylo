@@ -21,6 +21,14 @@ class SyncJobGeneration {
     fun owns(token: Long): Boolean = generation.get() == token
 }
 
+/** Automatic sync requires a validated internet route; battery saver defers metered work. */
+fun automaticSyncEligible(
+    hasInternet: Boolean,
+    validated: Boolean,
+    powerSave: Boolean,
+    metered: Boolean,
+): Boolean = hasInternet && validated && (!powerSave || !metered)
+
 /** Never interpret an empty or partial remote response as an instruction to delete local data. */
 fun mayRemoveMissing(complete: Boolean, remoteCount: Int): Boolean =
     complete && remoteCount > 0

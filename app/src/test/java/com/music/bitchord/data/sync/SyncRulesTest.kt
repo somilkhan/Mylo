@@ -23,6 +23,14 @@ class SyncRulesTest {
         assertFalse(generations.owns(second))
     }
 
+    @Test fun automaticSyncRequiresValidatedInternetAndRespectsBatterySaver() {
+        assertFalse(automaticSyncEligible(false, true, false, false))
+        assertFalse(automaticSyncEligible(true, false, false, false))
+        assertTrue(automaticSyncEligible(true, true, false, true))
+        assertFalse(automaticSyncEligible(true, true, true, true))
+        assertTrue(automaticSyncEligible(true, true, true, false))
+    }
+
     @Test fun onlyCompleteNonEmptyReadsMayRemove() {
         assertTrue(mayRemoveMissing(true, 20))
         assertFalse(mayRemoveMissing(false, 20))

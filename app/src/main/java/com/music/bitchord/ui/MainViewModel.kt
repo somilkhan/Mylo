@@ -24,6 +24,7 @@ import com.music.bitchord.data.sync.AccountLibrarySnapshot
 import com.music.bitchord.data.sync.AccountLibrarySnapshotStore
 import com.music.bitchord.data.sync.SyncResult
 import com.music.bitchord.data.sync.SyncJobGeneration
+import com.music.bitchord.data.sync.automaticSyncEligible
 import com.music.bitchord.data.sync.mayRemoveMissing
 import com.music.bitchord.data.sync.mergeRemoteRows
 import com.music.bitchord.data.model.SPOTIFY_MISSING_PREFIX
@@ -2101,9 +2102,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val connectivity = context.getSystemService(ConnectivityManager::class.java) ?: return false
         val activeNetwork = connectivity.activeNetwork ?: return false
         val capabilities = connectivity.getNetworkCapabilities(activeNetwork) ?: return false
-        if (!capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) return false
+        val hasInternet = capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+        val validated = capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
         val powerSave = context.getSystemService(PowerManager::class.java)?.isPowerSaveMode == true
-        return !powerSave || !connectivity.isActiveNetworkMetered
+        return automaticSyncEligible(
+            hasInternet = hasInternet,
+            validated = validated,
+            powerSave = powerSave,
+            metered = connectivity.isActiveNetworkMetered,
+        )
     }
 
     private fun publishCachedHistory(sections: List<InnertubeParser.HistorySection>) {
