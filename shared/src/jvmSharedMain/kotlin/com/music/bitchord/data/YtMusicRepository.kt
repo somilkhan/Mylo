@@ -496,11 +496,17 @@ object YtMusicRepository {
             // liked without holding this page open behind the whole list —
             // see [syncLikedMusic] and MainViewModel's fetchLibrary.
             val liked = async { browseSongs(LIKED_MUSIC).getOrNull() }
-            val added = async { runCatching { songsPaged(LIBRARY_SONGS) }.getOrDefault(emptyList()) }
+            val added = async {
+                (listOf(LIBRARY_SONGS, PRIVATE_LIBRARY_SONGS).flatMap { browseId ->
+                    runCatching { songsPaged(browseId) }.getOrDefault(emptyList())
+                }).distinctBy { it.videoId }
+            }
             val shelves = LIBRARY_FEEDS
-                .map { (title, browseId) ->
+                .map { (title, browseIds) ->
                     async {
-                        HomeShelf(title, runCatching { libraryItemsPaged(browseId) }.getOrDefault(emptyList()))
+                        HomeShelf(title, browseIds.flatMap { browseId ->
+                            runCatching { libraryItemsPaged(browseId) }.getOrDefault(emptyList())
+                        }.distinctBy { it.browseId ?: it.videoId ?: "${it.title}\\n${it.subtitle}" })
                     }
                 }
                 .awaitAll()
@@ -531,9 +537,17 @@ object YtMusicRepository {
     suspend fun libraryForSync(): Result<LibraryPage> = call("library:sync") {
         coroutineScope {
             val liked = async { browseSongs(LIKED_MUSIC).getOrThrow() }
-            val added = async { songsPagedStrict(LIBRARY_SONGS) }
-            val shelves = LIBRARY_FEEDS.map { (title, browseId) ->
-                async { HomeShelf(title, itemsPagedStrict(browseId)) }
+            val added = async {
+                buildList {
+                    listOf(LIBRARY_SONGS, PRIVATE_LIBRARY_SONGS).forEach { addAll(songsPagedStrict(it)) }
+                }.distinctBy { it.videoId }
+            }
+            val shelves = LIBRARY_FEEDS.map { (title, browseIds) ->
+                async {
+                    HomeShelf(title, buildList {
+                        browseIds.forEach { addAll(itemsPagedStrict(it)) }
+                    }.distinctBy { it.browseId ?: it.videoId ?: "${it.title}\\n${it.subtitle}" })
+                }
             }.awaitAll().filter { it.items.isNotEmpty() }
 
             val likedPage = liked.await()
@@ -907,6 +921,9 @@ object YtMusicRepository {
     /** Songs explicitly added to the library — distinct from Liked Music. */
     private const val LIBRARY_SONGS = "FEmusic_liked_videos"
 
+    /** Tracks uploaded privately to this YouTube Music account. */
+    private const val PRIVATE_LIBRARY_SONGS = "FEmusic_library_privately_owned_tracks"
+
     /** Saved and own playlists; also what the "add to playlist" picker lists. */
     private const val LIBRARY_PLAYLISTS = "FEmusic_liked_playlists"
 
@@ -923,11 +940,17 @@ object YtMusicRepository {
     const val PLAYLISTS_SHELF = "Playlists"
 
     private val LIBRARY_FEEDS = listOf(
-        PLAYLISTS_SHELF to LIBRARY_PLAYLISTS,
-        "Albums" to "FEmusic_liked_albums",
-        "Artists" to "FEmusic_library_corpus_track_artists",
-        "Subscriptions" to "FEmusic_library_corpus_artists",
-        "Podcasts" to "FEmusic_library_non_music_audio_list",
+        PLAYLISTS_SHELF to listOf(LIBRARY_PLAYLISTS),
+        "Albums" to listOf(
+            "FEmusic_liked_albums",
+            "FEmusic_library_privately_owned_releases",
+        ),
+        "Artists" to listOf(
+            "FEmusic_library_corpus_artists",
+            "FEmusic_library_corpus_track_artists",
+            "FEmusic_library_privately_owned_artists",
+        ),
+        "Podcasts" to listOf("FEmusic_library_non_music_audio_list"),
     )
 
     // ---- Writes -------------------------------------------------------------
