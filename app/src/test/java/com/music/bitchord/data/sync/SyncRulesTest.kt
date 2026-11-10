@@ -10,6 +10,19 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SyncRulesTest {
+    @Test fun onlyNewestSyncGenerationOwnsSharedState() {
+        val generations = SyncJobGeneration()
+        val first = generations.begin()
+        assertTrue(generations.owns(first))
+
+        val second = generations.begin()
+        assertFalse(generations.owns(first))
+        assertTrue(generations.owns(second))
+
+        generations.invalidate()
+        assertFalse(generations.owns(second))
+    }
+
     @Test fun onlyCompleteNonEmptyReadsMayRemove() {
         assertTrue(mayRemoveMissing(true, 20))
         assertFalse(mayRemoveMissing(false, 20))
