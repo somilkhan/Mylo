@@ -19,6 +19,7 @@ import com.music.bitchord.data.ListeningHistory
 import com.music.bitchord.data.sync.AccountLibrarySnapshot
 import com.music.bitchord.data.sync.AccountLibrarySnapshotStore
 import com.music.bitchord.data.sync.SyncResult
+import com.music.bitchord.data.sync.SyncJobGeneration
 import com.music.bitchord.data.sync.mayRemoveMissing
 import com.music.bitchord.data.model.SPOTIFY_MISSING_PREFIX
 import com.music.bitchord.data.model.SPOTIFY_PENDING_PREFIX
@@ -126,7 +127,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val accountSyncScope = CoroutineScope(SupervisorJob() + Dispatchers.IO + accountSyncFailureHandler)
     private var accountSyncJob: Job? = null
     // Prevent a cancelled, older sync from clearing the loading state of a newer one.
-    private val accountSyncGeneration = AtomicLong(0L)
+    private val accountSyncGeneration = SyncJobGeneration()
 
     // Process-wide, so the playback service offers Like on the same tracks.
     private val _signedIn = SignedIn.state(app)
@@ -1853,7 +1854,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             _accountSyncResult.value = SyncResult.BUSY
             return
         }
-        val syncGeneration = accountSyncGeneration.incrementAndGet()
+        val syncGeneration = accountSyncGeneration.begin()
         accountSyncJob = accountSyncScope.launch {
             _accountSyncing.value = true
             _accountSyncResult.value = SyncResult.BUSY
@@ -1983,7 +1984,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             } finally {
                 // Only the newest sync owns the shared indicator. A cancelled old job may
                 // complete after a new account/profile sync has already started.
-                if (accountSyncGeneration.get() == syncGeneration) {
+                if (accountSyncGeneration.owns(syncGeneration)) {
                     _accountSyncing.value = false
                 }
             }
