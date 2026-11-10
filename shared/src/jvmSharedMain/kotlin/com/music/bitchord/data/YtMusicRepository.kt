@@ -546,10 +546,7 @@ object YtMusicRepository {
                 // the "Liked Music" list doesn't already cover is worth a
                 // second section.
                 librarySongs = added.await().filterNot { it.videoId in likedIds },
-                shelves = shelves + listOfNotNull(
-                    recentActivity.await().takeIf { it.isNotEmpty() }
-                        ?.let { HomeShelf("Recent activity", it) },
-                ),
+                shelves = shelves,
                 likedContinuation = likedPage?.continuation,
             )
         }
@@ -621,7 +618,10 @@ object YtMusicRepository {
             LibraryPage(
                 likedSongs = likedPage?.songs.orEmpty(),
                 librarySongs = added.await().filterNot { it.videoId in likedIds },
-                shelves = shelves,
+                shelves = shelves + listOfNotNull(
+                    recentActivity.await().takeIf { it.isNotEmpty() }
+                        ?.let { HomeShelf("Recent activity", it) },
+                ),
                 likedContinuation = likedPage?.continuation,
             )
         }
