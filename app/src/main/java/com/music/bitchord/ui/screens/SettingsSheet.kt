@@ -487,7 +487,7 @@ fun SettingsScreen(
                 }
                 row("Sync mode", "read only", "read write", "youtube") {
                     SettingsRow(
-                        icon = Icons.Rounded.Sync,
+                        icon = Icons.Rounded.Cached,
                         title = "Sync mode",
                         subtitle = if (accountSyncMode == AccountSyncMode.RW) {
                             "Read and write · changes can reach YouTube Music"

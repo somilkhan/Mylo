@@ -1112,6 +1112,20 @@ object AppSettings {
         prefs.edit().putBoolean(KEY_ACCOUNT_SYNC_OVERWRITE, value).apply()
     }
 
+    fun accountSyncCategoriesDue(
+        categories: Set<LibrarySyncCategory>,
+        now: Long,
+        cooldownMs: Long,
+    ): Set<LibrarySyncCategory> = categories.filterTo(linkedSetOf()) { category ->
+        now - prefs.getLong(KEY_ACCOUNT_SYNC_LAST_PREFIX + category.name, 0L) >= cooldownMs
+    }
+
+    fun markAccountSyncCategoriesSynced(categories: Set<LibrarySyncCategory>, at: Long) {
+        prefs.edit().apply {
+            categories.forEach { putLong(KEY_ACCOUNT_SYNC_LAST_PREFIX + it.name, at) }
+        }.apply()
+    }
+
     fun setShuffleEnabled(value: Boolean) {
         shuffleEnabled.value = value
         prefs.edit().putBoolean(KEY_SHUFFLE_ENABLED, value).apply()
@@ -2061,6 +2075,7 @@ object AppSettings {
     private const val KEY_ACCOUNT_SYNC_CATEGORIES = "account_sync_categories"
     private const val KEY_ACCOUNT_SYNC_MODE = "account_sync_mode"
     private const val KEY_ACCOUNT_SYNC_OVERWRITE = "account_sync_overwrite"
+    private const val KEY_ACCOUNT_SYNC_LAST_PREFIX = "account_sync_last_"
     private const val KEY_SHUFFLE_ENABLED = "shuffle_enabled"
     private const val KEY_REPEAT_MODE = "repeat_mode"
     private const val KEY_NERD_STATS = "show_nerd_stats"

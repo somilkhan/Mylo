@@ -1,6 +1,9 @@
 package com.music.bitchord.ui
 
 import android.app.Application
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.os.PowerManager
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.music.bitchord.R
@@ -1869,13 +1872,28 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     _accountSyncResult.value = SyncResult.NOTHING
                     return@launch
                 }
-                if (!force && cached != null && now - cached.savedAt < ACCOUNT_SYNC_COOLDOWN_MS) {
+                val selectedCategories = AppSettings.accountSyncCategories.value
+                val syncCategories = if (force) {
+                    selectedCategories
+                } else {
+                    if (!automaticAccountSyncAllowed()) {
+                        _accountSyncResult.value = SyncResult.NOTHING
+                        _accountSyncStatus.value = "Automatic sync waiting for an eligible connection"
+                        return@launch
+                    }
+                    AppSettings.accountSyncCategoriesDue(
+                        selectedCategories,
+                        now,
+                        ACCOUNT_SYNC_COOLDOWN_MS,
+                    )
+                }
+                if (syncCategories.isEmpty()) {
                     _accountSyncResult.value = SyncResult.NOTHING
+                    _accountSyncStatus.value = "Selected sync categories are up to date"
                     return@launch
                 }
 
-                _accountSyncStatus.value = "Fetching account library…"
-                val syncCategories = AppSettings.accountSyncCategories.value
+                _accountSyncStatus.value = "Fetching selected account categories…"
                 val remoteLibrary = YtMusicRepository.libraryForSync(syncCategories).getOrElse {
                     _accountSyncResult.value = SyncResult.FAILED
                     _accountSyncStatus.value = "Sync failed · previous saved data kept"
@@ -2010,6 +2028,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     savedAt = now,
                 )
                 accountSnapshotStore.write(identity, snapshot)
+                AppSettings.markAccountSyncCategoriesSynced(syncCategories, now)
                 if (identity != listenerKey()) return@launch
 
                 LikeState.replaceSeededLiked(syncedLikedSongs.mapTo(HashSet()) { it.videoId })
@@ -2036,6 +2055,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
         }
+    }
+
+    private fun automaticAccountSyncAllowed(): Boolean {
+        val context = getApplication<Application>()
+        val connectivity = context.getSystemService(ConnectivityManager::class.java) ?: return false
+        val activeNetwork = connectivity.activeNetwork ?: return false
+        val capabilities = connectivity.getNetworkCapabilities(activeNetwork) ?: return false
+        if (!capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) return false
+        val powerSave = context.getSystemService(PowerManager::class.java)?.isPowerSaveMode == true
+        return !powerSave || !connectivity.isActiveNetworkMetered
     }
 
     private fun publishCachedHistory(sections: List<InnertubeParser.HistorySection>) {
