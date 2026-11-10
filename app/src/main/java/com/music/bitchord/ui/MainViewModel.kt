@@ -125,6 +125,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
     private val accountSyncScope = CoroutineScope(SupervisorJob() + Dispatchers.IO + accountSyncFailureHandler)
     private var accountSyncJob: Job? = null
+    // Prevent a cancelled, older sync from clearing the loading state of a newer one.
+    private val accountSyncGeneration = AtomicLong(0L)
 
     // Process-wide, so the playback service offers Like on the same tracks.
     private val _signedIn = SignedIn.state(app)
@@ -1851,6 +1853,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             _accountSyncResult.value = SyncResult.BUSY
             return
         }
+        val syncGeneration = accountSyncGeneration.incrementAndGet()
         accountSyncJob = accountSyncScope.launch {
             _accountSyncing.value = true
             _accountSyncResult.value = SyncResult.BUSY
@@ -1978,9 +1981,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 _accountSyncResult.value = SyncResult.FAILED
                     _accountSyncStatus.value = "Sync incomplete · previous saved data kept"
             } finally {
-                // The job may finish after the user switches Google account/profile.
-                // The old identity must not leave the global Settings spinner stuck on.
-                _accountSyncing.value = false
+                // Only the newest sync owns the shared indicator. A cancelled old job may
+                // complete after a new account/profile sync has already started.
+                if (accountSyncGeneration.get() == syncGeneration) {
+                    _accountSyncing.value = false
+                }
             }
         }
     }
@@ -3640,6 +3645,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun clearListenerState(restoreCached: Boolean = false) {
+        // Invalidate the old job before cancelling it; its finally block must not
+        // mutate the next listener's sync indicator.
+        accountSyncGeneration.incrementAndGet()
         accountSyncJob?.cancel()
         accountSyncJob = null
         _accountSyncing.value = false
