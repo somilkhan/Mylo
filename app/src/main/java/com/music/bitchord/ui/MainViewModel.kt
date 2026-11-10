@@ -1882,6 +1882,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                         return@launch
                     }
                     AppSettings.accountSyncCategoriesDue(
+                        identity,
                         selectedCategories,
                         now,
                         ACCOUNT_SYNC_COOLDOWN_MS,
@@ -2028,8 +2029,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     savedAt = now,
                 )
                 accountSnapshotStore.write(identity, snapshot)
-                AppSettings.markAccountSyncCategoriesSynced(syncCategories, now)
                 if (identity != listenerKey()) return@launch
+                AppSettings.markAccountSyncCategoriesSynced(identity, syncCategories, now)
 
                 LikeState.replaceSeededLiked(syncedLikedSongs.mapTo(HashSet()) { it.videoId })
                 _library.value = if (snapshot.library.isEmpty) {

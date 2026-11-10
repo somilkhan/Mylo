@@ -17,6 +17,7 @@ import com.music.bitchord.data.AccountSyncMode
 import com.music.bitchord.data.YtMusicRepository
 import com.music.bitchord.playback.EqLayout
 import com.music.bitchord.playback.EqualizerPreset
+import java.security.MessageDigest
 import kotlinx.coroutines.flow.MutableStateFlow
 
 
@@ -1112,17 +1113,26 @@ object AppSettings {
         prefs.edit().putBoolean(KEY_ACCOUNT_SYNC_OVERWRITE, value).apply()
     }
 
+    private fun accountSyncIdentityKey(accountKey: String): String =
+        MessageDigest.getInstance("SHA-256").digest(accountKey.toByteArray())
+            .take(12).joinToString("") { "%02x".format(it) }
+
     fun accountSyncCategoriesDue(
+        accountKey: String,
         categories: Set<LibrarySyncCategory>,
         now: Long,
         cooldownMs: Long,
-    ): Set<LibrarySyncCategory> = categories.filterTo(linkedSetOf()) { category ->
-        now - prefs.getLong(KEY_ACCOUNT_SYNC_LAST_PREFIX + category.name, 0L) >= cooldownMs
+    ): Set<LibrarySyncCategory> {
+        val identity = accountSyncIdentityKey(accountKey)
+        return categories.filterTo(linkedSetOf()) { category ->
+            now - prefs.getLong(KEY_ACCOUNT_SYNC_LAST_PREFIX + identity + "_" + category.name, 0L) >= cooldownMs
+        }
     }
 
-    fun markAccountSyncCategoriesSynced(categories: Set<LibrarySyncCategory>, at: Long) {
+    fun markAccountSyncCategoriesSynced(accountKey: String, categories: Set<LibrarySyncCategory>, at: Long) {
+        val identity = accountSyncIdentityKey(accountKey)
         prefs.edit().apply {
-            categories.forEach { putLong(KEY_ACCOUNT_SYNC_LAST_PREFIX + it.name, at) }
+            categories.forEach { putLong(KEY_ACCOUNT_SYNC_LAST_PREFIX + identity + "_" + it.name, at) }
         }.apply()
     }
 
