@@ -555,13 +555,13 @@ object YtMusicRepository {
             val albumRows = InnertubeParser.collectSongsDeep(response).size
             albumPlaylistOf(response, albumRows)?.let { response = it }
         }
-        var page = 1
+        val seenTokens = HashSet<String>()
         while (true) {
             val shelf = InnertubeParser.parsePlaylistShelf(response)
             (shelf?.songs ?: InnertubeParser.collectSongsDeep(response)).forEach { out[it.videoId] = it }
             val token = shelf?.continuation ?: InnertubeParser.continuationToken(response)
             if (token == null) return out.values.toList()
-            check(page++ < MAX_PAGES) { "Library feed $browseId exceeded $MAX_PAGES pages" }
+            check(seenTokens.add(token)) { "Library feed $browseId repeated a continuation token" }
             response = Innertube.browseContinuation(token)
         }
     }
@@ -569,7 +569,7 @@ object YtMusicRepository {
     private suspend fun itemsPagedStrict(browseId: String): List<ShelfItem> {
         val out = LinkedHashMap<String, ShelfItem>()
         var response = Innertube.browse(browseId)
-        var page = 1
+        val seenTokens = HashSet<String>()
         while (true) {
             val parsed = InnertubeParser.parseLibraryItemPage(response)
             parsed.items.forEach { item ->
@@ -577,7 +577,7 @@ object YtMusicRepository {
                 out.putIfAbsent(key, item)
             }
             val token = parsed.continuation ?: return out.values.toList()
-            check(page++ < MAX_PAGES) { "Library feed $browseId exceeded $MAX_PAGES pages" }
+            check(seenTokens.add(token)) { "Library feed $browseId repeated a continuation token" }
             response = Innertube.browseContinuation(token)
         }
     }
