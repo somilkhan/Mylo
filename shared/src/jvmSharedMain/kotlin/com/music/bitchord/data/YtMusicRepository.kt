@@ -538,7 +538,6 @@ object YtMusicRepository {
 
             val likedPage = liked.await()
             val likedIds = likedPage.songs.mapTo(HashSet()) { it.videoId }
-            LikeState.seedLiked(likedIds)
             LibraryPage(
                 likedSongs = likedPage.songs,
                 librarySongs = added.await().filterNot { it.videoId in likedIds },
