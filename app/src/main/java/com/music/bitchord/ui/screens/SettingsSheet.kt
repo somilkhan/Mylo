@@ -84,6 +84,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatDelegate
 import com.music.bitchord.data.lyrics.translationLanguageName
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -198,6 +199,7 @@ fun SettingsScreen(
     accountSyncing: Boolean,
     accountSyncResult: SyncResult,
     accountSyncStatus: String,
+    accountSyncCategoriesInProgress: Set<LibrarySyncCategory>,
     contentPadding: PaddingValues,
     modifier: Modifier = Modifier,
 ) {
@@ -477,10 +479,14 @@ fun SettingsScreen(
                             title = title,
                             subtitle = "Include in account sync",
                             trailing = {
-                                Switch(
-                                    checked = category in accountSyncCategories,
-                                    onCheckedChange = { AppSettings.setAccountSyncCategory(category, it) },
-                                )
+                                if (category in accountSyncCategoriesInProgress) {
+                                    CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                                } else {
+                                    Switch(
+                                        checked = category in accountSyncCategories,
+                                        onCheckedChange = { AppSettings.setAccountSyncCategory(category, it) },
+                                    )
+                                }
                             },
                         )
                     }

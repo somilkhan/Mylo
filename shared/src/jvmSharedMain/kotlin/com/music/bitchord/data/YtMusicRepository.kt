@@ -568,30 +568,51 @@ object YtMusicRepository {
      */
     suspend fun libraryForSync(
         categories: Set<LibrarySyncCategory> = LibrarySyncCategory.entries.toSet(),
+        onCategoryProgress: (LibrarySyncCategory, Boolean) -> Unit = { _, _ -> },
     ): Result<LibraryPage> = call("library:sync") {
         coroutineScope {
             val liked = async {
-                if (LibrarySyncCategory.LIKED_SONGS in categories) browseSongs(LIKED_MUSIC).getOrThrow()
-                else null
+                if (LibrarySyncCategory.LIKED_SONGS !in categories) null
+                else {
+                    onCategoryProgress(LibrarySyncCategory.LIKED_SONGS, true)
+                    try { browseSongs(LIKED_MUSIC).getOrThrow() }
+                    finally { onCategoryProgress(LibrarySyncCategory.LIKED_SONGS, false) }
+                }
             }
             val added = async {
                 if (LibrarySyncCategory.PRIVATE_SONGS !in categories) emptyList()
-                else buildList {
-                    listOf(LIBRARY_SONGS, PRIVATE_LIBRARY_SONGS).forEach { addAll(songsPagedStrict(it)) }
-                }.distinctBy { it.videoId }
+                else {
+                    onCategoryProgress(LibrarySyncCategory.PRIVATE_SONGS, true)
+                    try {
+                        buildList {
+                            listOf(LIBRARY_SONGS, PRIVATE_LIBRARY_SONGS).forEach { addAll(songsPagedStrict(it)) }
+                        }.distinctBy { it.videoId }
+                    } finally {
+                        onCategoryProgress(LibrarySyncCategory.PRIVATE_SONGS, false)
+                    }
+                }
             }
             val recentActivity = async {
-                if (LibrarySyncCategory.RECENT_ACTIVITY in categories) {
-                    libraryRecentActivity().getOrThrow()
-                } else emptyList()
+                if (LibrarySyncCategory.RECENT_ACTIVITY !in categories) emptyList()
+                else {
+                    onCategoryProgress(LibrarySyncCategory.RECENT_ACTIVITY, true)
+                    try { libraryRecentActivity().getOrThrow() }
+                    finally { onCategoryProgress(LibrarySyncCategory.RECENT_ACTIVITY, false) }
+                }
             }
             val shelves = LIBRARY_FEEDS
                 .filter { it.category == null || it.category in categories }
                 .map { feed ->
                     async {
-                        HomeShelf(feed.title, buildList {
-                            feed.browseIds.forEach { addAll(itemsPagedStrict(it)) }
-                        }.distinctBy { it.browseId ?: it.videoId ?: "${it.title}\\n${it.subtitle}" })
+                        val category = requireNotNull(feed.category)
+                        onCategoryProgress(category, true)
+                        try {
+                            HomeShelf(feed.title, buildList {
+                                feed.browseIds.forEach { addAll(itemsPagedStrict(it)) }
+                            }.distinctBy { it.browseId ?: it.videoId ?: "${it.title}\\n${it.subtitle}" })
+                        } finally {
+                            onCategoryProgress(category, false)
+                        }
                     }
                 }.awaitAll().filter { it.items.isNotEmpty() }
 

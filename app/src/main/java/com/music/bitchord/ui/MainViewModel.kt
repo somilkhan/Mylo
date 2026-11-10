@@ -605,6 +605,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val accountSyncResult: StateFlow<SyncResult> = _accountSyncResult.asStateFlow()
     private val _accountSyncStatus = MutableStateFlow("")
     val accountSyncStatus: StateFlow<String> = _accountSyncStatus.asStateFlow()
+    private val _accountSyncCategoriesInProgress = MutableStateFlow<Set<LibrarySyncCategory>>(emptySet())
+    val accountSyncCategoriesInProgress: StateFlow<Set<LibrarySyncCategory>> =
+        _accountSyncCategoriesInProgress.asStateFlow()
 
     /** In-memory cache is partitioned by account and profile; it is never shared. */
     private data class ListenerSnapshot(
@@ -1895,7 +1898,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 }
 
                 _accountSyncStatus.value = "Fetching selected account categories…"
-                val remoteLibrary = YtMusicRepository.libraryForSync(syncCategories).getOrElse {
+                val activeCategories = ConcurrentHashMap.newKeySet<LibrarySyncCategory>()
+                val remoteLibrary = YtMusicRepository.libraryForSync(syncCategories) { category, active ->
+                    if (active) activeCategories.add(category) else activeCategories.remove(category)
+                    _accountSyncCategoriesInProgress.value = activeCategories.toSet()
+                    val labels = activeCategories.joinToString { it.name.lowercase().replace('_', ' ') }
+                    if (labels.isNotBlank()) _accountSyncStatus.value = "Syncing $labels…"
+                }.getOrElse {
                     _accountSyncResult.value = SyncResult.FAILED
                     _accountSyncStatus.value = "Sync failed · previous saved data kept"
                     return@launch
@@ -2052,6 +2061,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 // Only the newest sync owns the shared indicator. A cancelled old job may
                 // complete after a new account/profile sync has already started.
                 if (accountSyncGeneration.owns(syncGeneration)) {
+                    _accountSyncCategoriesInProgress.value = emptySet()
                     _accountSyncing.value = false
                 }
             }
@@ -3734,6 +3744,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         accountSyncJob?.cancel()
         accountSyncJob = null
         _accountSyncing.value = false
+        _accountSyncCategoriesInProgress.value = emptySet()
         _accountSyncResult.value = SyncResult.NOTHING
         _account.value = null
         likedSyncJob?.cancel()
