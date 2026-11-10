@@ -12,6 +12,7 @@ import com.music.bitchord.auth.AuthStore
 import com.music.bitchord.data.canvas.SpotifyToken
 import com.music.bitchord.data.lyrics.LyricsSource
 import com.music.bitchord.data.sources.SourceKind
+import com.music.bitchord.data.LibrarySyncCategory
 import com.music.bitchord.playback.EqLayout
 import com.music.bitchord.playback.EqualizerPreset
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -346,6 +347,9 @@ object AppSettings {
 
     /** Refresh the signed-in YouTube Music mirror automatically, with a per-account cooldown. */
     val autoAccountSync = MutableStateFlow(true)
+
+    /** Independently selected YouTube Music sync categories. */
+    val accountSyncCategories = MutableStateFlow(LibrarySyncCategory.entries.toSet())
 
     /** Whether the queue is held in shuffled order (Mix button). */
     val shuffleEnabled = MutableStateFlow(false)
@@ -854,6 +858,10 @@ object AppSettings {
         }.getOrDefault(ThemeMode.DARK)
         autoplay.value = prefs.getBoolean(KEY_AUTOPLAY, true)
         autoAccountSync.value = prefs.getBoolean(KEY_AUTO_ACCOUNT_SYNC, true)
+        accountSyncCategories.value = prefs.getStringSet(KEY_ACCOUNT_SYNC_CATEGORIES, null)
+            ?.mapNotNull { stored -> runCatching { LibrarySyncCategory.valueOf(stored) }.getOrNull() }
+            ?.toSet()
+            ?: LibrarySyncCategory.entries.toSet()
         shuffleEnabled.value = prefs.getBoolean(KEY_SHUFFLE_ENABLED, false)
         repeatMode.value = prefs.getInt(KEY_REPEAT_MODE, Player.REPEAT_MODE_OFF)
         showNerdStats.value = prefs.getBoolean(KEY_NERD_STATS, false)
@@ -1074,6 +1082,14 @@ object AppSettings {
     fun setAutoAccountSync(value: Boolean) {
         autoAccountSync.value = value
         prefs.edit().putBoolean(KEY_AUTO_ACCOUNT_SYNC, value).apply()
+    }
+
+    fun setAccountSyncCategory(category: LibrarySyncCategory, enabled: Boolean) {
+        val updated = accountSyncCategories.value.toMutableSet().apply {
+            if (enabled) add(category) else remove(category)
+        }.toSet()
+        accountSyncCategories.value = updated
+        prefs.edit().putStringSet(KEY_ACCOUNT_SYNC_CATEGORIES, updated.map { it.name }.toSet()).apply()
     }
 
     fun setShuffleEnabled(value: Boolean) {
@@ -2022,6 +2038,7 @@ object AppSettings {
     private const val KEY_THEME = "theme_mode"
     private const val KEY_AUTOPLAY = "autoplay"
     private const val KEY_AUTO_ACCOUNT_SYNC = "auto_account_sync"
+    private const val KEY_ACCOUNT_SYNC_CATEGORIES = "account_sync_categories"
     private const val KEY_SHUFFLE_ENABLED = "shuffle_enabled"
     private const val KEY_REPEAT_MODE = "repeat_mode"
     private const val KEY_NERD_STATS = "show_nerd_stats"

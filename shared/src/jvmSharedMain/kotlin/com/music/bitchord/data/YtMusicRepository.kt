@@ -35,6 +35,16 @@ import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 
 /** Suspend API over Innertube. Every call returns a Result so the UI can show a real error. */
+enum class LibrarySyncCategory {
+    ALBUMS, ARTISTS, PLAYLISTS, LIKED_SONGS, PRIVATE_SONGS, RECENT_ACTIVITY
+}
+
+private data class LibrarySyncFeed(
+    val category: LibrarySyncCategory?,
+    val title: String,
+    val browseIds: List<String>,
+)
+
 object YtMusicRepository {
 
     private const val TAG = "BitChord"
@@ -502,9 +512,9 @@ object YtMusicRepository {
                 }).distinctBy { it.videoId }
             }
             val shelves = LIBRARY_FEEDS
-                .map { (title, browseIds) ->
+                .map { feed ->
                     async {
-                        HomeShelf(title, browseIds.flatMap { browseId ->
+                        HomeShelf(feed.title, feed.browseIds.flatMap { browseId ->
                             runCatching { libraryItemsPaged(browseId) }.getOrDefault(emptyList())
                         }.distinctBy { it.browseId ?: it.videoId ?: "${it.title}\\n${it.subtitle}" })
                     }
@@ -534,29 +544,37 @@ object YtMusicRepository {
      * Empty successful feeds remain valid; incomplete feeds fail the snapshot
      * so callers can retain the last known-good offline copy.
      */
-    suspend fun libraryForSync(): Result<LibraryPage> = call("library:sync") {
+    suspend fun libraryForSync(
+        categories: Set<LibrarySyncCategory> = LibrarySyncCategory.entries.toSet(),
+    ): Result<LibraryPage> = call("library:sync") {
         coroutineScope {
-            val liked = async { browseSongs(LIKED_MUSIC).getOrThrow() }
+            val liked = async {
+                if (LibrarySyncCategory.LIKED_SONGS in categories) browseSongs(LIKED_MUSIC).getOrThrow()
+                else null
+            }
             val added = async {
-                buildList {
+                if (LibrarySyncCategory.PRIVATE_SONGS !in categories) emptyList()
+                else buildList {
                     listOf(LIBRARY_SONGS, PRIVATE_LIBRARY_SONGS).forEach { addAll(songsPagedStrict(it)) }
                 }.distinctBy { it.videoId }
             }
-            val shelves = LIBRARY_FEEDS.map { (title, browseIds) ->
-                async {
-                    HomeShelf(title, buildList {
-                        browseIds.forEach { addAll(itemsPagedStrict(it)) }
-                    }.distinctBy { it.browseId ?: it.videoId ?: "${it.title}\\n${it.subtitle}" })
-                }
-            }.awaitAll().filter { it.items.isNotEmpty() }
+            val shelves = LIBRARY_FEEDS
+                .filter { it.category != null && it.category in categories }
+                .map { feed ->
+                    async {
+                        HomeShelf(feed.title, buildList {
+                            feed.browseIds.forEach { addAll(itemsPagedStrict(it)) }
+                        }.distinctBy { it.browseId ?: it.videoId ?: "${it.title}\\n${it.subtitle}" })
+                    }
+                }.awaitAll().filter { it.items.isNotEmpty() }
 
             val likedPage = liked.await()
-            val likedIds = likedPage.songs.mapTo(HashSet()) { it.videoId }
+            val likedIds = likedPage?.songs.orEmpty().mapTo(HashSet()) { it.videoId }
             LibraryPage(
-                likedSongs = likedPage.songs,
+                likedSongs = likedPage?.songs.orEmpty(),
                 librarySongs = added.await().filterNot { it.videoId in likedIds },
                 shelves = shelves,
-                likedContinuation = likedPage.continuation,
+                likedContinuation = likedPage?.continuation,
             )
         }
     }
@@ -940,17 +958,22 @@ object YtMusicRepository {
     const val PLAYLISTS_SHELF = "Playlists"
 
     private val LIBRARY_FEEDS = listOf(
-        PLAYLISTS_SHELF to listOf(LIBRARY_PLAYLISTS),
-        "Albums" to listOf(
-            "FEmusic_liked_albums",
-            "FEmusic_library_privately_owned_releases",
+        LibrarySyncFeed(LibrarySyncCategory.PLAYLISTS, PLAYLISTS_SHELF, listOf(LIBRARY_PLAYLISTS)),
+        LibrarySyncFeed(
+            LibrarySyncCategory.ALBUMS,
+            "Albums",
+            listOf("FEmusic_liked_albums", "FEmusic_library_privately_owned_releases"),
         ),
-        "Artists" to listOf(
-            "FEmusic_library_corpus_artists",
-            "FEmusic_library_corpus_track_artists",
-            "FEmusic_library_privately_owned_artists",
+        LibrarySyncFeed(
+            LibrarySyncCategory.ARTISTS,
+            "Artists",
+            listOf(
+                "FEmusic_library_corpus_artists",
+                "FEmusic_library_corpus_track_artists",
+                "FEmusic_library_privately_owned_artists",
+            ),
         ),
-        "Podcasts" to listOf("FEmusic_library_non_music_audio_list"),
+        LibrarySyncFeed(null, "Podcasts", listOf("FEmusic_library_non_music_audio_list")),
     )
 
     // ---- Writes -------------------------------------------------------------

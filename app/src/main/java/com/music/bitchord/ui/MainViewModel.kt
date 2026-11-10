@@ -15,6 +15,7 @@ import com.music.bitchord.data.AppUpdateChecker
 import com.music.bitchord.data.LocalMediaRepository
 import com.music.bitchord.data.LikeState
 import com.music.bitchord.data.YtMusicRepository
+import com.music.bitchord.data.LibrarySyncCategory
 import com.music.bitchord.data.ListeningHistory
 import com.music.bitchord.data.sync.AccountLibrarySnapshot
 import com.music.bitchord.data.sync.AccountLibrarySnapshotStore
@@ -1873,14 +1874,17 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 }
 
                 _accountSyncStatus.value = "Fetching account library…"
-                val remoteLibrary = YtMusicRepository.libraryForSync().getOrElse {
+                val syncCategories = AppSettings.accountSyncCategories.value
+                val remoteLibrary = YtMusicRepository.libraryForSync(syncCategories).getOrElse {
                     _accountSyncResult.value = SyncResult.FAILED
                     _accountSyncStatus.value = "Sync failed · previous saved data kept"
                     return@launch
                 }
                 if (identity != listenerKey()) return@launch
-                val likedSongs = remoteLibrary.likedSongs.toMutableList()
-                var likedToken = remoteLibrary.likedContinuation
+                val likedSongs = (if (LibrarySyncCategory.LIKED_SONGS in syncCategories) {
+                    remoteLibrary.likedSongs
+                } else cached?.library?.likedSongs.orEmpty()).toMutableList()
+                var likedToken = if (LibrarySyncCategory.LIKED_SONGS in syncCategories) remoteLibrary.likedContinuation else null
                 val seenLikedTokens = HashSet<String>()
                 var complete = true
                 while (likedToken != null) {
@@ -1900,14 +1904,19 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 }
 
                 if (identity != listenerKey()) return@launch
-                _accountSyncStatus.value = "Importing complete listening history…"
-                val firstHistory = YtMusicRepository.historyPage().getOrElse {
-                    complete = false
-                    null
-                }
                 val historySections = mutableListOf<InnertubeParser.HistorySection>()
-                var historyToken = firstHistory?.continuation
-                if (firstHistory != null) appendHistorySections(historySections, firstHistory.sections)
+                var historyToken: String? = null
+                if (LibrarySyncCategory.RECENT_ACTIVITY in syncCategories) {
+                    _accountSyncStatus.value = "Importing complete listening history…"
+                    val firstHistory = YtMusicRepository.historyPage().getOrElse {
+                        complete = false
+                        null
+                    }
+                    historyToken = firstHistory?.continuation
+                    if (firstHistory != null) appendHistorySections(historySections, firstHistory.sections)
+                } else {
+                    historySections.addAll(cached?.historySections.orEmpty())
+                }
                 val seenHistoryTokens = HashSet<String>()
                 while (historyToken != null) {
                     if (!seenHistoryTokens.add(historyToken)) {
@@ -1938,13 +1947,27 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 // than making a second request whose failure can masquerade as
                 // a successful empty result.
                 val recentSongs = historySections.flatMap { it.songs }.take(20)
+                val replacedShelfTitles = buildSet {
+                    if (LibrarySyncCategory.ALBUMS in syncCategories) add("Albums")
+                    if (LibrarySyncCategory.ARTISTS in syncCategories) add("Artists")
+                    if (LibrarySyncCategory.PLAYLISTS in syncCategories) add(YtMusicRepository.PLAYLISTS_SHELF)
+                }
+                val mergedLibrary = remoteLibrary.copy(
+                    likedSongs = likedSongs,
+                    librarySongs = if (LibrarySyncCategory.PRIVATE_SONGS in syncCategories) {
+                        remoteLibrary.librarySongs
+                    } else cached?.library?.librarySongs.orEmpty(),
+                    shelves = cached?.library?.shelves.orEmpty().filterNot { it.title in replacedShelfTitles } +
+                        remoteLibrary.shelves,
+                    likedContinuation = null,
+                )
                 if (!complete) {
                     _accountSyncResult.value = SyncResult.FAILED
                     _accountSyncStatus.value = "Sync incomplete · previous saved data kept"
                     return@launch
                 }
-                val remoteCount = likedSongs.size + remoteLibrary.librarySongs.size +
-                    remoteLibrary.shelves.sumOf { it.items.size }
+                val remoteCount = likedSongs.size + mergedLibrary.librarySongs.size +
+                    mergedLibrary.shelves.sumOf { it.items.size }
                 if (cached != null && !mayRemoveMissing(complete = true, remoteCount = remoteCount)) {
                     _accountSyncResult.value = SyncResult.FAILED
                     _accountSyncStatus.value = "Sync incomplete · previous saved data kept"
@@ -1954,7 +1977,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
                 _accountSyncStatus.value = "Saving offline account snapshot…"
                 val snapshot = AccountLibrarySnapshot(
-                    library = remoteLibrary.copy(likedSongs = likedSongs, likedContinuation = null),
+                    library = mergedLibrary,
                     historySections = historySections,
                     recentSongs = recentSongs,
                     savedAt = now,
@@ -1970,7 +1993,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 if (!_historyIsLocal.value) publishCachedHistory(historySections)
                 _accountSyncResult.value = SyncResult.SYNCED
-                _accountSyncStatus.value = "Synced " + historySections.sumOf { it.songs.size } + " history plays"
+                _accountSyncStatus.value = if (LibrarySyncCategory.RECENT_ACTIVITY in syncCategories) {
+                    "Synced " + historySections.sumOf { it.songs.size } + " history plays"
+                } else "Library sync completed"
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {

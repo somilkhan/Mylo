@@ -150,6 +150,7 @@ import com.music.bitchord.data.scrobbling.LastFM
 import com.music.bitchord.data.listentogether.ListenTogether
 import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.data.sync.SyncResult
+import com.music.bitchord.data.LibrarySyncCategory
 import com.music.bitchord.data.settings.OutputPcmMode
 import com.music.bitchord.playback.AudioOutputStatus
 import com.music.bitchord.data.settings.AutomixPerformanceMode
@@ -201,6 +202,7 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val autoAccountSync by AppSettings.autoAccountSync.collectAsStateWithLifecycle()
+    val accountSyncCategories by AppSettings.accountSyncCategories.collectAsStateWithLifecycle()
 
     val wifiQuality by AppSettings.audioQualityWifi.collectAsStateWithLifecycle()
     val cellularQuality by AppSettings.audioQualityCellular.collectAsStateWithLifecycle()
@@ -456,6 +458,28 @@ fun SettingsScreen(
                         badge = "…" .takeIf { accountSyncing },
                         onClick = onSyncNow,
                     )
+                }
+                listOf(
+                    LibrarySyncCategory.ALBUMS to "Albums",
+                    LibrarySyncCategory.ARTISTS to "Artists",
+                    LibrarySyncCategory.PLAYLISTS to "Playlists",
+                    LibrarySyncCategory.LIKED_SONGS to "Liked songs",
+                    LibrarySyncCategory.PRIVATE_SONGS to "Private songs",
+                    LibrarySyncCategory.RECENT_ACTIVITY to "Listening history",
+                ).forEach { (category, title) ->
+                    row(title, "sync", "library", "history", "youtube music") {
+                        SettingsRow(
+                            icon = Icons.Rounded.LibraryMusic,
+                            title = title,
+                            subtitle = "Include in account sync",
+                            trailing = {
+                                Switch(
+                                    checked = category in accountSyncCategories,
+                                    onCheckedChange = { AppSettings.setAccountSyncCategory(category, it) },
+                                )
+                            },
+                        )
+                    }
                 }
             }
             // Sits with the account rather than with Playback: a party is up to
