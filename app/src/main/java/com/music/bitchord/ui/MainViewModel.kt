@@ -64,12 +64,9 @@ import com.music.bitchord.data.settings.SearchHistory
 import com.music.bitchord.download.Downloads
 import android.util.LruCache
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineExceptionHandler
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
@@ -121,10 +118,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private val authStore = AuthStore(app)
     private val accountSnapshotStore = AccountLibrarySnapshotStore(File(app.filesDir, "account-library-snapshots"))
-    private val accountSyncFailureHandler = CoroutineExceptionHandler { _, failure ->
-        android.util.Log.e("AccountSync", "Background account sync failed", failure)
-    }
-    private val accountSyncScope = CoroutineScope(SupervisorJob() + Dispatchers.IO + accountSyncFailureHandler)
     private var accountSyncJob: Job? = null
     // Prevent a cancelled, older sync from clearing the loading state of a newer one.
     private val accountSyncGeneration = SyncJobGeneration()
@@ -1855,7 +1848,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             return
         }
         val syncGeneration = accountSyncGeneration.begin()
-        accountSyncJob = accountSyncScope.launch {
+        accountSyncJob = viewModelScope.launch(Dispatchers.IO) {
             _accountSyncing.value = true
             _accountSyncResult.value = SyncResult.BUSY
             _accountSyncStatus.value = "Starting sync…"
@@ -1885,6 +1878,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     _accountSyncStatus.value = "Sync failed · previous saved data kept"
                     return@launch
                 }
+                if (identity != listenerKey()) return@launch
                 val likedSongs = remoteLibrary.likedSongs.toMutableList()
                 var likedToken = remoteLibrary.likedContinuation
                 val seenLikedTokens = HashSet<String>()
@@ -1905,6 +1899,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     likedToken = page.continuation
                 }
 
+                if (identity != listenerKey()) return@launch
                 _accountSyncStatus.value = "Importing complete listening history…"
                 val firstHistory = YtMusicRepository.historyPage().getOrElse {
                     complete = false
