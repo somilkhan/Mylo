@@ -1900,10 +1900,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 _accountSyncStatus.value = "Fetching selected account categories…"
                 val activeCategories = ConcurrentHashMap.newKeySet<LibrarySyncCategory>()
                 val remoteLibrary = YtMusicRepository.libraryForSync(syncCategories) { category, active ->
-                    if (active) activeCategories.add(category) else activeCategories.remove(category)
-                    _accountSyncCategoriesInProgress.value = activeCategories.toSet()
-                    val labels = activeCategories.joinToString { it.name.lowercase().replace('_', ' ') }
-                    if (labels.isNotBlank()) _accountSyncStatus.value = "Syncing $labels…"
+                    if (identity == listenerKey()) {
+                        if (active) activeCategories.add(category) else activeCategories.remove(category)
+                        _accountSyncCategoriesInProgress.value = activeCategories.toSet()
+                        val labels = activeCategories.joinToString { it.name.lowercase().replace('_', ' ') }
+                        if (labels.isNotBlank()) _accountSyncStatus.value = "Syncing $labels…"
+                    }
                 }.getOrElse {
                     _accountSyncResult.value = SyncResult.FAILED
                     _accountSyncStatus.value = "Sync failed · previous saved data kept"
@@ -1917,7 +1919,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 val seenLikedTokens = HashSet<String>()
                 var complete = true
                 val syncingLikedContinuation = likedToken != null
-                if (syncingLikedContinuation) {
+                if (syncingLikedContinuation && identity == listenerKey()) {
                     activeCategories.add(LibrarySyncCategory.LIKED_SONGS)
                     _accountSyncCategoriesInProgress.value = activeCategories.toSet()
                     _accountSyncStatus.value = "Importing remaining liked songs…"
@@ -1939,7 +1941,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                         likedToken = page.continuation
                     }
                 } finally {
-                    if (syncingLikedContinuation) {
+                    if (syncingLikedContinuation && identity == listenerKey()) {
                         activeCategories.remove(LibrarySyncCategory.LIKED_SONGS)
                         _accountSyncCategoriesInProgress.value = activeCategories.toSet()
                     }
@@ -1949,7 +1951,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 val historySections = mutableListOf<InnertubeParser.HistorySection>()
                 var historyToken: String? = null
                 val syncingHistory = LibrarySyncCategory.LISTENING_HISTORY in syncCategories
-                if (syncingHistory) {
+                if (syncingHistory && identity == listenerKey()) {
                     activeCategories.add(LibrarySyncCategory.LISTENING_HISTORY)
                     _accountSyncCategoriesInProgress.value = activeCategories.toSet()
                     _accountSyncStatus.value = "Importing complete listening history…"
@@ -1982,7 +1984,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                         historyToken = page.continuation
                     }
                 } finally {
-                    if (syncingHistory) {
+                    if (syncingHistory && identity == listenerKey()) {
                         activeCategories.remove(LibrarySyncCategory.LISTENING_HISTORY)
                         _accountSyncCategoriesInProgress.value = activeCategories.toSet()
                     }
