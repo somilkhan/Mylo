@@ -3653,7 +3653,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private fun clearListenerState(restoreCached: Boolean = false) {
         // Invalidate the old job before cancelling it; its finally block must not
         // mutate the next listener's sync indicator.
-        accountSyncGeneration.begin()
+        accountSyncGeneration.invalidate()
         accountSyncJob?.cancel()
         accountSyncJob = null
         _accountSyncing.value = false
