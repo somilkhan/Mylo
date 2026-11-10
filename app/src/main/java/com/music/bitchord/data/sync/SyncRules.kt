@@ -4,6 +4,22 @@ import java.io.File
 import java.security.MessageDigest
 import java.time.LocalDateTime
 
+/**
+ * Identifies the one sync job allowed to publish shared loading state.
+ * Starting or invalidating a job revokes ownership from every older job.
+ */
+class SyncJobGeneration {
+    private val generation = AtomicLong(0L)
+
+    fun begin(): Long = generation.incrementAndGet()
+
+    fun invalidate() {
+        generation.incrementAndGet()
+    }
+
+    fun owns(token: Long): Boolean = generation.get() == token
+}
+
 /** Never interpret an empty or partial remote response as an instruction to delete local data. */
 fun mayRemoveMissing(complete: Boolean, remoteCount: Int): Boolean =
     complete && remoteCount > 0
