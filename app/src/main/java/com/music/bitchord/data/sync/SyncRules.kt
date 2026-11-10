@@ -29,6 +29,10 @@ fun mayRemoveMissing(complete: Boolean, remoteCount: Int): Boolean =
 fun mayReplacePlaylist(complete: Boolean, remoteCount: Int, hasLocalSongs: Boolean): Boolean =
     complete && (remoteCount > 0 || !hasLocalSongs)
 
+/** Keep the last known-good category when a refresh unexpectedly returns no rows. */
+fun <T> preserveNonEmptyOnEmptyRemote(local: List<T>, remote: List<T>): List<T> =
+    if (remote.isEmpty() && local.isNotEmpty()) local else remote
+
 /** Result shown by manual sync; a failed category must not be reported as a successful sync. */
 enum class SyncResult {
     SYNCED, FAILED, BUSY, NOTHING;

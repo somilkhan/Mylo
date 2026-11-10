@@ -36,6 +36,12 @@ class SyncRulesTest {
         assertTrue(mayReplacePlaylist(true, 0, false))
     }
 
+    @Test fun emptyCategoryRefreshKeepsLastKnownGoodRows() {
+        assertEquals(listOf("saved"), preserveNonEmptyOnEmptyRemote(listOf("saved"), emptyList()))
+        assertEquals(listOf("remote"), preserveNonEmptyOnEmptyRemote(listOf("saved"), listOf("remote")))
+        assertTrue(preserveNonEmptyOnEmptyRemote(emptyList<String>(), emptyList()).isEmpty())
+    }
+
     @Test fun manualSyncReportsFailureAndBusyAccurately() {
         assertEquals(SyncResult.FAILED, SyncResult.combine(listOf(SyncResult.SYNCED, SyncResult.FAILED)))
         assertEquals(SyncResult.BUSY, SyncResult.combine(listOf(SyncResult.BUSY, SyncResult.NOTHING)))
