@@ -523,6 +523,66 @@ object YtMusicRepository {
     }
 
     /**
+     * Strict library snapshot for account sync. Unlike [library], this never
+     * turns a failed category or interrupted continuation into an empty shelf.
+     * Empty successful feeds remain valid; incomplete feeds fail the snapshot
+     * so callers can retain the last known-good offline copy.
+     */
+    suspend fun libraryForSync(): Result<LibraryPage> = call("library:sync") {
+        coroutineScope {
+            val liked = async { browseSongs(LIKED_MUSIC).getOrThrow() }
+            val added = async { songsPagedStrict(LIBRARY_SONGS) }
+            val shelves = LIBRARY_FEEDS.map { (title, browseId) ->
+                async { HomeShelf(title, itemsPagedStrict(browseId)) }
+            }.awaitAll().filter { it.items.isNotEmpty() }
+
+            val likedPage = liked.await()
+            val likedIds = likedPage.songs.mapTo(HashSet()) { it.videoId }
+            LikeState.seedLiked(likedIds)
+            LibraryPage(
+                likedSongs = likedPage.songs,
+                librarySongs = added.await().filterNot { it.videoId in likedIds },
+                shelves = shelves,
+                likedContinuation = likedPage.continuation,
+            )
+        }
+    }
+
+    private suspend fun songsPagedStrict(browseId: String): List<Song> {
+        val out = LinkedHashMap<String, Song>()
+        var response = Innertube.browse(browseId)
+        if (browseId.startsWith("MPREb")) {
+            val albumRows = InnertubeParser.collectSongsDeep(response).size
+            albumPlaylistOf(response, albumRows)?.let { response = it }
+        }
+        var page = 1
+        while (true) {
+            val shelf = InnertubeParser.parsePlaylistShelf(response)
+            (shelf?.songs ?: InnertubeParser.collectSongsDeep(response)).forEach { out[it.videoId] = it }
+            val token = shelf?.continuation ?: InnertubeParser.continuationToken(response)
+            if (token == null) return out.values.toList()
+            check(page++ < MAX_PAGES) { "Library feed $browseId exceeded $MAX_PAGES pages" }
+            response = Innertube.browseContinuation(token)
+        }
+    }
+
+    private suspend fun itemsPagedStrict(browseId: String): List<ShelfItem> {
+        val out = LinkedHashMap<String, ShelfItem>()
+        var response = Innertube.browse(browseId)
+        var page = 1
+        while (true) {
+            val parsed = InnertubeParser.parseLibraryItemPage(response)
+            parsed.items.forEach { item ->
+                val key = item.browseId ?: item.videoId ?: "${item.title}\\n${item.subtitle}"
+                out.putIfAbsent(key, item)
+            }
+            val token = parsed.continuation ?: return out.values.toList()
+            check(page++ < MAX_PAGES) { "Library feed $browseId exceeded $MAX_PAGES pages" }
+            response = Innertube.browseContinuation(token)
+        }
+    }
+
+    /**
      * Finishes syncing the liked collection into [LikeState], following
      * [firstToken] page by page until the feed runs dry.
      *
