@@ -2006,9 +2006,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 val overwriteRemote = AppSettings.accountSyncOverwriteWithRemote.value
                 val syncedLikedSongs = mergeRemoteRows(
                     cached?.library?.likedSongs.orEmpty(),
-                    likedSongs,
+                    likedSongs.distinctBy { it.videoId },
                     overwriteRemote,
                 ) { it.videoId }
+                val syncedLikedIds = syncedLikedSongs.mapTo(HashSet()) { it.videoId }
                 val replacedShelfTitles = buildSet {
                     if (LibrarySyncCategory.ALBUMS in syncCategories) add("Albums")
                     if (LibrarySyncCategory.ARTISTS in syncCategories) add("Artists")
@@ -2021,7 +2022,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     if (LibrarySyncCategory.PRIVATE_SONGS in syncCategories) remoteLibrary.librarySongs
                     else cached?.library?.librarySongs.orEmpty(),
                     overwriteRemote,
-                ) { it.videoId }
+                ) { it.videoId }.filterNot { it.videoId in syncedLikedIds }
                 val remoteShelfTitles = remoteLibrary.shelves.mapTo(HashSet()) { it.title }
                 val preservedShelves = cached?.library?.shelves.orEmpty().filter { cachedShelf ->
                     cachedShelf.title !in replacedShelfTitles ||
@@ -3764,15 +3765,20 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         _activeProfileId.value?.let { profileId -> "$accountId:$profileId" }
     }
 
-    private fun clearListenerState(restoreCached: Boolean = false) {
-        // Invalidate the old job before cancelling it; its finally block must not
-        // mutate the next listener's sync indicator.
+    private fun cancelAccountSync() {
+        // Revoke ownership before cancellation so a late finally block cannot
+        // overwrite the next listener's progress or status.
         accountSyncGeneration.invalidate()
         accountSyncJob?.cancel()
         accountSyncJob = null
         _accountSyncing.value = false
         _accountSyncCategoriesInProgress.value = emptySet()
         _accountSyncResult.value = SyncResult.NOTHING
+        _accountSyncStatus.value = ""
+    }
+
+    private fun clearListenerState(restoreCached: Boolean = false) {
+        cancelAccountSync()
         _account.value = null
         likedSyncJob?.cancel()
         LikeState.clear()
@@ -3829,6 +3835,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             removeAccount(current)
             return
         }
+        cancelAccountSync()
         authStore.signOut()
         Innertube.cookie = null
         // The mirror image: verdicts reached with a session in hand say nothing
