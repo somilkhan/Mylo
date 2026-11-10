@@ -1978,7 +1978,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 _accountSyncResult.value = SyncResult.FAILED
                     _accountSyncStatus.value = "Sync incomplete · previous saved data kept"
             } finally {
-                if (identity == listenerKey()) _accountSyncing.value = false
+                // The job may finish after the user switches Google account/profile.
+                // The old identity must not leave the global Settings spinner stuck on.
+                _accountSyncing.value = false
             }
         }
     }
