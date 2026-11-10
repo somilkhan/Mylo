@@ -2108,8 +2108,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 _history.value = if (page.songs.isEmpty()) UiState.Error(text(R.string.history_empty))
                     else UiState.Success(page.songs)
             }.onFailure {
-                // A failed refresh must not blank a complete history snapshot already on disk.
-                if (cached == null) _history.value = UiState.Error(it.friendly())
+                // Keep the last saved state visible even when that snapshot has no history.
+                // Leaving UiState.Loading here would strand the screen on a spinner forever.
+                if (cached != null) {
+                    publishCachedHistory(cached.historySections)
+                } else {
+                    _history.value = UiState.Error(it.friendly())
+                }
             }
         }
     }
