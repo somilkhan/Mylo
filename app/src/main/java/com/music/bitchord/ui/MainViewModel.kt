@@ -1916,51 +1916,76 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 var likedToken = if (LibrarySyncCategory.LIKED_SONGS in syncCategories) remoteLibrary.likedContinuation else null
                 val seenLikedTokens = HashSet<String>()
                 var complete = true
-                while (likedToken != null) {
-                    if (!seenLikedTokens.add(likedToken)) {
-                        complete = false
-                        break
+                val syncingLikedContinuation = likedToken != null
+                if (syncingLikedContinuation) {
+                    activeCategories.add(LibrarySyncCategory.LIKED_SONGS)
+                    _accountSyncCategoriesInProgress.value = activeCategories.toSet()
+                    _accountSyncStatus.value = "Importing remaining liked songs…"
+                }
+                try {
+                    while (likedToken != null) {
+                        if (!seenLikedTokens.add(likedToken)) {
+                            complete = false
+                            break
+                        }
+                        if (identity != listenerKey()) return@launch
+                        val pageResult = YtMusicRepository.moreSongs(likedToken)
+                        if (pageResult.isFailure) {
+                            complete = false
+                            break
+                        }
+                        val page = pageResult.getOrThrow()
+                        likedSongs += page.songs
+                        likedToken = page.continuation
                     }
-                    if (identity != listenerKey()) return@launch
-                    val pageResult = YtMusicRepository.moreSongs(likedToken)
-                    if (pageResult.isFailure) {
-                        complete = false
-                        break
+                } finally {
+                    if (syncingLikedContinuation) {
+                        activeCategories.remove(LibrarySyncCategory.LIKED_SONGS)
+                        _accountSyncCategoriesInProgress.value = activeCategories.toSet()
                     }
-                    val page = pageResult.getOrThrow()
-                    likedSongs += page.songs
-                    likedToken = page.continuation
                 }
 
                 if (identity != listenerKey()) return@launch
                 val historySections = mutableListOf<InnertubeParser.HistorySection>()
                 var historyToken: String? = null
-                if (LibrarySyncCategory.LISTENING_HISTORY in syncCategories) {
+                val syncingHistory = LibrarySyncCategory.LISTENING_HISTORY in syncCategories
+                if (syncingHistory) {
+                    activeCategories.add(LibrarySyncCategory.LISTENING_HISTORY)
+                    _accountSyncCategoriesInProgress.value = activeCategories.toSet()
                     _accountSyncStatus.value = "Importing complete listening history…"
-                    val firstHistory = YtMusicRepository.historyPage().getOrElse {
-                        complete = false
-                        null
-                    }
-                    historyToken = firstHistory?.continuation
-                    if (firstHistory != null) appendHistorySections(historySections, firstHistory.sections)
-                } else {
-                    historySections.addAll(cached?.historySections.orEmpty())
                 }
-                val seenHistoryTokens = HashSet<String>()
-                while (historyToken != null) {
-                    if (!seenHistoryTokens.add(historyToken)) {
-                        complete = false
-                        break
+                try {
+                    if (syncingHistory) {
+                        val firstHistory = YtMusicRepository.historyPage().getOrElse {
+                            complete = false
+                            null
+                        }
+                        historyToken = firstHistory?.continuation
+                        if (firstHistory != null) appendHistorySections(historySections, firstHistory.sections)
+                    } else {
+                        historySections.addAll(cached?.historySections.orEmpty())
                     }
-                    if (identity != listenerKey()) return@launch
-                    val pageResult = YtMusicRepository.moreHistory(historyToken)
-                    if (pageResult.isFailure) {
-                        complete = false
-                        break
+                    val seenHistoryTokens = HashSet<String>()
+                    while (historyToken != null) {
+                        if (!seenHistoryTokens.add(historyToken)) {
+                            complete = false
+                            break
+                        }
+                        if (identity != listenerKey()) return@launch
+                        val pageResult = YtMusicRepository.moreHistory(historyToken)
+                        if (pageResult.isFailure) {
+                            complete = false
+                            break
+                        }
+                        val page = pageResult.getOrThrow()
+                        appendHistorySections(historySections, page.sections)
+                        historyToken = page.continuation
                     }
-                    val page = pageResult.getOrThrow()
-                    appendHistorySections(historySections, page.sections)
-                    historyToken = page.continuation
+                } finally {
+                    if (syncingHistory) {
+                        activeCategories.remove(LibrarySyncCategory.LISTENING_HISTORY)
+                        _accountSyncCategoriesInProgress.value = activeCategories.toSet()
+                    }
                 }
 
                 // A transient empty history response must not erase a previously imported

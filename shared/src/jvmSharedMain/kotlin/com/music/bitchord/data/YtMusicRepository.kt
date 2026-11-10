@@ -604,14 +604,14 @@ object YtMusicRepository {
                 .filter { it.category == null || it.category in categories }
                 .map { feed ->
                     async {
-                        val category = requireNotNull(feed.category)
-                        onCategoryProgress(category, true)
+                        val category = feed.category
+                        category?.let { onCategoryProgress(it, true) }
                         try {
                             HomeShelf(feed.title, buildList {
                                 feed.browseIds.forEach { addAll(itemsPagedStrict(it)) }
                             }.distinctBy { it.browseId ?: it.videoId ?: "${it.title}\\n${it.subtitle}" })
                         } finally {
-                            onCategoryProgress(category, false)
+                            category?.let { onCategoryProgress(it, false) }
                         }
                     }
                 }.awaitAll().filter { it.items.isNotEmpty() }
