@@ -3,6 +3,7 @@ package com.music.bitchord.data.sync
 import java.io.File
 import java.security.MessageDigest
 import java.time.LocalDateTime
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Identifies the one sync job allowed to publish shared loading state.
