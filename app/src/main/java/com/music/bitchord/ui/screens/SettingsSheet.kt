@@ -151,6 +151,7 @@ import com.music.bitchord.data.listentogether.ListenTogether
 import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.data.sync.SyncResult
 import com.music.bitchord.data.LibrarySyncCategory
+import com.music.bitchord.data.AccountSyncMode
 import com.music.bitchord.data.settings.OutputPcmMode
 import com.music.bitchord.playback.AudioOutputStatus
 import com.music.bitchord.data.settings.AutomixPerformanceMode
@@ -203,6 +204,8 @@ fun SettingsScreen(
     val context = LocalContext.current
     val autoAccountSync by AppSettings.autoAccountSync.collectAsStateWithLifecycle()
     val accountSyncCategories by AppSettings.accountSyncCategories.collectAsStateWithLifecycle()
+    val accountSyncMode by AppSettings.accountSyncMode.collectAsStateWithLifecycle()
+    val accountSyncOverwrite by AppSettings.accountSyncOverwriteWithRemote.collectAsStateWithLifecycle()
 
     val wifiQuality by AppSettings.audioQualityWifi.collectAsStateWithLifecycle()
     val cellularQuality by AppSettings.audioQualityCellular.collectAsStateWithLifecycle()
@@ -481,6 +484,36 @@ fun SettingsScreen(
                             },
                         )
                     }
+                }
+                row("Sync mode", "read only", "read write", "youtube") {
+                    SettingsRow(
+                        icon = Icons.Rounded.Sync,
+                        title = "Sync mode",
+                        subtitle = if (accountSyncMode == AccountSyncMode.RW) {
+                            "Read and write · changes can reach YouTube Music"
+                        } else "Read only · Mylo will not change your YouTube Music account",
+                        trailing = {
+                            Switch(
+                                checked = accountSyncMode == AccountSyncMode.RW,
+                                onCheckedChange = {
+                                    AppSettings.setAccountSyncMode(if (it) AccountSyncMode.RW else AccountSyncMode.RO)
+                                },
+                            )
+                        },
+                    )
+                }
+                row("Conflict resolution", "add only", "overwrite", "sync") {
+                    SettingsRow(
+                        icon = Icons.Rounded.FilterAlt,
+                        title = "Overwrite with YouTube",
+                        subtitle = "When off, remote items are added without removing local cached items",
+                        trailing = {
+                            Switch(
+                                checked = accountSyncOverwrite,
+                                onCheckedChange = AppSettings::setAccountSyncOverwriteWithRemote,
+                            )
+                        },
+                    )
                 }
             }
             // Sits with the account rather than with Playback: a party is up to

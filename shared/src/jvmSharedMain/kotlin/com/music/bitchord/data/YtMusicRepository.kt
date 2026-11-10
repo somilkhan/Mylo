@@ -39,6 +39,8 @@ enum class LibrarySyncCategory {
     ALBUMS, ARTISTS, PLAYLISTS, LIKED_SONGS, PRIVATE_SONGS, RECENT_ACTIVITY, LISTENING_HISTORY
 }
 
+enum class AccountSyncMode { RO, RW }
+
 private data class LibrarySyncFeed(
     val category: LibrarySyncCategory?,
     val title: String,
@@ -46,6 +48,18 @@ private data class LibrarySyncFeed(
 )
 
 object YtMusicRepository {
+    @Volatile private var accountSyncMode = AccountSyncMode.RW
+
+    fun setAccountSyncMode(mode: AccountSyncMode) {
+        accountSyncMode = mode
+    }
+
+    private fun requireAccountWritesEnabled() {
+        check(accountSyncMode == AccountSyncMode.RW) {
+            "YouTube Music account is in read-only sync mode"
+        }
+    }
+
 
     private const val TAG = "BitChord"
     private val moodGenreShelfCache = ConcurrentHashMap<String, List<HomeShelf>>()
@@ -1010,11 +1024,11 @@ object YtMusicRepository {
     }
 
     suspend fun rate(videoId: String, status: LikeStatus): Result<Unit> =
-        call("rate:$videoId") { Innertube.rate(videoId, status) }
+        call("rate:$videoId") { requireAccountWritesEnabled(); Innertube.rate(videoId, status) }
 
     /** Adds or removes a track from the library; [token] says which. */
     suspend fun setLibraryStatus(token: String): Result<Unit> =
-        call("library:feedback") { Innertube.sendFeedback(token) }
+        call("library:feedback") { requireAccountWritesEnabled(); Innertube.sendFeedback(token) }
 
     /**
      * Saves an album or playlist to the library, or removes it. [playlistId] is
@@ -1030,7 +1044,7 @@ object YtMusicRepository {
         call("library-state:$browseId") { InnertubeParser.parseLibraryState(Innertube.browse(browseId)) }
 
     suspend fun setSaved(playlistId: String, saved: Boolean): Result<Unit> =
-        call("library:$playlistId") { Innertube.ratePlaylist(playlistId, saved) }
+        call("library:$playlistId") { requireAccountWritesEnabled(); Innertube.ratePlaylist(playlistId, saved) }
 
     /**
      * Subscribes to an artist's channel, or unsubscribes. [channelId] is the one
@@ -1038,7 +1052,7 @@ object YtMusicRepository {
      * [com.music.bitchord.data.model.SubscriptionState].
      */
     suspend fun setSubscribed(channelId: String, subscribed: Boolean): Result<Unit> =
-        call("subscription:$channelId") { Innertube.setSubscribed(channelId, subscribed) }
+        call("subscription:$channelId") { requireAccountWritesEnabled(); Innertube.setSubscribed(channelId, subscribed) }
 
     /**
      * The playlists a track can be added to. Paged because accounts with long
@@ -1062,6 +1076,7 @@ object YtMusicRepository {
         privacy: PlaylistPrivacy,
         videoIds: List<String> = emptyList(),
     ): Result<String> = call("playlist:create") {
+        requireAccountWritesEnabled()
         Innertube.createPlaylist(title, privacy, videoIds = videoIds)
     }
 
@@ -1075,13 +1090,14 @@ object YtMusicRepository {
         playlistId: String,
         videoIds: List<String>,
     ): Result<Map<String, String>> =
-        call("playlist:add") { Innertube.addToPlaylist(playlistId, videoIds) }
+        call("playlist:add") { requireAccountWritesEnabled(); Innertube.addToPlaylist(playlistId, videoIds) }
 
     /** [entries] are (setVideoId, videoId) pairs — see [Song.setVideoId]. */
     suspend fun removeFromPlaylist(
         playlistId: String,
         entries: List<Pair<String, String>>,
     ): Result<Unit> = call("playlist:remove") {
+        requireAccountWritesEnabled()
         Innertube.removeFromPlaylist(playlistId, entries)
     }
 
@@ -1125,6 +1141,7 @@ object YtMusicRepository {
         current: List<String>,
         target: List<String>,
     ): Result<Unit> = call("playlist:reorder") {
+        requireAccountWritesEnabled()
         playlistMoves(current, target).chunked(MOVE_BATCH).forEach { batch ->
             Innertube.movePlaylistItems(playlistId, batch)
         }
@@ -1133,10 +1150,10 @@ object YtMusicRepository {
     private const val MOVE_BATCH = 50
 
     suspend fun renamePlaylist(playlistId: String, title: String): Result<Unit> =
-        call("playlist:rename") { Innertube.renamePlaylist(playlistId, title) }
+        call("playlist:rename") { requireAccountWritesEnabled(); Innertube.renamePlaylist(playlistId, title) }
 
     suspend fun deletePlaylist(playlistId: String): Result<Unit> =
-        call("playlist:delete") { Innertube.deletePlaylist(playlistId) }
+        call("playlist:delete") { requireAccountWritesEnabled(); Innertube.deletePlaylist(playlistId) }
 
     /**
      * Artist page. The landing page only lists ~5 songs, so the linked

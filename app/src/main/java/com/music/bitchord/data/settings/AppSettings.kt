@@ -13,6 +13,8 @@ import com.music.bitchord.data.canvas.SpotifyToken
 import com.music.bitchord.data.lyrics.LyricsSource
 import com.music.bitchord.data.sources.SourceKind
 import com.music.bitchord.data.LibrarySyncCategory
+import com.music.bitchord.data.AccountSyncMode
+import com.music.bitchord.data.YtMusicRepository
 import com.music.bitchord.playback.EqLayout
 import com.music.bitchord.playback.EqualizerPreset
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -350,6 +352,8 @@ object AppSettings {
 
     /** Independently selected YouTube Music sync categories. */
     val accountSyncCategories = MutableStateFlow(LibrarySyncCategory.entries.toSet())
+    val accountSyncMode = MutableStateFlow(AccountSyncMode.RW)
+    val accountSyncOverwriteWithRemote = MutableStateFlow(false)
 
     /** Whether the queue is held in shuffled order (Mix button). */
     val shuffleEnabled = MutableStateFlow(false)
@@ -862,6 +866,11 @@ object AppSettings {
             ?.mapNotNull { stored -> runCatching { LibrarySyncCategory.valueOf(stored) }.getOrNull() }
             ?.toSet()
             ?: LibrarySyncCategory.entries.toSet()
+        accountSyncMode.value = runCatching {
+            AccountSyncMode.valueOf(prefs.getString(KEY_ACCOUNT_SYNC_MODE, AccountSyncMode.RW.name) ?: AccountSyncMode.RW.name)
+        }.getOrDefault(AccountSyncMode.RW)
+        YtMusicRepository.setAccountSyncMode(accountSyncMode.value)
+        accountSyncOverwriteWithRemote.value = prefs.getBoolean(KEY_ACCOUNT_SYNC_OVERWRITE, false)
         shuffleEnabled.value = prefs.getBoolean(KEY_SHUFFLE_ENABLED, false)
         repeatMode.value = prefs.getInt(KEY_REPEAT_MODE, Player.REPEAT_MODE_OFF)
         showNerdStats.value = prefs.getBoolean(KEY_NERD_STATS, false)
@@ -1090,6 +1099,17 @@ object AppSettings {
         }.toSet()
         accountSyncCategories.value = updated
         prefs.edit().putStringSet(KEY_ACCOUNT_SYNC_CATEGORIES, updated.map { it.name }.toSet()).apply()
+    }
+
+    fun setAccountSyncMode(value: AccountSyncMode) {
+        accountSyncMode.value = value
+        YtMusicRepository.setAccountSyncMode(value)
+        prefs.edit().putString(KEY_ACCOUNT_SYNC_MODE, value.name).apply()
+    }
+
+    fun setAccountSyncOverwriteWithRemote(value: Boolean) {
+        accountSyncOverwriteWithRemote.value = value
+        prefs.edit().putBoolean(KEY_ACCOUNT_SYNC_OVERWRITE, value).apply()
     }
 
     fun setShuffleEnabled(value: Boolean) {
@@ -2039,6 +2059,8 @@ object AppSettings {
     private const val KEY_AUTOPLAY = "autoplay"
     private const val KEY_AUTO_ACCOUNT_SYNC = "auto_account_sync"
     private const val KEY_ACCOUNT_SYNC_CATEGORIES = "account_sync_categories"
+    private const val KEY_ACCOUNT_SYNC_MODE = "account_sync_mode"
+    private const val KEY_ACCOUNT_SYNC_OVERWRITE = "account_sync_overwrite"
     private const val KEY_SHUFFLE_ENABLED = "shuffle_enabled"
     private const val KEY_REPEAT_MODE = "repeat_mode"
     private const val KEY_NERD_STATS = "show_nerd_stats"

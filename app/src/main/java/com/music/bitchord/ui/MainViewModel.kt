@@ -22,7 +22,7 @@ import com.music.bitchord.data.sync.AccountLibrarySnapshotStore
 import com.music.bitchord.data.sync.SyncResult
 import com.music.bitchord.data.sync.SyncJobGeneration
 import com.music.bitchord.data.sync.mayRemoveMissing
-import com.music.bitchord.data.sync.preserveNonEmptyOnEmptyRemote
+import com.music.bitchord.data.sync.mergeRemoteRows
 import com.music.bitchord.data.model.SPOTIFY_MISSING_PREFIX
 import com.music.bitchord.data.model.SPOTIFY_PENDING_PREFIX
 import com.music.bitchord.data.spotify.SPOTIFY_PAGE_PREFIX
@@ -1948,10 +1948,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 // than making a second request whose failure can masquerade as
                 // a successful empty result.
                 val recentSongs = historySections.flatMap { it.songs }.take(20)
-                val syncedLikedSongs = preserveNonEmptyOnEmptyRemote(
+                val overwriteRemote = AppSettings.accountSyncOverwriteWithRemote.value
+                val syncedLikedSongs = mergeRemoteRows(
                     cached?.library?.likedSongs.orEmpty(),
                     likedSongs,
-                )
+                    overwriteRemote,
+                ) { it.videoId }
                 val replacedShelfTitles = buildSet {
                     if (LibrarySyncCategory.ALBUMS in syncCategories) add("Albums")
                     if (LibrarySyncCategory.ARTISTS in syncCategories) add("Artists")
@@ -1959,21 +1961,31 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     if (LibrarySyncCategory.RECENT_ACTIVITY in syncCategories) add("Recent activity")
                     add("Podcasts")
                 }
-                val syncedLibrarySongs = preserveNonEmptyOnEmptyRemote(
+                val syncedLibrarySongs = mergeRemoteRows(
                     cached?.library?.librarySongs.orEmpty(),
                     if (LibrarySyncCategory.PRIVATE_SONGS in syncCategories) remoteLibrary.librarySongs
                     else cached?.library?.librarySongs.orEmpty(),
-                )
+                    overwriteRemote,
+                ) { it.videoId }
                 val remoteShelfTitles = remoteLibrary.shelves.mapTo(HashSet()) { it.title }
                 val preservedShelves = cached?.library?.shelves.orEmpty().filter { cachedShelf ->
                     cachedShelf.title !in replacedShelfTitles ||
                         cachedShelf.title !in remoteShelfTitles ||
                         remoteLibrary.shelves.firstOrNull { it.title == cachedShelf.title }?.items.isNullOrEmpty()
                 }
+                val mergedRemoteShelves = remoteLibrary.shelves.map { remoteShelf ->
+                    val localItems = cached?.library?.shelves
+                        ?.firstOrNull { it.title == remoteShelf.title }?.items.orEmpty()
+                    remoteShelf.copy(items = mergeRemoteRows(
+                        localItems,
+                        remoteShelf.items,
+                        overwriteRemote,
+                    ) { it.browseId ?: it.videoId ?: "${it.title}\\n${it.subtitle}" })
+                }
                 val mergedLibrary = remoteLibrary.copy(
                     likedSongs = syncedLikedSongs,
                     librarySongs = syncedLibrarySongs,
-                    shelves = preservedShelves + remoteLibrary.shelves,
+                    shelves = preservedShelves + mergedRemoteShelves,
                     likedContinuation = null,
                 )
                 if (!complete) {

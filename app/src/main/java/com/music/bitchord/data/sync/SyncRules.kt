@@ -33,6 +33,19 @@ fun mayReplacePlaylist(complete: Boolean, remoteCount: Int, hasLocalSongs: Boole
 fun <T> preserveNonEmptyOnEmptyRemote(local: List<T>, remote: List<T>): List<T> =
     if (remote.isEmpty() && local.isNotEmpty()) local else remote
 
+/** Merge a complete remote category according to the Add-only / overwrite preference. */
+fun <T, K> mergeRemoteRows(
+    local: List<T>,
+    remote: List<T>,
+    overwriteRemote: Boolean,
+    key: (T) -> K,
+): List<T> {
+    if (remote.isEmpty() && local.isNotEmpty()) return local
+    if (overwriteRemote) return remote
+    val remoteKeys = remote.mapTo(HashSet(), key)
+    return remote + local.filter { key(it) !in remoteKeys }
+}
+
 /** Result shown by manual sync; a failed category must not be reported as a successful sync. */
 enum class SyncResult {
     SYNCED, FAILED, BUSY, NOTHING;

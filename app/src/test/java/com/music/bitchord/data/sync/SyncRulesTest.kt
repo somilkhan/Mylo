@@ -42,6 +42,14 @@ class SyncRulesTest {
         assertTrue(preserveNonEmptyOnEmptyRemote(emptyList<String>(), emptyList()).isEmpty())
     }
 
+    @Test fun addOnlyKeepsLocalRowsWhileOverwriteUsesRemoteRows() {
+        val local = listOf("a", "b")
+        val remote = listOf("b", "c")
+        assertEquals(listOf("b", "c", "a"), mergeRemoteRows(local, remote, false) { it })
+        assertEquals(listOf("b", "c"), mergeRemoteRows(local, remote, true) { it })
+        assertEquals(local, mergeRemoteRows(local, emptyList(), true) { it })
+    }
+
     @Test fun manualSyncReportsFailureAndBusyAccurately() {
         assertEquals(SyncResult.FAILED, SyncResult.combine(listOf(SyncResult.SYNCED, SyncResult.FAILED)))
         assertEquals(SyncResult.BUSY, SyncResult.combine(listOf(SyncResult.BUSY, SyncResult.NOTHING)))
