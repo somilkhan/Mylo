@@ -439,7 +439,7 @@ fun SettingsScreen(
                     SettingsRow(
                         icon = Icons.Rounded.Cached,
                         title = autoSyncTitle,
-                        subtitle = "Refresh your library and listening history in the background",
+                        subtitle = "Refresh selected categories when the connection is eligible; Sync Now runs immediately",
                         trailing = {
                             Switch(
                                 checked = autoAccountSync,
