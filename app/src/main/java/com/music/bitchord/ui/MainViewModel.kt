@@ -1880,7 +1880,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 }
 
                 _accountSyncStatus.value = "Fetching account library…"
-                val remoteLibrary = YtMusicRepository.library().getOrElse {
+                val remoteLibrary = YtMusicRepository.libraryForSync().getOrElse {
                     _accountSyncResult.value = SyncResult.FAILED
                     _accountSyncStatus.value = "Sync failed · previous saved data kept"
                     return@launch
