@@ -465,7 +465,8 @@ fun SettingsScreen(
                     LibrarySyncCategory.PLAYLISTS to "Playlists",
                     LibrarySyncCategory.LIKED_SONGS to "Liked songs",
                     LibrarySyncCategory.PRIVATE_SONGS to "Private songs",
-                    LibrarySyncCategory.RECENT_ACTIVITY to "Listening history",
+                    LibrarySyncCategory.RECENT_ACTIVITY to "Recent activity",
+                    LibrarySyncCategory.LISTENING_HISTORY to "Listening history",
                 ).forEach { (category, title) ->
                     row(title, "sync", "library", "history", "youtube music") {
                         SettingsRow(

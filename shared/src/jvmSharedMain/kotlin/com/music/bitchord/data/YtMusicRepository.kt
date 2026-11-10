@@ -36,7 +36,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 /** Suspend API over Innertube. Every call returns a Result so the UI can show a real error. */
 enum class LibrarySyncCategory {
-    ALBUMS, ARTISTS, PLAYLISTS, LIKED_SONGS, PRIVATE_SONGS, RECENT_ACTIVITY
+    ALBUMS, ARTISTS, PLAYLISTS, LIKED_SONGS, PRIVATE_SONGS, RECENT_ACTIVITY, LISTENING_HISTORY
 }
 
 private data class LibrarySyncFeed(
@@ -532,10 +532,18 @@ object YtMusicRepository {
                 // the "Liked Music" list doesn't already cover is worth a
                 // second section.
                 librarySongs = added.await().filterNot { it.videoId in likedIds },
-                shelves = shelves,
+                shelves = shelves + listOfNotNull(
+                    recentActivity.await().takeIf { it.isNotEmpty() }
+                        ?.let { HomeShelf("Recent activity", it) },
+                ),
                 likedContinuation = likedPage?.continuation,
             )
         }
+    }
+
+    /** The account's distinct Recent activity feed (saved/visited library items). */
+    suspend fun libraryRecentActivity(): Result<List<ShelfItem>> = call("library:recent-activity") {
+        InnertubeParser.parseLibraryItemPage(Innertube.browseContinuation(LIBRARY_RECENT_ACTIVITY)).items
     }
 
     /**
@@ -557,6 +565,11 @@ object YtMusicRepository {
                 else buildList {
                     listOf(LIBRARY_SONGS, PRIVATE_LIBRARY_SONGS).forEach { addAll(songsPagedStrict(it)) }
                 }.distinctBy { it.videoId }
+            }
+            val recentActivity = async {
+                if (LibrarySyncCategory.RECENT_ACTIVITY in categories) {
+                    libraryRecentActivity().getOrThrow()
+                } else emptyList()
             }
             val shelves = LIBRARY_FEEDS
                 .filter { it.category == null || it.category in categories }
@@ -941,6 +954,10 @@ object YtMusicRepository {
 
     /** Tracks uploaded privately to this YouTube Music account. */
     private const val PRIVATE_LIBRARY_SONGS = "FEmusic_library_privately_owned_tracks"
+
+    /** Innertube's account Recent activity filter, as used by InterTune's library sync. */
+    private const val LIBRARY_RECENT_ACTIVITY =
+        "4qmFsgIrEhdGRW11c2ljX2xpYnJhcnlfbGFuZGluZxoQZ2dNR0tnUUlCaEFCb0FZQg%3D%3D"
 
     /** Saved and own playlists; also what the "add to playlist" picker lists. */
     private const val LIBRARY_PLAYLISTS = "FEmusic_liked_playlists"

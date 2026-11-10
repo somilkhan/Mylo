@@ -1907,7 +1907,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 if (identity != listenerKey()) return@launch
                 val historySections = mutableListOf<InnertubeParser.HistorySection>()
                 var historyToken: String? = null
-                if (LibrarySyncCategory.RECENT_ACTIVITY in syncCategories) {
+                if (LibrarySyncCategory.LISTENING_HISTORY in syncCategories) {
                     _accountSyncStatus.value = "Importing complete listening history…"
                     val firstHistory = YtMusicRepository.historyPage().getOrElse {
                         complete = false
@@ -1956,6 +1956,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     if (LibrarySyncCategory.ALBUMS in syncCategories) add("Albums")
                     if (LibrarySyncCategory.ARTISTS in syncCategories) add("Artists")
                     if (LibrarySyncCategory.PLAYLISTS in syncCategories) add(YtMusicRepository.PLAYLISTS_SHELF)
+                    if (LibrarySyncCategory.RECENT_ACTIVITY in syncCategories) add("Recent activity")
                     add("Podcasts")
                 }
                 val syncedLibrarySongs = preserveNonEmptyOnEmptyRemote(
@@ -2007,7 +2008,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 if (!_historyIsLocal.value) publishCachedHistory(historySections)
                 _accountSyncResult.value = SyncResult.SYNCED
-                _accountSyncStatus.value = if (LibrarySyncCategory.RECENT_ACTIVITY in syncCategories) {
+                _accountSyncStatus.value = if (LibrarySyncCategory.LISTENING_HISTORY in syncCategories) {
                     "Synced " + historySections.sumOf { it.songs.size } + " history plays"
                 } else "Library sync completed"
             } catch (cancelled: CancellationException) {
