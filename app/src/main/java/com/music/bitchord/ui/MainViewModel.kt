@@ -2109,7 +2109,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             hasInternet = hasInternet,
             validated = validated,
             powerSave = powerSave,
-            metered = connectivity.isActiveNetworkMetered,
+            // Match InterTune's fail-safe: if Android cannot determine the cost, treat it as metered.
+            metered = runCatching { connectivity.isActiveNetworkMetered }.getOrNull(),
         )
     }
 

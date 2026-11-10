@@ -29,6 +29,9 @@ class SyncRulesTest {
         assertTrue(automaticSyncEligible(true, true, false, true))
         assertFalse(automaticSyncEligible(true, true, true, true))
         assertTrue(automaticSyncEligible(true, true, true, false))
+        // Unknown network cost must never be treated as an unmetered connection.
+        assertFalse(automaticSyncEligible(true, true, true, null))
+        assertTrue(automaticSyncEligible(true, true, false, null))
     }
 
     @Test fun onlyCompleteNonEmptyReadsMayRemove() {
