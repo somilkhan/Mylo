@@ -1926,6 +1926,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     historyToken = page.continuation
                 }
 
+                // A transient empty history response must not erase a previously imported
+                // full feed. The account snapshot is committed atomically, so treat this as
+                // an incomplete refresh and retain the last known-good library + history.
+                val hadHistory = cached?.historySections?.any { it.songs.isNotEmpty() } == true
+                if (hadHistory && historySections.none { it.songs.isNotEmpty() }) {
+                    complete = false
+                }
+
                 _accountSyncStatus.value = "Fetching recently played tracks…"
                 val recentSongs = YtMusicRepository.recents().getOrElse {
                     complete = false
