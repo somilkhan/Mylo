@@ -32,6 +32,12 @@ class SyncRulesTest {
         // Unknown network cost must never be treated as an unmetered connection.
         assertFalse(automaticSyncEligible(true, true, true, null))
         assertTrue(automaticSyncEligible(true, true, false, null))
+        assertTrue(automaticSyncEligible(true, true, true, true, AutomaticSyncMode.FULL))
+        assertFalse(automaticSyncEligible(true, true, true, true, AutomaticSyncMode.BALANCED))
+        assertTrue(automaticSyncEligible(true, true, false, true, AutomaticSyncMode.BALANCED))
+        assertFalse(automaticSyncEligible(true, true, false, true, AutomaticSyncMode.SAVER))
+        assertFalse(automaticSyncEligible(true, true, false, null, AutomaticSyncMode.SAVER))
+        assertTrue(automaticSyncEligible(true, true, true, false, AutomaticSyncMode.SAVER))
     }
 
     @Test fun onlyCompleteNonEmptyReadsMayRemove() {

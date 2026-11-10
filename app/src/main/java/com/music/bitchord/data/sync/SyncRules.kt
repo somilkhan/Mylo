@@ -21,13 +21,31 @@ class SyncJobGeneration {
     fun owns(token: Long): Boolean = generation.get() == token
 }
 
-/** Automatic sync requires a validated internet route; battery saver defers metered work. */
+/** User-selected power/data policy for background account sync. */
+enum class AutomaticSyncMode {
+    /** Ignore battery and metered-network restrictions. */
+    FULL,
+    /** Follow Android Battery Saver; metered routes remain available otherwise. */
+    BALANCED,
+    /** Only sync automatically on a known-unmetered route. */
+    SAVER,
+}
+
+/** Automatic sync requires validated internet and applies the selected resource policy. */
 fun automaticSyncEligible(
     hasInternet: Boolean,
     validated: Boolean,
     powerSave: Boolean,
     metered: Boolean?,
-): Boolean = hasInternet && validated && (!powerSave || metered == false)
+    mode: AutomaticSyncMode = AutomaticSyncMode.BALANCED,
+): Boolean {
+    if (!hasInternet || !validated) return false
+    return when (mode) {
+        AutomaticSyncMode.FULL -> true
+        AutomaticSyncMode.BALANCED -> !powerSave || metered == false
+        AutomaticSyncMode.SAVER -> metered == false
+    }
+}
 
 /** Never interpret an empty or partial remote response as an instruction to delete local data. */
 fun mayRemoveMissing(complete: Boolean, remoteCount: Int): Boolean =

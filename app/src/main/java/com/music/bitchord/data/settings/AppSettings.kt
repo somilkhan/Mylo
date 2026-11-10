@@ -14,6 +14,7 @@ import com.music.bitchord.data.lyrics.LyricsSource
 import com.music.bitchord.data.sources.SourceKind
 import com.music.bitchord.data.LibrarySyncCategory
 import com.music.bitchord.data.AccountSyncMode
+import com.music.bitchord.data.sync.AutomaticSyncMode
 import com.music.bitchord.data.YtMusicRepository
 import com.music.bitchord.playback.EqLayout
 import com.music.bitchord.playback.EqualizerPreset
@@ -350,6 +351,9 @@ object AppSettings {
 
     /** Refresh the signed-in YouTube Music mirror automatically, with a per-account cooldown. */
     val autoAccountSync = MutableStateFlow(true)
+
+    /** Battery/data budget applied to automatic account sync. */
+    val accountSyncBatteryMode = MutableStateFlow(AutomaticSyncMode.BALANCED)
 
     /** Independently selected YouTube Music sync categories. */
     val accountSyncCategories = MutableStateFlow(LibrarySyncCategory.entries.toSet())
@@ -863,6 +867,12 @@ object AppSettings {
         }.getOrDefault(ThemeMode.DARK)
         autoplay.value = prefs.getBoolean(KEY_AUTOPLAY, true)
         autoAccountSync.value = prefs.getBoolean(KEY_AUTO_ACCOUNT_SYNC, true)
+        accountSyncBatteryMode.value = runCatching {
+            AutomaticSyncMode.valueOf(
+                prefs.getString(KEY_ACCOUNT_SYNC_BATTERY_MODE, AutomaticSyncMode.BALANCED.name)
+                    ?: AutomaticSyncMode.BALANCED.name,
+            )
+        }.getOrDefault(AutomaticSyncMode.BALANCED)
         accountSyncCategories.value = prefs.getStringSet(KEY_ACCOUNT_SYNC_CATEGORIES, null)
             ?.mapNotNull { stored -> runCatching { LibrarySyncCategory.valueOf(stored) }.getOrNull() }
             ?.toSet()
@@ -1092,6 +1102,11 @@ object AppSettings {
     fun setAutoAccountSync(value: Boolean) {
         autoAccountSync.value = value
         prefs.edit().putBoolean(KEY_AUTO_ACCOUNT_SYNC, value).apply()
+    }
+
+    fun setAccountSyncBatteryMode(value: AutomaticSyncMode) {
+        accountSyncBatteryMode.value = value
+        prefs.edit().putString(KEY_ACCOUNT_SYNC_BATTERY_MODE, value.name).apply()
     }
 
     fun setAccountSyncCategory(category: LibrarySyncCategory, enabled: Boolean) {
@@ -2082,6 +2097,7 @@ object AppSettings {
     private const val KEY_THEME = "theme_mode"
     private const val KEY_AUTOPLAY = "autoplay"
     private const val KEY_AUTO_ACCOUNT_SYNC = "auto_account_sync"
+    private const val KEY_ACCOUNT_SYNC_BATTERY_MODE = "account_sync_battery_mode"
     private const val KEY_ACCOUNT_SYNC_CATEGORIES = "account_sync_categories"
     private const val KEY_ACCOUNT_SYNC_MODE = "account_sync_mode"
     private const val KEY_ACCOUNT_SYNC_OVERWRITE = "account_sync_overwrite"

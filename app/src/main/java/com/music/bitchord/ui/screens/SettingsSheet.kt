@@ -38,6 +38,7 @@ import androidx.compose.material.icons.automirrored.rounded.VolumeOff
 import androidx.compose.material.icons.rounded.Animation
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.BarChart
+import androidx.compose.material.icons.rounded.BatteryFull
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.BlurOff
 import androidx.compose.material.icons.rounded.BlurOn
@@ -151,6 +152,7 @@ import com.music.bitchord.data.scrobbling.LastFM
 import com.music.bitchord.data.listentogether.ListenTogether
 import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.data.sync.SyncResult
+import com.music.bitchord.data.sync.AutomaticSyncMode
 import com.music.bitchord.data.LibrarySyncCategory
 import com.music.bitchord.data.AccountSyncMode
 import com.music.bitchord.data.settings.OutputPcmMode
@@ -205,6 +207,7 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val autoAccountSync by AppSettings.autoAccountSync.collectAsStateWithLifecycle()
+    val accountSyncBatteryMode by AppSettings.accountSyncBatteryMode.collectAsStateWithLifecycle()
     val accountSyncCategories by AppSettings.accountSyncCategories.collectAsStateWithLifecycle()
     val accountSyncMode by AppSettings.accountSyncMode.collectAsStateWithLifecycle()
     val accountSyncOverwrite by AppSettings.accountSyncOverwriteWithRemote.collectAsStateWithLifecycle()
@@ -447,6 +450,61 @@ fun SettingsScreen(
                             )
                         },
                     )
+                }
+                row("Sync battery use", "sync", "battery", "metered", "data") {
+                    var showBatteryModeDialog by rememberSaveable { mutableStateOf(false) }
+                    val modeDescription = when (accountSyncBatteryMode) {
+                        AutomaticSyncMode.FULL -> "Full · sync on metered networks, even in Battery Saver"
+                        AutomaticSyncMode.BALANCED -> "Balanced · follow Android Battery Saver"
+                        AutomaticSyncMode.SAVER -> "Saver · automatic sync only on unmetered networks"
+                    }
+                    SettingsRow(
+                        icon = Icons.Rounded.BatteryFull,
+                        title = "Sync battery use",
+                        subtitle = modeDescription,
+                        value = accountSyncBatteryMode.name.lowercase().replaceFirstChar { it.uppercase() },
+                        onClick = { showBatteryModeDialog = true },
+                    )
+                    if (showBatteryModeDialog) {
+                        AlertDialog(
+                            onDismissRequest = { showBatteryModeDialog = false },
+                            title = { Text("Automatic sync policy") },
+                            text = {
+                                Column {
+                                    listOf(
+                                        Triple(AutomaticSyncMode.FULL, "Full", "Allow automatic sync on metered networks, regardless of Battery Saver."),
+                                        Triple(AutomaticSyncMode.BALANCED, "Balanced", "Follow Android Battery Saver. This keeps Mylo's current behaviour."),
+                                        Triple(AutomaticSyncMode.SAVER, "Saver", "Wait for a known-unmetered network, even when Battery Saver is off."),
+                                    ).forEach { (choice, label, detail) ->
+                                        TextButton(
+                                            onClick = {
+                                                AppSettings.setAccountSyncBatteryMode(choice)
+                                                showBatteryModeDialog = false
+                                            },
+                                            modifier = Modifier.fillMaxWidth(),
+                                        ) {
+                                            Column(Modifier.fillMaxWidth()) {
+                                                Text(
+                                                    text = label + if (choice == accountSyncBatteryMode) "  ✓" else "",
+                                                    color = MaterialTheme.colorScheme.onSurface,
+                                                )
+                                                Text(
+                                                    text = detail,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            confirmButton = {
+                                TextButton(onClick = { showBatteryModeDialog = false }) {
+                                    Text("Close")
+                                }
+                            },
+                        )
+                    }
                 }
                 val syncTitle = "Sync YouTube Music"
                 val syncSubtitle = when {
