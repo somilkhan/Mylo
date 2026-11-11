@@ -1465,6 +1465,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 if (enabled && _signedIn.value) syncAccountLibrary(force = false)
             }
         }
+        viewModelScope.launch {
+            // Re-evaluate automatic sync immediately when the listener changes
+            // the Full / Balanced / Saver policy in Settings.
+            AppSettings.accountSyncBatteryMode.drop(1).collect {
+                if (AppSettings.autoAccountSync.value && _signedIn.value) {
+                    syncAccountLibrary(force = false)
+                }
+            }
+        }
         loadHome()
         loadExplore()
         if (_signedIn.value) {
