@@ -31,6 +31,13 @@ enum class AutomaticSyncMode {
     SAVER,
 }
 
+/** InterTune-compatible per-mode automatic-sync cooldown. Manual Sync Now bypasses it. */
+fun automaticSyncCooldownMs(mode: AutomaticSyncMode): Long = when (mode) {
+    AutomaticSyncMode.FULL -> 30 * 60 * 1000L
+    AutomaticSyncMode.BALANCED -> 2 * 60 * 60 * 1000L
+    AutomaticSyncMode.SAVER -> 6 * 60 * 60 * 1000L
+}
+
 /** Automatic sync requires validated internet and applies the selected resource policy. */
 fun automaticSyncEligible(
     hasInternet: Boolean,

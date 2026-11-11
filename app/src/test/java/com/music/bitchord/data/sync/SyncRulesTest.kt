@@ -40,6 +40,12 @@ class SyncRulesTest {
         assertTrue(automaticSyncEligible(true, true, true, false, AutomaticSyncMode.SAVER))
     }
 
+    @Test fun automaticSyncCooldownMatchesInterTuneBatteryModes() {
+        assertEquals(30 * 60 * 1000L, automaticSyncCooldownMs(AutomaticSyncMode.FULL))
+        assertEquals(2 * 60 * 60 * 1000L, automaticSyncCooldownMs(AutomaticSyncMode.BALANCED))
+        assertEquals(6 * 60 * 60 * 1000L, automaticSyncCooldownMs(AutomaticSyncMode.SAVER))
+    }
+
     @Test fun onlyCompleteNonEmptyReadsMayRemove() {
         assertTrue(mayRemoveMissing(true, 20))
         assertFalse(mayRemoveMissing(false, 20))

@@ -25,6 +25,7 @@ import com.music.bitchord.data.sync.AccountLibrarySnapshotStore
 import com.music.bitchord.data.sync.SyncResult
 import com.music.bitchord.data.sync.SyncJobGeneration
 import com.music.bitchord.data.sync.automaticSyncEligible
+import com.music.bitchord.data.sync.automaticSyncCooldownMs
 import com.music.bitchord.data.sync.mayRemoveMissing
 import com.music.bitchord.data.sync.mergeRemoteRows
 import com.music.bitchord.data.model.SPOTIFY_MISSING_PREFIX
@@ -117,8 +118,6 @@ import java.util.concurrent.atomic.AtomicLong
 
 /** What the Search tab searches: YouTube Music, or the Local Music folder on this device. */
 enum class SearchSource { YOUTUBE, LIBRARY, ADDONS }
-
-private const val ACCOUNT_SYNC_COOLDOWN_MS = 30 * 60 * 1000L
 
 class MainViewModel(app: Application) : AndroidViewModel(app) {
 
@@ -1889,7 +1888,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                         identity,
                         selectedCategories,
                         now,
-                        ACCOUNT_SYNC_COOLDOWN_MS,
+                        automaticSyncCooldownMs(AppSettings.accountSyncBatteryMode.value),
                     )
                 }
                 if (syncCategories.isEmpty()) {
