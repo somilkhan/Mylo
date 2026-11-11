@@ -1474,6 +1474,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
         }
+        viewModelScope.launch {
+            // A network becoming available or changing between Wi-Fi and
+            // cellular should re-check due categories without waiting for a
+            // restart or a manual Sync Now.
+            AppSettings.meteredConnection.drop(1).collect {
+                if (AppSettings.autoAccountSync.value && _signedIn.value) {
+                    syncAccountLibrary(force = false)
+                }
+            }
+        }
         loadHome()
         loadExplore()
         if (_signedIn.value) {
