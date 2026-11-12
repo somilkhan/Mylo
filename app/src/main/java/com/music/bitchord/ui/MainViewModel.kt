@@ -2186,11 +2186,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     /**
      * The account's listening history.
      *
-     * Loaded on each visit rather than cached: it is a page whose whole subject
-     * is what happened most recently, and one that opened showing the state it
-     * was in last time would be answering a different question. Guests get the
-     * signed-out message straight away, since there is no account to have a
-     * history on.
+     * A complete account snapshot is preferred when one exists, so an offline
+     * visit still shows the full imported feed. Without one, the latest remote
+     * first page is fetched on each visit. Guests get the signed-out message
+     * straight away, since there is no account to have a history on.
      */
     fun selectHistorySource(local: Boolean) {
         if (_historyIsLocal.value == local) return
@@ -2254,13 +2253,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             if (identity != listenerKey()) return@launch
             result.onSuccess { page ->
                 _historySections.value = page.sections
-                _historyContinuation.value = historyContinuationTracker.reset(page.continuation)
+                val continuation = historyContinuationTracker.reset(page.continuation)
+                _historyContinuation.value = continuation
                 // Some feeds contain an empty boundary page before older rows.
                 // Keep the paging surface available instead of turning that
                 // valid continuation into a terminal "empty history" error.
                 _history.value = when {
                     page.songs.isNotEmpty() -> UiState.Success(page.songs)
-                    page.continuation != null -> UiState.Success(emptyList())
+                    continuation != null -> UiState.Success(emptyList())
                     else -> UiState.Error(text(R.string.history_empty))
                 }
             }.onFailure {
