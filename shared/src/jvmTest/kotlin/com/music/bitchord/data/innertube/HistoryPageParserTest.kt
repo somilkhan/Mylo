@@ -53,6 +53,24 @@ class HistoryPageParserTest {
     }
 
     @Test
+    fun keepsContinuationWhenBoundaryPageHasNoPlayableRows() {
+        val root = json.parseToJsonElement(
+            """
+            {
+              "continuationContents": {"musicShelfContinuation": {"contents": []}},
+              "continuations": [{"nextContinuationData": {"continuation": "after-empty-boundary"}}]
+            }
+            """.trimIndent(),
+        )
+
+        val page = InnertubeParser.parseHistoryPage(root)
+
+        assertEquals(emptyList(), page.songs)
+        assertEquals(emptyList(), page.sections)
+        assertEquals("after-empty-boundary", page.continuation)
+    }
+
+    @Test
     fun parsesContinuationShelfWithoutLosingRepeatedRows() {
         val root = json.parseToJsonElement(
             """

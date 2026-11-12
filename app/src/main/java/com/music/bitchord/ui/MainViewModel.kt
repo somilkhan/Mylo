@@ -1940,6 +1940,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 var likedToken = if (LibrarySyncCategory.LIKED_SONGS in syncCategories) remoteLibrary.likedContinuation else null
                 val seenLikedTokens = HashSet<String>()
                 var complete = true
+                if (likedToken != null && likedToken.isBlank()) {
+                    complete = false
+                    likedToken = null
+                }
                 val syncingLikedContinuation = likedToken != null
                 if (syncingLikedContinuation && identity == listenerKey()) {
                     activeCategories.add(LibrarySyncCategory.LIKED_SONGS)
@@ -1948,7 +1952,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 try {
                     while (likedToken != null) {
-                        if (!seenLikedTokens.add(likedToken)) {
+                        if (likedToken.isBlank() || !seenLikedTokens.add(likedToken)) {
                             complete = false
                             break
                         }
@@ -1985,13 +1989,17 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                             null
                         }
                         historyToken = firstHistory?.continuation
+                        if (historyToken != null && historyToken!!.isBlank()) {
+                            complete = false
+                            historyToken = null
+                        }
                         if (firstHistory != null) appendHistorySections(historySections, firstHistory.sections)
                     } else {
                         historySections.addAll(cached?.historySections.orEmpty())
                     }
                     val seenHistoryTokens = HashSet<String>()
                     while (historyToken != null) {
-                        if (!seenHistoryTokens.add(historyToken)) {
+                        if (historyToken.isBlank() || !seenHistoryTokens.add(historyToken)) {
                             complete = false
                             break
                         }
