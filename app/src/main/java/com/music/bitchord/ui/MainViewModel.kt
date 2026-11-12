@@ -99,6 +99,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import com.music.bitchord.data.sync.AccountLibrarySyncLock
 import com.music.bitchord.data.sources.AddonSource
 import com.music.bitchord.data.sources.SourceKind
 import com.music.bitchord.data.sources.SourceRegistry
@@ -1882,6 +1883,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             _accountSyncing.value = true
             _accountSyncResult.value = SyncResult.BUSY
             _accountSyncStatus.value = "Starting sync…"
+            // Hold the account/profile lock from snapshot read through the final write.
+            // A future WorkManager runner must use this same lock to avoid stale overwrites.
+            val accountLock = AccountLibrarySyncLock.lockFor(identity)
+            accountLock.lock()
             try {
                 val cached = accountSnapshotStore.read(identity)
                 if (identity != listenerKey()) return@launch
@@ -2116,6 +2121,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 _accountSyncResult.value = SyncResult.FAILED
                     _accountSyncStatus.value = "Sync incomplete · previous saved data kept"
             } finally {
+                accountLock.unlock()
                 // Only the newest sync owns the shared indicator. A cancelled old job may
                 // complete after a new account/profile sync has already started.
                 if (accountSyncGeneration.owns(syncGeneration)) {
