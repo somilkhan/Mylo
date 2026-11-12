@@ -585,6 +585,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val activeProfileId: StateFlow<String?> = _activeProfileId.asStateFlow()
 
     private val historyContinuationTracker = HistoryContinuationTracker()
+    private val maxEmptyHistoryPagesPerRequest = 20
     private val _history = MutableStateFlow<UiState<List<Song>>>(UiState.Loading)
     val history: StateFlow<UiState<List<Song>>> = _history.asStateFlow()
     private val _historyIsLocal = MutableStateFlow(true)
@@ -2117,10 +2118,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private companion object {
-        const val MAX_EMPTY_HISTORY_PAGES_PER_REQUEST = 20
-    }
-
     private fun automaticAccountSyncAllowed(): Boolean {
         val context = getApplication<Application>()
         val connectivity = context.getSystemService(ConnectivityManager::class.java) ?: return false
@@ -2299,7 +2296,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 val addedSections = mutableListOf<InnertubeParser.HistorySection>()
 
                 while (nextToken != null && addedSongs.isEmpty() &&
-                    fetchedPages < MAX_EMPTY_HISTORY_PAGES_PER_REQUEST
+                    fetchedPages < maxEmptyHistoryPagesPerRequest
                 ) {
                     val requestedToken = nextToken
                     val result = YtMusicRepository.moreHistory(requestedToken)
@@ -2334,7 +2331,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 // the next token available and expose Retry instead of spinning.
                 _historyLoadMoreFailed.value =
                     addedSongs.isEmpty() && nextToken != null &&
-                        fetchedPages >= MAX_EMPTY_HISTORY_PAGES_PER_REQUEST
+                        fetchedPages >= maxEmptyHistoryPagesPerRequest
             } finally {
                 if (identity == listenerKey()) _historyLoadingMore.value = false
             }
