@@ -20,3 +20,15 @@ object AccountLibrarySyncLock {
     fun lockFor(accountKey: String): Mutex =
         locks.computeIfAbsent(accountKey) { Mutex() }
 }
+
+
+/**
+ * Process-wide lock for Innertube's mutable cookie/channel identity.
+ *
+ * Foreground sync and WorkManager must share this exact mutex. Holding it for
+ * the complete paginated sync prevents a profile switch or another sync runner
+ * from changing credentials between continuation pages.
+ */
+object InnertubeSessionSyncLock {
+    val mutex = Mutex()
+}

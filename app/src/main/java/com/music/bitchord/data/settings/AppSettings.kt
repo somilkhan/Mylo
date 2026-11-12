@@ -154,6 +154,7 @@ enum class SongSort {
 object AppSettings {
 
     private lateinit var prefs: SharedPreferences
+    private var applicationContext: Context? = null
 
     /** Only for the Discord, WebDAV and SMB secrets — everything else on here is plain prefs. */
     private lateinit var authStore: AuthStore
@@ -797,6 +798,7 @@ object AppSettings {
      * one here was a measurable slice of cold start.
      */
     fun init(context: Context, authStore: AuthStore) {
+        applicationContext = context.applicationContext
         prefs = context.getSharedPreferences("bitchord_settings", Context.MODE_PRIVATE)
         this.authStore = authStore
         com.music.bitchord.data.spotify.LocalPlaylistStore.init(context)
@@ -818,6 +820,7 @@ object AppSettings {
     fun reload() {
         if (!this::prefs.isInitialized) return
         readAll()
+        applicationContext?.let(com.music.bitchord.data.sync.AccountLibrarySyncScheduler::refresh)
     }
 
     private fun readAll() {
@@ -1102,11 +1105,13 @@ object AppSettings {
     fun setAutoAccountSync(value: Boolean) {
         autoAccountSync.value = value
         prefs.edit().putBoolean(KEY_AUTO_ACCOUNT_SYNC, value).apply()
+        applicationContext?.let(com.music.bitchord.data.sync.AccountLibrarySyncScheduler::refresh)
     }
 
     fun setAccountSyncBatteryMode(value: AutomaticSyncMode) {
         accountSyncBatteryMode.value = value
         prefs.edit().putString(KEY_ACCOUNT_SYNC_BATTERY_MODE, value.name).apply()
+        applicationContext?.let(com.music.bitchord.data.sync.AccountLibrarySyncScheduler::refresh)
     }
 
     fun setAccountSyncCategory(category: LibrarySyncCategory, enabled: Boolean) {

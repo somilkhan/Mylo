@@ -20,9 +20,8 @@ import com.music.bitchord.data.LikeState
 import com.music.bitchord.data.YtMusicRepository
 import com.music.bitchord.data.LibrarySyncCategory
 import com.music.bitchord.data.ListeningHistory
-import com.music.bitchord.data.sync.AccountLibrarySnapshot
-import com.music.bitchord.data.sync.AccountLibrarySnapshotStore
 import com.music.bitchord.data.sync.SyncResult
+import com.music.bitchord.data.sync.AccountLibrarySnapshotStore
 import com.music.bitchord.data.sync.SyncJobGeneration
 import com.music.bitchord.data.sync.HistoryContinuationTracker
 import com.music.bitchord.data.sync.automaticSyncEligible
@@ -98,8 +97,11 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.sync.withPermit
-import com.music.bitchord.data.sync.AccountLibrarySyncLock
+import com.music.bitchord.data.sync.InnertubeSessionSyncLock
+import com.music.bitchord.data.sync.AccountLibrarySyncRunner
 import com.music.bitchord.data.sources.AddonSource
 import com.music.bitchord.data.sources.SourceKind
 import com.music.bitchord.data.sources.SourceRegistry
@@ -126,6 +128,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val authStore = AuthStore(app)
     private val accountSnapshotStore = AccountLibrarySnapshotStore(File(app.filesDir, "account-library-snapshots"))
     private var accountSyncJob: Job? = null
+    // Serializes every account sync against changes to Innertube's process-global identity.
+    private val innertubeSessionLock = InnertubeSessionSyncLock.mutex
     // Prevent a cancelled, older sync from clearing the loading state of a newer one.
     private val accountSyncGeneration = SyncJobGeneration()
 
@@ -1869,262 +1873,45 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      * response never replaces a previously populated snapshot.
      */
     fun syncAccountLibrary(force: Boolean = true) {
-        if (!_signedIn.value) {
-            _accountSyncResult.value = SyncResult.NOTHING
-            return
-        }
-        val identity = listenerKey() ?: return
-        if (accountSyncJob?.isActive == true) {
-            _accountSyncResult.value = SyncResult.BUSY
-            return
-        }
-        val syncGeneration = accountSyncGeneration.begin()
+        if (!_signedIn.value) { _accountSyncResult.value = SyncResult.NOTHING; return }
+        val accountId = _activeAccountId.value ?: return
+        val profileId = _activeProfileId.value ?: return
+        val identity = "$accountId:$profileId"
+        val session = authStore.sessions.firstOrNull { it.accountId == accountId } ?: return
+        if (accountSyncJob?.isActive == true) { _accountSyncResult.value = SyncResult.BUSY; return }
+        val generation = accountSyncGeneration.begin()
         accountSyncJob = viewModelScope.launch(Dispatchers.IO) {
             _accountSyncing.value = true
             _accountSyncResult.value = SyncResult.BUSY
             _accountSyncStatus.value = "Starting sync…"
-            // Hold the account/profile lock from snapshot read through the final write.
-            // A future WorkManager runner must use this same lock to avoid stale overwrites.
-            val accountLock = AccountLibrarySyncLock.lockFor(identity)
-            accountLock.lock()
             try {
-                val cached = accountSnapshotStore.read(identity)
-                if (identity != listenerKey()) return@launch
-                if (cached != null) {
-                    _library.value = if (cached.library.isEmpty) {
-                        UiState.Error(text(R.string.library_empty))
-                    } else UiState.Success(cached.library)
-                    LikeState.seedLiked(cached.library.likedSongs.mapTo(HashSet()) { it.videoId })
-                    if (!_historyIsLocal.value) publishCachedHistory(cached.historySections)
-                }
-                val now = System.currentTimeMillis()
-                if (!force && !AppSettings.autoAccountSync.value) {
-                    _accountSyncResult.value = SyncResult.NOTHING
-                    return@launch
-                }
-                val selectedCategories = AppSettings.accountSyncCategories.value
-                val syncCategories = if (force) {
-                    selectedCategories
-                } else {
-                    if (!automaticAccountSyncAllowed()) {
-                        _accountSyncResult.value = SyncResult.NOTHING
-                        _accountSyncStatus.value = "Automatic sync waiting for an eligible connection"
-                        return@launch
-                    }
-                    AppSettings.accountSyncCategoriesDue(
-                        identity,
-                        selectedCategories,
-                        now,
-                        automaticSyncCooldownMs(AppSettings.accountSyncBatteryMode.value),
-                    )
-                }
-                if (syncCategories.isEmpty()) {
-                    _accountSyncResult.value = SyncResult.NOTHING
-                    _accountSyncStatus.value = "Selected sync categories are up to date"
-                    return@launch
-                }
-
-                _accountSyncStatus.value = "Fetching selected account categories…"
-                val activeCategories = ConcurrentHashMap.newKeySet<LibrarySyncCategory>()
-                val remoteLibrary = YtMusicRepository.libraryForSync(syncCategories) { category, active ->
-                    if (identity == listenerKey()) {
-                        if (active) activeCategories.add(category) else activeCategories.remove(category)
-                        _accountSyncCategoriesInProgress.value = activeCategories.toSet()
-                        val labels = activeCategories.joinToString { it.name.lowercase().replace('_', ' ') }
-                        if (labels.isNotBlank()) _accountSyncStatus.value = "Syncing $labels…"
-                    }
-                }.getOrElse {
-                    _accountSyncResult.value = SyncResult.FAILED
-                    _accountSyncStatus.value = "Sync failed · previous saved data kept"
-                    return@launch
-                }
-                if (identity != listenerKey()) return@launch
-                val likedSongs = (if (LibrarySyncCategory.LIKED_SONGS in syncCategories) {
-                    remoteLibrary.likedSongs
-                } else cached?.library?.likedSongs.orEmpty()).toMutableList()
-                var likedToken = if (LibrarySyncCategory.LIKED_SONGS in syncCategories) remoteLibrary.likedContinuation else null
-                val seenLikedTokens = HashSet<String>()
-                var complete = true
-                if (likedToken != null && likedToken.isBlank()) {
-                    complete = false
-                    likedToken = null
-                }
-                val syncingLikedContinuation = likedToken != null
-                if (syncingLikedContinuation && identity == listenerKey()) {
-                    activeCategories.add(LibrarySyncCategory.LIKED_SONGS)
-                    _accountSyncCategoriesInProgress.value = activeCategories.toSet()
-                    _accountSyncStatus.value = "Importing remaining liked songs…"
-                }
-                try {
-                    while (likedToken != null) {
-                        if (likedToken.isBlank() || !seenLikedTokens.add(likedToken)) {
-                            complete = false
-                            break
+                val eligible = force || automaticAccountSyncAllowed()
+                val outcome = AccountLibrarySyncRunner(getApplication()).run(
+                    session = session, profileId = profileId, force = force,
+                    powerSave = false, metered = false, hasValidatedInternet = eligible,
+                    onProgress = { message, categories ->
+                        if (identity == listenerKey()) {
+                            _accountSyncStatus.value = message
+                            _accountSyncCategoriesInProgress.value = categories
                         }
-                        if (identity != listenerKey()) return@launch
-                        val pageResult = YtMusicRepository.moreSongs(likedToken)
-                        if (pageResult.isFailure) {
-                            complete = false
-                            break
-                        }
-                        val page = pageResult.getOrThrow()
-                        likedSongs += page.songs
-                        likedToken = page.continuation
-                    }
-                } finally {
-                    if (syncingLikedContinuation && identity == listenerKey()) {
-                        activeCategories.remove(LibrarySyncCategory.LIKED_SONGS)
-                        _accountSyncCategoriesInProgress.value = activeCategories.toSet()
-                    }
-                }
-
-                if (identity != listenerKey()) return@launch
-                val historySections = mutableListOf<InnertubeParser.HistorySection>()
-                var historyToken: String? = null
-                val syncingHistory = LibrarySyncCategory.LISTENING_HISTORY in syncCategories
-                if (syncingHistory && identity == listenerKey()) {
-                    activeCategories.add(LibrarySyncCategory.LISTENING_HISTORY)
-                    _accountSyncCategoriesInProgress.value = activeCategories.toSet()
-                    _accountSyncStatus.value = "Importing complete listening history…"
-                }
-                try {
-                    if (syncingHistory) {
-                        val firstHistory = YtMusicRepository.historyPage().getOrElse {
-                            complete = false
-                            null
-                        }
-                        historyToken = firstHistory?.continuation
-                        if (historyToken?.isBlank() == true) {
-                            complete = false
-                            historyToken = null
-                        }
-                        if (firstHistory != null) appendHistorySections(historySections, firstHistory.sections)
-                    } else {
-                        historySections.addAll(cached?.historySections.orEmpty())
-                    }
-                    val seenHistoryTokens = HashSet<String>()
-                    while (historyToken != null) {
-                        if (historyToken.isBlank() || !seenHistoryTokens.add(historyToken)) {
-                            complete = false
-                            break
-                        }
-                        if (identity != listenerKey()) return@launch
-                        val pageResult = YtMusicRepository.moreHistory(historyToken)
-                        if (pageResult.isFailure) {
-                            complete = false
-                            break
-                        }
-                        val page = pageResult.getOrThrow()
-                        appendHistorySections(historySections, page.sections)
-                        historyToken = page.continuation
-                    }
-                } finally {
-                    if (syncingHistory && identity == listenerKey()) {
-                        activeCategories.remove(LibrarySyncCategory.LISTENING_HISTORY)
-                        _accountSyncCategoriesInProgress.value = activeCategories.toSet()
-                    }
-                }
-
-                // A transient empty history response must not erase a previously imported
-                // full feed. The account snapshot is committed atomically, so treat this as
-                // an incomplete refresh and retain the last known-good library + history.
-                val hadHistory = cached?.historySections?.any { it.songs.isNotEmpty() } == true
-                if (hadHistory && historySections.none { it.songs.isNotEmpty() }) {
-                    complete = false
-                }
-
-                // Recents is a projection of the same account history feed in
-                // this repository. Derive it from the fully paged history rather
-                // than making a second request whose failure can masquerade as
-                // a successful empty result.
-                val recentSongs = historySections.flatMap { it.songs }.take(20)
-                val overwriteRemote = AppSettings.accountSyncOverwriteWithRemote.value
-                val syncedLikedSongs = mergeRemoteRows(
-                    cached?.library?.likedSongs.orEmpty(),
-                    likedSongs.distinctBy { it.videoId },
-                    overwriteRemote,
-                ) { it.videoId }
-                val syncedLikedIds = syncedLikedSongs.mapTo(HashSet()) { it.videoId }
-                val replacedShelfTitles = buildSet {
-                    if (LibrarySyncCategory.ALBUMS in syncCategories) add("Albums")
-                    if (LibrarySyncCategory.ARTISTS in syncCategories) add("Artists")
-                    if (LibrarySyncCategory.PLAYLISTS in syncCategories) add(YtMusicRepository.PLAYLISTS_SHELF)
-                    if (LibrarySyncCategory.RECENT_ACTIVITY in syncCategories) add("Recent activity")
-                    add("Podcasts")
-                }
-                val syncedLibrarySongs = mergeRemoteRows(
-                    cached?.library?.librarySongs.orEmpty(),
-                    if (LibrarySyncCategory.PRIVATE_SONGS in syncCategories) remoteLibrary.librarySongs
-                    else cached?.library?.librarySongs.orEmpty(),
-                    overwriteRemote,
-                ) { it.videoId }.filterNot { it.videoId in syncedLikedIds }
-                val remoteShelfTitles = remoteLibrary.shelves.mapTo(HashSet()) { it.title }
-                val preservedShelves = cached?.library?.shelves.orEmpty().filter { cachedShelf ->
-                    cachedShelf.title !in replacedShelfTitles ||
-                        cachedShelf.title !in remoteShelfTitles ||
-                        remoteLibrary.shelves.firstOrNull { it.title == cachedShelf.title }?.items.isNullOrEmpty()
-                }
-                val mergedRemoteShelves = remoteLibrary.shelves.map { remoteShelf ->
-                    val localItems = cached?.library?.shelves
-                        ?.firstOrNull { it.title == remoteShelf.title }?.items.orEmpty()
-                    remoteShelf.copy(items = mergeRemoteRows(
-                        localItems,
-                        remoteShelf.items,
-                        overwriteRemote,
-                    ) { it.browseId ?: it.videoId ?: "${it.title}\\n${it.subtitle}" })
-                }
-                val mergedLibrary = remoteLibrary.copy(
-                    likedSongs = syncedLikedSongs,
-                    librarySongs = syncedLibrarySongs,
-                    shelves = preservedShelves + mergedRemoteShelves,
-                    likedContinuation = null,
+                    },
                 )
-                if (!complete) {
-                    _accountSyncResult.value = SyncResult.FAILED
-                    _accountSyncStatus.value = "Sync incomplete · previous saved data kept"
-                    return@launch
-                }
-                val remoteCount = syncedLikedSongs.size + mergedLibrary.librarySongs.size +
-                    mergedLibrary.shelves.sumOf { it.items.size }
-                if (cached != null && !mayRemoveMissing(complete = true, remoteCount = remoteCount)) {
-                    _accountSyncResult.value = SyncResult.FAILED
-                    _accountSyncStatus.value = "Sync incomplete · previous saved data kept"
-                    return@launch
-                }
                 if (identity != listenerKey()) return@launch
-
-                _accountSyncStatus.value = "Saving offline account snapshot…"
-                val snapshot = AccountLibrarySnapshot(
-                    library = mergedLibrary,
-                    historySections = historySections,
-                    recentSongs = recentSongs,
-                    savedAt = now,
-                )
-                accountSnapshotStore.write(identity, snapshot)
-                if (identity != listenerKey()) return@launch
-                AppSettings.markAccountSyncCategoriesSynced(identity, syncCategories, now)
-
-                LikeState.replaceSeededLiked(syncedLikedSongs.mapTo(HashSet()) { it.videoId })
-                _library.value = if (snapshot.library.isEmpty) {
-                    UiState.Error(text(R.string.library_empty))
-                } else {
-                    UiState.Success(snapshot.library)
+                outcome.snapshot?.let { snapshot ->
+                    LikeState.replaceSeededLiked(snapshot.library.likedSongs.mapTo(HashSet()) { it.videoId })
+                    _library.value = if (snapshot.library.isEmpty) UiState.Error(text(R.string.library_empty))
+                        else UiState.Success(snapshot.library)
+                    if (!_historyIsLocal.value) publishCachedHistory(snapshot.historySections)
                 }
-                if (!_historyIsLocal.value) publishCachedHistory(historySections)
-                _accountSyncResult.value = SyncResult.SYNCED
-                _accountSyncStatus.value = if (LibrarySyncCategory.LISTENING_HISTORY in syncCategories) {
-                    "Synced " + historySections.sumOf { it.songs.size } + " history plays"
-                } else "Library sync completed"
+                _accountSyncResult.value = outcome.result
+                _accountSyncStatus.value = outcome.status
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
                 _accountSyncResult.value = SyncResult.FAILED
-                    _accountSyncStatus.value = "Sync incomplete · previous saved data kept"
+                _accountSyncStatus.value = "Sync incomplete · previous saved data kept"
             } finally {
-                accountLock.unlock()
-                // Only the newest sync owns the shared indicator. A cancelled old job may
-                // complete after a new account/profile sync has already started.
-                if (accountSyncGeneration.owns(syncGeneration)) {
+                if (accountSyncGeneration.owns(generation)) {
                     _accountSyncCategoriesInProgress.value = emptySet()
                     _accountSyncing.value = false
                 }
@@ -3641,12 +3428,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
         val oldAccountId = _activeAccountId.value
         val oldProfileId = _activeProfileId.value
-        // A sync already in flight signs requests with Innertube's global
-        // cookie/channel. Stop it before temporarily installing this candidate
-        // session, not after account validation has finished.
-        cancelAccountSync()
         viewModelScope.launch {
-            // Validate the exact cookie/profile pair before writing any of it.
+            innertubeSessionLock.withLock {
+                cancelAccountSyncAndJoin()
+                // Validate the exact cookie/profile pair before writing any of it.
             // The old implementation persisted first and unconditionally set
             // signedIn=true; a half-finished channel chooser therefore became
             // a durable broken "Personal" account.
@@ -3734,8 +3519,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             StreamResolver.onSessionChanged()
             if (wasSignedIn) clearListenerState()
             reloadForAccount()
-            loadChannels(force = true)
-            onComplete(true)
+                loadChannels(force = true)
+                onComplete(true)
+            }
         }
     }
 
@@ -3747,39 +3533,40 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         Innertube.selectChannel(profile?.pageId, profile?.dataSyncId, profile?.authUser)
     }
 
-    /** Selects an identity without ever allowing a response to replace it. */
+    /** Selects an identity only after every request using the previous identity has stopped. */
     fun selectProfile(accountId: String, selectedProfileId: String, supplied: YouTubeProfile? = null) {
         val source = _googleAccounts.value.firstOrNull { it.accountId == accountId } ?: return
         val profile = supplied ?: source.profiles.firstOrNull { it.profileId == selectedProfileId } ?: return
         if (accountId == _activeAccountId.value && profile.profileId == _activeProfileId.value) return
-        // Innertube credentials and channel selection are process-global. Cancel
-        // the old identity's sync before changing either, so its next page cannot
-        // be fetched under the newly selected profile.
-        cancelAccountSync()
-        cacheCurrentListener()
-        val index = source.profiles.indexOfFirst { it.profileId == profile.profileId }
-        val updatedProfiles = if (index >= 0) {
-            source.profiles.toMutableList().apply { set(index, profile) }
-        } else {
-            source.profiles + profile
+        viewModelScope.launch {
+            innertubeSessionLock.withLock {
+                cancelAccountSyncAndJoin()
+                cacheCurrentListener()
+                val index = source.profiles.indexOfFirst { it.profileId == profile.profileId }
+                val updatedProfiles = if (index >= 0) {
+                    source.profiles.toMutableList().apply { set(index, profile) }
+                } else {
+                    source.profiles + profile
+                }
+                val updated = source.copy(
+                    profiles = updatedProfiles,
+                    activeProfileId = profile.profileId,
+                )
+                authStore.upsertSession(updated)
+                authStore.select(accountId, profile.profileId)
+                _googleAccounts.value = authStore.sessions
+                _activeAccountId.value = accountId
+                _activeProfileId.value = profile.profileId
+                authStore.cookie = updated.cookie
+                Innertube.cookie = updated.cookie
+                Innertube.selectChannel(profile.pageId, profile.dataSyncId, profile.authUser)
+                _selectedChannelKey.value = profile.profileId
+                _selectedChannelName.value = profile.name
+                StreamResolver.onSessionChanged()
+                clearListenerState(restoreCached = true)
+                reloadForAccount()
+            }
         }
-        val updated = source.copy(
-            profiles = updatedProfiles,
-            activeProfileId = profile.profileId,
-        )
-        authStore.upsertSession(updated)
-        authStore.select(accountId, profile.profileId)
-        _googleAccounts.value = authStore.sessions
-        _activeAccountId.value = accountId
-        _activeProfileId.value = profile.profileId
-        authStore.cookie = updated.cookie
-        Innertube.cookie = updated.cookie
-        Innertube.selectChannel(profile.pageId, profile.dataSyncId, profile.authUser)
-        _selectedChannelKey.value = profile.profileId
-        _selectedChannelName.value = profile.name
-        StreamResolver.onSessionChanged()
-        clearListenerState(restoreCached = true)
-        reloadForAccount()
     }
 
     /** Returns false at an edge, allowing the avatar to play its elastic cue. */
@@ -3791,10 +3578,41 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun removeAccount(accountId: String) {
-        val fallback = authStore.removeAccount(accountId)
-        _googleAccounts.value = authStore.sessions
-        if (fallback == null) { signOut(); return }
-        selectProfile(fallback.accountId, fallback.activeProfileId ?: fallback.profiles.firstOrNull()?.profileId ?: return)
+        viewModelScope.launch {
+            innertubeSessionLock.withLock {
+                cancelAccountSyncAndJoin()
+                val fallback = authStore.removeAccount(accountId)
+                _googleAccounts.value = authStore.sessions
+                if (fallback == null) {
+                    authStore.signOut()
+                    Innertube.cookie = null
+                    Innertube.selectChannel(null, null)
+                    StreamResolver.onSessionChanged()
+                    _signedIn.value = false
+                    _activeAccountId.value = null
+                    _activeProfileId.value = null
+                    _selectedChannelKey.value = null
+                    _selectedChannelName.value = null
+                    clearListenerState()
+                    loadHome()
+                    return@withLock
+                }
+                val profile = fallback.profiles.firstOrNull {
+                    it.profileId == fallback.activeProfileId
+                } ?: fallback.profiles.firstOrNull() ?: return@withLock
+                authStore.select(fallback.accountId, profile.profileId)
+                _activeAccountId.value = fallback.accountId
+                _activeProfileId.value = profile.profileId
+                authStore.cookie = fallback.cookie
+                Innertube.cookie = fallback.cookie
+                Innertube.selectChannel(profile.pageId, profile.dataSyncId, profile.authUser)
+                _selectedChannelKey.value = profile.profileId
+                _selectedChannelName.value = profile.name
+                StreamResolver.onSessionChanged()
+                clearListenerState(restoreCached = true)
+                reloadForAccount()
+            }
+        }
     }
 
     private fun persistDetectedProfiles(channels: List<AccountChannel>) {
@@ -3846,6 +3664,19 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun listenerKey(): String? = _activeAccountId.value?.let { accountId ->
         _activeProfileId.value?.let { profileId -> "$accountId:$profileId" }
+    }
+
+    private suspend fun cancelAccountSyncAndJoin() {
+        // Revoke ownership first, then wait for cancellation to propagate through any
+        // in-flight HTTP request before a new cookie/channel can be installed.
+        accountSyncGeneration.invalidate()
+        val running = accountSyncJob
+        accountSyncJob = null
+        running?.cancelAndJoin()
+        _accountSyncing.value = false
+        _accountSyncCategoriesInProgress.value = emptySet()
+        _accountSyncResult.value = SyncResult.NOTHING
+        _accountSyncStatus.value = ""
     }
 
     private fun cancelAccountSync() {
@@ -3918,8 +3749,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             removeAccount(current)
             return
         }
-        cancelAccountSync()
-        authStore.signOut()
+        viewModelScope.launch {
+            innertubeSessionLock.withLock {
+                cancelAccountSyncAndJoin()
+                authStore.signOut()
         Innertube.cookie = null
         // The mirror image: verdicts reached with a session in hand say nothing
         // about what an anonymous walk will be told, and the clients stood down
@@ -3942,8 +3775,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         _playlists.value = emptyList()
         _playlistOwned.value = emptyMap()
         ownershipInFlight.clear()
-        _songMenu.value = null
-        loadHome()
+                _songMenu.value = null
+            }
+            loadHome()
+        }
     }
 
     private fun Throwable.friendly(): String = when {
