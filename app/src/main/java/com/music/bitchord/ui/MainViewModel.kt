@@ -3641,6 +3641,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
         val oldAccountId = _activeAccountId.value
         val oldProfileId = _activeProfileId.value
+        // A sync already in flight signs requests with Innertube's global
+        // cookie/channel. Stop it before temporarily installing this candidate
+        // session, not after account validation has finished.
+        cancelAccountSync()
         viewModelScope.launch {
             // Validate the exact cookie/profile pair before writing any of it.
             // The old implementation persisted first and unconditionally set
@@ -3748,6 +3752,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val source = _googleAccounts.value.firstOrNull { it.accountId == accountId } ?: return
         val profile = supplied ?: source.profiles.firstOrNull { it.profileId == selectedProfileId } ?: return
         if (accountId == _activeAccountId.value && profile.profileId == _activeProfileId.value) return
+        // Innertube credentials and channel selection are process-global. Cancel
+        // the old identity's sync before changing either, so its next page cannot
+        // be fetched under the newly selected profile.
+        cancelAccountSync()
         cacheCurrentListener()
         val index = source.profiles.indexOfFirst { it.profileId == profile.profileId }
         val updatedProfiles = if (index >= 0) {
