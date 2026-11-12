@@ -149,9 +149,8 @@ fun HistoryScreen(
                 }
                 val visibleSongs = displaySections.flatMap { it.songs }
                 val isCurrentRow = playingRowMatcher(visibleSongs, currentSong)
-                // The videoId alone is not a key here: the feed is deduplicated
-                // on it, but a list keyed on something that could repeat is one
-                // bad response away from a crash. The index makes it total.
+                // Repeated plays are intentional in listening history, so videoId alone
+                // is not a unique key. The index keeps every play as its own row.
                 var offset = 0
                 displaySections.forEachIndexed { sectionIndex, section ->
                     if (section.title.isNotBlank()) {

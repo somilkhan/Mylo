@@ -1989,7 +1989,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                             null
                         }
                         historyToken = firstHistory?.continuation
-                        if (historyToken != null && historyToken!!.isBlank()) {
+                        if (historyToken?.isBlank() == true) {
                             complete = false
                             historyToken = null
                         }
