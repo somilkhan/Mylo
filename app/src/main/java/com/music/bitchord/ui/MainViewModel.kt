@@ -24,6 +24,7 @@ import com.music.bitchord.data.sync.AccountLibrarySnapshot
 import com.music.bitchord.data.sync.AccountLibrarySnapshotStore
 import com.music.bitchord.data.sync.SyncResult
 import com.music.bitchord.data.sync.SyncJobGeneration
+import com.music.bitchord.data.sync.HistoryContinuationTracker
 import com.music.bitchord.data.sync.automaticSyncEligible
 import com.music.bitchord.data.sync.automaticSyncCooldownMs
 import com.music.bitchord.data.sync.mayRemoveMissing
@@ -583,6 +584,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val _activeProfileId = MutableStateFlow(authStore.activeProfileId)
     val activeProfileId: StateFlow<String?> = _activeProfileId.asStateFlow()
 
+    private val historyContinuationTracker = HistoryContinuationTracker()
     private val _history = MutableStateFlow<UiState<List<Song>>>(UiState.Loading)
     val history: StateFlow<UiState<List<Song>>> = _history.asStateFlow()
     private val _historyIsLocal = MutableStateFlow(true)
@@ -2115,6 +2117,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    private companion object {
+        const val MAX_EMPTY_HISTORY_PAGES_PER_REQUEST = 20
+    }
+
     private fun automaticAccountSyncAllowed(): Boolean {
         val context = getApplication<Application>()
         val connectivity = context.getSystemService(ConnectivityManager::class.java) ?: return false
@@ -2148,9 +2154,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         incoming: List<InnertubeParser.HistorySection>,
     ) {
         if (incoming.isEmpty()) return
-        if (incoming.first().title.isBlank() && target.isNotEmpty()) {
-            val tail = target.last()
-            target[target.lastIndex] = tail.copy(songs = tail.songs + incoming.flatMap { it.songs })
+        val first = incoming.first()
+        val tail = target.lastOrNull()
+        if (tail != null && (first.title.isBlank() || first.title == tail.title)) {
+            target[target.lastIndex] = tail.copy(songs = tail.songs + first.songs)
+            target += incoming.drop(1)
         } else {
             target += incoming
         }
@@ -2227,6 +2235,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             return
         }
         val identity = listenerKey() ?: return
+        historyContinuationTracker.reset(null)
         _history.value = UiState.Loading
         _historyContinuation.value = null
         _historySections.value = emptyList()
@@ -2240,6 +2249,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             // first page returned by historyPage(): doing so made older weeks/months disappear
             // every time the History screen opened after Sync Now.
             if (cached?.historySections?.isNotEmpty() == true) {
+                historyContinuationTracker.reset(null)
                 publishCachedHistory(cached.historySections)
                 return@launch
             }
@@ -2247,9 +2257,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             if (identity != listenerKey()) return@launch
             result.onSuccess { page ->
                 _historySections.value = page.sections
-                _historyContinuation.value = page.continuation
-                _history.value = if (page.songs.isEmpty()) UiState.Error(text(R.string.history_empty))
-                    else UiState.Success(page.songs)
+                _historyContinuation.value = historyContinuationTracker.reset(page.continuation)
+                // Some feeds contain an empty boundary page before older rows.
+                // Keep the paging surface available instead of turning that
+                // valid continuation into a terminal "empty history" error.
+                _history.value = when {
+                    page.songs.isNotEmpty() -> UiState.Success(page.songs)
+                    page.continuation != null -> UiState.Success(emptyList())
+                    else -> UiState.Error(text(R.string.history_empty))
+                }
             }.onFailure {
                 // Keep the last saved state visible even when that snapshot has no history.
                 // Leaving UiState.Loading here would strand the screen on a spinner forever.
@@ -2262,7 +2278,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Fetches the next remote history page without collapsing repeated plays. */
+    /**
+     * Fetches older remote history without collapsing repeated plays.
+     *
+     * Empty boundary pages are followed automatically (up to a bounded number
+     * per request), and every continuation is tracked so a multi-token cycle
+     * cannot trap the screen in an endless paging loop.
+     */
     fun loadMoreHistory() {
         val token = _historyContinuation.value ?: return
         if (_historyLoadingMore.value || !_signedIn.value) return
@@ -2271,33 +2293,48 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         _historyLoadMoreFailed.value = false
         viewModelScope.launch {
             try {
-                YtMusicRepository.moreHistory(token).onSuccess { page ->
-                    if (identity != listenerKey()) return@onSuccess
-                    val current = (_history.value as? UiState.Success)?.data.orEmpty()
-                    _history.value = UiState.Success(current + page.songs)
-                    if (page.sections.isNotEmpty()) {
-                        val updated = _historySections.value.toMutableList()
-                        val first = page.sections.first()
-                        if (first.title.isBlank() && updated.isNotEmpty()) {
-                            val tail = updated.last()
-                            updated[updated.lastIndex] = tail.copy(
-                                songs = tail.songs + page.sections.flatMap { it.songs },
-                            )
-                        } else {
-                            updated += page.sections
-                        }
-                        _historySections.value = updated
-                    }
-                    // A repeated token means the service did not advance; stop
-                    // rather than requesting the same page forever.
-                    _historyContinuation.value = page.continuation?.takeIf { it != token && page.songs.isNotEmpty() }
-                }.onFailure {
-                    if (identity == listenerKey()) {
-                        // Keep already loaded rows and the token so the user can retry.
-                        _historyContinuation.value = token
+                var nextToken: String? = token
+                var fetchedPages = 0
+                val addedSongs = mutableListOf<Song>()
+                val addedSections = mutableListOf<InnertubeParser.HistorySection>()
+
+                while (nextToken != null && addedSongs.isEmpty() &&
+                    fetchedPages < MAX_EMPTY_HISTORY_PAGES_PER_REQUEST
+                ) {
+                    val requestedToken = nextToken
+                    val result = YtMusicRepository.moreHistory(requestedToken)
+                    if (identity != listenerKey()) return@launch
+                    val page = result.getOrElse {
+                        // Preserve the exact token so Retry repeats only the failed page.
+                        _historyContinuation.value = requestedToken
                         _historyLoadMoreFailed.value = true
+                        return@launch
                     }
+                    fetchedPages++
+                    addedSongs += page.songs
+                    appendHistorySections(addedSections, page.sections)
+                    nextToken = historyContinuationTracker.advance(requestedToken, page.continuation)
                 }
+
+                if (identity != listenerKey()) return@launch
+                val current = (_history.value as? UiState.Success)?.data.orEmpty()
+                val combinedSongs = current + addedSongs
+                _history.value = if (combinedSongs.isEmpty() && nextToken == null) {
+                    UiState.Error(text(R.string.history_empty))
+                } else {
+                    UiState.Success(combinedSongs)
+                }
+                if (addedSections.isNotEmpty()) {
+                    val updated = _historySections.value.toMutableList()
+                    appendHistorySections(updated, addedSections)
+                    _historySections.value = updated
+                }
+                _historyContinuation.value = nextToken
+                // If the feed keeps returning empty but valid new tokens, leave
+                // the next token available and expose Retry instead of spinning.
+                _historyLoadMoreFailed.value =
+                    addedSongs.isEmpty() && nextToken != null &&
+                        fetchedPages >= MAX_EMPTY_HISTORY_PAGES_PER_REQUEST
             } finally {
                 if (identity == listenerKey()) _historyLoadingMore.value = false
             }

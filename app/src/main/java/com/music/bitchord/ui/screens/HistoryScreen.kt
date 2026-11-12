@@ -198,6 +198,9 @@ fun HistoryScreen(
                                 loadMoreFailed -> TextButton(onClick = onLoadMore) {
                                     androidx.compose.material3.Text(stringResource(R.string.try_again))
                                 }
+                                else -> TextButton(onClick = onLoadMore) {
+                                    androidx.compose.material3.Text("Load older history")
+                                }
                             }
                         }
                     }
