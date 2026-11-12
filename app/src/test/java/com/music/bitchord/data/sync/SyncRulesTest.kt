@@ -8,8 +8,35 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.yield
 
 class SyncRulesTest {
+
+    @Test fun accountSyncLockSerializesTheSameIdentityButNotDifferentProfiles() = runBlocking {
+        val identity = "google-account:profile-one"
+        val lock = AccountLibrarySyncLock.lockFor(identity)
+        val acquired = CompletableDeferred<Unit>()
+
+        lock.lock()
+        val waiting = async {
+            AccountLibrarySyncLock.lockFor(identity).withLock {
+                acquired.complete(Unit)
+            }
+        }
+        yield()
+        assertFalse("same account/profile must wait for the active snapshot transaction", acquired.isCompleted)
+        lock.unlock()
+        waiting.await()
+        assertTrue(acquired.isCompleted)
+
+        val otherProfile = AccountLibrarySyncLock.lockFor("google-account:profile-two")
+        assertFalse("different profiles must not block each other", lock === otherProfile)
+    }
+
     @Test fun onlyNewestSyncGenerationOwnsSharedState() {
         val generations = SyncJobGeneration()
         val first = generations.begin()
