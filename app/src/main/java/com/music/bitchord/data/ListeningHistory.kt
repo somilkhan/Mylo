@@ -13,10 +13,8 @@ import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -40,7 +38,20 @@ object ListeningHistory {
     private lateinit var appContext: Context
     private val historyFile: File get() = File(appContext.filesDir, FILE_NAME)
     private val writer = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val writeLock = Mutex()
+
+    // Serialize writes at enqueue time, not only when a coroutine eventually
+    // reaches the file lock. This makes clear() a true barrier: every record
+    // queued before it finishes first, and later records run after the delete.
+    private val enqueueLock = Any()
+    private var writeTail: Job? = null
+
+    private fun enqueueWrite(action: suspend () -> Unit): Job = synchronized(enqueueLock) {
+        val previous = writeTail
+        writer.launch {
+            previous?.join()
+            action()
+        }.also { writeTail = it }
+    }
 
     fun init(context: Context) {
         appContext = context.applicationContext
@@ -94,29 +105,30 @@ object ListeningHistory {
 
     fun record(song: Song, startedAt: Long) {
         if (!this::appContext.isInitialized || !_recordingEnabled.value || song.videoId.isBlank()) return
-        writer.launch {
-            writeLock.withLock {
-                historyFile.parentFile?.mkdirs()
-                val row = JSONObject()
-                    .put("id", song.videoId)
-                    .put("title", song.title)
-                    .put("artist", song.artist)
-                    .put("art", song.thumbnailUrl)
-                    .put("duration", song.durationText)
-                    .put("at", startedAt)
-                historyFile.appendText(row.toString() + "\n")
-            }
+        enqueueWrite {
+            historyFile.parentFile?.mkdirs()
+            val row = JSONObject()
+                .put("id", song.videoId)
+                .put("title", song.title)
+                .put("artist", song.artist)
+                .put("art", song.thumbnailUrl)
+                .put("duration", song.durationText)
+                .put("at", startedAt)
+            historyFile.appendText(row.toString() + "\n")
         }
     }
 
     /** Clears only this device's listening log; YouTube Music history is untouched. */
-    suspend fun clear() = withContext(Dispatchers.IO) {
-        if (!this@ListeningHistory::appContext.isInitialized) return@withContext
-        writeLock.withLock {
+    suspend fun clear() {
+        if (!this::appContext.isInitialized) return
+        // Enqueue the delete behind all writes already accepted. New playback
+        // records are queued behind this job and therefore cannot resurrect a
+        // row that the user just cleared.
+        enqueueWrite {
             historyFile.delete()
             appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                 .edit().remove(KEY_ENTRIES).apply()
-        }
+        }.join()
     }
 
     fun read(context: Context): List<Entry> {
