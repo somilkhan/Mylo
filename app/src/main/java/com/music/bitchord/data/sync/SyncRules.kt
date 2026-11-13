@@ -55,8 +55,8 @@ fun automaticSyncEligible(
 }
 
 /** Never interpret an empty or partial remote response as an instruction to delete local data. */
-fun mayRemoveMissing(complete: Boolean, remoteCount: Int): Boolean =
-    complete && remoteCount > 0
+fun mayRemoveMissing(complete: Boolean, remoteCount: Int, historyCount: Int = 0): Boolean =
+    complete && remoteCount + historyCount > 0
 
 /** A remote playlist may replace a populated local one only after a complete, non-empty read. */
 fun mayReplacePlaylist(complete: Boolean, remoteCount: Int, hasLocalSongs: Boolean): Boolean =
