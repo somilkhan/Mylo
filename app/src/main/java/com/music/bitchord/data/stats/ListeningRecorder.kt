@@ -31,10 +31,10 @@ import kotlin.math.min
  * lock screen from arriving as an hour of listening on the first tick after
  * resume.
  *
- * The cost is that the few seconds before the first tick of each track are not
- * counted. That is a systematic undercount of at most one sample interval per
- * track, and it is the right way to be wrong: every alternative overcounts, and
- * a Replay that flatters is worth less than one that is a little shy.
+ * The service anchors each play when audio starts, not at the first five-second
+ * sampler tick. Pauses and track transitions flush the final partial interval,
+ * while a pause/resume keeps the same play's accumulated time and two-second
+ * history threshold.
  *
  * ## Minutes and plays are different questions
  *
@@ -55,13 +55,6 @@ object ListeningRecorder {
     private var paused = false
     private var samplesSinceFlush = 0
 
-    /**
-     * One tick of the player's sampler.
-     *
-     * [durationMs] is the decoder's figure when it has one; the row's stated
-     * runtime stands in until it does, and a track with neither simply has to
-     * clear the thirty-second floor to count as a play.
-     */
     /** Called on the player's transition into audible playback, before the first sampler tick. */
     @Synchronized
     fun onTrackStarted(song: Song?, durationMs: Long) {

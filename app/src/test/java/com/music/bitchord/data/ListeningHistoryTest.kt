@@ -1,6 +1,7 @@
 package com.music.bitchord.data
 
 import com.music.bitchord.data.model.Song
+import com.music.bitchord.data.stats.ListeningRecorder
 import java.time.LocalDate
 import java.time.ZoneId
 import org.junit.Test
@@ -14,6 +15,13 @@ class ListeningHistoryTest {
         assertFalse(ListeningHistory.shouldRecord(1_999L, counted = false))
         assertTrue(ListeningHistory.shouldRecord(2_000L, counted = false))
         assertTrue(ListeningHistory.shouldRecord(500L, counted = true))
+    }
+
+    @Test
+    fun finalSamplerIntervalIsCountedAndLongGapsAreCapped() {
+        assertEquals(3_000L, ListeningRecorder.trailingSampleMs(1_000L, 4_000L))
+        assertEquals(8_000L, ListeningRecorder.trailingSampleMs(1_000L, 20_000L))
+        assertEquals(0L, ListeningRecorder.trailingSampleMs(4_000L, 1_000L))
     }
 
     @Test
