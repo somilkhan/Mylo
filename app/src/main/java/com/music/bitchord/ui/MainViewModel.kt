@@ -132,6 +132,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val innertubeSessionLock = InnertubeSessionSyncLock.mutex
     // Prevent a cancelled, older sync from clearing the loading state of a newer one.
     private val accountSyncGeneration = SyncJobGeneration()
+    // Blocks new foreground sync requests while a listener/account transition waits for the shared Innertube lock.
+    @Volatile private var accountSessionTransitioning = false
 
     // Process-wide, so the playback service offers Like on the same tracks.
     private val _signedIn = SignedIn.state(app)
@@ -1873,6 +1875,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      * response never replaces a previously populated snapshot.
      */
     fun syncAccountLibrary(force: Boolean = true) {
+        if (accountSessionTransitioning) { _accountSyncResult.value = SyncResult.NOTHING; return }
         if (!_signedIn.value) { _accountSyncResult.value = SyncResult.NOTHING; return }
         val accountId = _activeAccountId.value ?: return
         val profileId = _activeProfileId.value ?: return
@@ -3429,8 +3432,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val oldAccountId = _activeAccountId.value
         val oldProfileId = _activeProfileId.value
         viewModelScope.launch {
-            innertubeSessionLock.withLock {
-                cancelAccountSyncAndJoin()
+            withAccountSessionTransition {
                 // Validate the exact cookie/profile pair before writing any of it.
             // The old implementation persisted first and unconditionally set
             // signedIn=true; a half-finished channel chooser therefore became
@@ -3539,8 +3541,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val profile = supplied ?: source.profiles.firstOrNull { it.profileId == selectedProfileId } ?: return
         if (accountId == _activeAccountId.value && profile.profileId == _activeProfileId.value) return
         viewModelScope.launch {
-            innertubeSessionLock.withLock {
-                cancelAccountSyncAndJoin()
+            withAccountSessionTransition {
                 cacheCurrentListener()
                 val index = source.profiles.indexOfFirst { it.profileId == profile.profileId }
                 val updatedProfiles = if (index >= 0) {
@@ -3579,8 +3580,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun removeAccount(accountId: String) {
         viewModelScope.launch {
-            innertubeSessionLock.withLock {
-                cancelAccountSyncAndJoin()
+            withAccountSessionTransition {
                 val fallback = authStore.removeAccount(accountId)
                 _googleAccounts.value = authStore.sessions
                 if (fallback == null) {
@@ -3664,6 +3664,22 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun listenerKey(): String? = _activeAccountId.value?.let { accountId ->
         _activeProfileId.value?.let { profileId -> "$accountId:$profileId" }
+    }
+
+    /**
+     * Fence new foreground syncs, stop any current one before taking the shared
+     * Innertube mutex, then serialize the identity mutation against WorkManager.
+     * Cancelling a sync only after taking that mutex can deadlock when the sync
+     * is already queued behind a background worker holding it.
+     */
+    private suspend fun <T> withAccountSessionTransition(block: suspend () -> T): T {
+        accountSessionTransitioning = true
+        cancelAccountSyncAndJoin()
+        return try {
+            innertubeSessionLock.withLock { block() }
+        } finally {
+            accountSessionTransitioning = false
+        }
     }
 
     private suspend fun cancelAccountSyncAndJoin() {
@@ -3750,8 +3766,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             return
         }
         viewModelScope.launch {
-            innertubeSessionLock.withLock {
-                cancelAccountSyncAndJoin()
+            withAccountSessionTransition {
                 authStore.signOut()
         Innertube.cookie = null
         // The mirror image: verdicts reached with a session in hand say nothing
