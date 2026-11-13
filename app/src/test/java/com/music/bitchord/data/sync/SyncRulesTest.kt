@@ -77,6 +77,9 @@ class SyncRulesTest {
         assertTrue(mayRemoveMissing(true, 20))
         assertFalse(mayRemoveMissing(false, 20))
         assertFalse(mayRemoveMissing(true, 0))
+        // A history-only account snapshot is still valid content even when its library is empty.
+        assertTrue(mayRemoveMissing(true, 0, historyCount = 4))
+        assertFalse(mayRemoveMissing(false, 0, historyCount = 4))
     }
 
     @Test fun emptyRemoteNeverReplacesPopulatedPlaylist() {
