@@ -94,4 +94,28 @@ class HistoryPageParserTest {
         assertEquals("", page.sections.single().title)
         assertEquals("after-next", page.continuation)
     }
+
+    @Test
+    fun readsModernCommandExecutorContinuationToken() {
+        val root = json.parseToJsonElement(
+            """
+            {
+              "continuationContents": {"musicShelfContinuation": {"contents": []}},
+              "contents": {"continuationItemRenderer": {
+                "continuationEndpoint": {
+                  "commandExecutorCommand": {
+                    "commands": [
+                      {"continuationCommand": {"token": "modern-history-token"}}
+                    ]
+                  }
+                }
+              }}
+            }
+            """.trimIndent(),
+        )
+
+        val page = InnertubeParser.parseHistoryPage(root)
+
+        assertEquals("modern-history-token", page.continuation)
+    }
 }
