@@ -890,11 +890,10 @@ class PlaybackService : MediaLibraryService() {
             val durationMs = exoPlayer.duration.takeIf { it > 0 }
             scrobbleManager?.onPlayerStateChanged(isPlaying, song, durationMs)
 
-            // The listening record has to be told a pause happened, not merely
-            // stop being told about play: its sampler measures the gap between
-            // ticks, and an unclosed one across a pause is an afternoon on the
-            // lock screen arriving as an afternoon of listening.
-            if (!isPlaying) ListeningRecorder.onStopped()
+            // Close the final partial sample on pause, but preserve this play's
+            // accumulated time so resuming the same track does not start a new row.
+            if (isPlaying) ListeningRecorder.onTrackStarted(song, durationMs)
+            else ListeningRecorder.onPaused()
 
             // ListenBrainz: "now playing" on play/resume too, not just on
             // transition — a track started from idle or resumed from pause
@@ -3473,6 +3472,7 @@ class PlaybackService : MediaLibraryService() {
         val newSong = mediaItem?.toSong()
         val durationMs = exoPlayer.duration.takeIf { it > 0 }
         if (exoPlayer.isPlaying) {
+            ListeningRecorder.onTrackStarted(newSong, durationMs)
             scrobbleManager?.onSongStart(newSong, durationMs)
         }
 
