@@ -202,7 +202,11 @@ class AccountLibrarySyncRunner(context: Context) {
                     return@accountLock Outcome(SyncResult.FAILED, "Sync incomplete; previous saved data kept", cached)
                 }
                 val remoteCount = syncedLiked.size + library.librarySongs.size + library.shelves.sumOf { it.items.size }
-                if (cached != null && !mayRemoveMissing(complete = true, remoteCount = remoteCount)) {
+                if (cached != null && !mayRemoveMissing(
+                        complete = true,
+                        remoteCount = remoteCount,
+                        historyCount = historySections.sumOf { it.songs.size },
+                    )) {
                     return@accountLock Outcome(SyncResult.FAILED, "Empty refresh rejected; previous data kept", cached)
                 }
 
