@@ -118,6 +118,7 @@ import com.music.bitchord.data.matchesSearch
 import java.io.File
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 
 /** What the Search tab searches: YouTube Music, or the Local Music folder on this device. */
@@ -133,7 +134,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     // Prevent a cancelled, older sync from clearing the loading state of a newer one.
     private val accountSyncGeneration = SyncJobGeneration()
     // Blocks new foreground sync requests while a listener/account transition waits for the shared Innertube lock.
-    @Volatile private var accountSessionTransitioning = false
+    private val accountSessionTransitions = AtomicInteger(0)
 
     // Process-wide, so the playback service offers Like on the same tracks.
     private val _signedIn = SignedIn.state(app)
@@ -1875,7 +1876,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      * response never replaces a previously populated snapshot.
      */
     fun syncAccountLibrary(force: Boolean = true) {
-        if (accountSessionTransitioning) { _accountSyncResult.value = SyncResult.NOTHING; return }
+        if (accountSessionTransitions.get() > 0) { _accountSyncResult.value = SyncResult.NOTHING; return }
         if (!_signedIn.value) { _accountSyncResult.value = SyncResult.NOTHING; return }
         val accountId = _activeAccountId.value ?: return
         val profileId = _activeProfileId.value ?: return
@@ -3673,12 +3674,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      * is already queued behind a background worker holding it.
      */
     private suspend fun <T> withAccountSessionTransition(block: suspend () -> T): T {
-        accountSessionTransitioning = true
-        cancelAccountSyncAndJoin()
+        accountSessionTransitions.incrementAndGet()
         return try {
+            cancelAccountSyncAndJoin()
             innertubeSessionLock.withLock { block() }
         } finally {
-            accountSessionTransitioning = false
+            accountSessionTransitions.decrementAndGet()
         }
     }
 
