@@ -892,7 +892,7 @@ class PlaybackService : MediaLibraryService() {
 
             // Close the final partial sample on pause, but preserve this play's
             // accumulated time so resuming the same track does not start a new row.
-            if (isPlaying) ListeningRecorder.onTrackStarted(song, durationMs)
+            if (isPlaying) ListeningRecorder.onTrackStarted(song, durationMs ?: 0L)
             else ListeningRecorder.onPaused()
 
             // ListenBrainz: "now playing" on play/resume too, not just on
@@ -3472,7 +3472,7 @@ class PlaybackService : MediaLibraryService() {
         val newSong = mediaItem?.toSong()
         val durationMs = exoPlayer.duration.takeIf { it > 0 }
         if (exoPlayer.isPlaying) {
-            ListeningRecorder.onTrackStarted(newSong, durationMs)
+            ListeningRecorder.onTrackStarted(newSong, durationMs ?: 0L)
             scrobbleManager?.onSongStart(newSong, durationMs)
         }
 
