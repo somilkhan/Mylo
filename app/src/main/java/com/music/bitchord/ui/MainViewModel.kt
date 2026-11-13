@@ -3460,7 +3460,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             if (account == null) {
                 restoreActiveSession(oldAccountId, oldProfileId)
                 onComplete(false)
-                return@launch
+                return@withAccountSessionTransition
             }
 
             // A channel switch is another identity under the same Google
@@ -3476,7 +3476,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             if (accountId == null) {
                 restoreActiveSession(oldAccountId, oldProfileId)
                 onComplete(false)
-                return@launch
+                return@withAccountSessionTransition
             }
             val previous = authStore.sessions.firstOrNull { it.accountId == accountId }
             val selectedProfileId = profileId(session.pageId, session.dataSyncId, account.name)
@@ -3596,11 +3596,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     _selectedChannelName.value = null
                     clearListenerState()
                     loadHome()
-                    return@withLock
+                    return@withAccountSessionTransition
                 }
                 val profile = fallback.profiles.firstOrNull {
                     it.profileId == fallback.activeProfileId
-                } ?: fallback.profiles.firstOrNull() ?: return@withLock
+                } ?: fallback.profiles.firstOrNull() ?: return@withAccountSessionTransition
                 authStore.select(fallback.accountId, profile.profileId)
                 _activeAccountId.value = fallback.accountId
                 _activeProfileId.value = profile.profileId
