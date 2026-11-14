@@ -5,6 +5,7 @@ import com.music.bitchord.data.model.HomeShelf
 import com.music.bitchord.data.model.LibraryPage
 import com.music.bitchord.data.model.ShelfItem
 import com.music.bitchord.data.model.Song
+import java.io.File
 import java.nio.file.Files
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -52,6 +53,14 @@ class AccountLibrarySnapshotStoreTest {
             assertEquals(2, restored.historySections.single().songs.size)
             assertEquals(1, restored.recentSongs.size)
             assertTrue(store.read("account-b")!!.recentSongs.isEmpty())
+
+            // A process may stop after the old snapshot has been moved aside but
+            // before the replacement is installed. The backup must remain readable.
+            val snapshotFile = directory.listFiles()!!.single { it.name.endsWith(".json") }
+            val backupFile = File(directory, snapshotFile.name + ".bak")
+            assertTrue(snapshotFile.renameTo(backupFile))
+            assertEquals(snapshot.savedAt, store.read("account-a")!!.savedAt)
+            assertTrue(snapshotFile.isFile)
 
             store.write("account-a", snapshot.copy(library = snapshot.library.copy(likedSongs = emptyList())))
             assertTrue(store.read("account-a")!!.library.likedSongs.isEmpty())
