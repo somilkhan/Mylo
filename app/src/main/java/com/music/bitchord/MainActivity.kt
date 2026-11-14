@@ -4058,6 +4058,7 @@ private fun BitChordApp(
                         selectedIndex = displayedSelectedIndex,
                         onTabSelected = onDisplayedTabSelected,
                         scrollConnection = activeNavBarScroll,
+                        reduceMotion = reducePlayerMotion,
                         song = player.song,
                         isPlaying = player.isPlaying,
                         isLoading = playPauseBusy,
