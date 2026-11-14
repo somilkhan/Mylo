@@ -25,6 +25,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.fadeIn
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeOut
@@ -4108,6 +4109,17 @@ private fun BitChordApp(
                     )
                 }
                 val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+                val measuredBarsHeight = with(LocalDensity.current) { floatingBarsHeight.intValue.toDp() }
+                val fabBottomTarget = if (glassActive) {
+                    (measuredBarsHeight.takeIf { it > 0.dp } ?: 72.dp) + 10.dp
+                } else {
+                    2.dp
+                }
+                val fabBottom by animateDpAsState(
+                    targetValue = fabBottomTarget,
+                    animationSpec = tween(220),
+                    label = "scrobbleFabDock",
+                )
                 ScrobbleFab(
                     visible = scrobbleFabVisible(
                         selectedTab = selectedTab,
@@ -4136,7 +4148,7 @@ private fun BitChordApp(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .navigationBarsPadding()
-                        .padding(end = 16.dp, bottom = if (glassActive) 2.dp + SCROBBLE_FAB_SIZE + 10.dp else 2.dp),
+                        .padding(end = 16.dp, bottom = fabBottom),
                     reduceMotion = reducePlayerMotion,
                     folded = glassActive && navBarScroll.isInline,
                 )
