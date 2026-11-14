@@ -46,6 +46,7 @@ import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Sort
 import androidx.compose.material3.Button
@@ -516,14 +517,29 @@ fun ScrobbleScreen(
                                                     .padding(horizontal = 13.dp, vertical = 14.dp),
                                                 verticalArrangement = Arrangement.spacedBy(6.dp),
                                             ) {
-                                                Text(
-                                                    mode.title,
-                                                    style = MaterialTheme.typography.titleSmall,
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    color = MaterialTheme.colorScheme.onSurface,
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis,
-                                                )
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                ) {
+                                                    Text(
+                                                        mode.title,
+                                                        modifier = Modifier.weight(1f),
+                                                        style = MaterialTheme.typography.titleSmall,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        color = MaterialTheme.colorScheme.onSurface,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis,
+                                                    )
+                                                    if (selectedMode) {
+                                                        Icon(
+                                                            Icons.Rounded.CheckCircle,
+                                                            contentDescription = "Selected",
+                                                            tint = MaterialTheme.colorScheme.primary,
+                                                            modifier = Modifier.size(17.dp),
+                                                        )
+                                                    }
+                                                }
                                                 Text(
                                                     mode.description,
                                                     style = MaterialTheme.typography.bodySmall,
