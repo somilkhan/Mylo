@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -98,6 +99,9 @@ fun ScrobbleScreen(
     var recommendationsFailed by remember { mutableStateOf(false) }
     var recommendationRequest by remember { mutableIntStateOf(0) }
     var openedPlaylist by remember { mutableStateOf<String?>(null) }
+    val statsListState = rememberLazyListState()
+    val generateListState = rememberLazyListState()
+    val playlistsListState = rememberLazyListState()
 
     LaunchedEffect(context) {
         ScrobblePlaylistStore.init(context)
@@ -187,6 +191,11 @@ fun ScrobbleScreen(
             label = "scrobble-pages",
         ) { section ->
             LazyColumn(
+                state = when (section) {
+                    SCROBBLE_TAB_GENERATE -> generateListState
+                    SCROBBLE_TAB_PLAYLISTS -> playlistsListState
+                    else -> statsListState
+                },
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 64.dp, bottom = bottomPadding),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
