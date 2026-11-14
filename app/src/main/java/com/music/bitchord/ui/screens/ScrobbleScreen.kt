@@ -640,7 +640,7 @@ fun ScrobbleScreen(
                         }
                         if (generatedMix.isNotEmpty()) {
                             item("generated-result-heading") {
-                                PageHeading(generatedTitle, "${generatedMix.size} tracks ready")
+                                PageHeading(generatedTitle, "${generatedMix.size} tracks ready", eyebrow = false)
                             }
                             itemsIndexed(generatedMix, key = { _, song -> "generated-${songIdentity(song)}" }) { index, song ->
                                 TrackRow(song, onClick = { onPlayPlaylist(generatedTitle, generatedMix, index) })
@@ -739,7 +739,7 @@ fun ScrobbleScreen(
                                 }
                             }
                             item("playlist-detail-heading") {
-                                PageHeading(selected.title, selected.reason)
+                                PageHeading(selected.title, selected.reason, eyebrow = false)
                                 Button(onClick = { onPlayPlaylist(selected.title, selected.songs, 0) }, modifier = Modifier.fillMaxWidth()) {
                                     Icon(Icons.Rounded.PlayArrow, null)
                                     Spacer(Modifier.width(8.dp))
@@ -973,15 +973,17 @@ private fun HourlyActivityChart(hours: List<Long>, reduceMotion: Boolean) {
 }
 
 @Composable
-private fun PageHeading(title: String, subtitle: String) {
+private fun PageHeading(title: String, subtitle: String, eyebrow: Boolean = true) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(
-            "SCROBBLE",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 1.2.sp,
-        )
+        if (eyebrow) {
+            Text(
+                "SCROBBLE",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.2.sp,
+            )
+        }
         Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         Text(
             subtitle,
