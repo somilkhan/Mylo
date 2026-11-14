@@ -1,6 +1,8 @@
 package com.music.bitchord.ui.components
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -121,8 +123,12 @@ fun ScrobbleFab(
         AnimatedContent(
             targetState = open,
             transitionSpec = {
-                (fadeIn(tween(130)) + scaleIn(initialScale = 0.76f, animationSpec = tween(160))) togetherWith
-                    (fadeOut(tween(90)) + scaleOut(targetScale = 0.76f, animationSpec = tween(120)))
+                if (reduceMotion) {
+                    EnterTransition.None togetherWith ExitTransition.None
+                } else {
+                    (fadeIn(tween(130)) + scaleIn(initialScale = 0.76f, animationSpec = tween(160))) togetherWith
+                        (fadeOut(tween(90)) + scaleOut(targetScale = 0.76f, animationSpec = tween(120)))
+                }
             },
             label = "scrobbleFabGlyph",
         ) { isOpen ->
