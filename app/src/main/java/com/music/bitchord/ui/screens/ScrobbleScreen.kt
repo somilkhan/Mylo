@@ -507,13 +507,24 @@ fun ScrobbleScreen(
                                     Text(if (mixMode == ScrobbleMixMode.RADIO) "Choose a starting track" else "Choose an artist", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                                     val seeds = (recentTracks + topTracks).filter { it.videoId.isNotBlank() }.distinctBy(::songIdentity).take(12)
                                     if (seeds.isEmpty()) {
-                                        EmptyPanel("No radio seed yet", "Play or sync a YouTube Music track first. Local-only files cannot start YouTube Music radio.")
+                                        if (mixMode == ScrobbleMixMode.RADIO) {
+                                            EmptyPanel("No radio seed yet", "Play or sync a YouTube Music track first. Local-only files cannot start YouTube Music radio.")
+                                        } else {
+                                            EmptyPanel("No artist seed yet", "Play or sync a track by the artist you want to explore. Local-only files cannot look up an artist catalogue.")
+                                        }
                                     } else {
                                         seeds.forEach { song ->
                                             Row(
                                                 Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
                                                     .background(if (selectedSeed?.videoId == song.videoId) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.background)
-                                                    .clickable(enabled = !generatingMix) { selectedSeed = song }.padding(8.dp),
+                                                    .clickable(enabled = !generatingMix) {
+                                                        if (selectedSeed?.videoId != song.videoId) {
+                                                            selectedSeed = song
+                                                            generatedMix = emptyList()
+                                                            generationError = null
+                                                            mixSaved = false
+                                                        }
+                                                    }.padding(8.dp),
                                                 verticalAlignment = Alignment.CenterVertically,
                                             ) {
                                                 AsyncImage(model = song.thumbnailUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(44.dp).clip(RoundedCornerShape(10.dp)))
