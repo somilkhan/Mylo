@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -371,6 +372,14 @@ fun ScrobbleScreen(
                                         }
                                     }
                                 }
+                                if (summary!!.hourOfDay.any { it > 0L }) {
+                                    item("stats-hourly-activity") {
+                                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                            SectionHeading("When you listen")
+                                            HourlyActivityChart(summary!!.hourOfDay)
+                                        }
+                                    }
+                                }
                                 item("stats-top-heading") { SectionHeading("Most played") }
                                 items(summary!!.songs.sortedWith(compareByDescending<RankedSong> { it.plays }.thenByDescending { it.ms }).take(12), key = { "stat-${songIdentity(it.song)}" }) { ranked ->
                                     TrackRow(
@@ -676,6 +685,44 @@ fun ScrobbleScreen(
                                 }
                             }
                         }                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HourlyActivityChart(hours: List<Long>) {
+    val peak = hours.maxOrNull()?.takeIf { it > 0L } ?: return
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+    ) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth().height(76.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.Bottom,
+            ) {
+                hours.forEachIndexed { hour, value ->
+                    val barHeight = if (value <= 0L) 3.dp else (8f + 58f * (value.toFloat() / peak.toFloat())).dp
+                    Box(
+                        modifier = Modifier.weight(1f).height(76.dp),
+                        contentAlignment = Alignment.BottomCenter,
+                    ) {
+                        Box(
+                            modifier = Modifier.width(6.dp).height(barHeight)
+                                .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
+                                .background(if (value == peak) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer),
+                        )
+                    }
+                }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                listOf("00", "06", "12", "18", "23").forEach { hour ->
+                    Text(hour, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
