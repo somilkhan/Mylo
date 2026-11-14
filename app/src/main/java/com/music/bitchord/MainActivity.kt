@@ -4070,7 +4070,7 @@ private fun BitChordApp(
                         // already been bounded by the time it is applied.
                         .widthIn(max = FLOATING_BAR_MAX_WIDTH)
                         .fillMaxWidth()
-                        .then(if (showScrobble) Modifier.padding(end = SCROBBLE_FAB_SIZE + 10.dp) else Modifier)
+                        .then(if (selectedTab == TAB_HOME) Modifier.padding(end = SCROBBLE_FAB_SIZE + 10.dp) else Modifier)
                         .onSizeChanged { floatingBarsHeight.intValue = it.height },
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
