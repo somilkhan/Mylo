@@ -1,5 +1,6 @@
 package com.music.bitchord.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
@@ -102,6 +103,10 @@ fun ScrobbleScreen(
     val statsListState = rememberLazyListState()
     val generateListState = rememberLazyListState()
     val playlistsListState = rememberLazyListState()
+
+    BackHandler(enabled = selectedSection == SCROBBLE_TAB_PLAYLISTS && openedPlaylist != null) {
+        openedPlaylist = null
+    }
 
     LaunchedEffect(context) {
         ScrobblePlaylistStore.init(context)
