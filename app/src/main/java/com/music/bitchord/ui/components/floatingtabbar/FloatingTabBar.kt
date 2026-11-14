@@ -950,7 +950,8 @@ private fun SharedTransitionScope.ExpandedTabs(
                                     } else {
                                         Modifier.animateEnterExitTab(
                                             sharedTransitionScope = this@ExpandedTabs,
-                                            animatedVisibilityScope = animatedVisibilityScope
+                                            animatedVisibilityScope = animatedVisibilityScope,
+                                            reduceMotion = reduceAnimation,
                                         )
                                     }).graphicsLayer {
                                         scaleX = iconScale
@@ -964,7 +965,8 @@ private fun SharedTransitionScope.ExpandedTabs(
                                 Box(
                                     Modifier.animateEnterExitTab(
                                         sharedTransitionScope = this@ExpandedTabs,
-                                        animatedVisibilityScope = animatedVisibilityScope
+                                        animatedVisibilityScope = animatedVisibilityScope,
+                                        reduceMotion = reduceAnimation,
                                     )
                                 ) {
                                     tab.title()
@@ -1101,8 +1103,11 @@ private fun Modifier.animateEnterExitAccessory(
 @Composable
 private fun Modifier.animateEnterExitTab(
     sharedTransitionScope: SharedTransitionScope,
-    animatedVisibilityScope: AnimatedVisibilityScope
-): Modifier = with(sharedTransitionScope) {
+    animatedVisibilityScope: AnimatedVisibilityScope,
+    reduceMotion: Boolean,
+): Modifier {
+    if (reduceMotion) return this
+    return with(sharedTransitionScope) {
     with(animatedVisibilityScope) {
         val enterStartFraction = 0.5f
         val enterEndFraction = 0.8f
@@ -1161,6 +1166,7 @@ private fun Modifier.animateEnterExitTab(
                 if (animatedBlur > 0f) BlurEffect(animatedBlur, animatedBlur) else null
         }
     }
+}
 }
 
 private class FloatingTabBarScopeImpl : FloatingTabBarScope {
