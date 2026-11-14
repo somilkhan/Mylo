@@ -40,6 +40,8 @@
 package com.music.bitchord.ui.components.floatingtabbar
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.ExperimentalSharedTransitionApi
@@ -208,6 +210,7 @@ fun FloatingTabBar(
 fun FloatingTabBar(
     selectedTabKey: Any?,
     scrollConnection: FloatingTabBarScrollConnection,
+    reduceMotion: Boolean = false,
     modifier: Modifier = Modifier,
     tabBarContentModifier: @Composable () -> Modifier = DefaultTabBarContentModifier,
     inlineAccessory: (@Composable SharedTransitionScope.(Modifier, AnimatedVisibilityScope) -> Unit)? = null,
@@ -226,7 +229,10 @@ fun FloatingTabBar(
     SharedTransitionLayout(modifier = modifier) {
         AnimatedContent(
             targetState = scrollConnection.isInline,
-            transitionSpec = { fadeIn() togetherWith fadeOut() },
+            transitionSpec = {
+                if (reduceMotion) EnterTransition.None togetherWith ExitTransition.None
+                else fadeIn() togetherWith fadeOut()
+            },
             contentAlignment = Alignment.BottomCenter
         ) { isInline ->
             if (isInline) {
