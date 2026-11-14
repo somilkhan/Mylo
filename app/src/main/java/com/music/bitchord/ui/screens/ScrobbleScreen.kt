@@ -122,6 +122,8 @@ fun ScrobbleScreen(
     var generationError by remember { mutableStateOf<String?>(null) }
     var generatedMix by remember { mutableStateOf<List<Song>>(emptyList()) }
     var generatedTitle by remember { mutableStateOf("") }
+    var mixSaved by remember { mutableStateOf(false) }
+    var pendingRemovePlaylist by remember { mutableStateOf<String?>(null) }
     var openedPlaylist by remember { mutableStateOf<String?>(null) }
     val statsListState = rememberLazyListState()
     val generateListState = rememberLazyListState()
@@ -186,6 +188,7 @@ fun ScrobbleScreen(
         if (generationRequest == 0) return@LaunchedEffect
         generatingMix = true
         generationError = null
+        mixSaved = false
         generatedMix = emptyList()
         try {
             val generated = when (mixMode) {
@@ -235,7 +238,7 @@ fun ScrobbleScreen(
             val result = YtMusicRepository.quickPicks(excluded)
             result.exceptionOrNull()?.let { throw it }
             recommendations = result.getOrNull().orEmpty()
-                .filter { it.videoId.isNotBlank() }
+                 .filter { it.videoId.isNotBlank() && it.videoId !in excluded }
                 .distinctBy(::songIdentity)
             recommendationsFailed = false
         } catch (cancelled: CancellationException) {
@@ -250,6 +253,21 @@ fun ScrobbleScreen(
     Column(
         modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
     ) {
+        pendingRemovePlaylist?.let { title ->
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { pendingRemovePlaylist = null },
+                title = { Text("Remove saved mix?") },
+                text = { Text("‘$title’ will be removed from this device. Your listening history will stay untouched.") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        ScrobblePlaylistStore.remove(title)
+                        if (openedPlaylist == title) openedPlaylist = null
+                        pendingRemovePlaylist = null
+                    }) { Text("Remove") }
+                },
+                dismissButton = { TextButton(onClick = { pendingRemovePlaylist = null }) { Text("Cancel") } },
+            )
+        }
         AnimatedContent(
             targetState = selectedSection,
             modifier = Modifier.fillMaxSize(),
@@ -376,7 +394,7 @@ fun ScrobbleScreen(
                                             rowModes.forEach { mode ->
                                                 FilterChip(
                                                     selected = mixMode == mode,
-                                                    onClick = { mixMode = mode; generatedMix = emptyList(); generationError = null },
+                                                    onClick = { mixMode = mode; generatedMix = emptyList(); generationError = null; mixSaved = false },
                                                     label = { Text(mode.title) },
                                                 )
                                             }
@@ -427,7 +445,7 @@ fun ScrobbleScreen(
                         item("generate-action") {
                             Button(
                                 onClick = { generationRequest++ },
-                                enabled = !generatingMix && !loadingHistory && (mixMode != ScrobbleMixMode.RADIO || selectedSeed?.videoId?.isNotBlank() == true),
+                                enabled = !generatingMix && !loadingHistory && (mixMode !in setOf(ScrobbleMixMode.FAVOURITES, ScrobbleMixMode.REDISCOVER) || !loadingStats) && (mixMode != ScrobbleMixMode.RADIO || selectedSeed?.videoId?.isNotBlank() == true),
                                 modifier = Modifier.fillMaxWidth(),
                             ) {
                                 if (generatingMix) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
@@ -444,7 +462,7 @@ fun ScrobbleScreen(
                                 PageHeading(generatedTitle, "${generatedMix.size} tracks ready")
                             }
                             items(generatedMix.take(8), key = { "generated-${songIdentity(it)}" }) { song ->
-                                TrackRow(song, onClick = { onPlayPlaylist(generatedTitle, generatedMix) })
+                                TrackRow(song, onClick = { onPlayPlaylist(generatedTitle, listOf(song)) })
                             }
                             item("generated-actions") {
                                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -455,7 +473,8 @@ fun ScrobbleScreen(
                                     }
                                     OutlinedButton(onClick = {
                                         ScrobblePlaylistStore.save(generatedTitle, mixMode.description, generatedMix)
-                                    }) { Text("Save") }
+                                        mixSaved = true
+                                    }, enabled = !mixSaved) { Text(if (mixSaved) "Saved" else "Save") }
                                 }
                             }
                         }
@@ -524,7 +543,7 @@ fun ScrobbleScreen(
                                                     DropdownMenuItem(
                                                         text = { Text("Remove") },
                                                         leadingIcon = { Icon(Icons.Rounded.DeleteOutline, null) },
-                                                        onClick = { menuExpanded = false; ScrobblePlaylistStore.remove(playlist.title) },
+                                                        onClick = { menuExpanded = false; pendingRemovePlaylist = playlist.title },
                                                     )
                                                 }
                                             }
