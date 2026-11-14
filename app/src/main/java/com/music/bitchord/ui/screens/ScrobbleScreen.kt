@@ -411,23 +411,49 @@ fun ScrobbleScreen(
                             PageHeading("Make a mix", "Choose what you want to hear. Mylo builds the queue from your listening and YouTube Music.")
                         }
                         item("generate-modes") {
-                            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                Text("Start with", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    ScrobbleMixMode.entries.chunked(2).forEach { rowModes ->
-                                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                            rowModes.forEach { mode ->
-                                                FilterChip(
-                                                    selected = mixMode == mode,
-                                                    enabled = !generatingMix,
-                                                    onClick = { mixMode = mode; generatedMix = emptyList(); generationError = null; mixSaved = false },
-                                                    label = { Text(mode.title) },
+                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Text("Choose your listening mood", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                                ScrobbleMixMode.entries.chunked(2).forEach { rowModes ->
+                                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                        rowModes.forEach { mode ->
+                                            val selectedMode = mixMode == mode
+                                            Column(
+                                                modifier = Modifier.weight(1f)
+                                                    .clip(RoundedCornerShape(16.dp))
+                                                    .background(
+                                                        if (selectedMode) MaterialTheme.colorScheme.primaryContainer
+                                                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.48f),
+                                                    )
+                                                    .clickable(enabled = !generatingMix) {
+                                                        mixMode = mode
+                                                        generatedMix = emptyList()
+                                                        generationError = null
+                                                        mixSaved = false
+                                                    }
+                                                    .padding(horizontal = 13.dp, vertical = 14.dp),
+                                                verticalArrangement = Arrangement.spacedBy(6.dp),
+                                            ) {
+                                                Text(
+                                                    mode.title,
+                                                    style = MaterialTheme.typography.titleSmall,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = if (selectedMode) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                )
+                                                Text(
+                                                    mode.description,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = if (selectedMode) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.78f) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    maxLines = 2,
+                                                    minLines = 2,
+                                                    overflow = TextOverflow.Ellipsis,
                                                 )
                                             }
                                         }
+                                        if (rowModes.size == 1) Spacer(Modifier.weight(1f))
                                     }
                                 }
-                                Text(mixMode.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                         if (mixMode == ScrobbleMixMode.RADIO) {
