@@ -162,9 +162,7 @@ fun ScrobbleScreen(
         try {
             val excluded = (syncedHistory.map { it.videoId } + listens.map { it.song.videoId } + topTracks.map { it.videoId })
                 .filter(String::isNotBlank).toSet()
-            val titleArtist = (syncedHistory + listens.map { it.song } + topTracks)
-                .map { it.title to it.artist }.toSet()
-            val result = YtMusicRepository.quickPicks(excluded, titleArtist)
+            val result = YtMusicRepository.quickPicks(excluded)
             result.exceptionOrNull()?.let { throw it }
             recommendations = result.getOrNull().orEmpty()
                 .filter { it.videoId.isNotBlank() }
