@@ -103,7 +103,6 @@ fun GlassNavBar(
     dock: PlayerDock? = null,
     /** Dragging the bar's player up into the full player. */
     pull: MiniPlayerPull? = null,
-    reduceMotion: Boolean = false,
     /** Override the standalone circular tab; -1 keeps every section in the pill. */
     standaloneIndexOverride: Int? = null,
     modifier: Modifier = Modifier,
