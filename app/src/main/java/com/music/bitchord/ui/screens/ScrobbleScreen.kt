@@ -395,6 +395,7 @@ fun ScrobbleScreen(
                                             rowModes.forEach { mode ->
                                                 FilterChip(
                                                     selected = mixMode == mode,
+                                                    enabled = !generatingMix,
                                                     onClick = { mixMode = mode; generatedMix = emptyList(); generationError = null; mixSaved = false },
                                                     label = { Text(mode.title) },
                                                 )
@@ -417,7 +418,7 @@ fun ScrobbleScreen(
                                             Row(
                                                 Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
                                                     .background(if (selectedSeed?.videoId == song.videoId) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.background)
-                                                    .clickable { selectedSeed = song }.padding(8.dp),
+                                                    .clickable(enabled = !generatingMix) { selectedSeed = song }.padding(8.dp),
                                                 verticalAlignment = Alignment.CenterVertically,
                                             ) {
                                                 AsyncImage(model = song.thumbnailUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(44.dp).clip(RoundedCornerShape(10.dp)))
@@ -480,7 +481,7 @@ fun ScrobbleScreen(
                             }
                         }
                         item("generate-discovery-refresh") {
-                            OutlinedButton(onClick = { recommendationRequest++ }, enabled = !loadingRecommendations, modifier = Modifier.fillMaxWidth()) {
+                            OutlinedButton(onClick = { recommendationRequest++ }, enabled = !loadingRecommendations && !generatingMix, modifier = Modifier.fillMaxWidth()) {
                                 Icon(Icons.Rounded.Refresh, null)
                                 Spacer(Modifier.width(6.dp))
                                 Text(if (loadingRecommendations) "Refreshing picks…" else "Refresh discovery")
