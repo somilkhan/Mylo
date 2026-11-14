@@ -38,6 +38,7 @@ import androidx.compose.material.icons.automirrored.rounded.VolumeOff
 import androidx.compose.material.icons.rounded.Animation
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.BarChart
+import androidx.compose.material.icons.rounded.BatteryFull
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.BlurOff
 import androidx.compose.material.icons.rounded.BlurOn
@@ -84,6 +85,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatDelegate
 import com.music.bitchord.data.lyrics.translationLanguageName
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -149,6 +151,10 @@ import com.music.bitchord.data.NerdStats
 import com.music.bitchord.data.scrobbling.LastFM
 import com.music.bitchord.data.listentogether.ListenTogether
 import com.music.bitchord.data.settings.AppSettings
+import com.music.bitchord.data.sync.SyncResult
+import com.music.bitchord.data.sync.AutomaticSyncMode
+import com.music.bitchord.data.LibrarySyncCategory
+import com.music.bitchord.data.AccountSyncMode
 import com.music.bitchord.data.settings.OutputPcmMode
 import com.music.bitchord.playback.AudioOutputStatus
 import com.music.bitchord.data.settings.AutomixPerformanceMode
@@ -191,10 +197,20 @@ fun SettingsScreen(
     onSpotifyCanvasAuth: () -> Unit,
     onAppLanguage: () -> Unit,
     onEditSignatureApi: () -> Unit,
+    onSyncNow: () -> Unit,
+    accountSyncing: Boolean,
+    accountSyncResult: SyncResult,
+    accountSyncStatus: String,
+    accountSyncCategoriesInProgress: Set<LibrarySyncCategory>,
     contentPadding: PaddingValues,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    val autoAccountSync by AppSettings.autoAccountSync.collectAsStateWithLifecycle()
+    val accountSyncBatteryMode by AppSettings.accountSyncBatteryMode.collectAsStateWithLifecycle()
+    val accountSyncCategories by AppSettings.accountSyncCategories.collectAsStateWithLifecycle()
+    val accountSyncMode by AppSettings.accountSyncMode.collectAsStateWithLifecycle()
+    val accountSyncOverwrite by AppSettings.accountSyncOverwriteWithRemote.collectAsStateWithLifecycle()
 
     val wifiQuality by AppSettings.audioQualityWifi.collectAsStateWithLifecycle()
     val cellularQuality by AppSettings.audioQualityCellular.collectAsStateWithLifecycle()
@@ -419,6 +435,150 @@ fun SettingsScreen(
                         ?: stringResource(if (signedIn) R.string.signed_in else R.string.not_signed_in),
                     onClick = onAccountScrobbling,
                 )
+            }
+            if (signedIn) {
+                val autoSyncTitle = "Automatic library sync"
+                row(autoSyncTitle, "automatic", "background", "library", "history") {
+                    SettingsRow(
+                        icon = Icons.Rounded.Cached,
+                        title = autoSyncTitle,
+                        subtitle = "Refresh selected categories when the connection is eligible; Sync Now runs immediately",
+                        trailing = {
+                            Switch(
+                                checked = autoAccountSync,
+                                onCheckedChange = AppSettings::setAutoAccountSync,
+                            )
+                        },
+                    )
+                }
+                row("Sync battery use", "sync", "battery", "metered", "data") {
+                    var showBatteryModeDialog by rememberSaveable { mutableStateOf(false) }
+                    val modeDescription = when (accountSyncBatteryMode) {
+                        AutomaticSyncMode.FULL -> "Full · sync on metered networks, even in Battery Saver"
+                        AutomaticSyncMode.BALANCED -> "Balanced · follow Android Battery Saver"
+                        AutomaticSyncMode.SAVER -> "Saver · automatic sync only on unmetered networks"
+                    }
+                    SettingsRow(
+                        icon = Icons.Rounded.BatteryFull,
+                        title = "Sync battery use",
+                        subtitle = modeDescription,
+                        value = accountSyncBatteryMode.name.lowercase().replaceFirstChar { it.uppercase() },
+                        onClick = { showBatteryModeDialog = true },
+                    )
+                    if (showBatteryModeDialog) {
+                        AlertDialog(
+                            onDismissRequest = { showBatteryModeDialog = false },
+                            title = { Text("Automatic sync policy") },
+                            text = {
+                                Column {
+                                    listOf(
+                                        Triple(AutomaticSyncMode.FULL, "Full", "Allow automatic sync on metered networks, regardless of Battery Saver."),
+                                        Triple(AutomaticSyncMode.BALANCED, "Balanced", "Follow Android Battery Saver. This keeps Mylo's current behaviour."),
+                                        Triple(AutomaticSyncMode.SAVER, "Saver", "Wait for a known-unmetered network, even when Battery Saver is off."),
+                                    ).forEach { (choice, label, detail) ->
+                                        TextButton(
+                                            onClick = {
+                                                AppSettings.setAccountSyncBatteryMode(choice)
+                                                showBatteryModeDialog = false
+                                            },
+                                            modifier = Modifier.fillMaxWidth(),
+                                        ) {
+                                            Column(Modifier.fillMaxWidth()) {
+                                                Text(
+                                                    text = label + if (choice == accountSyncBatteryMode) "  ✓" else "",
+                                                    color = MaterialTheme.colorScheme.onSurface,
+                                                )
+                                                Text(
+                                                    text = detail,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            confirmButton = {
+                                TextButton(onClick = { showBatteryModeDialog = false }) {
+                                    Text("Close")
+                                }
+                            },
+                        )
+                    }
+                }
+                val syncTitle = "Sync YouTube Music"
+                val syncSubtitle = when {
+                    accountSyncing -> accountSyncStatus.ifBlank { "Syncing account library and history…" }
+                    accountSyncResult == SyncResult.SYNCED -> "Library and listening history synced"
+                    accountSyncResult == SyncResult.FAILED -> "Sync failed · tap to retry"
+                    else -> "Refresh your library and listening history"
+                }
+                row(syncTitle, "sync", "library", "history", "albums", "artists", "playlists") {
+                    SettingsRow(
+                        icon = Icons.Rounded.Cached,
+                        title = syncTitle,
+                        subtitle = syncSubtitle,
+                        badge = "…" .takeIf { accountSyncing },
+                        onClick = onSyncNow,
+                    )
+                }
+                listOf(
+                    LibrarySyncCategory.ALBUMS to "Albums",
+                    LibrarySyncCategory.ARTISTS to "Artists",
+                    LibrarySyncCategory.PLAYLISTS to "Playlists",
+                    LibrarySyncCategory.LIKED_SONGS to "Liked songs",
+                    LibrarySyncCategory.PRIVATE_SONGS to "Private songs",
+                    LibrarySyncCategory.RECENT_ACTIVITY to "Recent activity",
+                    LibrarySyncCategory.LISTENING_HISTORY to "Listening history",
+                ).forEach { (category, title) ->
+                    row(title, "sync", "library", "history", "youtube music") {
+                        SettingsRow(
+                            icon = Icons.Rounded.LibraryMusic,
+                            title = title,
+                            subtitle = "Include in account sync",
+                            trailing = {
+                                if (category in accountSyncCategoriesInProgress) {
+                                    CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                                } else {
+                                    Switch(
+                                        checked = category in accountSyncCategories,
+                                        onCheckedChange = { AppSettings.setAccountSyncCategory(category, it) },
+                                    )
+                                }
+                            },
+                        )
+                    }
+                }
+                row("Sync mode", "read only", "read write", "youtube") {
+                    SettingsRow(
+                        icon = Icons.Rounded.Cached,
+                        title = "Sync mode",
+                        subtitle = if (accountSyncMode == AccountSyncMode.RW) {
+                            "Read and write · changes can reach YouTube Music"
+                        } else "Read only · Mylo will not change your YouTube Music account",
+                        trailing = {
+                            Switch(
+                                checked = accountSyncMode == AccountSyncMode.RW,
+                                onCheckedChange = {
+                                    AppSettings.setAccountSyncMode(if (it) AccountSyncMode.RW else AccountSyncMode.RO)
+                                },
+                            )
+                        },
+                    )
+                }
+                row("Conflict resolution", "add only", "overwrite", "sync") {
+                    SettingsRow(
+                        icon = Icons.Rounded.FilterAlt,
+                        title = "Overwrite with YouTube",
+                        subtitle = "When off, remote items are added without removing local cached items",
+                        trailing = {
+                            Switch(
+                                checked = accountSyncOverwrite,
+                                onCheckedChange = AppSettings::setAccountSyncOverwriteWithRemote,
+                            )
+                        },
+                    )
+                }
             }
             // Sits with the account rather than with Playback: a party is up to
             // five signed-in people, and being signed in is the whole of what

@@ -35,7 +35,31 @@ import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 
 /** Suspend API over Innertube. Every call returns a Result so the UI can show a real error. */
+enum class LibrarySyncCategory {
+    ALBUMS, ARTISTS, PLAYLISTS, LIKED_SONGS, PRIVATE_SONGS, RECENT_ACTIVITY, LISTENING_HISTORY
+}
+
+enum class AccountSyncMode { RO, RW }
+
+private data class LibrarySyncFeed(
+    val category: LibrarySyncCategory?,
+    val title: String,
+    val browseIds: List<String>,
+)
+
 object YtMusicRepository {
+    @Volatile private var accountSyncMode = AccountSyncMode.RW
+
+    fun setAccountSyncMode(mode: AccountSyncMode) {
+        accountSyncMode = mode
+    }
+
+    private fun requireAccountWritesEnabled() {
+        check(accountSyncMode == AccountSyncMode.RW) {
+            "YouTube Music account is in read-only sync mode"
+        }
+    }
+
 
     private const val TAG = "BitChord"
     private val moodGenreShelfCache = ConcurrentHashMap<String, List<HomeShelf>>()
@@ -149,6 +173,16 @@ object YtMusicRepository {
      * whereas this is the page you open when twenty is not enough.
      */
     suspend fun history(): Result<List<Song>> = call("history") { fetchHistory() }
+
+    /** One page of account history, retaining repeated plays and day headings. */
+    suspend fun historyPage(): Result<InnertubeParser.HistoryPage> =
+        call("history") { InnertubeParser.parseHistoryPage(Innertube.browse(HISTORY)) }
+
+    /** Continue account history with YouTube's opaque continuation token. */
+    suspend fun moreHistory(token: String): Result<InnertubeParser.HistoryPage> =
+        call("history:more") {
+            InnertubeParser.parseHistoryPage(Innertube.browseContinuation(token))
+        }
 
     /** Account listening history for the Recents feed. */
     suspend fun recents(): Result<List<Song>> = call("recents") {
@@ -486,11 +520,17 @@ object YtMusicRepository {
             // liked without holding this page open behind the whole list —
             // see [syncLikedMusic] and MainViewModel's fetchLibrary.
             val liked = async { browseSongs(LIKED_MUSIC).getOrNull() }
-            val added = async { runCatching { songsPaged(LIBRARY_SONGS) }.getOrDefault(emptyList()) }
+            val added = async {
+                (listOf(LIBRARY_SONGS, PRIVATE_LIBRARY_SONGS).flatMap { browseId ->
+                    runCatching { songsPaged(browseId) }.getOrDefault(emptyList())
+                }).distinctBy { it.videoId }
+            }
             val shelves = LIBRARY_FEEDS
-                .map { (title, browseId) ->
+                .map { feed ->
                     async {
-                        HomeShelf(title, runCatching { libraryItemsPaged(browseId) }.getOrDefault(emptyList()))
+                        HomeShelf(feed.title, feed.browseIds.flatMap { browseId ->
+                            runCatching { libraryItemsPaged(browseId) }.getOrDefault(emptyList())
+                        }.distinctBy { it.browseId ?: it.videoId ?: "${it.title}\\n${it.subtitle}" })
                     }
                 }
                 .awaitAll()
@@ -509,6 +549,115 @@ object YtMusicRepository {
                 shelves = shelves,
                 likedContinuation = likedPage?.continuation,
             )
+        }
+    }
+
+    /** The account's distinct Recent activity feed (saved/visited library items). */
+    suspend fun libraryRecentActivity(): Result<List<ShelfItem>> = call("library:recent-activity") {
+        InnertubeParser.parseLibraryItemPage(Innertube.browseContinuation(LIBRARY_RECENT_ACTIVITY)).items
+    }
+
+    /**
+     * Strict library snapshot for account sync. Unlike [library], this never
+     * turns a failed category or interrupted continuation into an empty shelf.
+     * Empty successful feeds remain valid; incomplete feeds fail the snapshot
+     * so callers can retain the last known-good offline copy.
+     */
+    suspend fun libraryForSync(
+        categories: Set<LibrarySyncCategory> = LibrarySyncCategory.entries.toSet(),
+        onCategoryProgress: (LibrarySyncCategory, Boolean) -> Unit = { _, _ -> },
+    ): Result<LibraryPage> = call("library:sync") {
+        coroutineScope {
+            val liked = async {
+                if (LibrarySyncCategory.LIKED_SONGS !in categories) null
+                else {
+                    onCategoryProgress(LibrarySyncCategory.LIKED_SONGS, true)
+                    try { browseSongs(LIKED_MUSIC).getOrThrow() }
+                    finally { onCategoryProgress(LibrarySyncCategory.LIKED_SONGS, false) }
+                }
+            }
+            val added = async {
+                if (LibrarySyncCategory.PRIVATE_SONGS !in categories) emptyList()
+                else {
+                    onCategoryProgress(LibrarySyncCategory.PRIVATE_SONGS, true)
+                    try {
+                        buildList {
+                            listOf(LIBRARY_SONGS, PRIVATE_LIBRARY_SONGS).forEach { addAll(songsPagedStrict(it)) }
+                        }.distinctBy { it.videoId }
+                    } finally {
+                        onCategoryProgress(LibrarySyncCategory.PRIVATE_SONGS, false)
+                    }
+                }
+            }
+            val recentActivity = async {
+                if (LibrarySyncCategory.RECENT_ACTIVITY !in categories) emptyList()
+                else {
+                    onCategoryProgress(LibrarySyncCategory.RECENT_ACTIVITY, true)
+                    try { libraryRecentActivity().getOrThrow() }
+                    finally { onCategoryProgress(LibrarySyncCategory.RECENT_ACTIVITY, false) }
+                }
+            }
+            val shelves = LIBRARY_FEEDS
+                .filter { it.category == null || it.category in categories }
+                .map { feed ->
+                    async {
+                        val category = feed.category
+                        category?.let { onCategoryProgress(it, true) }
+                        try {
+                            HomeShelf(feed.title, buildList {
+                                feed.browseIds.forEach { addAll(itemsPagedStrict(it)) }
+                            }.distinctBy { it.browseId ?: it.videoId ?: "${it.title}\\n${it.subtitle}" })
+                        } finally {
+                            category?.let { onCategoryProgress(it, false) }
+                        }
+                    }
+                }.awaitAll().filter { it.items.isNotEmpty() }
+
+            val likedPage = liked.await()
+            val likedIds = likedPage?.songs.orEmpty().mapTo(HashSet()) { it.videoId }
+            LibraryPage(
+                likedSongs = likedPage?.songs.orEmpty(),
+                librarySongs = added.await().filterNot { it.videoId in likedIds },
+                shelves = shelves + listOfNotNull(
+                    recentActivity.await().takeIf { it.isNotEmpty() }
+                        ?.let { HomeShelf("Recent activity", it) },
+                ),
+                likedContinuation = likedPage?.continuation,
+            )
+        }
+    }
+
+    private suspend fun songsPagedStrict(browseId: String): List<Song> {
+        val out = LinkedHashMap<String, Song>()
+        var response = Innertube.browse(browseId)
+        if (browseId.startsWith("MPREb")) {
+            val albumRows = InnertubeParser.collectSongsDeep(response).size
+            albumPlaylistOf(response, albumRows)?.let { response = it }
+        }
+        val seenTokens = HashSet<String>()
+        while (true) {
+            val shelf = InnertubeParser.parsePlaylistShelf(response)
+            (shelf?.songs ?: InnertubeParser.collectSongsDeep(response)).forEach { out[it.videoId] = it }
+            val token = shelf?.continuation ?: InnertubeParser.continuationToken(response)
+            if (token == null) return out.values.toList()
+            check(seenTokens.add(token)) { "Library feed $browseId repeated a continuation token" }
+            response = Innertube.browseContinuation(token)
+        }
+    }
+
+    private suspend fun itemsPagedStrict(browseId: String): List<ShelfItem> {
+        val out = LinkedHashMap<String, ShelfItem>()
+        var response = Innertube.browse(browseId)
+        val seenTokens = HashSet<String>()
+        while (true) {
+            val parsed = InnertubeParser.parseLibraryItemPage(response)
+            parsed.items.forEach { item ->
+                val key = item.browseId ?: item.videoId ?: "${item.title}\\n${item.subtitle}"
+                out.putIfAbsent(key, item)
+            }
+            val token = parsed.continuation ?: return out.values.toList()
+            check(seenTokens.add(token)) { "Library feed $browseId repeated a continuation token" }
+            response = Innertube.browseContinuation(token)
         }
     }
 
@@ -838,6 +987,13 @@ object YtMusicRepository {
     /** Songs explicitly added to the library — distinct from Liked Music. */
     private const val LIBRARY_SONGS = "FEmusic_liked_videos"
 
+    /** Tracks uploaded privately to this YouTube Music account. */
+    private const val PRIVATE_LIBRARY_SONGS = "FEmusic_library_privately_owned_tracks"
+
+    /** Innertube's account Recent activity filter, as used by InterTune's library sync. */
+    private const val LIBRARY_RECENT_ACTIVITY =
+        "4qmFsgIrEhdGRW11c2ljX2xpYnJhcnlfbGFuZGluZxoQZ2dNR0tnUUlCaEFCb0FZQg%3D%3D"
+
     /** Saved and own playlists; also what the "add to playlist" picker lists. */
     private const val LIBRARY_PLAYLISTS = "FEmusic_liked_playlists"
 
@@ -854,11 +1010,22 @@ object YtMusicRepository {
     const val PLAYLISTS_SHELF = "Playlists"
 
     private val LIBRARY_FEEDS = listOf(
-        PLAYLISTS_SHELF to LIBRARY_PLAYLISTS,
-        "Albums" to "FEmusic_liked_albums",
-        "Artists" to "FEmusic_library_corpus_track_artists",
-        "Subscriptions" to "FEmusic_library_corpus_artists",
-        "Podcasts" to "FEmusic_library_non_music_audio_list",
+        LibrarySyncFeed(LibrarySyncCategory.PLAYLISTS, PLAYLISTS_SHELF, listOf(LIBRARY_PLAYLISTS)),
+        LibrarySyncFeed(
+            LibrarySyncCategory.ALBUMS,
+            "Albums",
+            listOf("FEmusic_liked_albums", "FEmusic_library_privately_owned_releases"),
+        ),
+        LibrarySyncFeed(
+            LibrarySyncCategory.ARTISTS,
+            "Artists",
+            listOf(
+                "FEmusic_library_corpus_artists",
+                "FEmusic_library_corpus_track_artists",
+                "FEmusic_library_privately_owned_artists",
+            ),
+        ),
+        LibrarySyncFeed(null, "Podcasts", listOf("FEmusic_library_non_music_audio_list")),
     )
 
     // ---- Writes -------------------------------------------------------------
@@ -878,11 +1045,11 @@ object YtMusicRepository {
     }
 
     suspend fun rate(videoId: String, status: LikeStatus): Result<Unit> =
-        call("rate:$videoId") { Innertube.rate(videoId, status) }
+        call("rate:$videoId") { requireAccountWritesEnabled(); Innertube.rate(videoId, status) }
 
     /** Adds or removes a track from the library; [token] says which. */
     suspend fun setLibraryStatus(token: String): Result<Unit> =
-        call("library:feedback") { Innertube.sendFeedback(token) }
+        call("library:feedback") { requireAccountWritesEnabled(); Innertube.sendFeedback(token) }
 
     /**
      * Saves an album or playlist to the library, or removes it. [playlistId] is
@@ -898,7 +1065,7 @@ object YtMusicRepository {
         call("library-state:$browseId") { InnertubeParser.parseLibraryState(Innertube.browse(browseId)) }
 
     suspend fun setSaved(playlistId: String, saved: Boolean): Result<Unit> =
-        call("library:$playlistId") { Innertube.ratePlaylist(playlistId, saved) }
+        call("library:$playlistId") { requireAccountWritesEnabled(); Innertube.ratePlaylist(playlistId, saved) }
 
     /**
      * Subscribes to an artist's channel, or unsubscribes. [channelId] is the one
@@ -906,7 +1073,7 @@ object YtMusicRepository {
      * [com.music.bitchord.data.model.SubscriptionState].
      */
     suspend fun setSubscribed(channelId: String, subscribed: Boolean): Result<Unit> =
-        call("subscription:$channelId") { Innertube.setSubscribed(channelId, subscribed) }
+        call("subscription:$channelId") { requireAccountWritesEnabled(); Innertube.setSubscribed(channelId, subscribed) }
 
     /**
      * The playlists a track can be added to. Paged because accounts with long
@@ -930,6 +1097,7 @@ object YtMusicRepository {
         privacy: PlaylistPrivacy,
         videoIds: List<String> = emptyList(),
     ): Result<String> = call("playlist:create") {
+        requireAccountWritesEnabled()
         Innertube.createPlaylist(title, privacy, videoIds = videoIds)
     }
 
@@ -943,13 +1111,14 @@ object YtMusicRepository {
         playlistId: String,
         videoIds: List<String>,
     ): Result<Map<String, String>> =
-        call("playlist:add") { Innertube.addToPlaylist(playlistId, videoIds) }
+        call("playlist:add") { requireAccountWritesEnabled(); Innertube.addToPlaylist(playlistId, videoIds) }
 
     /** [entries] are (setVideoId, videoId) pairs — see [Song.setVideoId]. */
     suspend fun removeFromPlaylist(
         playlistId: String,
         entries: List<Pair<String, String>>,
     ): Result<Unit> = call("playlist:remove") {
+        requireAccountWritesEnabled()
         Innertube.removeFromPlaylist(playlistId, entries)
     }
 
@@ -993,6 +1162,7 @@ object YtMusicRepository {
         current: List<String>,
         target: List<String>,
     ): Result<Unit> = call("playlist:reorder") {
+        requireAccountWritesEnabled()
         playlistMoves(current, target).chunked(MOVE_BATCH).forEach { batch ->
             Innertube.movePlaylistItems(playlistId, batch)
         }
@@ -1001,10 +1171,10 @@ object YtMusicRepository {
     private const val MOVE_BATCH = 50
 
     suspend fun renamePlaylist(playlistId: String, title: String): Result<Unit> =
-        call("playlist:rename") { Innertube.renamePlaylist(playlistId, title) }
+        call("playlist:rename") { requireAccountWritesEnabled(); Innertube.renamePlaylist(playlistId, title) }
 
     suspend fun deletePlaylist(playlistId: String): Result<Unit> =
-        call("playlist:delete") { Innertube.deletePlaylist(playlistId) }
+        call("playlist:delete") { requireAccountWritesEnabled(); Innertube.deletePlaylist(playlistId) }
 
     /**
      * Artist page. The landing page only lists ~5 songs, so the linked

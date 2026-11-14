@@ -12,8 +12,13 @@ import com.music.bitchord.auth.AuthStore
 import com.music.bitchord.data.canvas.SpotifyToken
 import com.music.bitchord.data.lyrics.LyricsSource
 import com.music.bitchord.data.sources.SourceKind
+import com.music.bitchord.data.LibrarySyncCategory
+import com.music.bitchord.data.AccountSyncMode
+import com.music.bitchord.data.sync.AutomaticSyncMode
+import com.music.bitchord.data.YtMusicRepository
 import com.music.bitchord.playback.EqLayout
 import com.music.bitchord.playback.EqualizerPreset
+import java.security.MessageDigest
 import kotlinx.coroutines.flow.MutableStateFlow
 
 
@@ -149,6 +154,7 @@ enum class SongSort {
 object AppSettings {
 
     private lateinit var prefs: SharedPreferences
+    private var applicationContext: Context? = null
 
     /** Only for the Discord, WebDAV and SMB secrets — everything else on here is plain prefs. */
     private lateinit var authStore: AuthStore
@@ -343,6 +349,17 @@ object AppSettings {
 
     /** Keep playing similar music once the queue runs out. */
     val autoplay = MutableStateFlow(true)
+
+    /** Refresh the signed-in YouTube Music mirror automatically, with a per-account cooldown. */
+    val autoAccountSync = MutableStateFlow(true)
+
+    /** Battery/data budget applied to automatic account sync. */
+    val accountSyncBatteryMode = MutableStateFlow(AutomaticSyncMode.BALANCED)
+
+    /** Independently selected YouTube Music sync categories. */
+    val accountSyncCategories = MutableStateFlow(LibrarySyncCategory.entries.toSet())
+    val accountSyncMode = MutableStateFlow(AccountSyncMode.RW)
+    val accountSyncOverwriteWithRemote = MutableStateFlow(false)
 
     /** Whether the queue is held in shuffled order (Mix button). */
     val shuffleEnabled = MutableStateFlow(false)
@@ -781,6 +798,7 @@ object AppSettings {
      * one here was a measurable slice of cold start.
      */
     fun init(context: Context, authStore: AuthStore) {
+        applicationContext = context.applicationContext
         prefs = context.getSharedPreferences("bitchord_settings", Context.MODE_PRIVATE)
         this.authStore = authStore
         com.music.bitchord.data.spotify.LocalPlaylistStore.init(context)
@@ -802,6 +820,7 @@ object AppSettings {
     fun reload() {
         if (!this::prefs.isInitialized) return
         readAll()
+        applicationContext?.let(com.music.bitchord.data.sync.AccountLibrarySyncScheduler::refresh)
     }
 
     private fun readAll() {
@@ -850,6 +869,22 @@ object AppSettings {
             ThemeMode.valueOf(prefs.getString(KEY_THEME, null) ?: "DARK")
         }.getOrDefault(ThemeMode.DARK)
         autoplay.value = prefs.getBoolean(KEY_AUTOPLAY, true)
+        autoAccountSync.value = prefs.getBoolean(KEY_AUTO_ACCOUNT_SYNC, true)
+        accountSyncBatteryMode.value = runCatching {
+            AutomaticSyncMode.valueOf(
+                prefs.getString(KEY_ACCOUNT_SYNC_BATTERY_MODE, AutomaticSyncMode.BALANCED.name)
+                    ?: AutomaticSyncMode.BALANCED.name,
+            )
+        }.getOrDefault(AutomaticSyncMode.BALANCED)
+        accountSyncCategories.value = prefs.getStringSet(KEY_ACCOUNT_SYNC_CATEGORIES, null)
+            ?.mapNotNull { stored -> runCatching { LibrarySyncCategory.valueOf(stored) }.getOrNull() }
+            ?.toSet()
+            ?: LibrarySyncCategory.entries.toSet()
+        accountSyncMode.value = runCatching {
+            AccountSyncMode.valueOf(prefs.getString(KEY_ACCOUNT_SYNC_MODE, AccountSyncMode.RW.name) ?: AccountSyncMode.RW.name)
+        }.getOrDefault(AccountSyncMode.RW)
+        YtMusicRepository.setAccountSyncMode(accountSyncMode.value)
+        accountSyncOverwriteWithRemote.value = prefs.getBoolean(KEY_ACCOUNT_SYNC_OVERWRITE, false)
         shuffleEnabled.value = prefs.getBoolean(KEY_SHUFFLE_ENABLED, false)
         repeatMode.value = prefs.getInt(KEY_REPEAT_MODE, Player.REPEAT_MODE_OFF)
         showNerdStats.value = prefs.getBoolean(KEY_NERD_STATS, false)
@@ -1065,6 +1100,60 @@ object AppSettings {
     fun setAutoplay(value: Boolean) {
         autoplay.value = value
         prefs.edit().putBoolean(KEY_AUTOPLAY, value).apply()
+    }
+
+    fun setAutoAccountSync(value: Boolean) {
+        autoAccountSync.value = value
+        prefs.edit().putBoolean(KEY_AUTO_ACCOUNT_SYNC, value).apply()
+        applicationContext?.let(com.music.bitchord.data.sync.AccountLibrarySyncScheduler::refresh)
+    }
+
+    fun setAccountSyncBatteryMode(value: AutomaticSyncMode) {
+        accountSyncBatteryMode.value = value
+        prefs.edit().putString(KEY_ACCOUNT_SYNC_BATTERY_MODE, value.name).apply()
+        applicationContext?.let(com.music.bitchord.data.sync.AccountLibrarySyncScheduler::refresh)
+    }
+
+    fun setAccountSyncCategory(category: LibrarySyncCategory, enabled: Boolean) {
+        val updated = accountSyncCategories.value.toMutableSet().apply {
+            if (enabled) add(category) else remove(category)
+        }.toSet()
+        accountSyncCategories.value = updated
+        prefs.edit().putStringSet(KEY_ACCOUNT_SYNC_CATEGORIES, updated.map { it.name }.toSet()).apply()
+    }
+
+    fun setAccountSyncMode(value: AccountSyncMode) {
+        accountSyncMode.value = value
+        YtMusicRepository.setAccountSyncMode(value)
+        prefs.edit().putString(KEY_ACCOUNT_SYNC_MODE, value.name).apply()
+    }
+
+    fun setAccountSyncOverwriteWithRemote(value: Boolean) {
+        accountSyncOverwriteWithRemote.value = value
+        prefs.edit().putBoolean(KEY_ACCOUNT_SYNC_OVERWRITE, value).apply()
+    }
+
+    private fun accountSyncIdentityKey(accountKey: String): String =
+        MessageDigest.getInstance("SHA-256").digest(accountKey.toByteArray())
+            .take(12).joinToString("") { "%02x".format(it) }
+
+    fun accountSyncCategoriesDue(
+        accountKey: String,
+        categories: Set<LibrarySyncCategory>,
+        now: Long,
+        cooldownMs: Long,
+    ): Set<LibrarySyncCategory> {
+        val identity = accountSyncIdentityKey(accountKey)
+        return categories.filterTo(linkedSetOf()) { category ->
+            now - prefs.getLong(KEY_ACCOUNT_SYNC_LAST_PREFIX + identity + "_" + category.name, 0L) >= cooldownMs
+        }
+    }
+
+    fun markAccountSyncCategoriesSynced(accountKey: String, categories: Set<LibrarySyncCategory>, at: Long) {
+        val identity = accountSyncIdentityKey(accountKey)
+        prefs.edit().apply {
+            categories.forEach { putLong(KEY_ACCOUNT_SYNC_LAST_PREFIX + identity + "_" + it.name, at) }
+        }.apply()
     }
 
     fun setShuffleEnabled(value: Boolean) {
@@ -2012,6 +2101,12 @@ object AppSettings {
     private const val KEY_SPEED = "playback_speed"
     private const val KEY_THEME = "theme_mode"
     private const val KEY_AUTOPLAY = "autoplay"
+    private const val KEY_AUTO_ACCOUNT_SYNC = "auto_account_sync"
+    private const val KEY_ACCOUNT_SYNC_BATTERY_MODE = "account_sync_battery_mode"
+    private const val KEY_ACCOUNT_SYNC_CATEGORIES = "account_sync_categories"
+    private const val KEY_ACCOUNT_SYNC_MODE = "account_sync_mode"
+    private const val KEY_ACCOUNT_SYNC_OVERWRITE = "account_sync_overwrite"
+    private const val KEY_ACCOUNT_SYNC_LAST_PREFIX = "account_sync_last_"
     private const val KEY_SHUFFLE_ENABLED = "shuffle_enabled"
     private const val KEY_REPEAT_MODE = "repeat_mode"
     private const val KEY_NERD_STATS = "show_nerd_stats"

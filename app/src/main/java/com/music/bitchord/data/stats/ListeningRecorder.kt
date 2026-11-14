@@ -1,6 +1,7 @@
 package com.music.bitchord.data.stats
 
 import com.music.bitchord.data.YtMusicRepository
+import com.music.bitchord.data.ListeningHistory
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.model.durationMillis
 import kotlinx.coroutines.CoroutineScope
@@ -30,10 +31,10 @@ import kotlin.math.min
  * lock screen from arriving as an hour of listening on the first tick after
  * resume.
  *
- * The cost is that the few seconds before the first tick of each track are not
- * counted. That is a systematic undercount of at most one sample interval per
- * track, and it is the right way to be wrong: every alternative overcounts, and
- * a Replay that flatters is worth less than one that is a little shy.
+ * The service anchors each play when audio starts, not at the first five-second
+ * sampler tick. Pauses and track transitions flush the final partial interval,
+ * while a pause/resume keeps the same play's accumulated time and two-second
+ * history threshold.
  *
  * ## Minutes and plays are different questions
  *
@@ -44,35 +45,109 @@ import kotlin.math.min
 object ListeningRecorder {
 
     private var currentId: String? = null
+    private var currentSong: Song? = null
+    private var currentDurationMs: Long = 0L
     private var lastSampleAt: Long = 0L
+    private var trackStartedAt: Long = 0L
     private var playedThisTrack: Long = 0L
     private var playCounted = false
+    private var historyRecorded = false
+    private var paused = false
     private var samplesSinceFlush = 0
 
+    /** Called on the player's transition into audible playback, before the first sampler tick. */
+    @Synchronized
+    fun onTrackStarted(song: Song?, durationMs: Long) {
+        if (song == null || song.videoId.isBlank()) return
+        val now = System.currentTimeMillis()
+        if (currentId == song.videoId) {
+            currentSong = song
+            if (durationMs > 0) currentDurationMs = durationMs
+            if (paused) {
+                // Resume the same play without counting the silent pause as listening
+                // or resetting its two-second history threshold.
+                lastSampleAt = now
+                paused = false
+            }
+            return
+        }
+        finishCurrent(now)
+        beginTrack(song, durationMs, now)
+    }
+
     /**
-     * One tick of the player's sampler.
-     *
-     * [durationMs] is the decoder's figure when it has one; the row's stated
-     * runtime stands in until it does, and a track with neither simply has to
-     * clear the thirty-second floor to count as a play.
+     * One tick of the player's sampler. The first tick is a fallback anchor for
+     * callers that start playback before the service's state callback arrives.
      */
     @Synchronized
     fun onSample(song: Song, durationMs: Long) {
         val now = System.currentTimeMillis()
         if (song.videoId != currentId) {
-            // A new track anchors the clock and contributes nothing yet — see
-            // the class note on undercounting.
-            currentId = song.videoId
-            lastSampleAt = now
-            playedThisTrack = 0L
-            playCounted = false
+            finishCurrent(now)
+            beginTrack(song, durationMs, now)
             return
         }
-        val step = (now - lastSampleAt).coerceIn(0L, MAX_STEP_MS)
+        currentSong = song
+        if (durationMs > 0) currentDurationMs = durationMs
+        if (paused) {
+            lastSampleAt = now
+            paused = false
+            return
+        }
+        val step = trailingSampleMs(lastSampleAt, now)
         lastSampleAt = now
+        recordStep(song, currentDurationMs, step)
+    }
+
+    /** Close the current audio interval but keep its counters for a later resume. */
+    @Synchronized
+    fun onPaused() {
+        finishCurrent(System.currentTimeMillis())
+        paused = true
+        ListeningStats.flush()
+    }
+
+    /** End a play at a track transition or service teardown. */
+    @Synchronized
+    fun onStopped() {
+        finishCurrent(System.currentTimeMillis())
+        currentId = null
+        currentSong = null
+        currentDurationMs = 0L
+        lastSampleAt = 0L
+        trackStartedAt = 0L
+        playedThisTrack = 0L
+        playCounted = false
+        historyRecorded = false
+        paused = false
+        samplesSinceFlush = 0
+        ListeningStats.flush()
+    }
+
+    private fun beginTrack(song: Song, durationMs: Long, now: Long) {
+        currentId = song.videoId
+        currentSong = song
+        currentDurationMs = durationMs
+        lastSampleAt = now
+        trackStartedAt = now
+        playedThisTrack = 0L
+        playCounted = false
+        historyRecorded = false
+        paused = false
+    }
+
+    /** Account for the last partial sampler interval when playback pauses or ends. */
+    private fun finishCurrent(now: Long) {
+        val song = currentSong ?: return
+        if (paused) return
+        val step = trailingSampleMs(lastSampleAt, now)
+        lastSampleAt = now
+        recordStep(song, currentDurationMs, step)
+    }
+
+    private fun recordStep(song: Song, durationMs: Long, step: Long) {
         if (step <= 0L) return
         playedThisTrack += step
-
         val length = durationMs.takeIf { it > 0 } ?: song.durationMillis()
         val threshold = if (length > 0) {
             min(length / 2, PLAY_CEILING_MS).coerceAtLeast(PLAY_FLOOR_MS)
@@ -81,30 +156,22 @@ object ListeningRecorder {
         }
         val counts = !playCounted && playedThisTrack >= threshold
         if (counts) playCounted = true
+        // History is a listening log, not a play-count list: a two-second skip
+        // belongs here even though it is too short to count toward Replay stats.
+        if (!historyRecorded && ListeningHistory.shouldRecord(playedThisTrack, counts)) {
+            historyRecorded = true
+            ListeningHistory.record(song, trackStartedAt)
+        }
 
         ListeningStats.record(enriched(song), step, counts)
-
         if (++samplesSinceFlush >= FLUSH_EVERY) {
             samplesSinceFlush = 0
             ListeningStats.flush()
         }
     }
 
-    /**
-     * Playback stopped, paused, or moved on.
-     *
-     * Forgetting the current track is what makes the *next* tick anchor rather
-     * than contribute: without it, a player paused for an afternoon would hand
-     * [MAX_STEP_MS] of listening to whatever was on screen when it resumed.
-     */
-    @Synchronized
-    fun onStopped() {
-        currentId = null
-        playedThisTrack = 0L
-        playCounted = false
-        samplesSinceFlush = 0
-        ListeningStats.flush()
-    }
+    internal fun trailingSampleMs(lastSampleAt: Long, endedAt: Long): Long =
+        (endedAt - lastSampleAt).coerceIn(0L, MAX_STEP_MS)
 
     // ── Filling in what the queue didn't carry ──────────────────────────────
 

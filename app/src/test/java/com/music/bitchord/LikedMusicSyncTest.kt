@@ -226,6 +226,19 @@ class LikedMusicSyncTest {
     }
 
     @Test
+    fun `complete liked sync removes stale remote seeds but keeps explicit changes`() {
+        LikeState.clear()
+        LikeState.seedLiked(setOf("old", "still"))
+        LikeState.set("explicit", LikeStatus.DISLIKE)
+        LikeState.replaceSeededLiked(setOf("still", "new"))
+
+        assertNull(LikeState.overrides.value["old"])
+        assertEquals(LikeStatus.LIKE, LikeState.overrides.value["still"])
+        assertEquals(LikeStatus.LIKE, LikeState.overrides.value["new"])
+        assertEquals(LikeStatus.DISLIKE, LikeState.overrides.value["explicit"])
+    }
+
+    @Test
     fun `a stated indifferent rating does not downgrade an existing like`() {
         LikeState.clear()
         LikeState.set("abc123", LikeStatus.LIKE)
