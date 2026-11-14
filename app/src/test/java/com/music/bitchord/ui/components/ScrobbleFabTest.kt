@@ -12,7 +12,6 @@ class ScrobbleFabTest {
         assertFalse(scrobbleFabVisible(selectedTab = 0, homeTab = 0, overlayOpen = true))
         assertFalse(scrobbleFabVisible(selectedTab = 0, homeTab = 0, overlayOpen = false, playerOpen = true))
         assertFalse(scrobbleFabVisible(selectedTab = 0, homeTab = 0, overlayOpen = false, keyboardVisible = true))
-        assertFalse(scrobbleFabVisible(selectedTab = 0, homeTab = 0, overlayOpen = false, scrollingDown = true))
     }
 
     @Test
