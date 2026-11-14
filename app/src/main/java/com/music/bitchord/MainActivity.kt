@@ -27,8 +27,10 @@ import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -164,6 +166,7 @@ import com.music.bitchord.ui.components.scrobbleFabVisible
 import com.music.bitchord.ui.components.liquidGlass
 import com.music.bitchord.ui.components.SpotifyImportAlert
 import com.music.bitchord.ui.screens.WearOsScreen
+import com.music.bitchord.ui.screens.SCROBBLE_TAB_PLAYLISTS
 import com.music.bitchord.ui.screens.AccountAndScrobblingScreen
 import com.music.bitchord.ui.screens.DiscordDialog
 import com.music.bitchord.ui.screens.DiscordDialogHost
@@ -512,6 +515,8 @@ private fun BitChordApp(
     // rather than inside the bar because the page's scroll is what drives it,
     // and the page is a sibling of the bar rather than a child.
     val navBarScroll = rememberFloatingTabBarScrollConnection()
+    // Scrobble owns its fold state: opening it must not inherit Home's scroll position.
+    val scrobbleNavBarScroll = rememberFloatingTabBarScrollConnection()
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     /**
      * Whether the player's sheet is up. The player is always a full-screen
@@ -577,6 +582,7 @@ private fun BitChordApp(
     var showReplay by rememberSaveable { mutableStateOf(false) }
     var showScrobble by rememberSaveable { mutableStateOf(false) }
     var scrobbleSection by rememberSaveable { mutableIntStateOf(0) }
+    val activeNavBarScroll = if (showScrobble) scrobbleNavBarScroll else navBarScroll
     // Library cards use the same Replay page as every other entry point, but
     // category cards ask it to start at their matching ranked section.
     var replayLandingPage by rememberSaveable { mutableStateOf(ReplayStoryPage.INTRO) }
@@ -2697,8 +2703,13 @@ private fun BitChordApp(
                         val libraryTabKey = "$TAB_KEY$TAB_LIBRARY"
                         val libraryShowAllSwap = (initialState == "library_show_all" && targetState == libraryTabKey) ||
                             (targetState == "library_show_all" && initialState == libraryTabKey)
-                        if (tabSwap || libraryShowAllSwap) {
+                        val scrobbleTransition = initialState == "scrobble" || targetState == "scrobble"
+                        if (tabSwap || libraryShowAllSwap || (scrobbleTransition && reducePlayerMotion)) {
                             EnterTransition.None togetherWith ExitTransition.None
+                        } else if (targetState == "scrobble") {
+                            (slideInVertically(tween(260)) { -it / 14 } + fadeIn(tween(180))) togetherWith fadeOut(tween(120))
+                        } else if (initialState == "scrobble") {
+                            fadeIn(tween(120)) togetherWith (slideOutVertically(tween(180)) { -it / 18 } + fadeOut(tween(120)))
                         } else {
                             fadeIn(tween(180)) togetherWith fadeOut(tween(180))
                         }
@@ -2722,7 +2733,7 @@ private fun BitChordApp(
                                     // Every page's scroll passes through here, so
                                     // the glass bar collapses on all of them
                                     // without each one having to know about it.
-                                    .nestedScroll(navBarScroll)
+                                    .nestedScroll(activeNavBarScroll)
                             } else {
                                 Modifier
                             },
@@ -2768,6 +2779,7 @@ private fun BitChordApp(
                                 viewModel.closeMoodGenre()
                                 selectedTab = TAB_EXPLORE
                             },
+                            onViewPlaylists = { scrobbleSection = SCROBBLE_TAB_PLAYLISTS },
                             syncedHistory = historySections.flatMap { it.songs },
                             reduceMotion = reducePlayerMotion,
                         )
@@ -4045,7 +4057,7 @@ private fun BitChordApp(
                         tabs = displayedTabs,
                         selectedIndex = displayedSelectedIndex,
                         onTabSelected = onDisplayedTabSelected,
-                        scrollConnection = navBarScroll,
+                        scrollConnection = activeNavBarScroll,
                         song = player.song,
                         isPlaying = player.isPlaying,
                         isLoading = playPauseBusy,
@@ -4122,7 +4134,7 @@ private fun BitChordApp(
                 }
                 val fabBottom by animateDpAsState(
                     targetValue = fabBottomTarget,
-                    animationSpec = tween(220),
+                    animationSpec = if (reducePlayerMotion) snap() else tween(220),
                     label = "scrobbleFabDock",
                 )
                 ScrobbleFab(
@@ -4155,7 +4167,7 @@ private fun BitChordApp(
                         .then(if (glassActive) Modifier else Modifier.windowInsetsPadding(floatingBarInsets))
                         .padding(end = 16.dp, bottom = fabBottom),
                     reduceMotion = reducePlayerMotion,
-                    folded = glassActive && navBarScroll.isInline,
+                    folded = glassActive && activeNavBarScroll.isInline,
                 )
             }
 
