@@ -2758,9 +2758,9 @@ private fun BitChordApp(
                         ScrobbleScreen(
                             selectedSection = scrobbleSection,
                             bottomPadding = if (player.song != null) 210.dp else 140.dp,
-                            onPlayPlaylist = { playlistName, songs ->
+                            onPlayPlaylist = { playlistName, songs, startIndex ->
                                 if (songs.isNotEmpty()) playFrom(
-                                    songs, 0, QueueSource("Scrobble · $playlistName", PlaybackSourceType.HISTORY)
+                                    songs, startIndex, QueueSource("Scrobble · $playlistName", PlaybackSourceType.HISTORY)
                                 )
                             },
                             onBrowseMoods = {
