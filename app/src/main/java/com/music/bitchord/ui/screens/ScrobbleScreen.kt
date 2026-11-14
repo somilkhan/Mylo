@@ -351,18 +351,24 @@ fun ScrobbleScreen(
                             }
                             else -> {
                                 item("stats-overview") {
-                                    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                                        Text(summary!!.label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                            MetricCard(formatListeningTime(summary!!.totalMs), "Listening", Modifier.weight(1f))
-                                            MetricCard(summary!!.totalPlays.toString(), "Plays", Modifier.weight(1f))
-                                            MetricCard(summary!!.distinctSongs.toString(), "Tracks", Modifier.weight(1f))
+                                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                        Text(summary!!.label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Card(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            shape = RoundedCornerShape(22.dp),
+                                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                                            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                                        ) {
+                                            Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                Text("LISTENING TIME", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.78f), fontWeight = FontWeight.SemiBold)
+                                                Text(formatListeningTime(summary!!.totalMs), style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.onPrimaryContainer, fontWeight = FontWeight.Bold)
+                                                Text("Across ${summary!!.distinctArtists} artists and ${summary!!.distinctAlbums} albums", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.78f))
+                                            }
                                         }
-                                        Text(
-                                            text = "Across ${summary!!.distinctArtists} artists and ${summary!!.distinctAlbums} albums",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
+                                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                            MetricCard(summary!!.totalPlays.toString(), "Total plays", Modifier.weight(1f))
+                                            MetricCard(summary!!.distinctSongs.toString(), "Unique tracks", Modifier.weight(1f))
+                                        }
                                     }
                                 }
                                 item("stats-top-heading") { SectionHeading("Most played") }
