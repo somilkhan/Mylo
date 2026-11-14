@@ -28,6 +28,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Explore
@@ -95,7 +96,7 @@ internal const val SCROBBLE_TAB_PLAYLISTS = 2
 fun ScrobbleScreen(
     selectedSection: Int,
     bottomPadding: Dp,
-    onPlayPlaylist: (String, List<Song>) -> Unit,
+    onPlayPlaylist: (String, List<Song>, Int) -> Unit,
     onBrowseMoods: () -> Unit,
     syncedHistory: List<Song> = emptyList(),
     modifier: Modifier = Modifier,
@@ -339,7 +340,7 @@ fun ScrobbleScreen(
                                     TrackRow(
                                         song = ranked.song,
                                         supporting = "${ranked.plays} ${if (ranked.plays == 1) "play" else "plays"} · ${formatListeningTime(ranked.ms)}",
-                                        onClick = { onPlayPlaylist("Most played", listOf(ranked.song)) },
+                                        onClick = { onPlayPlaylist("Most played", listOf(ranked.song), 0) },
                                     )
                                 }
                                 if (summary!!.artists.isNotEmpty()) {
@@ -461,12 +462,12 @@ fun ScrobbleScreen(
                             item("generated-result-heading") {
                                 PageHeading(generatedTitle, "${generatedMix.size} tracks ready")
                             }
-                            items(generatedMix.take(8), key = { "generated-${songIdentity(it)}" }) { song ->
-                                TrackRow(song, onClick = { onPlayPlaylist(generatedTitle, listOf(song)) })
+                            itemsIndexed(generatedMix.take(8), key = { _, song -> "generated-${songIdentity(song)}" }) { index, song ->
+                                TrackRow(song, onClick = { onPlayPlaylist(generatedTitle, generatedMix, index) })
                             }
                             item("generated-actions") {
                                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Button(onClick = { onPlayPlaylist(generatedTitle, generatedMix) }, modifier = Modifier.weight(1f)) {
+                                    Button(onClick = { onPlayPlaylist(generatedTitle, generatedMix, 0) }, modifier = Modifier.weight(1f)) {
                                         Icon(Icons.Rounded.PlayArrow, null)
                                         Spacer(Modifier.width(6.dp))
                                         Text("Play mix")
@@ -499,7 +500,7 @@ fun ScrobbleScreen(
                             }
                             item("playlist-detail-heading") {
                                 PageHeading(selected.title, selected.reason)
-                                Button(onClick = { onPlayPlaylist(selected.title, selected.songs) }, modifier = Modifier.fillMaxWidth()) {
+                                Button(onClick = { onPlayPlaylist(selected.title, selected.songs, 0) }, modifier = Modifier.fillMaxWidth()) {
                                     Icon(Icons.Rounded.PlayArrow, null)
                                     Spacer(Modifier.width(8.dp))
                                     Text("Play all · ${selected.songs.size} tracks")
@@ -507,7 +508,7 @@ fun ScrobbleScreen(
                             }
                             items(selected.songs.size, key = { index -> "saved-${selected.title}-${songIdentity(selected.songs[index])}-$index" }) { index ->
                                 val song = selected.songs[index]
-                                TrackRow(song, onClick = { onPlayPlaylist(selected.title, listOf(song)) })
+                                TrackRow(song, onClick = { onPlayPlaylist(selected.title, selected.songs, index) })
                             }
                         } else {
                             item("playlists-heading") {
@@ -548,7 +549,7 @@ fun ScrobbleScreen(
                                                 }
                                             }
                                         }
-                                        Button(onClick = { onPlayPlaylist(playlist.title, playlist.songs) }, modifier = Modifier.fillMaxWidth()) {
+                                        Button(onClick = { onPlayPlaylist(playlist.title, playlist.songs, 0) }, modifier = Modifier.fillMaxWidth()) {
                                             Icon(Icons.Rounded.PlayArrow, null)
                                             Spacer(Modifier.width(8.dp))
                                             Text("Play mix")
