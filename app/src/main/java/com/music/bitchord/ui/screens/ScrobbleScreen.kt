@@ -237,7 +237,7 @@ fun ScrobbleScreen(
                                     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                                         Text(summary!!.label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                            MetricCard(summary!!.hours.toString(), "Hours", Modifier.weight(1f))
+                                            MetricCard(formatListeningTime(summary!!.totalMs), "Listening", Modifier.weight(1f))
                                             MetricCard(summary!!.totalPlays.toString(), "Plays", Modifier.weight(1f))
                                             MetricCard(summary!!.distinctSongs.toString(), "Tracks", Modifier.weight(1f))
                                         }
@@ -256,13 +256,23 @@ fun ScrobbleScreen(
                                         onClick = { onPlayPlaylist("Most played", listOf(ranked.song)) },
                                     )
                                 }
-                                item("stats-artists-heading") { SectionHeading("Top artists") }
-                                items(summary!!.artists.take(5), key = { "artist-${it.title}" }) { artist ->
-                                    InfoPanel(artist.title, "${artist.plays} plays · ${artist.ms / 60_000} min")
+                                if (summary!!.artists.isNotEmpty()) {
+                                    item("stats-artists-heading") { SectionHeading("Top artists") }
+                                    items(summary!!.artists.take(5), key = { "artist-${it.title}" }) { artist ->
+                                        InfoPanel(artist.title, "${artist.plays} plays · ${artist.ms / 60_000} min")
+                                    }
                                 }
-                                item("stats-albums-heading") { SectionHeading("Top albums") }
-                                items(summary!!.albums.take(5), key = { "album-${it.title}-${it.subtitle.orEmpty()}" }) { album ->
-                                    InfoPanel(album.title, "${album.subtitle.orEmpty()} · ${album.plays} plays")
+                                if (summary!!.albums.isNotEmpty()) {
+                                    item("stats-albums-heading") { SectionHeading("Top albums") }
+                                    items(summary!!.albums.take(5), key = { "album-${it.title}-${it.subtitle.orEmpty()}" }) { album ->
+                                        InfoPanel(album.title, "${album.subtitle.orEmpty()} · ${album.plays} plays")
+                                    }
+                                }
+                                if (summary!!.genres.isNotEmpty()) {
+                                    item("stats-genres-heading") { SectionHeading("Top genres") }
+                                    items(summary!!.genres.take(5), key = { "genre-${it.title}" }) { genre ->
+                                        InfoPanel(genre.title, "${genre.plays} plays · ${genre.ms / 60_000} min")
+                                    }
                                 }
                                 summary!!.busiestDay?.let { day ->
                                     item("stats-busiest-day") {
@@ -540,6 +550,13 @@ private fun GeneratedMixCardContent(
             }
         }
     }
+}
+
+private fun formatListeningTime(totalMs: Long): String {
+    val totalMinutes = totalMs / 60_000
+    val hours = totalMinutes / 60
+    val minutes = totalMinutes % 60
+    return if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m"
 }
 
 private fun songIdentity(song: Song): String =
