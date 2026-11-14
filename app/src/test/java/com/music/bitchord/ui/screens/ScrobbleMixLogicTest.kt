@@ -45,6 +45,32 @@ class ScrobbleMixLogicTest {
         assertEquals(listOf(first), buildRediscoverMix(listens, counts, now, limit = 1))
     }
 
+
+    @Test
+    fun neverHeardExcludesKnownTracksAndDuplicatesAndHonoursLimit() {
+        val heard = Song("knowntrack01", "Already heard", "Artist", null)
+        val fresh = Song("freshtrack01", "New track", "Artist", null)
+        val duplicate = fresh.copy(title = "Duplicate row")
+        val blankId = Song("", "Local-only", "Artist", null)
+
+        val result = buildNeverHeardMix(
+            candidates = listOf(heard, fresh, duplicate, blankId),
+            heardVideoIds = setOf(heard.videoId),
+            limit = 1,
+        )
+
+        assertEquals(listOf(fresh), result)
+    }
+
+    @Test
+    fun neverHeardReturnsNoMoreThanRequestedAndZeroLimitIsEmpty() {
+        val first = Song("freshtrack01", "First", "Artist", null)
+        val second = Song("freshtrack02", "Second", "Artist", null)
+
+        assertEquals(listOf(first), buildNeverHeardMix(listOf(first, second), emptySet(), limit = 1))
+        assertEquals(emptyList<Song>(), buildNeverHeardMix(listOf(first), emptySet(), limit = 0))
+    }
+
     private companion object {
         const val DAY = 24L * 60 * 60 * 1000
     }
