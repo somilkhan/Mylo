@@ -34,3 +34,15 @@ internal fun buildRediscoverMix(
         .distinctBy(::songIdentity)
         .take(limit.coerceAtLeast(0))
 }
+
+
+/** Only catalogue tracks absent from the supplied listening history qualify as new-to-you. */
+internal fun buildNeverHeardMix(
+    candidates: List<Song>,
+    heardVideoIds: Set<String>,
+    limit: Int = 25,
+): List<Song> = candidates.asSequence()
+    .filter { it.videoId.isNotBlank() && it.videoId !in heardVideoIds }
+    .distinctBy(::songIdentity)
+    .take(limit.coerceAtLeast(0))
+    .toList()
