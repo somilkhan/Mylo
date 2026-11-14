@@ -7,6 +7,10 @@ import com.music.bitchord.data.model.LibraryPage
 import com.music.bitchord.data.model.ShelfItem
 import com.music.bitchord.data.model.Song
 import java.io.File
+import java.io.IOException
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import org.json.JSONArray
 import org.json.JSONObject
@@ -36,23 +40,30 @@ class AccountLibrarySnapshotStore(private val directory: File) {
 
     fun read(accountKey: String): AccountLibrarySnapshot? {
         val file = fileFor(accountKey)
-        if (!file.isFile) return null
-        return runCatching {
-            val root = JSONObject(file.readText())
-            if (root.optString("account") != accountKey) return null
-            val library = root.getJSONObject("library")
-            AccountLibrarySnapshot(
-                library = LibraryPage(
-                    likedSongs = readSongs(library.optJSONArray("liked")),
-                    librarySongs = readSongs(library.optJSONArray("songs")),
-                    shelves = readShelves(library.optJSONArray("shelves")),
-                    likedContinuation = null,
-                ),
-                historySections = readHistory(root.optJSONArray("history")),
-                recentSongs = readSongs(root.optJSONArray("recent")),
-                savedAt = root.optLong("savedAt"),
-            )
-        }.getOrNull()
+        val backup = File(directory, file.name + ".bak")
+        for (candidate in listOf(file, backup)) {
+            if (!candidate.isFile) continue
+            val snapshot = runCatching {
+                val root = JSONObject(candidate.readText())
+                if (root.optString("account") != accountKey) return null
+                val library = root.getJSONObject("library")
+                AccountLibrarySnapshot(
+                    library = LibraryPage(
+                        likedSongs = readSongs(library.optJSONArray("liked")),
+                        librarySongs = readSongs(library.optJSONArray("songs")),
+                        shelves = readShelves(library.optJSONArray("shelves")),
+                        likedContinuation = null,
+                    ),
+                    historySections = readHistory(root.optJSONArray("history")),
+                    recentSongs = readSongs(root.optJSONArray("recent")),
+                    savedAt = root.optLong("savedAt"),
+                )
+            }.getOrNull() ?: continue
+            // Recover the previous complete snapshot if a process stopped during replacement.
+            if (candidate == backup && !file.exists()) backup.renameTo(file)
+            return snapshot
+        }
+        return null
     }
 
     fun write(accountKey: String, snapshot: AccountLibrarySnapshot) {
@@ -69,9 +80,33 @@ class AccountLibrarySnapshotStore(private val directory: File) {
             .put("history", historyJson(snapshot.historySections))
             .put("recent", songsJson(snapshot.recentSongs))
         temporary.writeText(root.toString())
-        if (!temporary.renameTo(file)) {
-            temporary.copyTo(file, overwrite = true)
-            temporary.delete()
+        try {
+            // Same-directory atomic replacement keeps the last complete snapshot visible
+            // until the fully serialized replacement is ready.
+            Files.move(
+                temporary.toPath(),
+                file.toPath(),
+                StandardCopyOption.ATOMIC_MOVE,
+                StandardCopyOption.REPLACE_EXISTING,
+            )
+        } catch (_: AtomicMoveNotSupportedException) {
+            // Some filesystems cannot atomically replace an existing file. Keep a
+            // recoverable backup rather than copying over (and truncating) the live file.
+            val backup = File(directory, file.name + ".bak")
+            if (backup.exists() && file.exists()) backup.delete()
+            val hadOriginal = file.exists()
+            if (hadOriginal && !file.renameTo(backup)) {
+                throw IOException("Could not preserve the previous account snapshot")
+            }
+            try {
+                if (!temporary.renameTo(file)) {
+                    throw IOException("Could not install the new account snapshot")
+                }
+            } catch (failure: Throwable) {
+                if (hadOriginal && backup.exists()) backup.renameTo(file)
+                throw failure
+            }
+            backup.delete()
         }
     }
 
