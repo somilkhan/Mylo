@@ -101,6 +101,8 @@ fun GlassNavBar(
     dock: PlayerDock? = null,
     /** Dragging the bar's player up into the full player. */
     pull: MiniPlayerPull? = null,
+    /** Override the standalone circular tab; -1 keeps every section in the pill. */
+    standaloneIndexOverride: Int? = null,
     modifier: Modifier = Modifier,
 ) {
     // Held for the same reason [tabs] is. The glass factory below closes over
@@ -122,7 +124,7 @@ fun GlassNavBar(
     // Search is the odd one out in the iOS 26 layout: a circle of its own beside
     // the pill rather than a quarter of it. It is the last tab in BitChord's
     // order, which is where the shape wants it anyway.
-    val standaloneIndex = tabs.lastIndex
+    val standaloneIndex = standaloneIndexOverride ?: tabs.lastIndex
 
     // A factory, not a value — see the note in FloatingTabBar's header. Each of
     // the three surfaces gets its own glass modifier and so its own shape cache.
