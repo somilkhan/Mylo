@@ -83,9 +83,11 @@ object ListeningHistory {
                     writer.newLine()
                 }
             }
-            if (!temporary.renameTo(historyFile)) {
-                temporary.copyTo(historyFile, overwrite = true)
-                temporary.delete()
+            // If the same-directory rename is unavailable, keep the legacy
+            // preference untouched and retry migration on a later launch. A
+            // direct overwrite-copy could leave a truncated history file.
+            check(temporary.renameTo(historyFile)) {
+                "Could not atomically install migrated listening history"
             }
             // Remove the legacy value only after the complete file is in place.
             prefs.edit().remove(KEY_ENTRIES).apply()
