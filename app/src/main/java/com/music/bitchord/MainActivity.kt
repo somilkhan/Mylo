@@ -258,6 +258,8 @@ import com.music.bitchord.ui.components.QueueActionNoticeHost
 import com.music.bitchord.ui.components.TopBarAccountButton
 import com.music.bitchord.ui.screens.SegmentedControl
 import com.music.bitchord.ui.components.SearchField
+import com.music.bitchord.ui.components.ScrobbleFab
+import com.music.bitchord.ui.components.SCROBBLE_FAB_SIZE
 import com.music.bitchord.sharedui.resources.Res as SharedRes
 import com.music.bitchord.sharedui.resources.search_hint
 import com.music.bitchord.sharedui.resources.search_addons_hint
@@ -314,6 +316,7 @@ import com.music.bitchord.ui.screens.LibraryGridPage
 import com.music.bitchord.ui.screens.LibraryScreen
 import com.music.bitchord.ui.screens.MoodGenrePlaylistsScreen
 import com.music.bitchord.ui.screens.SearchScreen
+import com.music.bitchord.ui.screens.ScrobbleScreen
 import com.music.bitchord.data.settings.SongSort
 import com.music.bitchord.ui.onboarding.OnboardingScreen
 import com.music.bitchord.ui.replay.ReplayScreen
@@ -565,6 +568,8 @@ private fun BitChordApp(
     // opened from the page and the share sheet from either, and closing one
     // has to reveal what it was opened from.
     var showReplay by rememberSaveable { mutableStateOf(false) }
+    var showScrobble by rememberSaveable { mutableStateOf(false) }
+    var scrobbleSection by rememberSaveable { mutableIntStateOf(0) }
     // Library cards use the same Replay page as every other entry point, but
     // category cards ask it to start at their matching ranked section.
     var replayLandingPage by rememberSaveable { mutableStateOf(ReplayStoryPage.INTRO) }
@@ -1171,6 +1176,14 @@ private fun BitChordApp(
             BottomTab(exploreLabel, BitChordIcons.TabExplore),
             BottomTab(libraryLabel, BitChordIcons.TabLibrary),
             BottomTab(searchLabel, BitChordIcons.TabSearch),
+        )
+    }
+
+    val scrobbleTabs = remember {
+        listOf(
+            BottomTab("Stats", Icons.Rounded.History),
+            BottomTab("Generate", Icons.Rounded.PlayArrow),
+            BottomTab("Playlists", Icons.Rounded.MoreHoriz),
         )
     }
 
@@ -2608,6 +2621,7 @@ private fun BitChordApp(
         BackHandler(enabled = editingPartyServer) { editingPartyServer = false }
         BackHandler(enabled = editingSignatureApi) { editingSignatureApi = false }
         BackHandler(enabled = showHistory) { showHistory = false }
+        BackHandler(enabled = showScrobble) { showScrobble = false }
         // Disabled while a detail page is open over the grid: that one's own
         // BackHandler below has to close first, or back would skip past it
         // straight to Library. See [onLibraryItemClick].
@@ -2648,6 +2662,7 @@ private fun BitChordApp(
                         // was live, hit, and changed nothing on screen.
                         showSettings -> "settings"
                         showReplay -> "replay"
+                        showScrobble -> "scrobble"
                         detail != null -> detail.browseId
                         else -> "$TAB_KEY$selectedTab"
                     },
@@ -2715,7 +2730,7 @@ private fun BitChordApp(
                     // the identical copy fading in behind it.
                     val live = detailStack.lastOrNull()?.takeIf {
                         it.browseId == key && key != "settings" && key != "account_scrobbling" &&
-                            key != "discord" && key != "replay" && key != "history" &&
+                            key != "discord" && key != "replay" && key != "history" && key != "scrobble" &&
                             key != "library_show_all"
                     }
                     // Held for the same reason, one step further on: a popped
@@ -2732,7 +2747,24 @@ private fun BitChordApp(
                     val pageDetailListState = remember(key) {
                         detailListStates.getOrPut(key) { LazyListState() }
                     }
-                    if (key == "history") {
+                    if (key == "scrobble") {
+                        ScrobbleScreen(
+                            selectedSection = scrobbleSection,
+                            bottomPadding = if (player.song != null) 210.dp else 140.dp,
+                            onSectionChange = { scrobbleSection = it },
+                            onPlayPlaylist = { playlistName, songs ->
+                                if (songs.isNotEmpty()) playFrom(
+                                    songs, 0, QueueSource("Scrobble · $playlistName", PlaybackSourceType.HISTORY)
+                                )
+                            },
+                            onBrowseMoods = {
+                                showScrobble = false
+                                viewModel.closeMoodGenre()
+                                selectedTab = TAB_EXPLORE
+                            },
+                            reduceMotion = reducePlayerMotion,
+                        )
+                    } else if (key == "history") {
                         HistoryScreen(
                             state = historyState,
                             sections = historySections,
@@ -3585,6 +3617,7 @@ private fun BitChordApp(
                         showEqualizer -> stringResource(R.string.equalizer)
                         showSettings -> stringResource(R.string.settings)
                         showReplay -> stringResource(R.string.replay)
+                        showScrobble -> "Scrobble"
                         detail != null && detailActiveShelf != null -> detailActiveShelf?.title.orEmpty()
                         detail != null -> detail.title
                         selectedMoodGenre != null -> selectedMoodGenre?.title.orEmpty()
@@ -3603,7 +3636,7 @@ private fun BitChordApp(
                     scrolled = when {
                         showSettings || showAccountScrobbling || showSources || showListenTogether || showWearOs ||
                             showEqualizer ||
-                            showDiscord || showHistory ||
+                            showDiscord || showHistory || showScrobble ||
                             (libraryShowAll != null && detail == null) ||
                             (detail != null && detailActiveShelf != null) ||
                             selectedMoodGenre != null -> true
@@ -3643,6 +3676,7 @@ private fun BitChordApp(
                         settingsSubScreen != null -> ({ settingsSubScreen = null })
                         showSettings -> ({ showSettings = false })
                         showReplay -> ({ showReplay = false })
+                        showScrobble -> ({ showScrobble = false })
                         detailActiveShelf != null -> ({ detailActiveShelf = null })
                         detail != null -> ({ viewModel.closeDetail(); Unit })
                         selectedMoodGenre != null -> ({ viewModel.closeMoodGenre(); Unit })
@@ -3654,7 +3688,7 @@ private fun BitChordApp(
                         selectedTab == TAB_SEARCH && detail == null && selectedMoodGenre == null &&
                         libraryShowAll == null && !showSettings && !showAccountScrobbling &&
                         !showSources && !showListenTogether && !showWearOs && !showEqualizer && !showDiscord &&
-                        !showHistory && !showReplay
+                        !showHistory && !showReplay && !showScrobble
                     ) {
                         {
                             // The search field lives up here in the bar, beside the
@@ -3970,6 +4004,7 @@ private fun BitChordApp(
                     showReplay = false
                     settingsSubScreen = null
                     showHistory = false
+                    showScrobble = false
                     libraryShowAll = null
                     selectedTab = index
 
@@ -3980,6 +4015,12 @@ private fun BitChordApp(
                         searchFocusRequested = true
                     }
                 }
+
+                val displayedTabs = if (showScrobble) scrobbleTabs else tabs
+                val displayedSelectedIndex = if (showScrobble) scrobbleSection else selectedTab
+                val onDisplayedTabSelected: (Int) -> Unit = if (showScrobble) {
+                    { scrobbleSection = it }
+                } else onTabSelected
 
                 if (glassActive) Column(
                     modifier = Modifier
@@ -3994,9 +4035,9 @@ private fun BitChordApp(
                     // controls dock into the tab bar rather than riding above it,
                     // and the pair folds together on scroll. See [GlassNavBar].
                     GlassNavBar(
-                        tabs = tabs,
-                        selectedIndex = selectedTab,
-                        onTabSelected = onTabSelected,
+                        tabs = displayedTabs,
+                        selectedIndex = displayedSelectedIndex,
+                        onTabSelected = onDisplayedTabSelected,
                         scrollConnection = navBarScroll,
                         song = player.song,
                         isPlaying = player.isPlaying,
@@ -4015,6 +4056,7 @@ private fun BitChordApp(
                         onBlockedControl = showHostOnlyNotice,
                         dock = activeDock,
                         pull = playerSheetMotion.takeIf { !reducePlayerMotion },
+                        standaloneIndexOverride = if (showScrobble) -1 else null,
                         modifier = Modifier.fillMaxWidth(),
                     )
                 } else Column(
@@ -4028,6 +4070,7 @@ private fun BitChordApp(
                         // already been bounded by the time it is applied.
                         .widthIn(max = FLOATING_BAR_MAX_WIDTH)
                         .fillMaxWidth()
+                        .then(if (showScrobble) Modifier.padding(end = SCROBBLE_FAB_SIZE + 10.dp) else Modifier)
                         .onSizeChanged { floatingBarsHeight.intValue = it.height },
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
@@ -4057,12 +4100,39 @@ private fun BitChordApp(
                         Spacer(Modifier.height(8.dp))
                     }
                     FloatingBottomBar(
-                        tabs = tabs,
-                        selectedIndex = selectedTab,
+                        tabs = displayedTabs,
+                        selectedIndex = displayedSelectedIndex,
                         hazeState = hazeState,
-                        onTabSelected = onTabSelected,
+                        onTabSelected = onDisplayedTabSelected,
                     )
                 }
+                ScrobbleFab(
+                    visible = scrobbleFabVisible(
+                        selectedTab = selectedTab,
+                        homeTab = TAB_HOME,
+                        overlayOpen = showSettings || showReplay || showHistory || showAccountScrobbling ||
+                            showSources || showListenTogether || showWearOs || showEqualizer || showDiscord ||
+                            showSpotify || detail != null || selectedMoodGenre != null || libraryShowAll != null ||
+                            settingsSubScreen != null,
+                        playerOpen = showNowPlaying && playerSong != null,
+                        scrollingDown = glassActive && navBarScroll.isInline,
+                    ),
+                    open = showScrobble,
+                    onClick = {
+                        if (showScrobble) showScrobble = false else {
+                            scrobbleSection = 0
+                            showScrobble = true
+                        }
+                    },
+                    surface = if (glassActive) Modifier.liquidGlass(shape = CircleShape)
+                    else Modifier.background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .navigationBarsPadding()
+                        .padding(end = 16.dp, bottom = if (glassActive) 2.dp + SCROBBLE_FAB_SIZE + 10.dp else 2.dp),
+                    reduceMotion = reducePlayerMotion,
+                    folded = glassActive && navBarScroll.isInline,
+                )
             }
 
         }
