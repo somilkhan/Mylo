@@ -2752,7 +2752,6 @@ private fun BitChordApp(
                         ScrobbleScreen(
                             selectedSection = scrobbleSection,
                             bottomPadding = if (player.song != null) 210.dp else 140.dp,
-                            onSectionChange = { scrobbleSection = it },
                             onPlayPlaylist = { playlistName, songs ->
                                 if (songs.isNotEmpty()) playFrom(
                                     songs, 0, QueueSource("Scrobble · $playlistName", PlaybackSourceType.HISTORY)
