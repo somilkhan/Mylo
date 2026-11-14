@@ -73,6 +73,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -492,7 +495,8 @@ fun ScrobbleScreen(
                                                         else MaterialTheme.colorScheme.outline.copy(alpha = 0.32f),
                                                         shape = RoundedCornerShape(16.dp),
                                                     )
-                                                    .clickable(enabled = !generatingMix) {
+                                                    .semantics { selected = selectedMode }
+                                                    .clickable(enabled = !generatingMix, role = Role.RadioButton) {
                                                         mixMode = mode
                                                         generatedMix = emptyList()
                                                         generationError = null
@@ -537,10 +541,18 @@ fun ScrobbleScreen(
                                         }
                                     } else {
                                         seeds.forEach { song ->
+                                            val seedSelected = selectedSeed?.videoId == song.videoId
                                             Row(
                                                 Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
-                                                    .background(if (selectedSeed?.videoId == song.videoId) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.background)
-                                                    .clickable(enabled = !generatingMix) {
+                                                    .background(if (seedSelected) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.background)
+                                                    .border(
+                                                        width = if (seedSelected) 1.25.dp else 1.dp,
+                                                        color = if (seedSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.62f)
+                                                        else MaterialTheme.colorScheme.outline.copy(alpha = 0.24f),
+                                                        shape = RoundedCornerShape(14.dp),
+                                                    )
+                                                    .semantics { selected = seedSelected }
+                                                    .clickable(enabled = !generatingMix, role = Role.RadioButton) {
                                                         if (selectedSeed?.videoId != song.videoId) {
                                                             selectedSeed = song
                                                             generatedMix = emptyList()
@@ -556,7 +568,7 @@ fun ScrobbleScreen(
                                                     Text(song.title, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Medium)
                                                     Text(song.artist, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                                 }
-                                                if (selectedSeed?.videoId == song.videoId) Text("Selected", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                                                if (seedSelected) Text("Selected", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                                             }
                                         }
                                     }
@@ -751,15 +763,21 @@ fun ScrobbleScreen(
                                     ) {
                                         Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                             Row(
-                                                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).clickable { openedPlaylist = playlist.title },
+                                                modifier = Modifier.fillMaxWidth(),
                                                 verticalAlignment = Alignment.CenterVertically,
                                             ) {
-                                                AsyncImage(model = playlist.songs.firstOrNull()?.thumbnailUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(76.dp).clip(RoundedCornerShape(14.dp)))
-                                                Spacer(Modifier.width(13.dp))
-                                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                                    Text(playlist.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                                    Text("${playlist.songs.size} tracks", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-                                                    Text(playlist.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                                Row(
+                                                    modifier = Modifier.weight(1f).clip(RoundedCornerShape(14.dp))
+                                                        .clickable(role = Role.Button) { openedPlaylist = playlist.title },
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                ) {
+                                                    AsyncImage(model = playlist.songs.firstOrNull()?.thumbnailUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(76.dp).clip(RoundedCornerShape(14.dp)))
+                                                    Spacer(Modifier.width(13.dp))
+                                                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                        Text(playlist.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                        Text("${playlist.songs.size} tracks", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                                                        Text(playlist.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                                    }
                                                 }
                                                 Box {
                                                     IconButton(onClick = { menuExpanded = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "More playlist actions") }
@@ -913,7 +931,7 @@ private fun LoadingLine(label: String) {
 private fun TrackRow(song: Song, supporting: String = "", onClick: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
-            .clickable(onClick = onClick).padding(vertical = 7.dp),
+            .clickable(role = Role.Button, onClick = onClick).padding(vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         AsyncImage(
