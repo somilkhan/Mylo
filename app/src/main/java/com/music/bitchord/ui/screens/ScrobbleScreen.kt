@@ -86,7 +86,7 @@ private enum class ScrobbleMixMode(val title: String, val description: String) {
     TASTE_MIX("Taste mix", "A balanced blend of favourites, recent listens and fresh picks"),
     RADIO("Song radio", "Build a radio mix from a track you choose"),
     DISCOVER("Discover", "Fresh YouTube Music picks outside your listening history"),
-    REDISCOVER("Rediscover", "Tracks you loved and have not heard for 60 days"),
+    REDISCOVER("Rediscover", "Tracks played 3+ times on this device and quiet for 60 days"),
 }
 
 internal const val SCROBBLE_TAB_STATS = 0
@@ -107,6 +107,8 @@ fun ScrobbleScreen(
     val historyRevision by ListeningHistory.revision.collectAsStateWithLifecycle()
     var period by remember { mutableStateOf(ReplayPeriod.THIS_MONTH) }
     var summary by remember { mutableStateOf<ReplaySummary?>(null) }
+    var allTimeSummary by remember { mutableStateOf<ReplaySummary?>(null) }
+    var loadingAllTimeStats by remember { mutableStateOf(true) }
     var loadingStats by remember { mutableStateOf(true) }
     var statsFailed by remember { mutableStateOf(false) }
     var listens by remember { mutableStateOf<List<ListeningHistory.Entry>>(emptyList()) }
@@ -154,6 +156,19 @@ fun ScrobbleScreen(
         }
     }
 
+    LaunchedEffect(historyRevision) {
+        loadingAllTimeStats = true
+        try {
+            allTimeSummary = ListeningStats.summary(ReplayPeriod.ALL_TIME)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            allTimeSummary = null
+        } finally {
+            loadingAllTimeStats = false
+        }
+    }
+
     LaunchedEffect(period, historyRevision) {
         loadingStats = true
         statsFailed = false
@@ -168,19 +183,17 @@ fun ScrobbleScreen(
         }
     }
 
-    val topTracks = summary?.songs.orEmpty().map { it.song }.distinctBy(::songIdentity).take(25)
+    val topTracks = summary?.songs.orEmpty()
+        .sortedWith(compareByDescending { it.plays }.thenByDescending { it.ms })
+        .map { it.song }.distinctBy(::songIdentity).take(25)
     val recentTracks = (syncedHistory + listens.sortedByDescending { it.startedAt }.map { it.song })
         .asSequence()
         .filter { it.videoId.isNotBlank() || !it.localUri.isNullOrBlank() || !it.localPath.isNullOrBlank() }
         .distinctBy(::songIdentity)
         .take(25)
         .toList()
-    val rediscoverCutoff = System.currentTimeMillis() - 60L * 24 * 60 * 60 * 1000
-    val rediscoverTracks = listens.groupBy { songIdentity(it.song) }
-        .values.mapNotNull { events ->
-            val latest = events.maxByOrNull { it.startedAt } ?: return@mapNotNull null
-            latest.song.takeIf { events.size >= 3 && latest.startedAt <= rediscoverCutoff }
-        }.distinctBy(::songIdentity).take(25)
+    val allTimePlayCounts = allTimeSummary?.songs.orEmpty().associate { songIdentity(it.song) to it.plays }
+    val rediscoverTracks = buildRediscoverMix(listens, allTimePlayCounts, System.currentTimeMillis())
 
     LaunchedEffect(recentTracks, topTracks) {
         if (selectedSeed == null) selectedSeed = (recentTracks + topTracks).firstOrNull { it.videoId.isNotBlank() }
@@ -346,7 +359,7 @@ fun ScrobbleScreen(
                                     }
                                 }
                                 item("stats-top-heading") { SectionHeading("Most played") }
-                                items(summary!!.songs.take(12), key = { "stat-${songIdentity(it.song)}" }) { ranked ->
+                                items(summary!!.songs.sortedWith(compareByDescending { it.plays }.thenByDescending { it.ms }).take(12), key = { "stat-${songIdentity(it.song)}" }) { ranked ->
                                     TrackRow(
                                         song = ranked.song,
                                         supporting = "${ranked.plays} ${if (ranked.plays == 1) "play" else "plays"} · ${formatListeningTime(ranked.ms)}",
@@ -444,6 +457,9 @@ fun ScrobbleScreen(
                                 }
                             }
                         }
+                        if (mixMode == ScrobbleMixMode.REDISCOVER && loadingAllTimeStats) {
+                            item("rediscover-loading") { LoadingLine("Checking your all-time play counts") }
+                        }
                         item("generate-count") {
                             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -457,7 +473,10 @@ fun ScrobbleScreen(
                         item("generate-action") {
                             Button(
                                 onClick = { generationRequest++ },
-                                enabled = !generatingMix && !loadingHistory && (mixMode !in setOf(ScrobbleMixMode.FAVOURITES, ScrobbleMixMode.REDISCOVER, ScrobbleMixMode.TASTE_MIX) || !loadingStats) && (mixMode != ScrobbleMixMode.RADIO || selectedSeed?.videoId?.isNotBlank() == true),
+                                enabled = !generatingMix && !loadingHistory &&
+                                    (mixMode !in setOf(ScrobbleMixMode.FAVOURITES, ScrobbleMixMode.TASTE_MIX) || !loadingStats) &&
+                                    (mixMode != ScrobbleMixMode.REDISCOVER || !loadingAllTimeStats) &&
+                                    (mixMode != ScrobbleMixMode.RADIO || selectedSeed?.videoId?.isNotBlank() == true),
                                 modifier = Modifier.fillMaxWidth(),
                             ) {
                                 if (generatingMix) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
@@ -473,7 +492,7 @@ fun ScrobbleScreen(
                             item("generated-result-heading") {
                                 PageHeading(generatedTitle, "${generatedMix.size} tracks ready")
                             }
-                            itemsIndexed(generatedMix.take(8), key = { _, song -> "generated-${songIdentity(song)}" }) { index, song ->
+                            itemsIndexed(generatedMix, key = { _, song -> "generated-${songIdentity(song)}" }) { index, song ->
                                 TrackRow(song, onClick = { onPlayPlaylist(generatedTitle, generatedMix, index) })
                             }
                             item("generated-actions") {
@@ -533,7 +552,11 @@ fun ScrobbleScreen(
                                 items(ScrobblePlaylistStore.playlists.toList(), key = { "saved-${it.title}" }) { playlist ->
                                     var menuExpanded by remember(playlist.title) { mutableStateOf(false) }
                                     Column(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
+                                                .clickable { openedPlaylist = playlist.title },
+                                            verticalAlignment = Alignment.CenterVertically,
+                                        ) {
                                             AsyncImage(
                                                 model = playlist.songs.firstOrNull()?.thumbnailUrl,
                                                 contentDescription = null,
@@ -696,8 +719,3 @@ private fun formatListeningTime(totalMs: Long): String {
     return if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m"
 }
 
-private fun songIdentity(song: Song): String =
-    song.localUri?.takeIf(String::isNotBlank)?.let { "local:$it" }
-        ?: song.localPath?.takeIf(String::isNotBlank)?.let { "path:$it" }
-        ?: song.videoId.takeIf(String::isNotBlank)?.let { "video:$it" }
-        ?: "${song.title.lowercase()}|${song.artist.lowercase()}"
