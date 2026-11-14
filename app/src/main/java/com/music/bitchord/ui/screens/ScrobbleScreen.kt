@@ -83,6 +83,7 @@ import kotlinx.coroutines.delay
 private enum class ScrobbleMixMode(val title: String, val description: String) {
     FAVOURITES("Your favourites", "Your most-played tracks from Mylo listening stats"),
     RECENT("Recently played", "Your latest unique listens"),
+    TASTE_MIX("Taste mix", "A balanced blend of favourites, recent listens and fresh picks"),
     RADIO("Song radio", "Build a radio mix from a track you choose"),
     DISCOVER("Discover", "Fresh YouTube Music picks outside your listening history"),
     REDISCOVER("Rediscover", "Tracks you loved and have not heard for 60 days"),
@@ -195,6 +196,14 @@ fun ScrobbleScreen(
             val generated = when (mixMode) {
                 ScrobbleMixMode.FAVOURITES -> topTracks.take(mixTrackCount)
                 ScrobbleMixMode.RECENT -> recentTracks.take(mixTrackCount)
+                ScrobbleMixMode.TASTE_MIX -> {
+                    val excluded = (syncedHistory.map { it.videoId } + listens.map { it.song.videoId }).filter(String::isNotBlank).toSet()
+                    val fresh = recommendations.ifEmpty {
+                        runCatching { YtMusicRepository.quickPicks(excluded).getOrThrow() }.getOrDefault(emptyList())
+                    }
+                    (topTracks.take(12) + recentTracks.take(12) + fresh.filter { it.videoId.isNotBlank() && it.videoId !in excluded })
+                        .distinctBy(::songIdentity).shuffled().take(mixTrackCount)
+                }
                 ScrobbleMixMode.REDISCOVER -> rediscoverTracks.take(mixTrackCount)
                 ScrobbleMixMode.DISCOVER -> {
                     val excluded = (syncedHistory.map { it.videoId } + listens.map { it.song.videoId } + topTracks.map { it.videoId })
@@ -216,6 +225,7 @@ fun ScrobbleScreen(
             generatedTitle = when (mixMode) {
                 ScrobbleMixMode.FAVOURITES -> "Your favourites"
                 ScrobbleMixMode.RECENT -> "Recently played"
+                ScrobbleMixMode.TASTE_MIX -> "Your taste mix"
                 ScrobbleMixMode.RADIO -> "Radio · ${selectedSeed?.title.orEmpty()}"
                 ScrobbleMixMode.DISCOVER -> "Discover"
                 ScrobbleMixMode.REDISCOVER -> "Rediscover"
@@ -447,7 +457,7 @@ fun ScrobbleScreen(
                         item("generate-action") {
                             Button(
                                 onClick = { generationRequest++ },
-                                enabled = !generatingMix && !loadingHistory && (mixMode !in setOf(ScrobbleMixMode.FAVOURITES, ScrobbleMixMode.REDISCOVER) || !loadingStats) && (mixMode != ScrobbleMixMode.RADIO || selectedSeed?.videoId?.isNotBlank() == true),
+                                enabled = !generatingMix && !loadingHistory && (mixMode !in setOf(ScrobbleMixMode.FAVOURITES, ScrobbleMixMode.REDISCOVER, ScrobbleMixMode.TASTE_MIX) || !loadingStats) && (mixMode != ScrobbleMixMode.RADIO || selectedSeed?.videoId?.isNotBlank() == true),
                                 modifier = Modifier.fillMaxWidth(),
                             ) {
                                 if (generatingMix) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
