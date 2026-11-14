@@ -9,8 +9,12 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -69,6 +73,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -85,6 +90,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
+import kotlin.math.roundToLong
 
 private enum class ScrobbleMixMode(val title: String, val description: String) {
     FAVOURITES("Your favourites", "Your most-played tracks from Mylo listening stats"),
@@ -107,6 +113,7 @@ fun ScrobbleScreen(
     bottomPadding: Dp,
     onPlayPlaylist: (String, List<Song>, Int) -> Unit,
     onBrowseMoods: () -> Unit,
+    onViewPlaylists: () -> Unit,
     syncedHistory: List<Song> = emptyList(),
     modifier: Modifier = Modifier,
     reduceMotion: Boolean = false,
@@ -381,18 +388,28 @@ fun ScrobbleScreen(
                                         Card(
                                             modifier = Modifier.fillMaxWidth(),
                                             shape = RoundedCornerShape(22.dp),
-                                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                                             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                                         ) {
-                                            Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                                Text("LISTENING TIME", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.78f), fontWeight = FontWeight.SemiBold)
-                                                Text(formatListeningTime(summary!!.totalMs), style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.onPrimaryContainer, fontWeight = FontWeight.Bold)
-                                                Text("Across ${summary!!.distinctArtists} artists and ${summary!!.distinctAlbums} albums", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.78f))
+                                            Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                Text("LISTENING TIME", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.SemiBold)
+                                                AnimatedValueText(
+                                                    value = summary!!.totalMs / 60_000L,
+                                                    reduceMotion = reduceMotion,
+                                                    style = MaterialTheme.typography.displaySmall,
+                                                    color = MaterialTheme.colorScheme.onSurface,
+                                                    formatter = { formatListeningTime(it * 60_000L) },
+                                                )
+                                                Text("Listening captured on this device", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                             }
                                         }
                                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                            MetricCard(summary!!.totalPlays.toString(), "Total plays", Modifier.weight(1f))
-                                            MetricCard(summary!!.distinctSongs.toString(), "Unique tracks", Modifier.weight(1f))
+                                            MetricCard(summary!!.totalPlays.toLong(), "Total plays", reduceMotion, Modifier.weight(1f))
+                                            MetricCard(summary!!.distinctSongs.toLong(), "Unique tracks", reduceMotion, Modifier.weight(1f))
+                                        }
+                                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                            MetricCard(summary!!.distinctArtists.toLong(), "Artists", reduceMotion, Modifier.weight(1f))
+                                            MetricCard(summary!!.distinctAlbums.toLong(), "Albums", reduceMotion, Modifier.weight(1f))
                                         }
                                     }
                                 }
@@ -400,7 +417,7 @@ fun ScrobbleScreen(
                                     item("stats-hourly-activity") {
                                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                             SectionHeading("When you listen")
-                                            HourlyActivityChart(summary!!.hourOfDay)
+                                            HourlyActivityChart(summary!!.hourOfDay, reduceMotion)
                                         }
                                     }
                                 }
@@ -466,8 +483,14 @@ fun ScrobbleScreen(
                                                 modifier = Modifier.weight(1f)
                                                     .clip(RoundedCornerShape(16.dp))
                                                     .background(
-                                                        if (selectedMode) MaterialTheme.colorScheme.primaryContainer
-                                                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.48f),
+                                                        if (selectedMode) MaterialTheme.colorScheme.surfaceVariant
+                                                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f),
+                                                    )
+                                                    .border(
+                                                        width = if (selectedMode) 1.25.dp else 1.dp,
+                                                        color = if (selectedMode) MaterialTheme.colorScheme.primary.copy(alpha = 0.62f)
+                                                        else MaterialTheme.colorScheme.outline.copy(alpha = 0.32f),
+                                                        shape = RoundedCornerShape(16.dp),
                                                     )
                                                     .clickable(enabled = !generatingMix) {
                                                         mixMode = mode
@@ -482,14 +505,14 @@ fun ScrobbleScreen(
                                                     mode.title,
                                                     style = MaterialTheme.typography.titleSmall,
                                                     fontWeight = FontWeight.SemiBold,
-                                                    color = if (selectedMode) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+                                                    color = MaterialTheme.colorScheme.onSurface,
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis,
                                                 )
                                                 Text(
                                                     mode.description,
                                                     style = MaterialTheme.typography.bodySmall,
-                                                    color = if (selectedMode) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.78f) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                     maxLines = 2,
                                                     minLines = 2,
                                                     overflow = TextOverflow.Ellipsis,
@@ -592,6 +615,45 @@ fun ScrobbleScreen(
                                             generationError = "You have 20 saved mixes. Remove one before saving another."
                                         }
                                     }, enabled = !mixSaved) { Text(if (mixSaved) "Saved" else "Save") }
+                                }
+                            }
+                            item("generated-save-feedback") {
+                                AnimatedContent(
+                                    targetState = mixSaved,
+                                    transitionSpec = {
+                                        if (reduceMotion) EnterTransition.None togetherWith ExitTransition.None
+                                        else if (targetState) {
+                                            (slideInHorizontally(tween(260)) { it / 3 } + fadeIn(tween(180))) togetherWith fadeOut(tween(100))
+                                        } else {
+                                            fadeIn(tween(100)) togetherWith (slideOutHorizontally(tween(140)) { -it / 5 } + fadeOut(tween(100)))
+                                        }
+                                    },
+                                    label = "generated-save-feedback",
+                                ) { saved ->
+                                    if (saved) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth()
+                                                .clip(RoundedCornerShape(18.dp))
+                                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                                .padding(12.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                        ) {
+                                            AsyncImage(
+                                                model = generatedMix.firstOrNull()?.thumbnailUrl,
+                                                contentDescription = null,
+                                                contentScale = ContentScale.Crop,
+                                                modifier = Modifier.size(44.dp).clip(RoundedCornerShape(10.dp)),
+                                            )
+                                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                                Text("Saved to Playlists", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                                                Text("Ready whenever you are", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            }
+                                            TextButton(onClick = onViewPlaylists) { Text("View") }
+                                        }
+                                    } else {
+                                        Spacer(Modifier.height(0.dp))
+                                    }
                                 }
                             }
                         }
@@ -727,8 +789,18 @@ fun ScrobbleScreen(
 }
 
 @Composable
-private fun HourlyActivityChart(hours: List<Long>) {
+private fun HourlyActivityChart(hours: List<Long>, reduceMotion: Boolean) {
     val peak = hours.maxOrNull()?.takeIf { it > 0L } ?: return
+    var barsVisible by remember(hours) { mutableStateOf(false) }
+    LaunchedEffect(hours, reduceMotion) {
+        barsVisible = false
+        if (reduceMotion) {
+            barsVisible = true
+        } else {
+            delay(40)
+            barsVisible = true
+        }
+    }
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
@@ -742,7 +814,17 @@ private fun HourlyActivityChart(hours: List<Long>) {
                 verticalAlignment = Alignment.Bottom,
             ) {
                 hours.forEachIndexed { hour, value ->
-                    val barHeight = if (value <= 0L) 3.dp else (8f + 58f * (value.toFloat() / peak.toFloat())).dp
+                    val targetFraction = if (value <= 0L) 0f else (value.toFloat() / peak.toFloat()).coerceIn(0f, 1f)
+                    val fraction by androidx.compose.animation.core.animateFloatAsState(
+                        targetValue = if (barsVisible) targetFraction else 0f,
+                        animationSpec = if (reduceMotion) snap() else tween(
+                            durationMillis = 520,
+                            delayMillis = hour * 12,
+                            easing = FastOutSlowInEasing,
+                        ),
+                        label = "hourly-bar-$hour",
+                    )
+                    val barHeight = if (value <= 0L) 3.dp else (3f + 63f * fraction).dp
                     Box(
                         modifier = Modifier.weight(1f).height(76.dp),
                         contentAlignment = Alignment.BottomCenter,
@@ -750,7 +832,7 @@ private fun HourlyActivityChart(hours: List<Long>) {
                         Box(
                             modifier = Modifier.width(6.dp).height(barHeight)
                                 .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
-                                .background(if (value == peak) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer),
+                                .background(if (value == peak) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.22f)),
                         )
                     }
                 }
@@ -778,7 +860,7 @@ private fun SectionHeading(title: String) {
 }
 
 @Composable
-private fun MetricCard(value: String, label: String, modifier: Modifier = Modifier) {
+private fun MetricCard(value: Long, label: String, reduceMotion: Boolean, modifier: Modifier = Modifier) {
     Card(
         modifier = modifier,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.62f)),
@@ -786,7 +868,12 @@ private fun MetricCard(value: String, label: String, modifier: Modifier = Modifi
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 13.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-            Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            AnimatedValueText(
+                value = value,
+                reduceMotion = reduceMotion,
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
             Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
@@ -880,6 +967,36 @@ private fun GeneratedMixCardContent(
             }
         }
     }
+}
+
+@Composable
+private fun AnimatedValueText(
+    value: Long,
+    reduceMotion: Boolean,
+    style: TextStyle,
+    color: androidx.compose.ui.graphics.Color,
+    formatter: (Long) -> String = { it.toString() },
+) {
+    val animatedValue = remember { Animatable(0f) }
+    LaunchedEffect(value, reduceMotion) {
+        val target = value.coerceAtLeast(0L).toFloat()
+        if (reduceMotion) {
+            animatedValue.snapTo(target)
+        } else {
+            animatedValue.animateTo(
+                targetValue = target,
+                animationSpec = tween(durationMillis = 650, easing = FastOutSlowInEasing),
+            )
+        }
+    }
+    Text(
+        text = formatter(animatedValue.value.roundToLong()),
+        style = style,
+        color = color,
+        fontWeight = FontWeight.Bold,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
 }
 
 private fun formatListeningTime(totalMs: Long): String {
