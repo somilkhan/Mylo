@@ -75,6 +75,7 @@ import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.stats.ListeningStats
 import com.music.bitchord.data.stats.ReplayPeriod
 import com.music.bitchord.data.stats.ReplaySummary
+import com.music.bitchord.data.stats.RankedSong
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -359,7 +360,7 @@ fun ScrobbleScreen(
                                     }
                                 }
                                 item("stats-top-heading") { SectionHeading("Most played") }
-                                items(summary!!.songs.sortedWith(compareByDescending { it.plays }.thenByDescending { it.ms }).take(12), key = { "stat-${songIdentity(it.song)}" }) { ranked ->
+                                items(summary!!.songs.sortedWith(compareByDescending<RankedSong> { it.plays }.thenByDescending { it.ms }).take(12), key = { "stat-${songIdentity(it.song)}" }) { ranked ->
                                     TrackRow(
                                         song = ranked.song,
                                         supporting = "${ranked.plays} ${if (ranked.plays == 1) "play" else "plays"} · ${formatListeningTime(ranked.ms)}",
