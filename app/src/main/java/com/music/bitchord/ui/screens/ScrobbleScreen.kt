@@ -793,10 +793,15 @@ fun ScrobbleScreen(
                                 items(visiblePlaylists, key = { "saved-${it.title}" }) { playlist ->
                                     var menuExpanded by remember(playlist.title) { mutableStateOf(false) }
                                     val sharedArtworkState = rememberSharedContentState(playlistSharedElementKey(playlist.songs))
+                                    val playlistCardShape = RoundedCornerShape(20.dp)
                                     Card(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        shape = RoundedCornerShape(20.dp),
-                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f)),
+                                        modifier = Modifier.fillMaxWidth().border(
+                                            width = 1.dp,
+                                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.24f),
+                                            shape = playlistCardShape,
+                                        ),
+                                        shape = playlistCardShape,
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f)),
                                         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                                     ) {
                                         Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
