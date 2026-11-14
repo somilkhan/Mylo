@@ -6,9 +6,17 @@ import org.junit.Test
 
 class ScrobbleFabTest {
     @Test
-    fun fabIsVisibleOnlyOnHomeWhenNoCompetingOverlayIsOpen() {
+    fun fabIsVisibleOnlyOnHomeWhenNoCompetingSurfaceIsActive() {
         assertTrue(scrobbleFabVisible(selectedTab = 0, homeTab = 0, overlayOpen = false))
         assertFalse(scrobbleFabVisible(selectedTab = 1, homeTab = 0, overlayOpen = false))
         assertFalse(scrobbleFabVisible(selectedTab = 0, homeTab = 0, overlayOpen = true))
+        assertFalse(scrobbleFabVisible(selectedTab = 0, homeTab = 0, overlayOpen = false, playerOpen = true))
+        assertFalse(scrobbleFabVisible(selectedTab = 0, homeTab = 0, overlayOpen = false, keyboardVisible = true))
+        assertFalse(scrobbleFabVisible(selectedTab = 0, homeTab = 0, overlayOpen = false, scrollingDown = true))
+    }
+
+    @Test
+    fun fabReturnsWhenScrollStopsOrReverses() {
+        assertTrue(scrobbleFabVisible(selectedTab = 0, homeTab = 0, overlayOpen = false, scrollingDown = false))
     }
 }
