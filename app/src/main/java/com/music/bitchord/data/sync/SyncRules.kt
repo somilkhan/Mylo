@@ -1,6 +1,10 @@
 package com.music.bitchord.data.sync
 
 import java.io.File
+import java.io.IOException
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import java.time.LocalDateTime
 import java.util.concurrent.atomic.AtomicLong
@@ -152,12 +156,18 @@ class LikedSnapshotStore(private val directory: File) {
 
     fun read(accountKey: String): Set<String>? {
         val file = fileFor(accountKey)
-        if (!file.isFile) return null
-        return runCatching {
-            val lines = file.readLines()
-            if (lines.firstOrNull() != accountKey) return null
-            lines.drop(1).filter(String::isNotBlank).toSet()
-        }.getOrNull()
+        val backup = File(directory, file.name + ".bak")
+        for (candidate in listOf(file, backup)) {
+            if (!candidate.isFile) continue
+            val ids = runCatching {
+                val lines = candidate.readLines()
+                if (lines.firstOrNull() != accountKey) throw IOException("Liked snapshot account mismatch")
+                lines.drop(1).filter(String::isNotBlank).toSet()
+            }.getOrNull() ?: continue
+            if (candidate == backup && (!file.exists() || file.delete())) backup.renameTo(file)
+            return ids
+        }
+        return null
     }
 
     fun write(accountKey: String, ids: Set<String>) {
@@ -168,9 +178,27 @@ class LikedSnapshotStore(private val directory: File) {
             appendLine(accountKey)
             ids.forEach { appendLine(it) }
         })
-        if (!temporary.renameTo(file)) {
-            temporary.copyTo(file, overwrite = true)
-            temporary.delete()
+        try {
+            Files.move(
+                temporary.toPath(),
+                file.toPath(),
+                StandardCopyOption.ATOMIC_MOVE,
+                StandardCopyOption.REPLACE_EXISTING,
+            )
+        } catch (_: AtomicMoveNotSupportedException) {
+            val backup = File(directory, file.name + ".bak")
+            if (backup.exists() && file.exists()) backup.delete()
+            val hadOriginal = file.exists()
+            if (hadOriginal && !file.renameTo(backup)) {
+                throw IOException("Could not preserve the previous liked snapshot")
+            }
+            try {
+                if (!temporary.renameTo(file)) throw IOException("Could not install liked snapshot")
+            } catch (failure: Throwable) {
+                if (hadOriginal && backup.exists()) backup.renameTo(file)
+                throw failure
+            }
+            backup.delete()
         }
     }
 }
