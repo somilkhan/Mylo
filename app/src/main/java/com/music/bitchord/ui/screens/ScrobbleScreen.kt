@@ -68,6 +68,7 @@ import com.music.bitchord.data.stats.ReplaySummary
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.delay
 
 internal const val SCROBBLE_TAB_STATS = 0
 internal const val SCROBBLE_TAB_GENERATE = 1
@@ -103,6 +104,7 @@ fun ScrobbleScreen(
     }
 
     LaunchedEffect(context, historyRevision) {
+        delay(250)
         loadingHistory = true
         try {
             listens = withContext(Dispatchers.IO) { ListeningHistory.read(context) }
@@ -116,7 +118,7 @@ fun ScrobbleScreen(
         }
     }
 
-    LaunchedEffect(period) {
+    LaunchedEffect(period, historyRevision) {
         loadingStats = true
         statsFailed = false
         try {
@@ -144,7 +146,7 @@ fun ScrobbleScreen(
             latest.song.takeIf { events.size >= 3 && latest.startedAt <= rediscoverCutoff }
         }.distinctBy(::songIdentity).take(25)
 
-    LaunchedEffect(selectedSection, listens, syncedHistory, recommendationRequest) {
+    LaunchedEffect(selectedSection, syncedHistory, recommendationRequest) {
         if (selectedSection != SCROBBLE_TAB_GENERATE || loadingHistory) return@LaunchedEffect
         loadingRecommendations = true
         recommendationsFailed = false
