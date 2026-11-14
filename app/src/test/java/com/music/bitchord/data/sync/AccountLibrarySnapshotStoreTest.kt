@@ -56,7 +56,7 @@ class AccountLibrarySnapshotStoreTest {
 
             // A process may stop after the old snapshot has been moved aside but
             // before the replacement is installed. The backup must remain readable.
-            val snapshotFile = directory.listFiles()!!.single { it.name.endsWith(".json") }
+            val snapshotFile = directory.listFiles()!!.single { it.name.endsWith(".json") && it.readText().contains("\"account\":\"account-a\"") }
             val backupFile = File(directory, snapshotFile.name + ".bak")
             assertTrue(snapshotFile.renameTo(backupFile))
             assertEquals(snapshot.savedAt, store.read("account-a")!!.savedAt)
