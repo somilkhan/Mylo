@@ -400,10 +400,15 @@ fun ScrobbleScreen(
                                 item("stats-overview") {
                                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                         Text(summary!!.label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        val listeningHeroShape = RoundedCornerShape(22.dp)
                                         Card(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            shape = RoundedCornerShape(22.dp),
-                                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                                            modifier = Modifier.fillMaxWidth().border(
+                                                width = 1.dp,
+                                                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.26f),
+                                                shape = listeningHeroShape,
+                                            ),
+                                            shape = listeningHeroShape,
+                                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.82f)),
                                             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                                         ) {
                                             Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
