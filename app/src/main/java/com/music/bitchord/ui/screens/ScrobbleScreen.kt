@@ -184,7 +184,7 @@ fun ScrobbleScreen(
     }
 
     val topTracks = summary?.songs.orEmpty()
-        .sortedWith(compareByDescending { it.plays }.thenByDescending { it.ms })
+        .sortedWith(compareByDescending<RankedSong> { it.plays }.thenByDescending { it.ms })
         .map { it.song }.distinctBy(::songIdentity).take(25)
     val recentTracks = (syncedHistory + listens.sortedByDescending { it.startedAt }.map { it.song })
         .asSequence()
