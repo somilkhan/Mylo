@@ -14,6 +14,7 @@ import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -87,6 +88,7 @@ fun GlassNavBar(
     selectedIndex: Int,
     onTabSelected: (Int) -> Unit,
     scrollConnection: FloatingTabBarScrollConnection,
+    reduceMotion: Boolean = false,
     song: Song?,
     isPlaying: Boolean,
     isLoading: Boolean,
@@ -101,6 +103,7 @@ fun GlassNavBar(
     dock: PlayerDock? = null,
     /** Dragging the bar's player up into the full player. */
     pull: MiniPlayerPull? = null,
+    reduceMotion: Boolean = false,
     /** Override the standalone circular tab; -1 keeps every section in the pill. */
     standaloneIndexOverride: Int? = null,
     modifier: Modifier = Modifier,
@@ -133,6 +136,7 @@ fun GlassNavBar(
     FloatingTabBar(
         selectedTabKey = selectedIndex,
         scrollConnection = scrollConnection,
+        reduceMotion = reduceMotion,
         modifier = modifier
             .windowInsetsPadding(floatingBarInsets)
             .padding(horizontal = BAR_GUTTER)
@@ -155,6 +159,7 @@ fun GlassNavBar(
                     onBlockedControl = onBlockedControl,
                     dock = dock,
                     pull = pull,
+                    reduceMotion = reduceMotion,
                     modifier = accessoryModifier.then(glassSurface()),
                 )
             }
@@ -175,6 +180,7 @@ fun GlassNavBar(
                     onBlockedControl = onBlockedControl,
                     dock = dock,
                     pull = pull,
+                    reduceMotion = reduceMotion,
                     modifier = accessoryModifier.fillMaxWidth().then(glassSurface()),
                 )
             }
@@ -292,6 +298,7 @@ private fun GlassNowPlaying(
     onBlockedControl: () -> Unit,
     dock: PlayerDock?,
     pull: MiniPlayerPull?,
+    reduceMotion: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val haptics = rememberHaptics()
@@ -299,7 +306,7 @@ private fun GlassNowPlaying(
     val isPressed by pressSource.collectIsPressedAsState()
     val pressScale by animateFloatAsState(
         targetValue = if (isPressed) 1.04f else 1f,
-        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        animationSpec = if (reduceMotion) snap() else spring(stiffness = Spring.StiffnessMediumLow),
         label = "accessoryPressScale",
     )
 
