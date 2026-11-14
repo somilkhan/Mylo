@@ -24,6 +24,8 @@ internal data class SavedScrobblePlaylist(
 internal object ScrobblePlaylistStore {
     private const val PREF_NAME = "mylo_scrobble_playlists"
     private const val KEY_PLAYLISTS = "saved_playlists_v1"
+    private const val MAX_SAVED_PLAYLISTS = 20
+    private const val MAX_TRACKS_PER_PLAYLIST = 50
 
     private var preferences: SharedPreferences? = null
     val playlists = mutableStateListOf<SavedScrobblePlaylist>()
@@ -38,15 +40,31 @@ internal object ScrobblePlaylistStore {
 
     fun save(title: String, reason: String, songs: List<Song>) {
         if (title.isBlank() || songs.isEmpty()) return
-        val saved = SavedScrobblePlaylist(title.trim(), reason, songs.toList())
-        val existingIndex = playlists.indexOfFirst { it.title == saved.title }
-        if (existingIndex >= 0) {
-            playlists[existingIndex] = saved
-        } else {
-            playlists.add(0, saved)
+        val cleanTitle = title.trim()
+        val snapshot = songs.distinctBy(::songKey).take(MAX_TRACKS_PER_PLAYLIST)
+        val sameSnapshot = playlists.firstOrNull { existing ->
+            existing.title == cleanTitle && existing.songs.map(::songKey) == snapshot.map(::songKey)
         }
+        if (sameSnapshot != null) return
+
+        // Never silently replace a previously saved snapshot when a fresh mix
+        // has the same generated title. Keep both, with a predictable suffix.
+        var finalTitle = cleanTitle
+        var suffix = 2
+        while (playlists.any { it.title.equals(finalTitle, ignoreCase = true) }) {
+            finalTitle = "$cleanTitle $suffix"
+            suffix++
+        }
+        playlists.add(0, SavedScrobblePlaylist(finalTitle, reason, snapshot))
+        while (playlists.size > MAX_SAVED_PLAYLISTS) playlists.removeAt(playlists.lastIndex)
         persist()
     }
+
+    private fun songKey(song: Song): String =
+        song.localUri?.takeIf(String::isNotBlank)?.let { "local:$it" }
+            ?: song.localPath?.takeIf(String::isNotBlank)?.let { "path:$it" }
+            ?: song.videoId.takeIf(String::isNotBlank)?.let { "video:$it" }
+            ?: "${song.title.lowercase()}|${song.artist.lowercase()}"
 
     fun remove(title: String) {
         if (playlists.removeAll { it.title == title }) persist()
