@@ -47,6 +47,23 @@ class ScrobblePlaylistStoreTest {
     }
 
     @Test
+    fun savedMixLimitNeverSilentlyDeletesAnOlderPlaylist() {
+        ScrobblePlaylistStore.playlists.clear()
+        try {
+            repeat(20) { index ->
+                val song = Song("video${index.toString().padStart(6, '0')}", "Track $index", "Artist", null)
+                assertEquals(true, ScrobblePlaylistStore.save("Mix $index", "Test", listOf(song)))
+            }
+            val oldestTitle = ScrobblePlaylistStore.playlists.last().title
+            assertEquals(false, ScrobblePlaylistStore.save("One more", "Test", listOf(Song("another0001", "Another", "Artist", null))))
+            assertEquals(20, ScrobblePlaylistStore.playlists.size)
+            assertEquals(oldestTitle, ScrobblePlaylistStore.playlists.last().title)
+        } finally {
+            ScrobblePlaylistStore.playlists.clear()
+        }
+    }
+
+    @Test
     fun identicalSavedSnapshotIsNotDuplicated() {
         val song = Song("abcdefghijk", "First", "Artist", null)
         ScrobblePlaylistStore.playlists.clear()
