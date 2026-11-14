@@ -94,6 +94,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
@@ -130,6 +131,8 @@ import com.music.bitchord.ui.haptics.rememberHaptics
 import kotlin.math.roundToInt
 
 /** Hoisted so the default is one stable lambda rather than a new one per call. */
+private val LocalFloatingTabBarReduceMotion = staticCompositionLocalOf { false }
+
 private val DefaultTabBarContentModifier: @Composable () -> Modifier = { Modifier }
 
 /**
@@ -226,7 +229,8 @@ fun FloatingTabBar(
 
     val isAccessoryShared = inlineAccessory != null && expandedAccessory != null
 
-    SharedTransitionLayout(modifier = modifier) {
+    CompositionLocalProvider(LocalFloatingTabBarReduceMotion provides reduceMotion) {
+        SharedTransitionLayout(modifier = modifier) {
         AnimatedContent(
             targetState = scrollConnection.isInline,
             transitionSpec = {
@@ -263,6 +267,7 @@ fun FloatingTabBar(
                     animatedVisibilityScope = this@AnimatedContent
                 )
             }
+        }
         }
     }
 }
@@ -506,10 +511,11 @@ private fun SharedTransitionScope.InlineTab(
 ) {
     Box(
         modifier = modifier
-            .sharedElement(
-                sharedContentState = rememberSharedContentState("tabGroup"),
+            .sharedElementIfMotionAllowed(
+                sharedTransitionScope = this@InlineTab,
+                sharedKey = "tabGroup",
                 animatedVisibilityScope = animatedVisibilityScope,
-                zIndexInOverlay = 1f
+                zIndexInOverlay = 1f,
             )
             .shadow(
                 shape = shapes.tabBarShape,
@@ -538,10 +544,11 @@ private fun SharedTransitionScope.InlineTab(
         Tab(
             icon = {
                 Box(
-                    Modifier.sharedElement(
-                        sharedContentState = rememberSharedContentState("tab#${inlineTab.key}-icon"),
+                    Modifier.sharedElementIfMotionAllowed(
+                        sharedTransitionScope = this@InlineTab,
+                        sharedKey = "tab#${inlineTab.key}-icon",
                         animatedVisibilityScope = animatedVisibilityScope,
-                        zIndexInOverlay = 1f
+                        zIndexInOverlay = 1f,
                     )
                 ) {
                     inlineTab.icon()
@@ -570,10 +577,11 @@ private fun SharedTransitionScope.InlineStandaloneTab(
         isInline = true,
         isStandalone = true,
         modifier = modifier
-            .sharedElement(
-                sharedContentState = rememberSharedContentState("standaloneTab"),
+            .sharedElementIfMotionAllowed(
+                sharedTransitionScope = this@InlineStandaloneTab,
+                sharedKey = "standaloneTab",
                 animatedVisibilityScope = animatedVisibilityScope,
-                zIndexInOverlay = 1f
+                zIndexInOverlay = 1f,
             )
             .shadow(
                 shape = shapes.standaloneTabShape,
@@ -609,9 +617,10 @@ private fun SharedTransitionScope.InlineAccessory(
             modifier = modifier
                 .then(
                     if (isAccessoryShared) {
-                        Modifier.sharedElement(
-                            sharedContentState = rememberSharedContentState("accessory"),
-                            animatedVisibilityScope = animatedVisibilityScope
+                        Modifier.sharedElementIfMotionAllowed(
+                            sharedTransitionScope = this@InlineAccessory,
+                            sharedKey = "accessory",
+                            animatedVisibilityScope = animatedVisibilityScope,
                         )
                     } else {
                         Modifier.animateEnterExitAccessory(
@@ -729,9 +738,10 @@ private fun SharedTransitionScope.ExpandedAccessory(
         modifier = modifier
             .then(
                 if (isAccessoryShared) {
-                    Modifier.sharedElement(
-                        sharedContentState = rememberSharedContentState("accessory"),
-                        animatedVisibilityScope = animatedVisibilityScope
+                    Modifier.sharedElementIfMotionAllowed(
+                        sharedTransitionScope = this@ExpandedAccessory,
+                        sharedKey = "accessory",
+                        animatedVisibilityScope = animatedVisibilityScope,
                     )
                 } else {
                     Modifier.animateEnterExitAccessory(
@@ -845,10 +855,11 @@ private fun SharedTransitionScope.ExpandedTabs(
     // here, over the bar, rather than inside the bar's clip.
     Box(
         modifier = modifier
-            .sharedElement(
-                sharedContentState = rememberSharedContentState("tabGroup"),
+            .sharedElementIfMotionAllowed(
+                sharedTransitionScope = this@ExpandedTabs,
+                sharedKey = "tabGroup",
                 animatedVisibilityScope = animatedVisibilityScope,
-                zIndexInOverlay = 1f
+                zIndexInOverlay = 1f,
             )
     ) {
         // The bar's glass is exported for the lens to refract.
@@ -942,10 +953,11 @@ private fun SharedTransitionScope.ExpandedTabs(
                             icon = {
                                 Box(
                                     modifier = (if (tab.key == inlineTab?.key) {
-                                        Modifier.sharedElement(
-                                            sharedContentState = rememberSharedContentState("tab#${tab.key}-icon"),
+                                        Modifier.sharedElementIfMotionAllowed(
+                                            sharedTransitionScope = this@ExpandedTabs,
+                                            sharedKey = "tab#${tab.key}-icon",
                                             animatedVisibilityScope = animatedVisibilityScope,
-                                            zIndexInOverlay = 1f
+                                            zIndexInOverlay = 1f,
                                         )
                                     } else {
                                         Modifier.animateEnterExitTab(
@@ -1027,10 +1039,11 @@ private fun SharedTransitionScope.ExpandedStandaloneTab(
         isInline = false,
         isStandalone = true,
         modifier = modifier
-            .sharedElement(
-                sharedContentState = rememberSharedContentState("standaloneTab"),
+            .sharedElementIfMotionAllowed(
+                sharedTransitionScope = this@ExpandedStandaloneTab,
+                sharedKey = "standaloneTab",
                 animatedVisibilityScope = animatedVisibilityScope,
-                zIndexInOverlay = 1f
+                zIndexInOverlay = 1f,
             )
             .shadow(
                 shape = shapes.standaloneTabShape,
@@ -1071,6 +1084,23 @@ private fun Tab(
     }
 }
 
+@Composable
+private fun Modifier.sharedElementIfMotionAllowed(
+    sharedTransitionScope: SharedTransitionScope,
+    sharedKey: String,
+    animatedVisibilityScope: AnimatedVisibilityScope,
+    zIndexInOverlay: Float = 0f,
+): Modifier {
+    if (LocalFloatingTabBarReduceMotion.current) return this
+    return with(sharedTransitionScope) {
+        sharedElement(
+            sharedContentState = rememberSharedContentState(sharedKey),
+            animatedVisibilityScope = animatedVisibilityScope,
+            zIndexInOverlay = zIndexInOverlay,
+        )
+    }
+}
+
 /**
  * A custom modifier that provides smooth enter/exit animations without clipping shadows or other content.
  * This is an alternative to animateEnterExit that uses renderInSharedTransitionScopeOverlay to prevent clipping.
@@ -1079,7 +1109,9 @@ private fun Tab(
 private fun Modifier.animateEnterExitAccessory(
     sharedTransitionScope: SharedTransitionScope,
     animatedVisibilityScope: AnimatedVisibilityScope
-): Modifier = with(sharedTransitionScope) {
+): Modifier {
+    if (LocalFloatingTabBarReduceMotion.current) return this
+    return with(sharedTransitionScope) {
     with(animatedVisibilityScope) {
         val animatedAlpha by transition.animateFloat { targetState ->
             when (targetState) {
@@ -1094,6 +1126,7 @@ private fun Modifier.animateEnterExitAccessory(
                 compositingStrategy = CompositingStrategy.ModulateAlpha,
                 alpha = animatedAlpha
             )
+        }
     }
 }
 
