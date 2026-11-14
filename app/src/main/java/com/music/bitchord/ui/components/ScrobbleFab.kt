@@ -20,29 +20,35 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.dp
 
-/** Diameter of the scrobble button. Matches the Search circle beside it. */
+/** Diameter of the scrobble button. A 62dp visual control exceeds the 48dp touch minimum. */
 internal val SCROBBLE_FAB_SIZE = 62.dp
 
 /**
- * Whether the scrobble button is shown. Home only, and never while another
- * full-screen page (Settings, Replay, history) is over the tabs.
+ * The FAB belongs to the Home surface only. It gets out of the way while the
+ * user is navigating, opening another surface, using the keyboard, or
+ * scrolling down to read. It returns as soon as scrolling stops/reverses.
  */
 internal fun scrobbleFabVisible(
     selectedTab: Int,
     homeTab: Int,
     overlayOpen: Boolean,
-): Boolean = selectedTab == homeTab && !overlayOpen
+    playerOpen: Boolean = false,
+    keyboardVisible: Boolean = false,
+    scrollingDown: Boolean = false,
+): Boolean = selectedTab == homeTab &&
+    !overlayOpen &&
+    !playerOpen &&
+    !keyboardVisible &&
+    !scrollingDown
 
 /**
- * The floating scrobble button.
+ * Floating entry point to Scrobble.
  *
- * It always occupies [SCROBBLE_FAB_SIZE] so the layout around it does not
- * move when it appears or disappears. When [visible] is false it shrinks and
- * fades out and stops taking taps. When [open] is true the glyph turns into a
- * close icon.
- *
- * [surface] is the caller's material (liquid glass, haze or solid), so the
- * button matches the bar it sits in.
+ * Keep the layout slot stable while animating the visual surface. This avoids
+ * pushing the page or navigation bar when the FAB appears/disappears. Hidden
+ * means non-interactive and absent from accessibility; it is not merely
+ * transparent. [surface] is supplied by the host so this control uses the
+ * same liquid-glass/material treatment as the surrounding navigation chrome.
  */
 @Composable
 fun ScrobbleFab(
@@ -57,12 +63,12 @@ fun ScrobbleFab(
     val spec = if (reduceMotion) {
         snap()
     } else {
-        spring<Float>(dampingRatio = 0.72f, stiffness = 320f)
+        spring<Float>(dampingRatio = 0.78f, stiffness = 360f)
     }
     val scale by animateFloatAsState(
         targetValue = when {
-            !visible -> 0.6f
-            folded -> 0.84f
+            !visible -> 0.72f
+            folded -> 0.88f
             else -> 1f
         },
         animationSpec = spec,
@@ -73,6 +79,15 @@ fun ScrobbleFab(
         animationSpec = spec,
         label = "scrobbleFabAlpha",
     )
+    val lift by animateFloatAsState(
+        targetValue = when {
+            !visible -> 14f
+            folded -> 4f
+            else -> 0f
+        },
+        animationSpec = spec,
+        label = "scrobbleFabLift",
+    )
 
     Box(
         contentAlignment = Alignment.Center,
@@ -81,6 +96,7 @@ fun ScrobbleFab(
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
+                translationY = lift * density
                 this.alpha = alpha
             }
             .then(surface)
@@ -89,7 +105,7 @@ fun ScrobbleFab(
                 if (visible) {
                     Modifier.clickable(
                         role = Role.Button,
-                        onClickLabel = if (open) "Close scrobble" else "Open scrobble",
+                        onClickLabel = if (open) "Close Scrobble" else "Open Scrobble",
                         onClick = onClick,
                     )
                 } else {
