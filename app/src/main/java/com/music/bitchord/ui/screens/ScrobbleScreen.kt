@@ -681,7 +681,7 @@ fun ScrobbleScreen(
                                                 playlistSortNewest = true
                                                 openedPlaylist = null
                                                 onViewPlaylists()
-                                            }) { Text("View") }
+                                            }) { Text("View playlists") }
                                         }
                                     } else {
                                         Spacer(Modifier.height(0.dp))
@@ -829,7 +829,8 @@ fun ScrobbleScreen(
                                     }
                                 }
                             }
-                        }                    }
+                        }
+                    }
                 }
             }
         }
@@ -840,6 +841,8 @@ fun ScrobbleScreen(
 @Composable
 private fun HourlyActivityChart(hours: List<Long>, reduceMotion: Boolean) {
     val peak = hours.maxOrNull()?.takeIf { it > 0L } ?: return
+    val dayParts = buildListeningDayParts(hours)
+    val totalDayPartMs = dayParts.sumOf { it.listeningMs }
     var barsVisible by remember(hours) { mutableStateOf(false) }
     LaunchedEffect(hours, reduceMotion) {
         barsVisible = false
@@ -850,13 +853,52 @@ private fun HourlyActivityChart(hours: List<Long>, reduceMotion: Boolean) {
             barsVisible = true
         }
     }
+    val dayPartBarProgress by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (barsVisible) 1f else 0f,
+        animationSpec = if (reduceMotion) snap() else tween(durationMillis = 600, easing = FastOutSlowInEasing),
+        label = "daypart-split-bar",
+    )
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text("Listening by time of day", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                    Text("Share of recorded listening time", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Box(
+                    modifier = Modifier.fillMaxWidth().height(12.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                    contentAlignment = Alignment.CenterStart,
+                ) {
+                    Row(Modifier.fillMaxWidth(dayPartBarProgress).fillMaxHeight()) {
+                        val visibleParts = dayParts.filter { it.listeningMs > 0L }
+                        visibleParts.forEachIndexed { index, part ->
+                            val fraction = part.listeningMs.toFloat() / totalDayPartMs.toFloat()
+                            val alpha = listOf(1f, 0.78f, 0.56f, 0.34f)[dayParts.indexOf(part)]
+                            Box(
+                                Modifier.weight(fraction).fillMaxHeight()
+                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = alpha)),
+                            )
+                        }
+                    }
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    dayParts.forEach { part ->
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text("${part.percentageOf(totalDayPartMs)}%", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                            Text(part.name, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(part.timeRange, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f))
+                        }
+                    }
+                }
+            }
+            Text("Hourly activity", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.SemiBold)
             Row(
                 modifier = Modifier.fillMaxWidth().height(76.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
