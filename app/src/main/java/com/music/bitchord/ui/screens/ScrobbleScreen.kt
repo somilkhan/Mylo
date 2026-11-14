@@ -29,10 +29,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.Explore
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -71,8 +71,6 @@ import com.music.bitchord.data.stats.ReplaySummary
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.text.DateFormat
-import java.util.Date
 
 internal const val SCROBBLE_TAB_STATS = 0
 internal const val SCROBBLE_TAB_GENERATE = 1
@@ -338,7 +336,7 @@ fun ScrobbleScreen(
                                         Text("Refresh picks")
                                     }
                                     OutlinedButton(onClick = onBrowseMoods) {
-                                        Icon(Icons.Rounded.AutoAwesome, null)
+                                        Icon(Icons.Rounded.Explore, null)
                                         Spacer(Modifier.width(6.dp))
                                         Text("Moods")
                                     }
@@ -352,7 +350,7 @@ fun ScrobbleScreen(
                         if (selected != null) {
                             item("playlist-back") {
                                 TextButton(onClick = { openedPlaylist = null }) {
-                                    Icon(Icons.Rounded.QueueMusic, null)
+                                    Icon(Icons.Rounded.History, null)
                                     Spacer(Modifier.width(6.dp))
                                     Text("All playlists")
                                 }
@@ -380,7 +378,7 @@ fun ScrobbleScreen(
                             } else {
                                 items(ScrobblePlaylistStore.playlists.toList(), key = { "saved-${it.title}" }) { playlist ->
                                     Card(
-                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                                         shape = RoundedCornerShape(22.dp),
                                     ) {
                                         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -432,7 +430,7 @@ private fun SectionHeading(title: String) {
 private fun MetricCard(value: String, label: String, modifier: Modifier = Modifier) {
     Card(
         modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         shape = RoundedCornerShape(18.dp),
     ) {
         Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -444,7 +442,7 @@ private fun MetricCard(value: String, label: String, modifier: Modifier = Modifi
 
 @Composable
 private fun InfoPanel(title: String, value: String) {
-    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
+    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Text(value, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -454,7 +452,7 @@ private fun InfoPanel(title: String, value: String) {
 
 @Composable
 private fun EmptyPanel(title: String, body: String) {
-    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer), shape = RoundedCornerShape(20.dp)) {
+    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), shape = RoundedCornerShape(20.dp)) {
         Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Text(body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -522,7 +520,7 @@ private fun GeneratedMixCardContent(
     onPlay: (String, List<Song>) -> Unit,
     onSave: () -> Unit,
 ) {
-    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer), shape = RoundedCornerShape(22.dp)) {
+    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), shape = RoundedCornerShape(22.dp)) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
