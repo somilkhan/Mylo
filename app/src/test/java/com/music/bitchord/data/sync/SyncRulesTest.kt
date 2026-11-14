@@ -158,6 +158,16 @@ class SyncRulesTest {
             store.write("dsid:b", setOf("three"))
             assertEquals(setOf("one", "two"), store.read("dsid:a"))
             assertEquals(setOf("three"), store.read("dsid:b"))
+
+            // The prior complete id set remains readable if replacement is interrupted.
+            val snapshotFile = dir.listFiles()!!.single {
+                it.name.endsWith(".txt") && it.readLines().firstOrNull() == "dsid:a"
+            }
+            val backupFile = File(dir, snapshotFile.name + ".bak")
+            assertTrue(snapshotFile.renameTo(backupFile))
+            assertEquals(setOf("one", "two"), store.read("dsid:a"))
+            assertTrue(snapshotFile.isFile)
+
             store.write("dsid:a", setOf("two"))
             assertEquals(setOf("two"), store.read("dsid:a"))
         } finally {
