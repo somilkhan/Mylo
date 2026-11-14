@@ -37,6 +37,9 @@ import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Sort
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -51,6 +54,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Slider
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.LaunchedEffect
@@ -130,6 +134,8 @@ fun ScrobbleScreen(
     var mixSaved by remember { mutableStateOf(false) }
     var pendingRemovePlaylist by remember { mutableStateOf<String?>(null) }
     var openedPlaylist by remember { mutableStateOf<String?>(null) }
+    var playlistQuery by remember { mutableStateOf("") }
+    var playlistSortNewest by remember { mutableStateOf(true) }
     val statsListState = rememberLazyListState()
     val generateListState = rememberLazyListState()
     val playlistsListState = rememberLazyListState()
@@ -578,58 +584,92 @@ fun ScrobbleScreen(
                                 TrackRow(song, onClick = { onPlayPlaylist(selected.title, selected.songs, index) })
                             }
                         } else {
+                            val savedPlaylists = ScrobblePlaylistStore.playlists.toList()
+                            val visiblePlaylists = savedPlaylists
+                                .filter { playlist ->
+                                    playlist.title.contains(playlistQuery, ignoreCase = true) ||
+                                        playlist.reason.contains(playlistQuery, ignoreCase = true) ||
+                                        playlist.songs.any { it.title.contains(playlistQuery, ignoreCase = true) || it.artist.contains(playlistQuery, ignoreCase = true) }
+                                }
+                                .let { matches -> if (playlistSortNewest) matches else matches.sortedBy { it.title.lowercase() } }
                             item("playlists-heading") {
-                                PageHeading("Your mixes", "Saved on this device, ready whenever you are")
+                                PageHeading("Your library", "${savedPlaylists.size} saved mixes · Stored on this device")
                             }
-                            if (ScrobblePlaylistStore.playlists.isEmpty()) {
+                            if (savedPlaylists.isNotEmpty()) {
+                                item("playlists-search") {
+                                    OutlinedTextField(
+                                        value = playlistQuery,
+                                        onValueChange = { playlistQuery = it },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        singleLine = true,
+                                        placeholder = { Text("Search mixes or tracks") },
+                                        leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
+                                        trailingIcon = {
+                                            if (playlistQuery.isNotEmpty()) IconButton(onClick = { playlistQuery = "" }) {
+                                                Icon(Icons.Rounded.Close, contentDescription = "Clear search")
+                                            }
+                                        },
+                                        shape = RoundedCornerShape(16.dp),
+                                    )
+                                }
+                                item("playlists-sort") {
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Icon(Icons.Rounded.Sort, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        FilterChip(selected = playlistSortNewest, onClick = { playlistSortNewest = true }, label = { Text("Recently saved") })
+                                        FilterChip(selected = !playlistSortNewest, onClick = { playlistSortNewest = false }, label = { Text("Name") })
+                                    }
+                                }
+                            }
+                            if (savedPlaylists.isEmpty()) {
                                 item("playlists-empty") {
-                                    EmptyPanel("No saved mixes yet", "Open Generate and save a mix. Your saved playlists won't change your listening history.")
+                                    EmptyPanel("Your library is ready", "Create a mix in Generate and save it here. Your saved playlists stay separate from listening history.")
+                                }
+                            } else if (visiblePlaylists.isEmpty()) {
+                                item("playlists-no-results") {
+                                    EmptyPanel("No matches", "Try another playlist, artist or track name.")
                                 }
                             } else {
-                                items(ScrobblePlaylistStore.playlists.toList(), key = { "saved-${it.title}" }) { playlist ->
+                                items(visiblePlaylists, key = { "saved-${it.title}" }) { playlist ->
                                     var menuExpanded by remember(playlist.title) { mutableStateOf(false) }
-                                    Column(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
-                                                .clickable { openedPlaylist = playlist.title },
-                                            verticalAlignment = Alignment.CenterVertically,
-                                        ) {
-                                            AsyncImage(
-                                                model = playlist.songs.firstOrNull()?.thumbnailUrl,
-                                                contentDescription = null,
-                                                contentScale = ContentScale.Crop,
-                                                modifier = Modifier.size(68.dp).clip(RoundedCornerShape(14.dp)),
-                                            )
-                                            Spacer(Modifier.width(14.dp))
-                                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                                Text(playlist.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                                Text("${playlist.songs.size} tracks · On this device", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                                Text(playlist.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                            }
-                                            Box {
-                                                IconButton(onClick = { menuExpanded = true }) {
-                                                    Icon(Icons.Rounded.MoreVert, contentDescription = "More playlist actions")
+                                    Card(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(20.dp),
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f)),
+                                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                                    ) {
+                                        Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).clickable { openedPlaylist = playlist.title },
+                                                verticalAlignment = Alignment.CenterVertically,
+                                            ) {
+                                                AsyncImage(model = playlist.songs.firstOrNull()?.thumbnailUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(76.dp).clip(RoundedCornerShape(14.dp)))
+                                                Spacer(Modifier.width(13.dp))
+                                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                    Text(playlist.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                    Text("${playlist.songs.size} tracks", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                                                    Text(playlist.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
                                                 }
-                                                DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                                                    DropdownMenuItem(text = { Text("Open") }, onClick = { menuExpanded = false; openedPlaylist = playlist.title })
-                                                    DropdownMenuItem(
-                                                        text = { Text("Remove") },
-                                                        leadingIcon = { Icon(Icons.Rounded.DeleteOutline, null) },
-                                                        onClick = { menuExpanded = false; pendingRemovePlaylist = playlist.title },
-                                                    )
+                                                Box {
+                                                    IconButton(onClick = { menuExpanded = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "More playlist actions") }
+                                                    DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                                                        DropdownMenuItem(text = { Text("Open") }, onClick = { menuExpanded = false; openedPlaylist = playlist.title })
+                                                        DropdownMenuItem(text = { Text("Remove") }, leadingIcon = { Icon(Icons.Rounded.DeleteOutline, null) }, onClick = { menuExpanded = false; pendingRemovePlaylist = playlist.title })
+                                                    }
                                                 }
                                             }
-                                        }
-                                        Button(onClick = { onPlayPlaylist(playlist.title, playlist.songs, 0) }, modifier = Modifier.fillMaxWidth()) {
-                                            Icon(Icons.Rounded.PlayArrow, null)
-                                            Spacer(Modifier.width(8.dp))
-                                            Text("Play mix")
+                                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                Button(onClick = { onPlayPlaylist(playlist.title, playlist.songs, 0) }, modifier = Modifier.weight(1f)) {
+                                                    Icon(Icons.Rounded.PlayArrow, null)
+                                                    Spacer(Modifier.width(6.dp))
+                                                    Text("Play")
+                                                }
+                                                OutlinedButton(onClick = { openedPlaylist = playlist.title }, modifier = Modifier.weight(1f)) { Text("View tracks") }
+                                            }
                                         }
                                     }
                                 }
                             }
-                        }
-                    }
+                        }                    }
                 }
             }
         }
