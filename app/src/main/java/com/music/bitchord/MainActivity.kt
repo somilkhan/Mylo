@@ -2762,6 +2762,7 @@ private fun BitChordApp(
                                 viewModel.closeMoodGenre()
                                 selectedTab = TAB_EXPLORE
                             },
+                            syncedHistory = historySections.flatMap { it.songs },
                             reduceMotion = reducePlayerMotion,
                         )
                     } else if (key == "history") {
