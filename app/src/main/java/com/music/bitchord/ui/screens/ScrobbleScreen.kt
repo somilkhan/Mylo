@@ -79,6 +79,7 @@ fun ScrobbleScreen(
     bottomPadding: Dp,
     onPlayPlaylist: (String, List<Song>) -> Unit,
     onBrowseMoods: () -> Unit,
+    syncedHistory: List<Song> = emptyList(),
     modifier: Modifier = Modifier,
     reduceMotion: Boolean = false,
 ) {
@@ -130,9 +131,9 @@ fun ScrobbleScreen(
     }
 
     val topTracks = summary?.songs.orEmpty().map { it.song }.distinctBy(::songIdentity).take(25)
-    val recentTracks = listens.asSequence()
-        .sortedByDescending { it.startedAt }
-        .map { it.song }
+    val recentTracks = (syncedHistory + listens.sortedByDescending { it.startedAt }.map { it.song })
+        .asSequence()
+        .filter { it.videoId.isNotBlank() || !it.localUri.isNullOrBlank() || !it.localPath.isNullOrBlank() }
         .distinctBy(::songIdentity)
         .take(25)
         .toList()
@@ -148,9 +149,9 @@ fun ScrobbleScreen(
         loadingRecommendations = true
         recommendationsFailed = false
         try {
-            val excluded = (listens.map { it.song.videoId } + topTracks.map { it.videoId })
+            val excluded = (syncedHistory.map { it.videoId } + listens.map { it.song.videoId } + topTracks.map { it.videoId })
                 .filter(String::isNotBlank).toSet()
-            val titleArtist = (listens.map { it.song } + topTracks)
+            val titleArtist = (syncedHistory + listens.map { it.song } + topTracks)
                 .map { it.title to it.artist }.toSet()
             val result = YtMusicRepository.quickPicks(excluded, titleArtist)
             result.exceptionOrNull()?.let { throw it }
