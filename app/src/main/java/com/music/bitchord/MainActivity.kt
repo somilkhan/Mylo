@@ -4106,16 +4106,22 @@ private fun BitChordApp(
                         onTabSelected = onDisplayedTabSelected,
                     )
                 }
+                val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
                 ScrobbleFab(
                     visible = scrobbleFabVisible(
                         selectedTab = selectedTab,
                         homeTab = TAB_HOME,
                         overlayOpen = showSettings || showReplay || showHistory || showAccountScrobbling ||
                             showSources || showListenTogether || showWearOs || showEqualizer || showDiscord ||
-                            showSpotify || detail != null || selectedMoodGenre != null || libraryShowAll != null ||
+                            showSpotify || showSpotifyCanvasAuth || showDiscordLogin || showSpotifyLogin ||
+                            showDownloadManager || showAccountSelector || showLyricsSources ||
+                            showLastfmLogin || showListenBrainzLogin || showWebDavEditor || showSmbEditor ||
+                            editingSource != null || editingPartyServer || editingSignatureApi ||
+                            showUpdateDialog || creatingPlaylist || confirmJioSaavn ||
+                            detail != null || selectedMoodGenre != null || libraryShowAll != null ||
                             settingsSubScreen != null,
                         playerOpen = showNowPlaying && playerSong != null,
-                        scrollingDown = glassActive && navBarScroll.isInline,
+                        keyboardVisible = imeVisible,
                     ),
                     open = showScrobble,
                     onClick = {
