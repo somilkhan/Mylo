@@ -31,9 +31,9 @@ import androidx.compose.ui.unit.dp
 internal val SCROBBLE_FAB_SIZE = 62.dp
 
 /**
- * The FAB belongs to the Home surface only. It gets out of the way while the
- * user is navigating, opening another surface, using the keyboard, or
- * scrolling down to read. It returns as soon as scrolling stops/reverses.
+ * The FAB belongs to the Home surface only. It hides on other tabs and while
+ * a competing surface, the full player, or the keyboard is active. Scrolling
+ * folds it slightly rather than removing it, so it remains reachable.
  */
 internal fun scrobbleFabVisible(
     selectedTab: Int,
@@ -41,12 +41,10 @@ internal fun scrobbleFabVisible(
     overlayOpen: Boolean,
     playerOpen: Boolean = false,
     keyboardVisible: Boolean = false,
-    scrollingDown: Boolean = false,
 ): Boolean = selectedTab == homeTab &&
     !overlayOpen &&
     !playerOpen &&
-    !keyboardVisible &&
-    !scrollingDown
+    !keyboardVisible
 
 /**
  * Floating entry point to Scrobble.
