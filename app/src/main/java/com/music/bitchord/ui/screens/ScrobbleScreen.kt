@@ -249,7 +249,7 @@ fun ScrobbleScreen(
                                     }
                                 }
                                 item("stats-top-heading") { SectionHeading("Most played") }
-                                items(summary!!.songs.take(12), key = { "stat-${it.song.videoId}" }) { ranked ->
+                                items(summary!!.songs.take(12), key = { "stat-${songIdentity(it.song)}" }) { ranked ->
                                     TrackRow(
                                         song = ranked.song,
                                         supporting = "${ranked.plays} plays · ${ranked.ms / 60_000} min",
