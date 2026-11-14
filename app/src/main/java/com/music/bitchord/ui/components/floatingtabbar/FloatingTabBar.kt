@@ -130,9 +130,9 @@ import com.music.bitchord.ui.haptics.Haptic
 import com.music.bitchord.ui.haptics.rememberHaptics
 import kotlin.math.roundToInt
 
-/** Hoisted so the default is one stable lambda rather than a new one per call. */
 private val LocalFloatingTabBarReduceMotion = staticCompositionLocalOf { false }
 
+/** Hoisted so the default is one stable lambda rather than a new one per call. */
 private val DefaultTabBarContentModifier: @Composable () -> Modifier = { Modifier }
 
 /**
@@ -231,43 +231,43 @@ fun FloatingTabBar(
 
     CompositionLocalProvider(LocalFloatingTabBarReduceMotion provides reduceMotion) {
         SharedTransitionLayout(modifier = modifier) {
-        AnimatedContent(
-            targetState = scrollConnection.isInline,
-            transitionSpec = {
-                if (reduceMotion) EnterTransition.None togetherWith ExitTransition.None
-                else fadeIn() togetherWith fadeOut()
-            },
-            contentAlignment = Alignment.BottomCenter
-        ) { isInline ->
-            if (isInline) {
-                InlineBar(
-                    scope = scope,
-                    selectedTabKey = selectedTabKey,
-                    accessory = inlineAccessory,
-                    isAccessoryShared = isAccessoryShared,
-                    onInlineTabClick = { scrollConnection.expand() },
-                    colors = colors,
-                    shapes = shapes,
-                    sizes = sizes,
-                    elevations = elevations,
-                    tabBarContentModifier = tabBarContentModifier,
-                    animatedVisibilityScope = this@AnimatedContent
-                )
-            } else {
-                ExpandedBar(
-                    scope = scope,
-                    selectedTabKey = selectedTabKey,
-                    accessory = expandedAccessory,
-                    isAccessoryShared = isAccessoryShared,
-                    colors = colors,
-                    shapes = shapes,
-                    sizes = sizes,
-                    elevations = elevations,
-                    tabBarContentModifier = tabBarContentModifier,
-                    animatedVisibilityScope = this@AnimatedContent
-                )
+            AnimatedContent(
+                targetState = scrollConnection.isInline,
+                transitionSpec = {
+                    if (reduceMotion) EnterTransition.None togetherWith ExitTransition.None
+                    else fadeIn() togetherWith fadeOut()
+                },
+                contentAlignment = Alignment.BottomCenter
+            ) { isInline ->
+                if (isInline) {
+                    InlineBar(
+                        scope = scope,
+                        selectedTabKey = selectedTabKey,
+                        accessory = inlineAccessory,
+                        isAccessoryShared = isAccessoryShared,
+                        onInlineTabClick = { scrollConnection.expand() },
+                        colors = colors,
+                        shapes = shapes,
+                        sizes = sizes,
+                        elevations = elevations,
+                        tabBarContentModifier = tabBarContentModifier,
+                        animatedVisibilityScope = this@AnimatedContent
+                    )
+                } else {
+                    ExpandedBar(
+                        scope = scope,
+                        selectedTabKey = selectedTabKey,
+                        accessory = expandedAccessory,
+                        isAccessoryShared = isAccessoryShared,
+                        colors = colors,
+                        shapes = shapes,
+                        sizes = sizes,
+                        elevations = elevations,
+                        tabBarContentModifier = tabBarContentModifier,
+                        animatedVisibilityScope = this@AnimatedContent
+                    )
+                }
             }
-        }
         }
     }
 }
@@ -1093,7 +1093,7 @@ private fun Modifier.sharedElementIfMotionAllowed(
 ): Modifier {
     if (LocalFloatingTabBarReduceMotion.current) return this
     return with(sharedTransitionScope) {
-        sharedElement(
+        this@sharedElementIfMotionAllowed.sharedElement(
             sharedContentState = rememberSharedContentState(sharedKey),
             animatedVisibilityScope = animatedVisibilityScope,
             zIndexInOverlay = zIndexInOverlay,
@@ -1112,20 +1112,20 @@ private fun Modifier.animateEnterExitAccessory(
 ): Modifier {
     if (LocalFloatingTabBarReduceMotion.current) return this
     return with(sharedTransitionScope) {
-    with(animatedVisibilityScope) {
-        val animatedAlpha by transition.animateFloat { targetState ->
-            when (targetState) {
-                EnterExitState.Visible -> 1f
-                else -> 0f
+        with(animatedVisibilityScope) {
+            val animatedAlpha by transition.animateFloat { targetState ->
+                when (targetState) {
+                    EnterExitState.Visible -> 1f
+                    else -> 0f
+                }
             }
-        }
 
-        this@animateEnterExitAccessory
-            .renderInSharedTransitionScopeOverlay()
-            .graphicsLayer(
-                compositingStrategy = CompositingStrategy.ModulateAlpha,
-                alpha = animatedAlpha
-            )
+            this@animateEnterExitAccessory
+                .renderInSharedTransitionScopeOverlay()
+                .graphicsLayer(
+                    compositingStrategy = CompositingStrategy.ModulateAlpha,
+                    alpha = animatedAlpha
+                )
         }
     }
 }

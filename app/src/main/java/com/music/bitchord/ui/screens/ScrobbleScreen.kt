@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -841,8 +842,9 @@ fun ScrobbleScreen(
 @Composable
 private fun HourlyActivityChart(hours: List<Long>, reduceMotion: Boolean) {
     val peak = hours.maxOrNull()?.takeIf { it > 0L } ?: return
-    val dayParts = buildListeningDayParts(hours)
-    val totalDayPartMs = dayParts.sumOf { it.listeningMs }
+    val dayParts = remember(hours) { buildListeningDayParts(hours) }
+    val totalDayPartMs = remember(dayParts) { dayParts.sumOf { it.listeningMs } }
+    if (totalDayPartMs <= 0L) return
     var barsVisible by remember(hours) { mutableStateOf(false) }
     LaunchedEffect(hours, reduceMotion) {
         barsVisible = false
@@ -877,14 +879,20 @@ private fun HourlyActivityChart(hours: List<Long>, reduceMotion: Boolean) {
                     contentAlignment = Alignment.CenterStart,
                 ) {
                     Row(Modifier.fillMaxWidth(dayPartBarProgress).fillMaxHeight()) {
-                        val visibleParts = dayParts.filter { it.listeningMs > 0L }
-                        visibleParts.forEachIndexed { index, part ->
-                            val fraction = part.listeningMs.toFloat() / totalDayPartMs.toFloat()
-                            val alpha = listOf(1f, 0.78f, 0.56f, 0.34f)[dayParts.indexOf(part)]
-                            Box(
-                                Modifier.weight(fraction).fillMaxHeight()
-                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = alpha)),
-                            )
+                        dayParts.forEachIndexed { index, part ->
+                            if (part.listeningMs > 0L) {
+                                val fraction = part.listeningMs.toFloat() / totalDayPartMs.toFloat()
+                                val alpha = when (index) {
+                                    0 -> 1f
+                                    1 -> 0.78f
+                                    2 -> 0.56f
+                                    else -> 0.34f
+                                }
+                                Box(
+                                    Modifier.weight(fraction).fillMaxHeight()
+                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = alpha)),
+                                )
+                            }
                         }
                     }
                 }
