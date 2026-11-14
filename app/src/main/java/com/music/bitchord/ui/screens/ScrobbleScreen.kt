@@ -208,9 +208,9 @@ fun ScrobbleScreen(
                                     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                                         Text(summary!!.label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                            MetricCard(summary!!.hours.toString(), "Hours")
-                                            MetricCard(summary!!.totalPlays.toString(), "Plays")
-                                            MetricCard(summary!!.distinctSongs.toString(), "Tracks")
+                                            MetricCard(summary!!.hours.toString(), "Hours", Modifier.weight(1f))
+                                            MetricCard(summary!!.totalPlays.toString(), "Plays", Modifier.weight(1f))
+                                            MetricCard(summary!!.distinctSongs.toString(), "Tracks", Modifier.weight(1f))
                                         }
                                         Text(
                                             text = "Across ${summary!!.distinctArtists} artists and ${summary!!.distinctAlbums} albums",
@@ -254,25 +254,24 @@ fun ScrobbleScreen(
                                 EmptyPanel("History unavailable", "Mylo couldn't read your device listening history.")
                             }
                         } else {
-                            GeneratedMixCard(
+                            item("mix-favourites") { GeneratedMixCard(
                                 title = "Your favourites",
                                 description = "Your most-played tracks from the selected statistics period",
                                 songs = topTracks,
                                 onPlay = onPlayPlaylist,
                                 onSave = { ScrobblePlaylistStore.save("Your favourites", "Most-played tracks", topTracks) },
-                            )
-                            GeneratedMixCard(
+                            ) }
+                            item("mix-recent") { GeneratedMixCard(
                                 title = "Recently played",
                                 description = "A fresh queue from your latest unique listens",
                                 songs = recentTracks,
                                 onPlay = onPlayPlaylist,
                                 onSave = { ScrobblePlaylistStore.save("Recently played", "Your latest unique listens", recentTracks) },
-                            )
+                            ) }
                             when {
                                 loadingRecommendations -> item("discover-loading") { LoadingLine("Finding fresh picks") }
                                 recommendationsFailed -> item("discover-error") {
                                     EmptyPanel("Discovery couldn't load", "Check your connection and try again.")
-                                    item
                                 }
                                 recommendations.isEmpty() -> item("discover-empty") {
                                     EmptyPanel("No fresh picks yet", "YouTube Music did not return recommendations outside your recent listening.")
@@ -385,9 +384,9 @@ private fun SectionHeading(title: String) {
 }
 
 @Composable
-private fun MetricCard(value: String, label: String) {
+private fun MetricCard(value: String, label: String, modifier: Modifier = Modifier) {
     Card(
-        modifier = Modifier.weight(1f),
+        modifier = modifier,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         shape = RoundedCornerShape(18.dp),
     ) {
@@ -427,7 +426,7 @@ private fun LoadingLine(label: String) {
 }
 
 @Composable
-private fun TrackRow(song: Song, supporting: String, onClick: () -> Unit) {
+private fun TrackRow(song: Song, supporting: String = "", onClick: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
             .clickable(onClick = onClick).padding(vertical = 7.dp),
