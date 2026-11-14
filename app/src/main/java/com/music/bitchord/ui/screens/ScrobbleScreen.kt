@@ -80,7 +80,6 @@ internal const val SCROBBLE_TAB_PLAYLISTS = 2
 fun ScrobbleScreen(
     selectedSection: Int,
     bottomPadding: Dp,
-    onSectionChange: (Int) -> Unit,
     onPlayPlaylist: (String, List<Song>) -> Unit,
     onBrowseMoods: () -> Unit,
     modifier: Modifier = Modifier,
@@ -283,14 +282,14 @@ fun ScrobbleScreen(
                                 EmptyPanel("History unavailable", "Mylo couldn't read your device listening history.")
                             }
                         } else {
-                            item("mix-favourites") { GeneratedMixCard(
+                            item("mix-favourites") { GeneratedMixCardContent(
                                 title = "Your favourites",
                                 description = "Your most-played tracks from the selected statistics period",
                                 songs = topTracks,
                                 onPlay = onPlayPlaylist,
                                 onSave = { ScrobblePlaylistStore.save("Your favourites", "Most-played tracks", topTracks) },
                             ) }
-                            item("mix-recent") { GeneratedMixCard(
+                            item("mix-recent") { GeneratedMixCardContent(
                                 title = "Recently played",
                                 description = "A fresh queue from your latest unique listens",
                                 songs = recentTracks,
@@ -298,7 +297,7 @@ fun ScrobbleScreen(
                                 onSave = { ScrobblePlaylistStore.save("Recently played", "Your latest unique listens", recentTracks) },
                             ) }
                             if (rediscoverTracks.isNotEmpty()) {
-                                item("mix-rediscover") { GeneratedMixCard(
+                                item("mix-rediscover") { GeneratedMixCardContent(
                                     title = "Rediscover",
                                     description = "Tracks you played at least three times and haven't heard in 60 days",
                                     songs = rediscoverTracks,
@@ -488,28 +487,6 @@ private fun TrackRow(song: Song, supporting: String = "", onClick: () -> Unit) {
         }
         Icon(Icons.Rounded.PlayArrow, contentDescription = "Play ${song.title}", tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
-}
-
-@Composable
-private fun GeneratedMixCard(
-    title: String,
-    description: String,
-    songs: List<Song>,
-    onPlay: (String, List<Song>) -> Unit,
-    onSave: () -> Unit,
-) {
-    itemContentProxy(title, description, songs, onPlay, onSave)
-}
-
-@Composable
-private fun itemContentProxy(
-    title: String,
-    description: String,
-    songs: List<Song>,
-    onPlay: (String, List<Song>) -> Unit,
-    onSave: () -> Unit,
-) {
-    GeneratedMixCardContent(title, description, songs, onPlay, onSave)
 }
 
 @Composable
