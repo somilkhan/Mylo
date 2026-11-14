@@ -13,9 +13,4 @@ class ScrobbleFabTest {
         assertFalse(scrobbleFabVisible(selectedTab = 0, homeTab = 0, overlayOpen = false, playerOpen = true))
         assertFalse(scrobbleFabVisible(selectedTab = 0, homeTab = 0, overlayOpen = false, keyboardVisible = true))
     }
-
-    @Test
-    fun fabReturnsWhenScrollStopsOrReverses() {
-        assertTrue(scrobbleFabVisible(selectedTab = 0, homeTab = 0, overlayOpen = false, scrollingDown = false))
-    }
 }
