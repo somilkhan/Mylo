@@ -45,7 +45,7 @@ class AccountLibrarySnapshotStore(private val directory: File) {
             if (!candidate.isFile) continue
             val snapshot = runCatching {
                 val root = JSONObject(candidate.readText())
-                if (root.optString("account") != accountKey) return null
+                if (root.optString("account") != accountKey) throw IOException("Snapshot account mismatch")
                 val library = root.getJSONObject("library")
                 AccountLibrarySnapshot(
                     library = LibraryPage(
