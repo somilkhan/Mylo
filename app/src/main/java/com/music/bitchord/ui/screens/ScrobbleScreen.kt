@@ -91,6 +91,7 @@ private enum class ScrobbleMixMode(val title: String, val description: String) {
     RECENT("Recently played", "Your latest unique listens"),
     TASTE_MIX("Taste mix", "A balanced blend of favourites, recent listens and fresh picks"),
     RADIO("Song radio", "Build a radio mix from a track you choose"),
+    SIMILAR_ARTIST("Similar artist", "Explore more tracks from an artist you already enjoy"),
     DISCOVER("Discover", "Fresh YouTube Music picks outside your listening history"),
     REDISCOVER("Rediscover", "Tracks played 3+ times on this device and quiet for 60 days"),
 }
@@ -240,6 +241,16 @@ fun ScrobbleScreen(
                         .filter { it.videoId.isNotBlank() && it.videoId != seed.videoId }
                         .distinctBy(::songIdentity).take(mixTrackCount)
                 }
+                ScrobbleMixMode.SIMILAR_ARTIST -> {
+                    val seed = selectedSeed?.takeIf { it.videoId.isNotBlank() }
+                        ?: throw IllegalStateException("Choose a track by the artist you want to explore")
+                    val artistBrowseId = seed.artistId
+                        ?: YtMusicRepository.findArtistPageId(seed.artist).getOrThrow()
+                        ?: throw IllegalStateException("Couldn't find an exact artist match for ${seed.artist}")
+                    YtMusicRepository.artistPage(artistBrowseId).getOrThrow().songs
+                        .filter { it.videoId.isNotBlank() && it.videoId != seed.videoId }
+                        .distinctBy(::songIdentity).take(mixTrackCount)
+                }
             }
             if (generated.isEmpty()) throw IllegalStateException("No tracks were available for this mix. Try another mode or refresh your listening data.")
             generatedMix = generated
@@ -248,6 +259,7 @@ fun ScrobbleScreen(
                 ScrobbleMixMode.RECENT -> "Recently played"
                 ScrobbleMixMode.TASTE_MIX -> "Your taste mix"
                 ScrobbleMixMode.RADIO -> "Radio · ${selectedSeed?.title.orEmpty()}"
+                ScrobbleMixMode.SIMILAR_ARTIST -> "More by ${selectedSeed?.artist.orEmpty()}"
                 ScrobbleMixMode.DISCOVER -> "Discover"
                 ScrobbleMixMode.REDISCOVER -> "Rediscover"
             }
@@ -477,10 +489,10 @@ fun ScrobbleScreen(
                                 }
                             }
                         }
-                        if (mixMode == ScrobbleMixMode.RADIO) {
+                        if (mixMode == ScrobbleMixMode.RADIO || mixMode == ScrobbleMixMode.SIMILAR_ARTIST) {
                             item("generate-seed") {
                                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Text("Choose a starting track", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                                    Text(if (mixMode == ScrobbleMixMode.RADIO) "Choose a starting track" else "Choose an artist", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                                     val seeds = (recentTracks + topTracks).filter { it.videoId.isNotBlank() }.distinctBy(::songIdentity).take(12)
                                     if (seeds.isEmpty()) {
                                         EmptyPanel("No radio seed yet", "Play or sync a YouTube Music track first. Local-only files cannot start YouTube Music radio.")
@@ -524,7 +536,7 @@ fun ScrobbleScreen(
                                 enabled = !generatingMix && !loadingHistory &&
                                     (mixMode !in setOf(ScrobbleMixMode.FAVOURITES, ScrobbleMixMode.TASTE_MIX) || !loadingStats) &&
                                     (mixMode != ScrobbleMixMode.REDISCOVER || !loadingAllTimeStats) &&
-                                    (mixMode != ScrobbleMixMode.RADIO || selectedSeed?.videoId?.isNotBlank() == true),
+                                    (mixMode !in setOf(ScrobbleMixMode.RADIO, ScrobbleMixMode.SIMILAR_ARTIST) || selectedSeed?.videoId?.isNotBlank() == true),
                                 modifier = Modifier.fillMaxWidth(),
                             ) {
                                 if (generatingMix) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
