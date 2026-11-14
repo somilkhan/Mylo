@@ -23,6 +23,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -43,6 +45,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -86,6 +89,7 @@ fun ScrobbleScreen(
     reduceMotion: Boolean = false,
 ) {
     val context = LocalContext.current
+    val historyRevision by ListeningHistory.revision.collectAsStateWithLifecycle()
     var period by remember { mutableStateOf(ReplayPeriod.THIS_MONTH) }
     var summary by remember { mutableStateOf<ReplaySummary?>(null) }
     var loadingStats by remember { mutableStateOf(true) }
@@ -101,8 +105,13 @@ fun ScrobbleScreen(
 
     LaunchedEffect(context) {
         ScrobblePlaylistStore.init(context)
+    }
+
+    LaunchedEffect(context, historyRevision) {
+        loadingHistory = true
         try {
             listens = withContext(Dispatchers.IO) { ListeningHistory.read(context) }
+            historyFailed = false
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {
@@ -133,6 +142,12 @@ fun ScrobbleScreen(
         .distinctBy(::songIdentity)
         .take(25)
         .toList()
+    val rediscoverCutoff = System.currentTimeMillis() - 60L * 24 * 60 * 60 * 1000
+    val rediscoverTracks = listens.groupBy { songIdentity(it.song) }
+        .values.mapNotNull { events ->
+            val latest = events.maxByOrNull { it.startedAt } ?: return@mapNotNull null
+            latest.song.takeIf { events.size >= 3 && latest.startedAt <= rediscoverCutoff }
+        }.distinctBy(::songIdentity).take(25)
 
     LaunchedEffect(selectedSection, listens, recommendationRequest) {
         if (selectedSection != SCROBBLE_TAB_GENERATE || loadingHistory) return@LaunchedEffect
@@ -185,7 +200,10 @@ fun ScrobbleScreen(
                             PageHeading("Your listening", "A clear picture of what you play in Mylo")
                         }
                         item("stats-periods") {
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(
+                                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
                                 ReplayPeriod.entries.forEach { option ->
                                     FilterChip(
                                         selected = period == option,
@@ -227,9 +245,22 @@ fun ScrobbleScreen(
                                         onClick = { onPlayPlaylist("Most played", listOf(ranked.song)) },
                                     )
                                 }
+                                item("stats-artists-heading") { SectionHeading("Top artists") }
+                                items(summary!!.artists.take(5), key = { "artist-${it.title}" }) { artist ->
+                                    InfoPanel(artist.title, "${artist.plays} plays · ${artist.ms / 60_000} min")
+                                }
+                                item("stats-albums-heading") { SectionHeading("Top albums") }
+                                items(summary!!.albums.take(5), key = { "album-${it.title}-${it.subtitle.orEmpty()}" }) { album ->
+                                    InfoPanel(album.title, "${album.subtitle.orEmpty()} · ${album.plays} plays")
+                                }
                                 summary!!.busiestDay?.let { day ->
                                     item("stats-busiest-day") {
                                         InfoPanel("Your biggest day", "$day · ${summary!!.busiestDayMs / 60_000} minutes")
+                                    }
+                                }
+                                summary!!.peakHour?.let { hour ->
+                                    item("stats-peak-hour") {
+                                        InfoPanel("Peak listening hour", "%02d:00–%02d:00".format(hour, (hour + 1) % 24))
                                     }
                                 }
                             }
@@ -268,6 +299,19 @@ fun ScrobbleScreen(
                                 onPlay = onPlayPlaylist,
                                 onSave = { ScrobblePlaylistStore.save("Recently played", "Your latest unique listens", recentTracks) },
                             ) }
+                            if (rediscoverTracks.isNotEmpty()) {
+                                item("mix-rediscover") { GeneratedMixCard(
+                                    title = "Rediscover",
+                                    description = "Tracks you played at least three times and haven't heard in 60 days",
+                                    songs = rediscoverTracks,
+                                    onPlay = onPlayPlaylist,
+                                    onSave = { ScrobblePlaylistStore.save("Rediscover", "Played 3+ times and quiet for 60 days", rediscoverTracks) },
+                                ) }
+                            } else {
+                                item("mix-rediscover-empty") {
+                                    EmptyPanel("Rediscover unlocks over time", "Tracks played at least three times and left quiet for 60 days will appear here.")
+                                }
+                            }
                             when {
                                 loadingRecommendations -> item("discover-loading") { LoadingLine("Finding fresh picks") }
                                 recommendationsFailed -> item("discover-error") {
@@ -321,7 +365,8 @@ fun ScrobbleScreen(
                                     Text("Play all · ${selected.songs.size} tracks")
                                 }
                             }
-                            items(selected.songs, key = { "saved-${selected.title}-${songIdentity(it)}" }) { song ->
+                            items(selected.songs.size, key = { index -> "saved-${selected.title}-${songIdentity(selected.songs[index])}-$index" }) { index ->
+                                val song = selected.songs[index]
                                 TrackRow(song, onClick = { onPlayPlaylist(selected.title, listOf(song)) })
                             }
                         } else {
