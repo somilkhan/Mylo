@@ -232,9 +232,11 @@ fun ScrobbleScreen(
                     val heard = (syncedHistory.map { it.videoId } + listens.map { it.song.videoId } +
                         topTracks.map { it.videoId } + recentTracks.map { it.videoId })
                         .filter(String::isNotBlank).toSet()
-                    YtMusicRepository.quickPicks(heard).getOrThrow()
-                        .filter { it.videoId.isNotBlank() && it.videoId !in heard }
-                        .distinctBy(::songIdentity).take(mixTrackCount)
+                    buildNeverHeardMix(
+                        YtMusicRepository.quickPicks(heard).getOrThrow(),
+                        heard,
+                        mixTrackCount,
+                    )
                 }
                 ScrobbleMixMode.DISCOVER -> {
                     val excluded = (syncedHistory.map { it.videoId } + listens.map { it.song.videoId } + topTracks.map { it.videoId })
