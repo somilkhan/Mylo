@@ -33,11 +33,16 @@ import androidx.compose.material.icons.rounded.Explore
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -200,8 +205,8 @@ fun ScrobbleScreen(
                     else -> statsListState
                 },
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 64.dp, bottom = bottomPadding),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
+                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 64.dp, bottom = bottomPadding + 28.dp),
+                verticalArrangement = Arrangement.spacedBy(20.dp),
             ) {
                 when (section) {
                     SCROBBLE_TAB_STATS -> {
@@ -250,7 +255,7 @@ fun ScrobbleScreen(
                                 items(summary!!.songs.take(12), key = { "stat-${songIdentity(it.song)}" }) { ranked ->
                                     TrackRow(
                                         song = ranked.song,
-                                        supporting = "${ranked.plays} plays · ${ranked.ms / 60_000} min",
+                                        supporting = "${ranked.plays} ${if (ranked.plays == 1) "play" else "plays"} · ${formatListeningTime(ranked.ms)}",
                                         onClick = { onPlayPlaylist("Most played", listOf(ranked.song)) },
                                     )
                                 }
@@ -398,30 +403,39 @@ fun ScrobbleScreen(
                                 }
                             } else {
                                 items(ScrobblePlaylistStore.playlists.toList(), key = { "saved-${it.title}" }) { playlist ->
-                                    Card(
-                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                                        shape = RoundedCornerShape(22.dp),
-                                    ) {
-                                        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                AsyncImage(
-                                                    model = playlist.songs.firstOrNull()?.thumbnailUrl,
-                                                    contentDescription = null,
-                                                    contentScale = ContentScale.Crop,
-                                                    modifier = Modifier.size(52.dp).clip(RoundedCornerShape(12.dp)),
-                                                )
-                                                Spacer(Modifier.width(12.dp))
-                                                Column(Modifier.weight(1f)) {
-                                                    Text(playlist.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                                                    Text("${playlist.songs.size} tracks · Saved on device", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    var menuExpanded by remember(playlist.title) { mutableStateOf(false) }
+                                    Column(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            AsyncImage(
+                                                model = playlist.songs.firstOrNull()?.thumbnailUrl,
+                                                contentDescription = null,
+                                                contentScale = ContentScale.Crop,
+                                                modifier = Modifier.size(68.dp).clip(RoundedCornerShape(14.dp)),
+                                            )
+                                            Spacer(Modifier.width(14.dp))
+                                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                Text(playlist.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                Text("${playlist.songs.size} tracks · On this device", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                Text(playlist.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                            }
+                                            Box {
+                                                IconButton(onClick = { menuExpanded = true }) {
+                                                    Icon(Icons.Rounded.MoreVert, contentDescription = "More playlist actions")
+                                                }
+                                                DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                                                    DropdownMenuItem(text = { Text("Open") }, onClick = { menuExpanded = false; openedPlaylist = playlist.title })
+                                                    DropdownMenuItem(
+                                                        text = { Text("Remove") },
+                                                        leadingIcon = { Icon(Icons.Rounded.DeleteOutline, null) },
+                                                        onClick = { menuExpanded = false; ScrobblePlaylistStore.remove(playlist.title) },
+                                                    )
                                                 }
                                             }
-                                            Text(playlist.reason, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                                Button(onClick = { onPlayPlaylist(playlist.title, playlist.songs) }) { Text("Play") }
-                                                TextButton(onClick = { openedPlaylist = playlist.title }) { Text("Open") }
-                                                TextButton(onClick = { ScrobblePlaylistStore.remove(playlist.title) }) { Text("Remove") }
-                                            }
+                                        }
+                                        Button(onClick = { onPlayPlaylist(playlist.title, playlist.songs) }, modifier = Modifier.fillMaxWidth()) {
+                                            Icon(Icons.Rounded.PlayArrow, null)
+                                            Spacer(Modifier.width(8.dp))
+                                            Text("Play mix")
                                         }
                                     }
                                 }
@@ -463,11 +477,9 @@ private fun MetricCard(value: String, label: String, modifier: Modifier = Modifi
 
 @Composable
 private fun InfoPanel(title: String, value: String) {
-    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Text(value, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
+    Column(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
+        Text(value, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -519,32 +531,31 @@ private fun GeneratedMixCardContent(
     onPlay: (String, List<Song>) -> Unit,
     onSave: () -> Unit,
 ) {
-    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), shape = RoundedCornerShape(22.dp)) {
-        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            if (songs.isEmpty()) {
-                Text("Keep listening to unlock this mix.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            } else {
-                Text("${songs.size} tracks ready", style = MaterialTheme.typography.labelLarge)
-                songs.take(3).forEach { song ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        AsyncImage(model = song.thumbnailUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(36.dp).clip(RoundedCornerShape(8.dp)))
-                        Spacer(Modifier.width(9.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(song.title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium)
-                            Text(song.artist, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
+    Column(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            AsyncImage(
+                model = songs.firstOrNull()?.thumbnailUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.size(76.dp).clip(RoundedCornerShape(16.dp)),
+            )
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(if (songs.isEmpty()) "Keep listening to unlock this mix" else "${songs.size} tracks", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        if (songs.isEmpty()) {
+            Text("Your mix will appear here as your listening history grows.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                Button(onClick = { onPlay(title, songs) }, modifier = Modifier.weight(1f)) {
+                    Icon(Icons.Rounded.PlayArrow, null)
+                    Spacer(Modifier.width(6.dp))
+                    Text("Play mix")
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = { onPlay(title, songs) }, modifier = Modifier.weight(1f)) {
-                        Icon(Icons.Rounded.PlayArrow, null)
-                        Spacer(Modifier.width(6.dp))
-                        Text("Play mix")
-                    }
-                    TextButton(onClick = onSave) { Text("Save") }
-                }
+                TextButton(onClick = onSave) { Text("Save") }
             }
         }
     }
