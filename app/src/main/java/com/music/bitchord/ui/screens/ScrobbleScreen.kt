@@ -4,6 +4,8 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -110,6 +112,7 @@ internal const val SCROBBLE_TAB_STATS = 0
 internal const val SCROBBLE_TAB_GENERATE = 1
 internal const val SCROBBLE_TAB_PLAYLISTS = 2
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun ScrobbleScreen(
     selectedSection: Int,
@@ -214,6 +217,10 @@ fun ScrobbleScreen(
         .toList()
     val allTimePlayCounts = allTimeSummary?.songs.orEmpty().associate { songIdentity(it.song) to it.plays }
     val rediscoverTracks = buildRediscoverMix(listens, allTimePlayCounts, System.currentTimeMillis())
+    val savedPlaylists = ScrobblePlaylistStore.playlists.toList()
+    val savedPlaylistForGeneratedMix = savedPlaylists.firstOrNull { playlist ->
+        playlist.songs.map(::songIdentity) == generatedMix.map(::songIdentity)
+    }
 
     LaunchedEffect(recentTracks, topTracks) {
         if (selectedSeed == null) selectedSeed = (recentTracks + topTracks).firstOrNull { it.videoId.isNotBlank() }
@@ -334,6 +341,7 @@ fun ScrobbleScreen(
                 dismissButton = { TextButton(onClick = { pendingRemovePlaylist = null }) { Text("Cancel") } },
             )
         }
+        SharedTransitionLayout(modifier = Modifier.fillMaxSize()) {
         AnimatedContent(
             targetState = selectedSection,
             modifier = Modifier.fillMaxSize(),
@@ -347,6 +355,7 @@ fun ScrobbleScreen(
             },
             label = "scrobble-pages",
         ) { section ->
+            val pageVisibilityScope = this
             LazyColumn(
                 state = when (section) {
                     SCROBBLE_TAB_GENERATE -> generateListState
@@ -651,17 +660,28 @@ fun ScrobbleScreen(
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                                         ) {
+                                            val sharedArtworkState = rememberSharedContentState(playlistSharedElementKey(generatedMix))
                                             AsyncImage(
                                                 model = generatedMix.firstOrNull()?.thumbnailUrl,
                                                 contentDescription = null,
                                                 contentScale = ContentScale.Crop,
-                                                modifier = Modifier.size(44.dp).clip(RoundedCornerShape(10.dp)),
+                                                modifier = Modifier.size(44.dp)
+                                                    .then(if (reduceMotion) Modifier else Modifier.sharedElement(
+                                                        sharedContentState = sharedArtworkState,
+                                                        animatedVisibilityScope = pageVisibilityScope,
+                                                    ))
+                                                    .clip(RoundedCornerShape(10.dp)),
                                             )
                                             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                                Text("Saved to Playlists", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                                                Text("Ready whenever you are", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                Text(savedPlaylistForGeneratedMix?.title ?: generatedTitle, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                Text("Saved to Playlists", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                             }
-                                            TextButton(onClick = onViewPlaylists) { Text("View") }
+                                            TextButton(onClick = {
+                                                playlistQuery = ""
+                                                playlistSortNewest = true
+                                                openedPlaylist = null
+                                                onViewPlaylists()
+                                            }) { Text("View") }
                                         }
                                     } else {
                                         Spacer(Modifier.height(0.dp))
@@ -708,7 +728,6 @@ fun ScrobbleScreen(
                                 TrackRow(song, onClick = { onPlayPlaylist(selected.title, selected.songs, index) })
                             }
                         } else {
-                            val savedPlaylists = ScrobblePlaylistStore.playlists.toList()
                             val visiblePlaylists = savedPlaylists
                                 .filter { playlist ->
                                     playlist.title.contains(playlistQuery, ignoreCase = true) ||
@@ -755,6 +774,7 @@ fun ScrobbleScreen(
                             } else {
                                 items(visiblePlaylists, key = { "saved-${it.title}" }) { playlist ->
                                     var menuExpanded by remember(playlist.title) { mutableStateOf(false) }
+                                    val sharedArtworkState = rememberSharedContentState(playlistSharedElementKey(playlist.songs))
                                     Card(
                                         modifier = Modifier.fillMaxWidth(),
                                         shape = RoundedCornerShape(20.dp),
@@ -771,7 +791,17 @@ fun ScrobbleScreen(
                                                         .clickable(role = Role.Button) { openedPlaylist = playlist.title },
                                                     verticalAlignment = Alignment.CenterVertically,
                                                 ) {
-                                                    AsyncImage(model = playlist.songs.firstOrNull()?.thumbnailUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(76.dp).clip(RoundedCornerShape(14.dp)))
+                                                    AsyncImage(
+                                                        model = playlist.songs.firstOrNull()?.thumbnailUrl,
+                                                        contentDescription = null,
+                                                        contentScale = ContentScale.Crop,
+                                                        modifier = Modifier.size(76.dp)
+                                                            .then(if (reduceMotion) Modifier else Modifier.sharedElement(
+                                                                sharedContentState = sharedArtworkState,
+                                                                animatedVisibilityScope = pageVisibilityScope,
+                                                            ))
+                                                            .clip(RoundedCornerShape(14.dp)),
+                                                    )
                                                     Spacer(Modifier.width(13.dp))
                                                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                                         Text(playlist.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -802,6 +832,7 @@ fun ScrobbleScreen(
                         }                    }
                 }
             }
+        }
         }
     }
 }
@@ -1016,6 +1047,9 @@ private fun AnimatedValueText(
         overflow = TextOverflow.Ellipsis,
     )
 }
+
+private fun playlistSharedElementKey(songs: List<Song>): String =
+    "scrobble-playlist-art-${songs.joinToString(separator = "|") { songIdentity(it) }}"
 
 private fun formatListeningTime(totalMs: Long): String {
     val totalMinutes = totalMs / 60_000
