@@ -1,6 +1,13 @@
 package com.music.bitchord.ui.components
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.snap
 import androidx.compose.foundation.clickable
@@ -113,11 +120,20 @@ fun ScrobbleFab(
                 },
             ),
     ) {
-        Icon(
-            imageVector = if (open) Icons.Rounded.Close else Icons.Rounded.GraphicEq,
-            contentDescription = if (open) "Close Scrobble" else "Open Scrobble",
-            tint = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.size(24.dp),
-        )
+        AnimatedContent(
+            targetState = open,
+            transitionSpec = {
+                (fadeIn(tween(130)) + scaleIn(initialScale = 0.76f, animationSpec = tween(160))) togetherWith
+                    (fadeOut(tween(90)) + scaleOut(targetScale = 0.76f, animationSpec = tween(120)))
+            },
+            label = "scrobbleFabGlyph",
+        ) { isOpen ->
+            Icon(
+                imageVector = if (isOpen) Icons.Rounded.Close else Icons.Rounded.GraphicEq,
+                contentDescription = if (isOpen) "Close Scrobble" else "Open Scrobble",
+                tint = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.size(24.dp),
+            )
+        }
     }
 }
