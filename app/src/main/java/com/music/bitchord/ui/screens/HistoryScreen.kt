@@ -13,6 +13,8 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -72,7 +74,8 @@ fun HistoryScreen(
     val songs = (state as? UiState.Success)?.data.orEmpty()
     val recordingEnabled by ListeningHistory.recordingEnabled.collectAsState()
     var confirmClear by remember { mutableStateOf(false) }
-    var query by remember { mutableStateOf("") }
+    var dateMenuExpanded by remember { mutableStateOf(false) }
+    var selectedDate by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(listState, songs.size, hasMore, loadMoreFailed, state is UiState.Success) {
         snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1 }
             .collect { lastVisible ->
@@ -110,22 +113,6 @@ fun HistoryScreen(
                 }
             }
         }
-        if (state is UiState.Success && songs.isNotEmpty()) {
-            item(key = "history:search") {
-                androidx.compose.material3.OutlinedTextField(
-                    value = query,
-                    onValueChange = { query = it },
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                    singleLine = true,
-                    placeholder = { androidx.compose.material3.Text("Search history") },
-                    trailingIcon = {
-                        if (query.isNotEmpty()) TextButton(onClick = { query = "" }) {
-                            androidx.compose.material3.Text("Clear")
-                        }
-                    },
-                )
-            }
-        }
         when (state) {
             is UiState.Loading -> songListSkeleton(count = 10, keyPrefix = "skeleton:history")
 
@@ -140,13 +127,8 @@ fun HistoryScreen(
             is UiState.Success -> {
                 val allSongs = state.data
                 val sourceSections = sections.ifEmpty { listOf(HistorySection("", allSongs)) }
-                val displaySections = if (query.isBlank()) sourceSections else sourceSections.mapNotNull { section ->
-                    val matches = section.songs.filter { song ->
-                        song.title.contains(query, ignoreCase = true) ||
-                            song.artist.contains(query, ignoreCase = true)
-                    }
-                    matches.takeIf { it.isNotEmpty() }?.let { section.copy(songs = it) }
-                }
+                val availableDates = sourceSections.map { it.title }.filter { it.isNotBlank() }.distinct()
+                val displaySections = sourceSections.filter { selectedDate == null || it.title == selectedDate }
                 val visibleSongs = displaySections.flatMap { it.songs }
                 val isCurrentRow = playingRowMatcher(visibleSongs, currentSong)
                 // Repeated plays are intentional in listening history, so videoId alone
@@ -155,12 +137,52 @@ fun HistoryScreen(
                 displaySections.forEachIndexed { sectionIndex, section ->
                     if (section.title.isNotBlank()) {
                         item(key = "history:section:$sectionIndex") {
-                            androidx.compose.material3.Text(
-                                text = section.title,
-                                style = MaterialTheme.typography.titleSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-                            )
+                            androidx.compose.foundation.layout.Row(
+                                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 12.dp, top = 8.dp, bottom = 4.dp),
+                                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween,
+                            ) {
+                                androidx.compose.material3.Text(
+                                    text = section.title,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                if (sectionIndex == 0) {
+                                    androidx.compose.foundation.layout.Box {
+                                        TextButton(
+                                            onClick = { dateMenuExpanded = true },
+                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                        ) {
+                                            androidx.compose.material3.Text(
+                                                text = (selectedDate ?: "All dates") + "  ▾",
+                                                style = MaterialTheme.typography.labelLarge,
+                                                maxLines = 1,
+                                            )
+                                        }
+                                        DropdownMenu(
+                                            expanded = dateMenuExpanded,
+                                            onDismissRequest = { dateMenuExpanded = false },
+                                        ) {
+                                            DropdownMenuItem(
+                                                text = { androidx.compose.material3.Text("All dates") },
+                                                onClick = {
+                                                    selectedDate = null
+                                                    dateMenuExpanded = false
+                                                },
+                                            )
+                                            availableDates.forEach { date ->
+                                                DropdownMenuItem(
+                                                    text = { androidx.compose.material3.Text(date) },
+                                                    onClick = {
+                                                        selectedDate = date
+                                                        dateMenuExpanded = false
+                                                    },
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                     val sectionOffset = offset
