@@ -155,7 +155,7 @@ fun ScrobbleScreen(
             latest.song.takeIf { events.size >= 3 && latest.startedAt <= rediscoverCutoff }
         }.distinctBy(::songIdentity).take(25)
 
-    LaunchedEffect(selectedSection, syncedHistory, recommendationRequest) {
+    LaunchedEffect(selectedSection, syncedHistory, listens, loadingHistory, summary, recommendationRequest) {
         if (selectedSection != SCROBBLE_TAB_GENERATE || loadingHistory) return@LaunchedEffect
         loadingRecommendations = true
         recommendationsFailed = false
