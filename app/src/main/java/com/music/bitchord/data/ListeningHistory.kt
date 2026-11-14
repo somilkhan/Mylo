@@ -30,6 +30,9 @@ object ListeningHistory {
     const val MIN_HEARD_MS = 2_000L
     private val _recordingEnabled = MutableStateFlow(true)
     val recordingEnabled: StateFlow<Boolean> = _recordingEnabled.asStateFlow()
+    private val _revision = MutableStateFlow(0L)
+    /** Changes after a listen is durably appended or the device history is cleared. */
+    val revision: StateFlow<Long> = _revision.asStateFlow()
 
     /** History includes a short skip after two seconds, independently of play-count thresholds. */
     fun shouldRecord(playedMs: Long, counted: Boolean): Boolean =
@@ -117,6 +120,7 @@ object ListeningHistory {
                 .put("duration", song.durationText)
                 .put("at", startedAt)
             historyFile.appendText(row.toString() + "\n")
+            _revision.value += 1L
         }
     }
 
@@ -130,6 +134,7 @@ object ListeningHistory {
             historyFile.delete()
             appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                 .edit().remove(KEY_ENTRIES).apply()
+            _revision.value += 1L
         }.join()
     }
 
