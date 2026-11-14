@@ -49,6 +49,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Slider
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.LaunchedEffect
@@ -78,6 +79,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
 
+private enum class ScrobbleMixMode(val title: String, val description: String) {
+    FAVOURITES("Your favourites", "Your most-played tracks from Mylo listening stats"),
+    RECENT("Recently played", "Your latest unique listens"),
+    RADIO("Song radio", "Build a radio mix from a track you choose"),
+    DISCOVER("Discover", "Fresh YouTube Music picks outside your listening history"),
+    REDISCOVER("Rediscover", "Tracks you loved and have not heard for 60 days"),
+}
+
 internal const val SCROBBLE_TAB_STATS = 0
 internal const val SCROBBLE_TAB_GENERATE = 1
 internal const val SCROBBLE_TAB_PLAYLISTS = 2
@@ -105,6 +114,14 @@ fun ScrobbleScreen(
     var loadingRecommendations by remember { mutableStateOf(false) }
     var recommendationsFailed by remember { mutableStateOf(false) }
     var recommendationRequest by remember { mutableIntStateOf(0) }
+    var mixMode by remember { mutableStateOf(ScrobbleMixMode.FAVOURITES) }
+    var selectedSeed by remember { mutableStateOf<Song?>(null) }
+    var mixTrackCount by remember { mutableIntStateOf(20) }
+    var generationRequest by remember { mutableIntStateOf(0) }
+    var generatingMix by remember { mutableStateOf(false) }
+    var generationError by remember { mutableStateOf<String?>(null) }
+    var generatedMix by remember { mutableStateOf<List<Song>>(emptyList()) }
+    var generatedTitle by remember { mutableStateOf("") }
     var openedPlaylist by remember { mutableStateOf<String?>(null) }
     val statsListState = rememberLazyListState()
     val generateListState = rememberLazyListState()
@@ -160,6 +177,53 @@ fun ScrobbleScreen(
             val latest = events.maxByOrNull { it.startedAt } ?: return@mapNotNull null
             latest.song.takeIf { events.size >= 3 && latest.startedAt <= rediscoverCutoff }
         }.distinctBy(::songIdentity).take(25)
+
+    LaunchedEffect(recentTracks, topTracks) {
+        if (selectedSeed == null) selectedSeed = (recentTracks + topTracks).firstOrNull { it.videoId.isNotBlank() }
+    }
+
+    LaunchedEffect(generationRequest) {
+        if (generationRequest == 0) return@LaunchedEffect
+        generatingMix = true
+        generationError = null
+        generatedMix = emptyList()
+        try {
+            val generated = when (mixMode) {
+                ScrobbleMixMode.FAVOURITES -> topTracks.take(mixTrackCount)
+                ScrobbleMixMode.RECENT -> recentTracks.take(mixTrackCount)
+                ScrobbleMixMode.REDISCOVER -> rediscoverTracks.take(mixTrackCount)
+                ScrobbleMixMode.DISCOVER -> {
+                    val excluded = (syncedHistory.map { it.videoId } + listens.map { it.song.videoId } + topTracks.map { it.videoId })
+                        .filter(String::isNotBlank).toSet()
+                    YtMusicRepository.quickPicks(excluded).getOrThrow()
+                        .filter { it.videoId.isNotBlank() && it.videoId !in excluded }
+                        .distinctBy(::songIdentity).take(mixTrackCount)
+                }
+                ScrobbleMixMode.RADIO -> {
+                    val seed = selectedSeed?.takeIf { it.videoId.isNotBlank() }
+                        ?: throw IllegalStateException("Choose a YouTube Music track for Song radio")
+                    YtMusicRepository.radio(seed.videoId).getOrThrow()
+                        .filter { it.videoId.isNotBlank() && it.videoId != seed.videoId }
+                        .distinctBy(::songIdentity).take(mixTrackCount)
+                }
+            }
+            if (generated.isEmpty()) throw IllegalStateException("No tracks were available for this mix. Try another mode or refresh your listening data.")
+            generatedMix = generated
+            generatedTitle = when (mixMode) {
+                ScrobbleMixMode.FAVOURITES -> "Your favourites"
+                ScrobbleMixMode.RECENT -> "Recently played"
+                ScrobbleMixMode.RADIO -> "Radio · ${selectedSeed?.title.orEmpty()}"
+                ScrobbleMixMode.DISCOVER -> "Discover"
+                ScrobbleMixMode.REDISCOVER -> "Rediscover"
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            generationError = error.message ?: "Couldn't generate this mix. Try again."
+        } finally {
+            generatingMix = false
+        }
+    }
 
     LaunchedEffect(selectedSection, syncedHistory, listens, loadingHistory, summary, recommendationRequest) {
         if (selectedSection != SCROBBLE_TAB_GENERATE || loadingHistory) return@LaunchedEffect
@@ -301,73 +365,105 @@ fun ScrobbleScreen(
 
                     SCROBBLE_TAB_GENERATE -> {
                         item("generate-heading") {
-                            PageHeading("Made from your taste", "Ready-to-play mixes shaped by your listening")
+                            PageHeading("Make a mix", "Choose what you want to hear. Mylo builds the queue from your listening and YouTube Music.")
                         }
-                        if (loadingHistory) {
-                            item("generate-history-loading") { LoadingLine("Reading your listening history") }
-                        } else if (historyFailed) {
-                            item("generate-history-error") {
-                                EmptyPanel("History unavailable", "Mylo couldn't read your device listening history.")
-                            }
-                        } else {
-                            item("mix-favourites") { GeneratedMixCardContent(
-                                title = "Your favourites",
-                                description = "Your most-played tracks from the selected statistics period",
-                                songs = topTracks,
-                                onPlay = onPlayPlaylist,
-                                onSave = { ScrobblePlaylistStore.save("Your favourites", "Most-played tracks", topTracks) },
-                            ) }
-                            item("mix-recent") { GeneratedMixCardContent(
-                                title = "Recently played",
-                                description = "A fresh queue from your latest unique listens",
-                                songs = recentTracks,
-                                onPlay = onPlayPlaylist,
-                                onSave = { ScrobblePlaylistStore.save("Recently played", "Your latest unique listens", recentTracks) },
-                            ) }
-                            if (rediscoverTracks.isNotEmpty()) {
-                                item("mix-rediscover") { GeneratedMixCardContent(
-                                    title = "Rediscover",
-                                    description = "Tracks you played at least three times and haven't heard in 60 days",
-                                    songs = rediscoverTracks,
-                                    onPlay = onPlayPlaylist,
-                                    onSave = { ScrobblePlaylistStore.save("Rediscover", "Played 3+ times and quiet for 60 days", rediscoverTracks) },
-                                ) }
-                            } else {
-                                item("mix-rediscover-empty") {
-                                    EmptyPanel("Rediscover unlocks over time", "Tracks played at least three times and left quiet for 60 days will appear here.")
-                                }
-                            }
-                            when {
-                                loadingRecommendations -> item("discover-loading") { LoadingLine("Finding fresh picks") }
-                                recommendationsFailed -> item("discover-error") {
-                                    EmptyPanel("Discovery couldn't load", "Check your connection and try again.")
-                                }
-                                recommendations.isEmpty() -> item("discover-empty") {
-                                    EmptyPanel("No fresh picks yet", "YouTube Music did not return recommendations outside your recent listening.")
-                                }
-                                else -> item("discover-card") {
-                                    GeneratedMixCardContent(
-                                        title = "Discover",
-                                        description = "New recommendations beyond your recent listening",
-                                        songs = recommendations,
-                                        onPlay = onPlayPlaylist,
-                                        onSave = { ScrobblePlaylistStore.save("Discover", "New recommendations", recommendations) },
-                                    )
-                                }
-                            }
-                            item("discover-actions") {
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    OutlinedButton(onClick = { recommendationRequest++ }, enabled = !loadingRecommendations) {
-                                        Icon(Icons.Rounded.Refresh, null)
-                                        Spacer(Modifier.width(6.dp))
-                                        Text("Refresh picks")
-                                    }
-                                    OutlinedButton(onClick = onBrowseMoods) {
-                                        Icon(Icons.Rounded.Explore, null)
-                                        Spacer(Modifier.width(6.dp))
-                                        Text("Moods")
+                        item("generate-modes") {
+                            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Text("Start with", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    ScrobbleMixMode.entries.chunked(2).forEach { rowModes ->
+                                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            rowModes.forEach { mode ->
+                                                FilterChip(
+                                                    selected = mixMode == mode,
+                                                    onClick = { mixMode = mode; generatedMix = emptyList(); generationError = null },
+                                                    label = { Text(mode.title) },
+                                                )
+                                            }
+                                        }
                                     }
                                 }
+                                Text(mixMode.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                        if (mixMode == ScrobbleMixMode.RADIO) {
+                            item("generate-seed") {
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text("Choose a starting track", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                                    val seeds = (recentTracks + topTracks).filter { it.videoId.isNotBlank() }.distinctBy(::songIdentity).take(12)
+                                    if (seeds.isEmpty()) {
+                                        EmptyPanel("No radio seed yet", "Play or sync a YouTube Music track first. Local-only files cannot start YouTube Music radio.")
+                                    } else {
+                                        seeds.forEach { song ->
+                                            Row(
+                                                Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
+                                                    .background(if (selectedSeed?.videoId == song.videoId) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.background)
+                                                    .clickable { selectedSeed = song }.padding(8.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                            ) {
+                                                AsyncImage(model = song.thumbnailUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(44.dp).clip(RoundedCornerShape(10.dp)))
+                                                Spacer(Modifier.width(10.dp))
+                                                Column(Modifier.weight(1f)) {
+                                                    Text(song.title, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Medium)
+                                                    Text(song.artist, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                }
+                                                if (selectedSeed?.videoId == song.videoId) Text("Selected", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        item("generate-count") {
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("Mix length", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                                    Spacer(Modifier.weight(1f))
+                                    Text("${mixTrackCount} tracks", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                Slider(value = mixTrackCount.toFloat(), onValueChange = { mixTrackCount = it.toInt().coerceIn(5, 35) }, valueRange = 5f..35f, steps = 29, enabled = !generatingMix)
+                            }
+                        }
+                        item("generate-action") {
+                            Button(
+                                onClick = { generationRequest++ },
+                                enabled = !generatingMix && !loadingHistory && (mixMode != ScrobbleMixMode.RADIO || selectedSeed?.videoId?.isNotBlank() == true),
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                if (generatingMix) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                                else Icon(Icons.Rounded.PlayArrow, null)
+                                Spacer(Modifier.width(8.dp))
+                                Text(if (generatingMix) "Building your mix…" else "Generate mix")
+                            }
+                        }
+                        generationError?.let { error ->
+                            item("generate-error") { EmptyPanel("Couldn't build this mix", error) }
+                        }
+                        if (generatedMix.isNotEmpty()) {
+                            item("generated-result-heading") {
+                                PageHeading(generatedTitle, "${generatedMix.size} tracks ready")
+                            }
+                            items(generatedMix.take(8), key = { "generated-${songIdentity(it)}" }) { song ->
+                                TrackRow(song, onClick = { onPlayPlaylist(generatedTitle, generatedMix) })
+                            }
+                            item("generated-actions") {
+                                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Button(onClick = { onPlayPlaylist(generatedTitle, generatedMix) }, modifier = Modifier.weight(1f)) {
+                                        Icon(Icons.Rounded.PlayArrow, null)
+                                        Spacer(Modifier.width(6.dp))
+                                        Text("Play mix")
+                                    }
+                                    OutlinedButton(onClick = {
+                                        ScrobblePlaylistStore.save(generatedTitle, mixMode.description, generatedMix)
+                                    }) { Text("Save") }
+                                }
+                            }
+                        }
+                        item("generate-discovery-refresh") {
+                            OutlinedButton(onClick = { recommendationRequest++ }, enabled = !loadingRecommendations, modifier = Modifier.fillMaxWidth()) {
+                                Icon(Icons.Rounded.Refresh, null)
+                                Spacer(Modifier.width(6.dp))
+                                Text(if (loadingRecommendations) "Refreshing picks…" else "Refresh discovery")
                             }
                         }
                     }
