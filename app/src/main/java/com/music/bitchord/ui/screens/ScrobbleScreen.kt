@@ -205,7 +205,7 @@ fun ScrobbleScreen(
                     else -> statsListState
                 },
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 64.dp, bottom = bottomPadding + 28.dp),
+                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 104.dp, bottom = bottomPadding + 28.dp),
                 verticalArrangement = Arrangement.spacedBy(20.dp),
             ) {
                 when (section) {
