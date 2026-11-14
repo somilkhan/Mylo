@@ -38,14 +38,15 @@ internal object ScrobblePlaylistStore {
         playlists.addAll(restored)
     }
 
-    fun save(title: String, reason: String, songs: List<Song>) {
-        if (title.isBlank() || songs.isEmpty()) return
+    fun save(title: String, reason: String, songs: List<Song>): Boolean {
+        if (title.isBlank() || songs.isEmpty()) return false
         val cleanTitle = title.trim()
         val snapshot = songs.distinctBy(::songKey).take(MAX_TRACKS_PER_PLAYLIST)
         val sameSnapshot = playlists.firstOrNull { existing ->
-            existing.title == cleanTitle && existing.songs.map(::songKey) == snapshot.map(::songKey)
+            (existing.title == cleanTitle || existing.title.startsWith("$cleanTitle ")) && existing.songs.map(::songKey) == snapshot.map(::songKey)
         }
-        if (sameSnapshot != null) return
+        if (sameSnapshot != null) return true
+        if (playlists.size >= MAX_SAVED_PLAYLISTS) return false
 
         // Never silently replace a previously saved snapshot when a fresh mix
         // has the same generated title. Keep both, with a predictable suffix.
@@ -56,8 +57,8 @@ internal object ScrobblePlaylistStore {
             suffix++
         }
         playlists.add(0, SavedScrobblePlaylist(finalTitle, reason, snapshot))
-        while (playlists.size > MAX_SAVED_PLAYLISTS) playlists.removeAt(playlists.lastIndex)
         persist()
+        return true
     }
 
     private fun songKey(song: Song): String =
