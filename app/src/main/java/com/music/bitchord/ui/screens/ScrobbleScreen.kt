@@ -503,17 +503,27 @@ fun ScrobbleScreen(
                                         Text("Play mix")
                                     }
                                     OutlinedButton(onClick = {
-                                        ScrobblePlaylistStore.save(generatedTitle, mixMode.description, generatedMix)
-                                        mixSaved = true
+                                        if (ScrobblePlaylistStore.save(generatedTitle, mixMode.description, generatedMix)) {
+                                            mixSaved = true
+                                        } else {
+                                            generationError = "You have 20 saved mixes. Remove one before saving another."
+                                        }
                                     }, enabled = !mixSaved) { Text(if (mixSaved) "Saved" else "Save") }
                                 }
                             }
                         }
                         item("generate-discovery-refresh") {
-                            OutlinedButton(onClick = { recommendationRequest++ }, enabled = !loadingRecommendations && !generatingMix, modifier = Modifier.fillMaxWidth()) {
-                                Icon(Icons.Rounded.Refresh, null)
-                                Spacer(Modifier.width(6.dp))
-                                Text(if (loadingRecommendations) "Refreshing picks…" else "Refresh discovery")
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedButton(onClick = { recommendationRequest++ }, enabled = !loadingRecommendations && !generatingMix, modifier = Modifier.weight(1f)) {
+                                    Icon(Icons.Rounded.Refresh, null)
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(if (loadingRecommendations) "Refreshing…" else "Refresh picks")
+                                }
+                                OutlinedButton(onClick = onBrowseMoods, enabled = !generatingMix, modifier = Modifier.weight(1f)) {
+                                    Icon(Icons.Rounded.Explore, null)
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("Browse moods")
+                                }
                             }
                         }
                     }
