@@ -92,6 +92,7 @@ private enum class ScrobbleMixMode(val title: String, val description: String) {
     TASTE_MIX("Taste mix", "A balanced blend of favourites, recent listens and fresh picks"),
     RADIO("Song radio", "Build a radio mix from a track you choose"),
     SIMILAR_ARTIST("Similar artist", "Explore more tracks from an artist you already enjoy"),
+    NEVER_HEARD("Never heard", "Find catalogue picks missing from your listening history"),
     DISCOVER("Discover", "Fresh YouTube Music picks outside your listening history"),
     REDISCOVER("Rediscover", "Tracks played 3+ times on this device and quiet for 60 days"),
 }
@@ -227,6 +228,14 @@ fun ScrobbleScreen(
                         .distinctBy(::songIdentity).shuffled().take(mixTrackCount)
                 }
                 ScrobbleMixMode.REDISCOVER -> rediscoverTracks.take(mixTrackCount)
+                ScrobbleMixMode.NEVER_HEARD -> {
+                    val heard = (syncedHistory.map { it.videoId } + listens.map { it.song.videoId } +
+                        topTracks.map { it.videoId } + recentTracks.map { it.videoId })
+                        .filter(String::isNotBlank).toSet()
+                    YtMusicRepository.quickPicks(heard).getOrThrow()
+                        .filter { it.videoId.isNotBlank() && it.videoId !in heard }
+                        .distinctBy(::songIdentity).take(mixTrackCount)
+                }
                 ScrobbleMixMode.DISCOVER -> {
                     val excluded = (syncedHistory.map { it.videoId } + listens.map { it.song.videoId } + topTracks.map { it.videoId })
                         .filter(String::isNotBlank).toSet()
@@ -260,6 +269,7 @@ fun ScrobbleScreen(
                 ScrobbleMixMode.TASTE_MIX -> "Your taste mix"
                 ScrobbleMixMode.RADIO -> "Radio · ${selectedSeed?.title.orEmpty()}"
                 ScrobbleMixMode.SIMILAR_ARTIST -> "More by ${selectedSeed?.artist.orEmpty()}"
+                ScrobbleMixMode.NEVER_HEARD -> "New to you"
                 ScrobbleMixMode.DISCOVER -> "Discover"
                 ScrobbleMixMode.REDISCOVER -> "Rediscover"
             }
