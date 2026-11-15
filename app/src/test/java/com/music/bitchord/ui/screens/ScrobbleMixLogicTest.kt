@@ -396,4 +396,22 @@ class ScrobbleMixLogicTest {
     private companion object {
         const val DAY = 24L * 60 * 60 * 1000
     }
+
+    @Test
+    fun lastWaveIdentityPortDeduplicatesWhitespaceCaseAndVideoIdWithoutLosingFirstMetadata() {
+        val canonical = Song("abcdefghijk", "  Björk   –   Jóga ", "Björk", null)
+        val sameSongDifferentUpload = Song("lmnopqrstuv", "Björk – Jóga", "BJÖRK", "alternate-art")
+        val sameVideoDifferentMetadata = Song("abcdefghijk", "Different title", "Different artist", null)
+        val unrelated = Song("zyxwvutsrqp", "Army of Me", "Björk", null)
+
+        val result = distinctRecommendationSongs(
+            listOf(canonical, sameSongDifferentUpload, sameVideoDifferentMetadata, unrelated),
+        )
+
+        assertEquals(listOf(canonical, unrelated), result)
+        assertEquals(
+            "björk – jóga|björk",
+            recommendationIdentity(canonical),
+        )
+    }
 }
