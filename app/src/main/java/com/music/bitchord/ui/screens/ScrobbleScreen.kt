@@ -855,23 +855,54 @@ fun ScrobbleScreen(
                         val artistName = similarArtistQuery.trim().ifBlank {
                             selectedSeed?.takeIf(::isYouTubeCatalogTrack)?.artist.orEmpty()
                         }.ifBlank { throw IllegalStateException("Enter an artist to find similar artists") }
-                        val similarArtists = LastFM.getSimilarArtists(artistName, limit = 8).getOrThrow()
-                        coroutineScope {
-                            similarArtists.map { artist ->
-                                async {
-                                    try {
-                                        buildTagMix(
-                                            YtMusicRepository.search("$artist songs", SearchFilter.SONGS).getOrThrow(),
-                                            limit = 3,
-                                        ).filterNot { it.artist.equals(artistName, ignoreCase = true) }
-                                    } catch (cancelled: CancellationException) {
-                                        throw cancelled
-                                    } catch (_: Exception) {
-                                        emptyList()
+                        // YouTube radio is the primary source, so this mode still
+                        // works for users who have not configured Last.fm.
+                        val youtubeRadio = try {
+                            val seed = buildTagMix(
+                                YtMusicRepository.search("$artistName songs", SearchFilter.SONGS).getOrThrow(),
+                                limit = 3,
+                            ).firstOrNull()
+                            if (seed == null) {
+                                emptyList()
+                            } else {
+                                YtMusicRepository.radio(seed.videoId).getOrThrow()
+                                    .filter { it.videoId.isNotBlank() && it.videoId != seed.videoId }
+                            }
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                            emptyList()
+                        }
+                        // Last.fm expands the artist graph when configured; every
+                        // result is resolved through real YouTube Music search.
+                        val lastFmTracks = if (lastFmDiscoveryAvailable) {
+                            val similarArtists = try {
+                                LastFM.getSimilarArtists(artistName, limit = 8).getOrThrow()
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (_: Exception) {
+                                emptyList()
+                            }
+                            coroutineScope {
+                                similarArtists.map { artist ->
+                                    async {
+                                        try {
+                                            buildTagMix(
+                                                YtMusicRepository.search("$artist songs", SearchFilter.SONGS).getOrThrow(),
+                                                limit = 3,
+                                            ).filterNot { it.artist.equals(artistName, ignoreCase = true) }
+                                        } catch (cancelled: CancellationException) {
+                                            throw cancelled
+                                        } catch (_: Exception) {
+                                            emptyList()
+                                        }
                                     }
-                                }
-                            }.awaitAll().flatten()
-                        }.distinctBy(::songIdentity).take(mixTrackCount)
+                                }.awaitAll().flatten()
+                            }
+                        } else {
+                            emptyList()
+                        }
+                        buildYouTubeFirstMix(youtubeRadio, lastFmTracks, mixTrackCount)
                     }
                 }
             }
@@ -1509,8 +1540,8 @@ fun ScrobbleScreen(
                         if (mixMode == ScrobbleMixMode.SIMILAR_ARTISTS && !lastFmDiscoveryAvailable) {
                             item("generate-similar-artists-warning") {
                                 InfoPanel(
-                                    "Last.fm discovery unavailable",
-                                    "This build has no Last.fm API credentials configured. Song radio and Artist mix still work without Last.fm.",
+                                    "YouTube Music discovery",
+                                    "Last.fm enrichment is unavailable, so this mix will use YouTube Music radio only.",
                                 )
                             }
                         }
@@ -1896,7 +1927,6 @@ fun ScrobbleScreen(
                                     (mixMode !in setOf(ScrobbleMixMode.FAVOURITES, ScrobbleMixMode.TASTE_MIX) || !loadingSyncedStats) &&
                                     (mixMode != ScrobbleMixMode.FAVOURITES || favouriteTracks.isNotEmpty()) &&
                                     (mixMode != ScrobbleMixMode.TAG || tagQuery.isNotBlank()) &&
-                                    (mixMode != ScrobbleMixMode.SIMILAR_ARTISTS || lastFmDiscoveryAvailable) &&
                                     (mixMode != ScrobbleMixMode.REDISCOVER || !loadingAllTimeStats) &&
                                     (mixMode != ScrobbleMixMode.REDISCOVER || !allTimeStatsFailed) &&
                                     (mixMode !in setOf(ScrobbleMixMode.REDISCOVER, ScrobbleMixMode.NEVER_HEARD) || !historyFailed) &&
