@@ -226,6 +226,9 @@ fun ScrobbleScreen(
     var openedPlaylist by remember { mutableStateOf<String?>(null) }
     var playlistQuery by remember { mutableStateOf("") }
     var playlistSortMode by remember { mutableStateOf(ScrobblePlaylistSortMode.RECENT) }
+    var playlistSelectionMode by remember { mutableStateOf(false) }
+    var selectedPlaylistTitles by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var showBulkRemoveConfirm by remember { mutableStateOf(false) }
     var pendingExport by remember { mutableStateOf<Pair<String, String>?>(null) }
     var coverEditorPlaylist by remember { mutableStateOf<String?>(null) }
     var coverPickerPlaylist by remember { mutableStateOf<String?>(null) }
@@ -762,6 +765,30 @@ fun ScrobbleScreen(
                     }) { Text("Save") }
                 },
                 dismissButton = { TextButton(onClick = { pendingRenamePlaylist = null; renamePlaylistError = null }) { Text("Cancel") } },
+            )
+        }
+        if (showBulkRemoveConfirm) {
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { showBulkRemoveConfirm = false },
+                title = { Text("Remove selected playlists?") },
+                text = {
+                    Text("${selectedPlaylistTitles.size} playlists will be removed from this device. Listening history and playback data will remain untouched.")
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        selectedPlaylistTitles.forEach { title ->
+                            releaseCoverPermission(ScrobblePlaylistStore.remove(title))
+                            if (openedPlaylist == title) openedPlaylist = null
+                            if (coverEditorPlaylist == title) coverEditorPlaylist = null
+                        }
+                        selectedPlaylistTitles = emptySet()
+                        playlistSelectionMode = false
+                        showBulkRemoveConfirm = false
+                    }) { Text("Remove") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showBulkRemoveConfirm = false }) { Text("Cancel") }
+                },
             )
         }
         pendingRemovePlaylist?.let { title ->
@@ -1622,7 +1649,63 @@ fun ScrobbleScreen(
                                     )
                                 } }
                             item("playlists-heading") {
-                                PageHeading("Your collections", "${savedPlaylists.size} saved mixes · Made by you, kept on this device")
+                                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                            Text("Your collections", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                                            Text(
+                                                "${savedPlaylists.size} saved mixes · Made by you, kept on this device",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                        TextButton(
+                                            onClick = {
+                                                playlistSelectionMode = !playlistSelectionMode
+                                                selectedPlaylistTitles = emptySet()
+                                            },
+                                        ) {
+                                            Text(if (playlistSelectionMode) "Cancel" else "Select")
+                                        }
+                                    }
+                                    if (playlistSelectionMode) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        ) {
+                                            Text(
+                                                "${selectedPlaylistTitles.size} selected",
+                                                modifier = Modifier.weight(1f),
+                                                style = MaterialTheme.typography.labelLarge,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                            TextButton(
+                                                onClick = {
+                                                    selectedPlaylistTitles = if (selectedPlaylistTitles.size == visiblePlaylists.size) {
+                                                        emptySet()
+                                                    } else {
+                                                        visiblePlaylists.mapTo(linkedSetOf()) { it.title }
+                                                    }
+                                                },
+                                                enabled = visiblePlaylists.isNotEmpty(),
+                                            ) {
+                                                Text(if (selectedPlaylistTitles.size == visiblePlaylists.size) "Deselect all" else "Select all")
+                                            }
+                                            Button(
+                                                onClick = { showBulkRemoveConfirm = true },
+                                                enabled = selectedPlaylistTitles.isNotEmpty(),
+                                            ) {
+                                                Icon(Icons.Rounded.DeleteOutline, contentDescription = null)
+                                                Spacer(Modifier.width(5.dp))
+                                                Text("Remove")
+                                            }
+                                        }
+                                    }
+                                }
                             }
                             if (savedPlaylists.isNotEmpty()) {
                                 item("playlists-search") {
@@ -1684,7 +1767,18 @@ fun ScrobbleScreen(
                                             ) {
                                                 Row(
                                                     modifier = Modifier.weight(1f).clip(RoundedCornerShape(14.dp))
-                                                        .clickable(role = Role.Button) { openedPlaylist = playlist.title },
+                                                        .semantics { selected = playlist.title in selectedPlaylistTitles }
+                                                        .clickable(role = if (playlistSelectionMode) Role.Checkbox else Role.Button) {
+                                                            if (playlistSelectionMode) {
+                                                                selectedPlaylistTitles = if (playlist.title in selectedPlaylistTitles) {
+                                                                    selectedPlaylistTitles - playlist.title
+                                                                } else {
+                                                                    selectedPlaylistTitles + playlist.title
+                                                                }
+                                                            } else {
+                                                                openedPlaylist = playlist.title
+                                                            }
+                                                        },
                                                     verticalAlignment = Alignment.CenterVertically,
                                                 ) {
                                                     PlaylistArtwork(
@@ -1705,6 +1799,23 @@ fun ScrobbleScreen(
                                                     }
                                                 }
                                                 Box {
+                                                    if (playlistSelectionMode) {
+                                                        IconButton(
+                                                            onClick = {
+                                                                selectedPlaylistTitles = if (playlist.title in selectedPlaylistTitles) {
+                                                                    selectedPlaylistTitles - playlist.title
+                                                                } else {
+                                                                    selectedPlaylistTitles + playlist.title
+                                                                }
+                                                            },
+                                                        ) {
+                                                            Icon(
+                                                                if (playlist.title in selectedPlaylistTitles) Icons.Rounded.CheckCircle else Icons.Rounded.MoreVert,
+                                                                contentDescription = if (playlist.title in selectedPlaylistTitles) "Deselect playlist" else "Select playlist",
+                                                                tint = if (playlist.title in selectedPlaylistTitles) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                            )
+                                                        }
+                                                    } else {
                                                     IconButton(onClick = { menuExpanded = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "More playlist actions") }
                                                     DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
                                                         DropdownMenuItem(text = { Text("Open") }, onClick = { menuExpanded = false; openedPlaylist = playlist.title })
@@ -1750,9 +1861,10 @@ fun ScrobbleScreen(
                                                         })
                                                         DropdownMenuItem(text = { Text("Remove") }, leadingIcon = { Icon(Icons.Rounded.DeleteOutline, null) }, onClick = { menuExpanded = false; pendingRemovePlaylist = playlist.title })
                                                     }
+                                                    }
                                                 }
                                             }
-                                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            if (!playlistSelectionMode) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                                 Button(onClick = { onPlayPlaylist(playlist.title, playlist.songs, 0) }, modifier = Modifier.weight(1f)) {
                                                     Icon(Icons.Rounded.PlayArrow, null)
                                                     Spacer(Modifier.width(6.dp))
