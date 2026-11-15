@@ -4129,11 +4129,10 @@ private fun BitChordApp(
                 }
                 val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
                 val measuredBarsHeight = with(LocalDensity.current) { floatingBarsHeight.intValue.toDp() }
-                val fabBottomTarget = if (glassActive) {
-                    (measuredBarsHeight.takeIf { it > 0.dp } ?: 72.dp) + 10.dp
-                } else {
-                    2.dp
-                }
+                // The FAB docks above the complete player/navigation stack in both
+                // material modes. Each bar already includes its own system/gesture
+                // inset, so applying another inset to the FAB would double the gap.
+                val fabBottomTarget = (measuredBarsHeight.takeIf { it > 0.dp } ?: 72.dp) + 10.dp
                 val fabBottom by animateDpAsState(
                     targetValue = fabBottomTarget,
                     animationSpec = if (reducePlayerMotion) snap() else tween(220),
@@ -4166,7 +4165,6 @@ private fun BitChordApp(
                     else Modifier.background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
-                        .then(if (glassActive) Modifier else Modifier.windowInsetsPadding(floatingBarInsets))
                         .padding(end = 16.dp, bottom = fabBottom),
                     reduceMotion = reducePlayerMotion,
                     folded = glassActive && activeNavBarScroll.isInline,
