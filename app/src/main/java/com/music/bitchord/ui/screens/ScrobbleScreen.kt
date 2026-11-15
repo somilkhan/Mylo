@@ -744,35 +744,9 @@ fun ScrobbleScreen(
                             limit = mixTrackCount,
                         )
                     }
-                    ScrobbleMixMode.DISCOVER -> {
-                        val excluded = (syncedHistory.map { it.videoId } + listens.map { it.song.videoId } + generationTopTracks.map { it.videoId })
-                            .filter(String::isNotBlank).toSet()
-                        val heardSongs = (syncedHistory + listens.map { it.song } +
-                            generationTopTracks + recentTracks)
-                            .distinctBy(::recommendationIdentity)
-                        buildDiscoverMix(
-                            candidates = recommendations.ifEmpty {
-                                YtMusicRepository.quickPicks(excluded).getOrThrow()
-                            },
-                            heardVideoIds = excluded,
-                            heardSongs = heardSongs,
-                            topArtistNames = favouriteTracks.take(12).mapTo(mutableSetOf()) {
-                                com.music.bitchord.data.stats.ListeningStats.primaryArtist(it.artist) ?: it.artist
-                            },
-                            recentArtistNames = recentTracks.take(12).mapTo(mutableSetOf()) {
-                                com.music.bitchord.data.stats.ListeningStats.primaryArtist(it.artist) ?: it.artist
-                            },
-                            artistAffinity = run {
-                                val counts = generationTopRankedTracks.groupBy {
-                                    com.music.bitchord.data.stats.ListeningStats.primaryArtist(it.song.artist)
-                                        ?.lowercase() ?: it.song.artist.lowercase()
-                                }.mapValues { (_, rows) -> rows.sumOf { it.plays }.toDouble() }
-                                val max = counts.values.maxOrNull() ?: 0.0
-                                if (max <= 0.0) emptyMap() else counts.mapValues { (_, value) -> value / max }
-                            },
-                            limit = mixTrackCount,
-                        )
-                    }
+                    // Recommendation refresh already ran LastWave's source scoring,
+                    // strict heard exclusion and progressive diversity selection.
+                    ScrobbleMixMode.DISCOVER -> distinctRecommendationSongs(recommendations).take(mixTrackCount)
                     ScrobbleMixMode.RADIO -> {
                         val seed = selectedSeed?.takeIf(::isYouTubeCatalogTrack)
                             ?: throw IllegalStateException("Choose a YouTube Music track for Song radio")
