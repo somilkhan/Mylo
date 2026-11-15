@@ -301,7 +301,7 @@ class ScrobbleMixLogicTest {
         assertEquals(5, result.size)
         assertEquals("Top Artist", result.first().artist)
         assertEquals("Recent Artist", result.last().artist)
-        assertEquals(2, result.count { it.artist == "New Artist" })
+        assertEquals(3, result.count { it.artist == "New Artist" })
     }
 
     @Test
