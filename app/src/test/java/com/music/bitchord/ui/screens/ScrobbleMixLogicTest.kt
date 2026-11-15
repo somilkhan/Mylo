@@ -298,6 +298,30 @@ class ScrobbleMixLogicTest {
     }
 
     @Test
+    fun similarArtistMixExcludesSeedArtistAndBalancesOtherArtists() {
+        val seedOne = Song("seedtrk0001", "Seed song", "Seed Artist", null)
+        val seedTwo = Song("seedtrk0002", "Another seed song", "Seed Artist feat. Guest", null)
+        val relatedA1 = Song("relAtrack01", "A one", "Related A", null)
+        val relatedA2 = Song("relAtrack02", "A two", "Related A", null)
+        val relatedA3 = Song("relAtrack03", "A three", "Related A", null)
+        val relatedB1 = Song("relBtrack01", "B one", "Related B", null)
+        val relatedB2 = Song("relBtrack02", "B two", "Related B", null)
+        val relatedB3 = Song("relBtrack03", "B three", "Related B", null)
+
+        val result = buildSimilarArtistMix(
+            youtubeRadio = listOf(seedOne, relatedA1, relatedB1, relatedA2, relatedB2, seedTwo),
+            lastFmSimilar = listOf(relatedA3, relatedB3),
+            seedArtist = "Seed Artist",
+            limit = 4,
+        )
+
+        assertEquals(4, result.size)
+        assertTrue(result.none { it.artist.startsWith("Seed Artist") })
+        assertEquals(2, result.count { it.artist == "Related A" })
+        assertEquals(2, result.count { it.artist == "Related B" })
+    }
+
+    @Test
     fun neverHeardExcludesAlternateUploadsAndEditsOfPreviouslyHeardTracks() {
         val heard = Song("heardtrack01", "Deep Swim", "Original Artist", null)
         val alternateUpload = Song("alttrack001", "Deep Swim - Official Audio", "Original Artist", null)
