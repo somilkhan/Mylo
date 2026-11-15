@@ -342,7 +342,7 @@ private fun ScrobblePlaylistsScreen(
                             scope.launch {
                                 try {
                                     ScrobblePlaylistStore.setCustomCover(
-                                        playlist.id, coverUri.trim().ifBlank { null },
+                                        playlist.id, coverUri.trim().takeIf { it.isNotEmpty() },
                                     )
                                     message = "Cover updated"
                                 } catch (failure: Exception) { message = failure.message }
