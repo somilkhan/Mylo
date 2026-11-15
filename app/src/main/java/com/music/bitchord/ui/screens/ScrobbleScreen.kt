@@ -219,6 +219,7 @@ fun ScrobbleScreen(
     var seedSearchError by remember { mutableStateOf<String?>(null) }
     var seedSearchRequest by remember { mutableIntStateOf(0) }
     var tagQuery by remember { mutableStateOf("") }
+    var similarArtistQuery by remember { mutableStateOf("") }
     var mixTrackCount by remember { mutableIntStateOf(20) }
     var generationRequest by remember { mutableIntStateOf(0) }
     var generatingMix by remember { mutableStateOf(false) }
@@ -673,9 +674,10 @@ fun ScrobbleScreen(
                             .distinctBy(::songIdentity).take(mixTrackCount)
                     }
                     ScrobbleMixMode.SIMILAR_ARTISTS -> {
-                        val seed = selectedSeed?.takeIf(::isYouTubeCatalogTrack)
-                            ?: throw IllegalStateException("Choose a YouTube Music track to find similar artists")
-                        val similarArtists = LastFM.getSimilarArtists(seed.artist, limit = 8).getOrThrow()
+                        val artistName = similarArtistQuery.trim().ifBlank {
+                            selectedSeed?.takeIf(::isYouTubeCatalogTrack)?.artist.orEmpty()
+                        }.ifBlank { throw IllegalStateException("Enter an artist to find similar artists") }
+                        val similarArtists = LastFM.getSimilarArtists(artistName, limit = 8).getOrThrow()
                         coroutineScope {
                             similarArtists.map { artist ->
                                 async {
@@ -703,7 +705,7 @@ fun ScrobbleScreen(
                 ScrobbleMixMode.TASTE_MIX -> "Your taste mix"
                 ScrobbleMixMode.RADIO -> "Radio · ${selectedSeed?.title.orEmpty()}"
                 ScrobbleMixMode.ARTIST_MIX -> "More by ${selectedSeed?.artist.orEmpty()}"
-                ScrobbleMixMode.SIMILAR_ARTISTS -> "Similar to ${selectedSeed?.artist.orEmpty()}"
+                ScrobbleMixMode.SIMILAR_ARTISTS -> "Similar to ${similarArtistQuery.trim().ifBlank { selectedSeed?.artist.orEmpty() }}" 
                 ScrobbleMixMode.NEVER_HEARD -> "New to you"
                 ScrobbleMixMode.DISCOVER -> "Discover"
                 ScrobbleMixMode.TAG -> "${tagQuery.trim().replaceFirstChar { it.uppercase() }} mix"
@@ -1337,7 +1339,7 @@ fun ScrobbleScreen(
                                 }
                             }
                         }
-                        if (mixMode == ScrobbleMixMode.RADIO || mixMode == ScrobbleMixMode.ARTIST_MIX || mixMode == ScrobbleMixMode.SIMILAR_ARTISTS) {
+                        if (mixMode == ScrobbleMixMode.RADIO || mixMode == ScrobbleMixMode.ARTIST_MIX) {
                             item("generate-seed") {
                                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                     Text(if (mixMode == ScrobbleMixMode.RADIO) "Choose a starting track" else "Choose an artist", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
@@ -1456,6 +1458,33 @@ fun ScrobbleScreen(
                                 }
                             }
                         }
+                        if (mixMode == ScrobbleMixMode.SIMILAR_ARTISTS) {
+                            item("generate-similar-artist-seed") {
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text("Choose an artist", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                                    OutlinedTextField(
+                                        value = similarArtistQuery,
+                                        onValueChange = {
+                                            similarArtistQuery = it
+                                            generatedMix = emptyList()
+                                            generationError = null
+                                            mixSaved = false
+                                        },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        singleLine = true,
+                                        enabled = !generatingMix,
+                                        label = { Text("Artist name") },
+                                        placeholder = { Text("e.g. Radiohead") },
+                                        shape = RoundedCornerShape(16.dp),
+                                    )
+                                    Text(
+                                        "Mylo uses Last.fm to find related artists, then searches YouTube Music for playable tracks.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        }
                         if (mixMode == ScrobbleMixMode.TAG) {
                             item("generate-tag-options") {
                                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -1567,7 +1596,8 @@ fun ScrobbleScreen(
                                     (mixMode != ScrobbleMixMode.REDISCOVER || !loadingAllTimeStats) &&
                                     (mixMode != ScrobbleMixMode.REDISCOVER || !allTimeStatsFailed) &&
                                     (mixMode !in setOf(ScrobbleMixMode.REDISCOVER, ScrobbleMixMode.NEVER_HEARD) || !historyFailed) &&
-                                    (mixMode !in setOf(ScrobbleMixMode.RADIO, ScrobbleMixMode.ARTIST_MIX, ScrobbleMixMode.SIMILAR_ARTISTS) || selectedSeed?.let(::isYouTubeCatalogTrack) == true),
+                                    (mixMode !in setOf(ScrobbleMixMode.RADIO, ScrobbleMixMode.ARTIST_MIX) || selectedSeed?.let(::isYouTubeCatalogTrack) == true) &&
+                                    (mixMode != ScrobbleMixMode.SIMILAR_ARTISTS || similarArtistQuery.isNotBlank()),
                                 modifier = Modifier.fillMaxWidth(),
                             ) {
                                 if (generatingMix) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
