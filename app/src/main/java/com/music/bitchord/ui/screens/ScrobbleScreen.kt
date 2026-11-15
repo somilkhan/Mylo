@@ -98,6 +98,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.music.bitchord.data.ListeningHistory
+import com.music.bitchord.data.scrobbling.LastFM
 import com.music.bitchord.data.YtMusicRepository
 import com.music.bitchord.data.model.SearchFilter
 import com.music.bitchord.data.model.Song
@@ -106,6 +107,9 @@ import com.music.bitchord.data.stats.ReplayPeriod
 import com.music.bitchord.data.stats.ReplaySummary
 import com.music.bitchord.data.stats.RankedSong
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -120,6 +124,7 @@ private enum class ScrobbleMixMode(val title: String, val description: String) {
     TASTE_MIX("Taste mix", "A balanced blend of favourites, recent listens and fresh picks"),
     RADIO("Song radio", "Build a radio mix from a track you choose"),
     ARTIST_MIX("Artist mix", "Explore more tracks from an artist you already enjoy"),
+    SIMILAR_ARTISTS("Similar artists", "Discover tracks from artists related to your chosen artist"),
     NEVER_HEARD("Never heard", "Find catalogue picks missing from your listening history"),
     DISCOVER("Discover", "Fresh YouTube Music picks outside your listening history"),
     TAG("By genre", "Build a mix from a genre or tag"),
@@ -374,10 +379,43 @@ fun ScrobbleScreen(
                         limit = mixTrackCount,
                     )
                 }
-                ScrobbleMixMode.TAG -> buildTagMix(
-                    YtMusicRepository.search("${tagQuery.trim()} music", SearchFilter.SONGS).getOrThrow(),
-                    mixTrackCount,
-                )
+                ScrobbleMixMode.TAG -> {
+                    val youtubeTracks = buildTagMix(
+                        YtMusicRepository.search("${tagQuery.trim()} music", SearchFilter.SONGS).getOrThrow(),
+                        limit = mixTrackCount * 2,
+                    )
+                    val lastFmTracks = if (LastFM.isInitialized()) {
+                        val tagTracks = try {
+                            LastFM.getTagTopTracks(tagQuery, limit = minOf(8, mixTrackCount)).getOrThrow()
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                            emptyList()
+                        }
+                        coroutineScope {
+                            tagTracks.map { candidate ->
+                                async {
+                                    try {
+                                        buildTagMix(
+                                            YtMusicRepository.search(
+                                                "${candidate.name} ${candidate.artist}",
+                                                SearchFilter.SONGS,
+                                            ).getOrThrow(),
+                                            limit = 1,
+                                        ).firstOrNull()
+                                    } catch (cancelled: CancellationException) {
+                                        throw cancelled
+                                    } catch (_: Exception) {
+                                        null
+                                    }
+                                }
+                            }.awaitAll().filterNotNull()
+                        }
+                    } else {
+                        emptyList()
+                    }
+                    buildBalancedSourceMix(youtubeTracks, lastFmTracks, mixTrackCount)
+                }
                 ScrobbleMixMode.LIBRARY -> buildLibraryMix(
                     YtMusicRepository.library().getOrThrow(),
                     mixTrackCount,
@@ -417,6 +455,27 @@ fun ScrobbleScreen(
                         .filter { it.videoId.isNotBlank() && it.videoId != seed.videoId }
                         .distinctBy(::songIdentity).take(mixTrackCount)
                 }
+                ScrobbleMixMode.SIMILAR_ARTISTS -> {
+                    val seed = selectedSeed?.takeIf(::isYouTubeCatalogTrack)
+                        ?: throw IllegalStateException("Choose a YouTube Music track to find similar artists")
+                    val similarArtists = LastFM.getSimilarArtists(seed.artist, limit = 8).getOrThrow()
+                    coroutineScope {
+                        similarArtists.map { artist ->
+                            async {
+                                try {
+                                    buildTagMix(
+                                        YtMusicRepository.search("$artist songs", SearchFilter.SONGS).getOrThrow(),
+                                        limit = 3,
+                                    ).filterNot { it.artist.equals(seed.artist, ignoreCase = true) }
+                                } catch (cancelled: CancellationException) {
+                                    throw cancelled
+                                } catch (_: Exception) {
+                                    emptyList()
+                                }
+                            }
+                        }.awaitAll().flatten()
+                    }.distinctBy(::songIdentity).take(mixTrackCount)
+                }
                 }
             }
             if (generated.isEmpty()) throw IllegalStateException("No tracks were available for this mix. Try another mode or refresh your listening data.")
@@ -427,6 +486,7 @@ fun ScrobbleScreen(
                 ScrobbleMixMode.TASTE_MIX -> "Your taste mix"
                 ScrobbleMixMode.RADIO -> "Radio · ${selectedSeed?.title.orEmpty()}"
                 ScrobbleMixMode.ARTIST_MIX -> "More by ${selectedSeed?.artist.orEmpty()}"
+                ScrobbleMixMode.SIMILAR_ARTISTS -> "Similar to ${selectedSeed?.artist.orEmpty()}"
                 ScrobbleMixMode.NEVER_HEARD -> "New to you"
                 ScrobbleMixMode.DISCOVER -> "Discover"
                 ScrobbleMixMode.TAG -> "${tagQuery.trim().replaceFirstChar { it.uppercase() }} mix"
@@ -796,6 +856,7 @@ fun ScrobbleScreen(
                                                             ScrobbleMixMode.TASTE_MIX -> Icons.Rounded.GraphicEq
                                                             ScrobbleMixMode.RADIO -> Icons.Rounded.PlayArrow
                                                             ScrobbleMixMode.ARTIST_MIX -> Icons.Rounded.Explore
+                                    ScrobbleMixMode.SIMILAR_ARTISTS -> Icons.Rounded.Explore
                                                             ScrobbleMixMode.NEVER_HEARD -> Icons.Rounded.Search
                                                             ScrobbleMixMode.DISCOVER -> Icons.Rounded.Explore
                                                             ScrobbleMixMode.TAG -> Icons.Rounded.Search
@@ -845,7 +906,7 @@ fun ScrobbleScreen(
                                 }
                             }
                         }
-                        if (mixMode == ScrobbleMixMode.RADIO || mixMode == ScrobbleMixMode.ARTIST_MIX) {
+                        if (mixMode == ScrobbleMixMode.RADIO || mixMode == ScrobbleMixMode.ARTIST_MIX || mixMode == ScrobbleMixMode.SIMILAR_ARTISTS) {
                             item("generate-seed") {
                                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                     Text(if (mixMode == ScrobbleMixMode.RADIO) "Choose a starting track" else "Choose an artist", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
@@ -1002,7 +1063,8 @@ fun ScrobbleScreen(
                                         }
                                     }
                                     Text(
-                                        "Searches YouTube Music for real tracks matching this tag.",
+                                        if (LastFM.isInitialized()) "Blends YouTube Music search results with Last.fm's top tracks for this tag."
+                                        else "Searches YouTube Music for real tracks matching this tag.",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
@@ -1040,7 +1102,7 @@ fun ScrobbleScreen(
                                     (mixMode != ScrobbleMixMode.REDISCOVER || !loadingAllTimeStats) &&
                                     (mixMode != ScrobbleMixMode.REDISCOVER || !allTimeStatsFailed) &&
                                     (mixMode !in setOf(ScrobbleMixMode.REDISCOVER, ScrobbleMixMode.NEVER_HEARD) || !historyFailed) &&
-                                    (mixMode !in setOf(ScrobbleMixMode.RADIO, ScrobbleMixMode.ARTIST_MIX) || selectedSeed?.let(::isYouTubeCatalogTrack) == true),
+                                    (mixMode !in setOf(ScrobbleMixMode.RADIO, ScrobbleMixMode.ARTIST_MIX, ScrobbleMixMode.SIMILAR_ARTISTS) || selectedSeed?.let(::isYouTubeCatalogTrack) == true),
                                 modifier = Modifier.fillMaxWidth(),
                             ) {
                                 if (generatingMix) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
