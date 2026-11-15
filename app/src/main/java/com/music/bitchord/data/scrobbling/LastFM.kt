@@ -16,6 +16,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.coroutines.CancellationException
@@ -68,6 +69,87 @@ internal fun parseLastFmTagTracks(
     }
         .distinctBy { "${it.name.lowercase(Locale.ROOT)}|${it.artist.lowercase(Locale.ROOT)}" }
         .take(limit.coerceAtMost(50))
+}
+
+
+internal fun parseLastFmObjects(value: JsonElement?): List<JsonObject> = when (value) {
+    is JsonArray -> value.mapNotNull { it as? JsonObject }
+    is JsonObject -> listOf(value)
+    else -> emptyList()
+}
+
+private fun JsonObject.textValue(key: String): String =
+    (this[key] as? JsonPrimitive)?.contentOrNull?.trim().orEmpty()
+
+private fun JsonObject.lastFmArtwork(): String? {
+    val images = this["image"] as? JsonArray ?: return null
+    return images.mapNotNull { item ->
+        val image = item as? JsonObject ?: return@mapNotNull null
+        val url = image.textValue("#text")
+        url.takeIf { it.isNotBlank() && !it.contains("2a96cbd8b46e442fc41c2b86b821562f") }
+    }.lastOrNull()
+}
+
+internal fun parseLastFmUserStats(response: String): LastFM.UserStats? {
+    val root = runCatching { Json.parseToJsonElement(response) as? JsonObject }.getOrNull() ?: return null
+    val user = root["user"] as? JsonObject ?: return null
+    return LastFM.UserStats(
+        playCount = user.textValue("playcount").toLongOrNull() ?: 0L,
+        trackCount = user.textValue("track_count").toLongOrNull() ?: 0L,
+        artistCount = user.textValue("artist_count").toLongOrNull() ?: 0L,
+        albumCount = user.textValue("album_count").toLongOrNull() ?: 0L,
+        avatarUrl = user.lastFmArtwork(),
+    )
+}
+
+internal fun parseLastFmTopTracks(response: String, limit: Int = 50): List<LastFM.RankedTrack> {
+    if (limit <= 0) return emptyList()
+    val root = runCatching { Json.parseToJsonElement(response) as? JsonObject }.getOrNull() ?: return emptyList()
+    val rows = root["toptracks"] as? JsonObject ?: return emptyList()
+    return parseLastFmObjects(rows["track"]).mapNotNull { track ->
+        val name = track.textValue("name")
+        val artistObject = track["artist"] as? JsonObject
+        val artist = artistObject?.textValue("name")
+            ?: (track["artist"] as? JsonPrimitive)?.contentOrNull?.trim().orEmpty()
+        if (name.isBlank() || artist.isBlank()) null else LastFM.RankedTrack(
+            name = name,
+            artist = artist,
+            playCount = track.textValue("playcount").toLongOrNull() ?: 0L,
+            artworkUrl = track.lastFmArtwork(),
+        )
+    }.distinctBy { "${it.name.lowercase(Locale.ROOT)}|${it.artist.lowercase(Locale.ROOT)}" }.take(limit)
+}
+
+internal fun parseLastFmTopArtists(response: String, limit: Int = 30): List<LastFM.RankedArtist> {
+    if (limit <= 0) return emptyList()
+    val root = runCatching { Json.parseToJsonElement(response) as? JsonObject }.getOrNull() ?: return emptyList()
+    val rows = root["topartists"] as? JsonObject ?: return emptyList()
+    return parseLastFmObjects(rows["artist"]).mapNotNull { artist ->
+        val name = artist.textValue("name")
+        if (name.isBlank()) null else LastFM.RankedArtist(
+            name = name,
+            playCount = artist.textValue("playcount").toLongOrNull() ?: 0L,
+            artworkUrl = artist.lastFmArtwork(),
+        )
+    }.distinctBy { it.name.lowercase(Locale.ROOT) }.take(limit)
+}
+
+internal fun parseLastFmTopAlbums(response: String, limit: Int = 20): List<LastFM.RankedAlbum> {
+    if (limit <= 0) return emptyList()
+    val root = runCatching { Json.parseToJsonElement(response) as? JsonObject }.getOrNull() ?: return emptyList()
+    val rows = root["topalbums"] as? JsonObject ?: return emptyList()
+    return parseLastFmObjects(rows["album"]).mapNotNull { album ->
+        val name = album.textValue("name")
+        val artistObject = album["artist"] as? JsonObject
+        val artist = artistObject?.textValue("name")
+            ?: (album["artist"] as? JsonPrimitive)?.contentOrNull?.trim().orEmpty()
+        if (name.isBlank() || artist.isBlank()) null else LastFM.RankedAlbum(
+            name = name,
+            artist = artist,
+            playCount = album.textValue("playcount").toLongOrNull() ?: 0L,
+            artworkUrl = album.lastFmArtwork(),
+        )
+    }.distinctBy { "${it.name.lowercase(Locale.ROOT)}|${it.artist.lowercase(Locale.ROOT)}" }.take(limit)
 }
 
 object LastFM {
@@ -244,6 +326,66 @@ object LastFM {
     }
 
     data class DiscoveryTrack(val name: String, val artist: String)
+    data class UserStats(
+        val playCount: Long,
+        val trackCount: Long,
+        val artistCount: Long,
+        val albumCount: Long,
+        val avatarUrl: String?,
+    )
+    data class RankedTrack(val name: String, val artist: String, val playCount: Long, val artworkUrl: String?)
+    data class RankedArtist(val name: String, val playCount: Long, val artworkUrl: String?)
+    data class RankedAlbum(val name: String, val artist: String, val playCount: Long, val artworkUrl: String?)
+
+    private val supportedStatsPeriods = setOf("overall", "7day", "1month", "3month", "6month", "12month")
+
+    /** LastWave-compatible Last.fm profile totals; this read requires an API key, not a write session. */
+    suspend fun getUserStats(username: String): Result<UserStats> = discoveryResult {
+        require(isInitialized()) { "Last.fm API credentials are not configured" }
+        val user = username.trim()
+        require(user.isNotBlank()) { "Connect a Last.fm username to load global statistics" }
+        val response = postAndRead("user.getinfo", extra = mapOf("user" to user))
+        parseLastFmUserStats(response) ?: error("Last.fm returned an invalid user profile")
+    }
+
+    suspend fun getTopTracks(username: String, period: String = "overall", limit: Int = 50): Result<List<RankedTrack>> =
+        discoveryResult {
+            require(isInitialized()) { "Last.fm API credentials are not configured" }
+            val user = username.trim()
+            require(user.isNotBlank()) { "Connect a Last.fm username to load global statistics" }
+            require(period in supportedStatsPeriods) { "Unsupported Last.fm statistics period" }
+            val response = postAndRead(
+                "user.gettoptracks",
+                extra = mapOf("user" to user, "period" to period, "limit" to limit.coerceIn(1, 100).toString()),
+            )
+            parseLastFmTopTracks(response, limit)
+        }
+
+    suspend fun getTopArtists(username: String, period: String = "overall", limit: Int = 30): Result<List<RankedArtist>> =
+        discoveryResult {
+            require(isInitialized()) { "Last.fm API credentials are not configured" }
+            val user = username.trim()
+            require(user.isNotBlank()) { "Connect a Last.fm username to load global statistics" }
+            require(period in supportedStatsPeriods) { "Unsupported Last.fm statistics period" }
+            val response = postAndRead(
+                "user.gettopartists",
+                extra = mapOf("user" to user, "period" to period, "limit" to limit.coerceIn(1, 100).toString()),
+            )
+            parseLastFmTopArtists(response, limit)
+        }
+
+    suspend fun getTopAlbums(username: String, period: String = "overall", limit: Int = 20): Result<List<RankedAlbum>> =
+        discoveryResult {
+            require(isInitialized()) { "Last.fm API credentials are not configured" }
+            val user = username.trim()
+            require(user.isNotBlank()) { "Connect a Last.fm username to load global statistics" }
+            require(period in supportedStatsPeriods) { "Unsupported Last.fm statistics period" }
+            val response = postAndRead(
+                "user.gettopalbums",
+                extra = mapOf("user" to user, "period" to period, "limit" to limit.coerceIn(1, 100).toString()),
+            )
+            parseLastFmTopAlbums(response, limit)
+        }
 
     /** Public Last.fm discovery endpoint; does not require a user session. */
     suspend fun getSimilarArtists(artist: String, limit: Int = 8): Result<List<String>> =

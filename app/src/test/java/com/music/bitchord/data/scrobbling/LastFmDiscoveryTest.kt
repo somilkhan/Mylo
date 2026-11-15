@@ -88,4 +88,46 @@ class LastFmDiscoveryTest {
         assertEquals(emptyList<String>(), parseLastFmSimilarArtists("""{"similarartists":{}}"""))
         assertEquals(emptyList<LastFM.DiscoveryTrack>(), parseLastFmTagTracks("""{"tracks":{}}"""))
     }
+    @Test
+    fun parsesLastFmProfileTotalsAndArtwork() {
+        val stats = parseLastFmUserStats(
+            """{"user":{"playcount":"1200","track_count":"450","artist_count":"120","album_count":"90","image":[{"#text":"https://img/small.jpg","size":"small"},{"#text":"https://img/large.jpg","size":"large"}]}}""",
+        )
+        assertEquals(1200L, stats?.playCount)
+        assertEquals(450L, stats?.trackCount)
+        assertEquals(120L, stats?.artistCount)
+        assertEquals(90L, stats?.albumCount)
+        assertEquals("https://img/large.jpg", stats?.avatarUrl)
+    }
+
+    @Test
+    fun parsesLastFmTopChartsForArrayAndSingleObjectPayloads() {
+        val tracks = parseLastFmTopTracks(
+            """{"toptracks":{"track":[{"name":"Track A","playcount":"12","artist":{"name":"Artist A"}},{"name":"Track B","playcount":"4","artist":"Artist B"}]}}""",
+        )
+        assertEquals(listOf("Track A", "Track B"), tracks.map { it.name })
+        assertEquals(12L, tracks.first().playCount)
+
+        val artists = parseLastFmTopArtists(
+            """{"topartists":{"artist":{"name":"Artist A","playcount":"20","image":[{"#text":"https://img/a.jpg","size":"extralarge"}]}}}""",
+        )
+        assertEquals(1, artists.size)
+        assertEquals("Artist A", artists.single().name)
+        assertEquals("https://img/a.jpg", artists.single().artworkUrl)
+
+        val albums = parseLastFmTopAlbums(
+            """{"topalbums":{"album":{"name":"Album A","playcount":"8","artist":{"name":"Artist A"}}}}""",
+        )
+        assertEquals(1, albums.size)
+        assertEquals("Artist A", albums.single().artist)
+        assertEquals(8L, albums.single().playCount)
+    }
+
+    @Test
+    fun malformedOrEmptyLastFmStatsPayloadsDoNotInventEntries() {
+        assertEquals(null, parseLastFmUserStats("""{"error":6,"message":"User not found"}"""))
+        assertEquals(emptyList<LastFM.RankedTrack>(), parseLastFmTopTracks("""{"toptracks":{"track":[]}}"""))
+        assertEquals(emptyList<LastFM.RankedArtist>(), parseLastFmTopArtists("""{}"""))
+        assertEquals(emptyList<LastFM.RankedAlbum>(), parseLastFmTopAlbums("""{"topalbums":{"album":{}}}"""))
+    }
 }
