@@ -282,12 +282,12 @@ class ScrobbleMixLogicTest {
 
     @Test
     fun discoverUsesLastWaveTasteAffinityAndArtistDiversityBeforeRelaxingCaps() {
-        val topArtistA = Song("topartist001", "Top artist song", "Top Artist", null)
+        val topArtistA = Song("topartst001", "Top artist song", "Top Artist", null)
         val recentArtistA = Song("recentart01", "Recent artist song", "Recent Artist", null)
-        val newArtistA = Song("newartist001", "New artist one", "New Artist", null)
-        val newArtistB = Song("newartist002", "New artist two", "New Artist", null)
-        val newArtistC = Song("newartist003", "New artist three", "New Artist", null)
-        val newArtistD = Song("newartist004", "New artist four", "New Artist", null)
+        val newArtistA = Song("newartst001", "New artist one", "New Artist", null)
+        val newArtistB = Song("newartst002", "New artist two", "New Artist", null)
+        val newArtistC = Song("newartst003", "New artist three", "New Artist", null)
+        val newArtistD = Song("newartst004", "New artist four", "New Artist", null)
 
         val result = buildDiscoverMix(
             candidates = listOf(newArtistA, newArtistB, newArtistC, newArtistD, topArtistA, recentArtistA),
