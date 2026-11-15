@@ -227,7 +227,7 @@ fun ScrobbleScreen(
     }
 
     LaunchedEffect(recentTracks, topTracks) {
-        if (selectedSeed == null) selectedSeed = (recentTracks + topTracks).firstOrNull { it.videoId.isNotBlank() }
+        if (selectedSeed == null) selectedSeed = (recentTracks + topTracks).firstOrNull(::isYouTubeCatalogTrack)
     }
 
     LaunchedEffect(generationRequest) {
@@ -267,7 +267,7 @@ fun ScrobbleScreen(
                         .distinctBy(::songIdentity).take(mixTrackCount)
                 }
                 ScrobbleMixMode.RADIO -> {
-                    val seed = selectedSeed?.takeIf { it.videoId.isNotBlank() }
+                    val seed = selectedSeed?.takeIf(::isYouTubeCatalogTrack)
                         ?: throw IllegalStateException("Choose a YouTube Music track for Song radio")
                     YtMusicRepository.radio(seed.videoId).getOrThrow()
                         .filter { it.videoId.isNotBlank() && it.videoId != seed.videoId }
@@ -597,7 +597,7 @@ fun ScrobbleScreen(
                             item("generate-seed") {
                                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                     Text(if (mixMode == ScrobbleMixMode.RADIO) "Choose a starting track" else "Choose an artist", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                                    val seeds = (recentTracks + topTracks).filter { it.videoId.isNotBlank() }.distinctBy(::songIdentity).take(12)
+                                    val seeds = (recentTracks + topTracks).filter(::isYouTubeCatalogTrack).distinctBy(::songIdentity).take(12)
                                     if (seeds.isEmpty()) {
                                         if (mixMode == ScrobbleMixMode.RADIO) {
                                             EmptyPanel("No radio seed yet", "Play or sync a YouTube Music track first. Local-only files cannot start YouTube Music radio.")
@@ -659,7 +659,7 @@ fun ScrobbleScreen(
                                 enabled = !generatingMix && !loadingHistory &&
                                     (mixMode !in setOf(ScrobbleMixMode.FAVOURITES, ScrobbleMixMode.TASTE_MIX) || !loadingStats) &&
                                     (mixMode != ScrobbleMixMode.REDISCOVER || !loadingAllTimeStats) &&
-                                    (mixMode !in setOf(ScrobbleMixMode.RADIO, ScrobbleMixMode.ARTIST_MIX) || selectedSeed?.videoId?.isNotBlank() == true),
+                                    (mixMode !in setOf(ScrobbleMixMode.RADIO, ScrobbleMixMode.ARTIST_MIX) || selectedSeed?.let(::isYouTubeCatalogTrack) == true),
                                 modifier = Modifier.fillMaxWidth(),
                             ) {
                                 if (generatingMix) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
