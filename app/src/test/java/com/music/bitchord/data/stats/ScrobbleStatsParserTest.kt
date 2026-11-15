@@ -11,7 +11,7 @@ class ScrobbleStatsParserTest {
     @Test
     fun parsesTrackArtistAlbumAndTagChartRows() {
         val track = Json.parseToJsonElement(
-            """{"name":"Blue Monday","artist":{"name":"New Order"},"playcount":"120","listeners":"40","album":{"#text":"Power, Corruption & Lies"},"image":[{"size":"large","#text":"https://img.test/cover.jpg"}]}""",
+            """{"name":"Blue Monday","artist":{"name":"New Order"},"playcount":"120","listeners":"40","match":"0.87","album":{"#text":"Power, Corruption & Lies"},"image":[{"size":"large","#text":"https://img.test/cover.jpg"}]}""",
         )
         val artist = Json.parseToJsonElement(
             """{"name":"New Order","playcount":"500","listeners":"200","image":[{"size":"extralarge","#text":"https://img.test/artist.jpg"}]}""",
@@ -29,6 +29,7 @@ class ScrobbleStatsParserTest {
         assertEquals("New Order", parsedTrack.artist)
         assertEquals("Power, Corruption & Lies", parsedTrack.album)
         assertEquals(120L, parsedTrack.playCount)
+        assertEquals(0.87, parsedTrack.match!!, 0.001)
         assertEquals("https://img.test/cover.jpg", parsedTrack.artworkUrl)
         assertEquals(500L, parsedArtist.playCount)
         assertEquals("https://img.test/artist.jpg", parsedArtist.artworkUrl)

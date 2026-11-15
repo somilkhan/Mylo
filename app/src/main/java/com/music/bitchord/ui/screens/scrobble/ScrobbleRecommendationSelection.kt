@@ -21,7 +21,7 @@ internal object ScrobbleRecommendationSelection {
 
     fun select(candidates: List<ScrobbleRecommendationCandidate>, total: Int): List<Song> {
         if (total <= 0 || candidates.isEmpty()) return emptyList()
-        val unique = candidates.distinctBy { it.song.scrobbleIdentityKey }
+        val unique = distinctCandidates(candidates)
             .sortedWith(compareByDescending<ScrobbleRecommendationCandidate> { it.fresh }
                 .thenByDescending { it.score })
         val selected = selectFinal(unique, total)
@@ -40,6 +40,20 @@ internal object ScrobbleRecommendationSelection {
             it.song.scrobbleIdentityKey == opener.song.scrobbleIdentityKey ||
                 it.song.scrobbleIdentityKey == closer.song.scrobbleIdentityKey
         }.let { middle -> listOf(opener) + middle + closer }.map { it.song }
+    }
+
+    private fun distinctCandidates(candidates: List<ScrobbleRecommendationCandidate>): List<ScrobbleRecommendationCandidate> {
+        val seenIds = HashSet<String>()
+        val seenKeys = HashSet<String>()
+        return candidates.filter { candidate ->
+            val key = candidate.song.scrobbleIdentityKey
+            val id = candidate.song.videoId.takeIf(String::isNotBlank)
+            if (key in seenKeys || (id != null && id in seenIds)) false else {
+                seenKeys += key
+                id?.let(seenIds::add)
+                true
+            }
+        }
     }
 
     private fun selectFinal(

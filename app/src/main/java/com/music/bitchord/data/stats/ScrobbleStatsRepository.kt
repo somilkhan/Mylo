@@ -21,6 +21,7 @@ data class ScrobbleChartEntry(
     val playCount: Long = 0L,
     val listeners: Long? = null,
     val artworkUrl: String? = null,
+    val match: Double? = null,
 )
 
 data class ScrobbleStatsSnapshot(
@@ -117,6 +118,7 @@ object ScrobbleStatsRepository {
             playCount = obj.longAt("playcount") ?: 0L,
             listeners = obj.longAt("listeners"),
             artworkUrl = obj.bestImageUrl(),
+            match = obj.doubleAt("match"),
         )
     }
 
@@ -158,6 +160,9 @@ object ScrobbleStatsRepository {
 
     private fun JsonObject.longAt(key: String): Long? =
         (this[key] as? JsonPrimitive)?.contentOrNull?.toLongOrNull()
+
+    private fun JsonObject.doubleAt(key: String): Double? =
+        (this[key] as? JsonPrimitive)?.contentOrNull?.toDoubleOrNull()
 
     private fun JsonObject.bestImageUrl(): String? {
         val images = this["image"].asElementList().mapNotNull { it as? JsonObject }
