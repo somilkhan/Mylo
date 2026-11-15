@@ -148,4 +148,36 @@ class ScrobblePlaylistStoreTest {
         }
     }
 
+
+    @Test
+    fun customPlaylistCanBeEmptyAndSurvivesCodecRoundTrip() {
+        val custom = SavedScrobblePlaylist("Road trip", "Custom playlist", emptyList())
+        val restored = ScrobblePlaylistCodec.decodeOrNull(
+            ScrobblePlaylistCodec.encode(listOf(custom)),
+        ).orEmpty().single()
+
+        assertEquals(custom.title, restored.title)
+        assertEquals(custom.reason, restored.reason)
+        assertEquals(emptyList<Song>(), restored.songs)
+    }
+
+    @Test
+    fun createRejectsBlankDuplicateAndLimitAndAddSongsDeduplicates() {
+        ScrobblePlaylistStore.playlists.clear()
+        try {
+            assertEquals(false, ScrobblePlaylistStore.create("   "))
+            assertEquals(true, ScrobblePlaylistStore.create("Road trip"))
+            assertEquals(false, ScrobblePlaylistStore.create("ROAD TRIP"))
+
+            val first = Song("abcdefghijk", "First", "Artist", null)
+            val second = Song("lmnopqrstuv", "Second", "Artist", null)
+            assertEquals(2, ScrobblePlaylistStore.addSongs("Road trip", listOf(first, first, second)))
+            assertEquals(0, ScrobblePlaylistStore.addSongs("Road trip", listOf(first, second)))
+            assertEquals(listOf(first, second), ScrobblePlaylistStore.playlists.single().songs)
+        } finally {
+            ScrobblePlaylistStore.playlists.clear()
+        }
+    }
+
+
 }
