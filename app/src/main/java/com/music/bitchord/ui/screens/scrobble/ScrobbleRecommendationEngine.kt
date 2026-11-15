@@ -20,11 +20,12 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.random.Random
 
 private const val LASTFM_SOURCE_TIMEOUT_MS = 6_000L
-private const val YOUTUBE_RESOLVE_TIMEOUT_MS = 5_500L
-private const val MAX_LASTFM_RESOLVE = 24
+private const val YOUTUBE_RESOLVE_TIMEOUT_MS = 4_500L
+private const val MAX_LASTFM_RESOLVE = 18
 
 private data class SourcedTrack(
     val entry: ScrobbleChartEntry,
@@ -212,13 +213,13 @@ internal object ScrobbleRecommendationEngine {
     private suspend fun resolvePlayable(
         candidates: List<MergedTrack>, onProgress: (String) -> Unit,
     ): List<Pair<Song, MergedTrack>> = coroutineScope {
-        var completed = 0
+        val completed = AtomicInteger(0)
         candidates.map { candidate ->
             async {
                 searchLimiter.withPermit {
                     val song = withTimeoutOrNull(YOUTUBE_RESOLVE_TIMEOUT_MS) { resolveSong(candidate.entry) }
-                    completed++
-                    if (completed % 5 == 0) onProgress("Matching tracks " + completed + "/" + candidates.size)
+                    val done = completed.incrementAndGet()
+                    if (done % 5 == 0) onProgress("Matching tracks " + done + "/" + candidates.size)
                     song?.let { it to candidate }
                 }
             }
