@@ -134,6 +134,7 @@ fun ScrobbleScreen(
     var summary by remember { mutableStateOf<ReplaySummary?>(null) }
     var allTimeSummary by remember { mutableStateOf<ReplaySummary?>(null) }
     var loadingAllTimeStats by remember { mutableStateOf(true) }
+    var allTimeStatsFailed by remember { mutableStateOf(false) }
     var loadingStats by remember { mutableStateOf(true) }
     var statsFailed by remember { mutableStateOf(false) }
     var listens by remember { mutableStateOf<List<ListeningHistory.Entry>>(emptyList()) }
@@ -185,12 +186,14 @@ fun ScrobbleScreen(
 
     LaunchedEffect(historyRevision) {
         loadingAllTimeStats = true
+        allTimeStatsFailed = false
         try {
             allTimeSummary = ListeningStats.summary(ReplayPeriod.ALL_TIME)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {
             allTimeSummary = null
+            allTimeStatsFailed = true
         } finally {
             loadingAllTimeStats = false
         }
@@ -508,6 +511,14 @@ fun ScrobbleScreen(
                                 )
                             }
                         }
+                        if (allTimeStatsFailed) {
+                            item("generate-all-time-stats-warning") {
+                                InfoPanel(
+                                    "All-time stats unavailable",
+                                    "Rediscover needs completed-play counts from this device. Reopen Scrobble to retry.",
+                                )
+                            }
+                        }
                         if (recommendationsFailed) {
                             item("generate-recommendations-warning") {
                                 InfoPanel(
@@ -675,6 +686,7 @@ fun ScrobbleScreen(
                                 enabled = !generatingMix && !loadingHistory &&
                                     (mixMode !in setOf(ScrobbleMixMode.FAVOURITES, ScrobbleMixMode.TASTE_MIX) || !loadingStats) &&
                                     (mixMode != ScrobbleMixMode.REDISCOVER || !loadingAllTimeStats) &&
+                                    (mixMode != ScrobbleMixMode.REDISCOVER || !allTimeStatsFailed) &&
                                     (mixMode !in setOf(ScrobbleMixMode.REDISCOVER, ScrobbleMixMode.NEVER_HEARD) || !historyFailed) &&
                                     (mixMode !in setOf(ScrobbleMixMode.RADIO, ScrobbleMixMode.ARTIST_MIX) || selectedSeed?.let(::isYouTubeCatalogTrack) == true),
                                 modifier = Modifier.fillMaxWidth(),
