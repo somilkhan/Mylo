@@ -2008,9 +2008,53 @@ fun ScrobbleScreen(
                                     }
                                 }
                             }
-                            items(selected.songs.size, key = { index -> "saved-${selected.title}-${songIdentity(selected.songs[index])}-$index" }) { index ->
+                            items(selected.songs.size, key = { index -> "saved-" + selected.title + "-" + songIdentity(selected.songs[index]) + "-" + index }) { index ->
                                 val song = selected.songs[index]
-                                TrackRow(song, onClick = { onPlayPlaylist(selected.title, selected.songs, index) })
+                                var trackMenuExpanded by remember(selected.title, index) { mutableStateOf(false) }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                ) {
+                                    Box(Modifier.weight(1f)) {
+                                        TrackRow(song, onClick = { onPlayPlaylist(selected.title, selected.songs, index) })
+                                    }
+                                    Box {
+                                        IconButton(onClick = { trackMenuExpanded = true }) {
+                                            Icon(Icons.Rounded.MoreVert, contentDescription = "Track actions")
+                                        }
+                                        DropdownMenu(
+                                            expanded = trackMenuExpanded,
+                                            onDismissRequest = { trackMenuExpanded = false },
+                                        ) {
+                                            DropdownMenuItem(
+                                                text = { Text("Move up") },
+                                                enabled = index > 0,
+                                                onClick = {
+                                                    ScrobblePlaylistStore.moveSong(selected.title, index, index - 1)
+                                                    trackMenuExpanded = false
+                                                },
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text("Move down") },
+                                                enabled = index < selected.songs.lastIndex,
+                                                onClick = {
+                                                    ScrobblePlaylistStore.moveSong(selected.title, index, index + 1)
+                                                    trackMenuExpanded = false
+                                                },
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text("Remove from playlist") },
+                                                onClick = {
+                                                    if (ScrobblePlaylistStore.removeSong(selected.title, index)) {
+                                                        Toast.makeText(context, "Removed from " + selected.title, Toast.LENGTH_SHORT).show()
+                                                    }
+                                                    trackMenuExpanded = false
+                                                },
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         } else {
                             val visiblePlaylists = savedPlaylists

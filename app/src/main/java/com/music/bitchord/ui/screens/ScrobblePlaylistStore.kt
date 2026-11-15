@@ -94,6 +94,34 @@ internal object ScrobblePlaylistStore {
             ?: song.videoId.takeIf(String::isNotBlank)?.let { "video:$it" }
             ?: "${song.title.lowercase()}|${song.artist.lowercase()}"
 
+    /** Removes one track from a saved snapshot without touching listening history. */
+    fun removeSong(title: String, trackIndex: Int): Boolean {
+        val playlistIndex = playlists.indexOfFirst { it.title == title }
+        if (playlistIndex < 0) return false
+        val existing = playlists[playlistIndex]
+        if (trackIndex !in existing.songs.indices) return false
+        playlists[playlistIndex] = existing.copy(
+            songs = existing.songs.filterIndexed { index, _ -> index != trackIndex },
+        )
+        persist()
+        return true
+    }
+
+    /** Persists a local playlist reorder, matching LastWave's moveTrack behaviour. */
+    fun moveSong(title: String, fromIndex: Int, toIndex: Int): Boolean {
+        val playlistIndex = playlists.indexOfFirst { it.title == title }
+        if (playlistIndex < 0) return false
+        val existing = playlists[playlistIndex]
+        if (fromIndex !in existing.songs.indices || toIndex !in existing.songs.indices) return false
+        if (fromIndex == toIndex) return true
+        val reordered = existing.songs.toMutableList().apply {
+            add(toIndex, removeAt(fromIndex))
+        }
+        playlists[playlistIndex] = existing.copy(songs = reordered)
+        persist()
+        return true
+    }
+
     /**
      * Renames one saved snapshot without changing its tracks or order.
      * Names are unique ignoring case so playlist identity remains unambiguous

@@ -96,6 +96,44 @@ class ScrobblePlaylistStoreTest {
     }
 
     @Test
+    fun removingTrackOnlyChangesTheTargetPlaylistSnapshot() {
+        val first = Song("abcdefghijk", "First", "Artist", null)
+        val second = Song("lmnopqrstuv", "Second", "Artist", null)
+        ScrobblePlaylistStore.playlists.clear()
+        try {
+            ScrobblePlaylistStore.save("Mix A", "Reason", listOf(first, second))
+            ScrobblePlaylistStore.save("Mix B", "Reason", listOf(first))
+
+            assertEquals(true, ScrobblePlaylistStore.removeSong("Mix A", 0))
+            assertEquals(listOf(second), ScrobblePlaylistStore.playlists.first { it.title == "Mix A" }.songs)
+            assertEquals(listOf(first), ScrobblePlaylistStore.playlists.first { it.title == "Mix B" }.songs)
+            assertEquals(false, ScrobblePlaylistStore.removeSong("Missing", 0))
+            assertEquals(false, ScrobblePlaylistStore.removeSong("Mix A", 4))
+        } finally {
+            ScrobblePlaylistStore.playlists.clear()
+        }
+    }
+
+    @Test
+    fun movingTrackPersistsNewOrderAndRejectsInvalidIndexes() {
+        val first = Song("abcdefghijk", "First", "Artist", null)
+        val second = Song("lmnopqrstuv", "Second", "Artist", null)
+        val third = Song("zyxwvutsrqp", "Third", "Artist", null)
+        ScrobblePlaylistStore.playlists.clear()
+        try {
+            ScrobblePlaylistStore.save("Ordered", "Reason", listOf(first, second, third))
+
+            assertEquals(true, ScrobblePlaylistStore.moveSong("Ordered", 0, 2))
+            assertEquals(listOf(second, third, first), ScrobblePlaylistStore.playlists.single().songs)
+            assertEquals(false, ScrobblePlaylistStore.moveSong("Ordered", 3, 0))
+            assertEquals(false, ScrobblePlaylistStore.moveSong("Missing", 0, 1))
+            assertEquals(true, ScrobblePlaylistStore.moveSong("Ordered", 1, 1))
+        } finally {
+            ScrobblePlaylistStore.playlists.clear()
+        }
+    }
+
+    @Test
     fun identicalSavedSnapshotIsNotDuplicated() {
         val song = Song("abcdefghijk", "First", "Artist", null)
         ScrobblePlaylistStore.playlists.clear()
