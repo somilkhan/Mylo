@@ -30,6 +30,7 @@ concurrency:
 
 jobs:
   android:
+    if: github.event_name != 'issue_comment' || (github.event.issue.pull_request && github.event.comment.body == '/build-apk' && github.event.comment.user.login == 'somilkhan')
     name: Android unit tests (optional APK build)
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -109,6 +110,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   desktop:
+    if: github.event_name != 'issue_comment'
     name: Desktop compile and tests
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -130,6 +132,7 @@ jobs:
         run: ./gradlew --no-daemon --stacktrace :desktopApp:test
 
   web:
+    if: github.event_name != 'issue_comment'
     name: Web tests and typecheck
     runs-on: ubuntu-latest
     timeout-minutes: 30
