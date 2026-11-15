@@ -728,16 +728,14 @@ fun ScrobbleScreen(
                                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                                         ) {
                                             val sharedArtworkState = rememberSharedContentState(playlistSharedElementKey(generatedMix))
-                                            AsyncImage(
-                                                model = generatedMix.firstOrNull()?.thumbnailUrl,
-                                                contentDescription = null,
-                                                contentScale = ContentScale.Crop,
-                                                modifier = Modifier.size(44.dp)
+                                            ArtworkMosaic(
+                                                generatedMix,
+                                                Modifier.size(48.dp)
                                                     .then(if (reduceMotion) Modifier else Modifier.sharedElement(
                                                         sharedContentState = sharedArtworkState,
                                                         animatedVisibilityScope = pageVisibilityScope,
                                                     ))
-                                                    .clip(RoundedCornerShape(10.dp)),
+                                                    .clip(RoundedCornerShape(12.dp)),
                                             )
                                             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                                 Text(savedPlaylistForGeneratedMix?.title ?: generatedTitle, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -857,7 +855,7 @@ fun ScrobbleScreen(
                                 items(visiblePlaylists, key = { "saved-${it.title}" }) { playlist ->
                                     var menuExpanded by remember(playlist.title) { mutableStateOf(false) }
                                     val sharedArtworkState = rememberSharedContentState(playlistSharedElementKey(playlist.songs))
-                                    val playlistCardShape = RoundedCornerShape(20.dp)
+                                    val playlistCardShape = RoundedCornerShape(24.dp)
                                     Card(
                                         modifier = Modifier.fillMaxWidth().border(
                                             width = 1.dp,
@@ -868,7 +866,7 @@ fun ScrobbleScreen(
                                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f)),
                                         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                                     ) {
-                                        Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                        Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                                             Row(
                                                 modifier = Modifier.fillMaxWidth(),
                                                 verticalAlignment = Alignment.CenterVertically,
@@ -1125,12 +1123,15 @@ private fun TrackRow(song: Song, supporting: String = "", onClick: () -> Unit) {
             .clickable(role = Role.Button, onClick = onClick).padding(horizontal = 10.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        AsyncImage(
-            model = song.thumbnailUrl,
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.size(52.dp).clip(RoundedCornerShape(12.dp)),
-        )
+        ArtworkMosaic(
+                                                        playlist.songs,
+                                                        Modifier.size(96.dp)
+                                                            .then(if (reduceMotion) Modifier else Modifier.sharedElement(
+                                                                sharedContentState = sharedArtworkState,
+                                                                animatedVisibilityScope = pageVisibilityScope,
+                                                            ))
+                                                            .clip(RoundedCornerShape(18.dp)),
+                                                    )
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(song.title, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Medium)
