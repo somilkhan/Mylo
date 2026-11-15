@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
@@ -45,13 +46,22 @@ private enum class ScrobbleHubTab(val label: String) {
 @Composable
 internal fun ScrobbleHubScreen(
     modifier: Modifier = Modifier,
+    onBack: () -> Unit,
     onPlay: (List<Song>, Int) -> Unit,
 ) {
     var tab by rememberSaveable { mutableStateOf(ScrobbleHubTab.STATS.name) }
     val context = LocalContext.current
     LaunchedEffect(Unit) { ScrobblePlaylistStore.init(context) }
 
-    Column(modifier = modifier.fillMaxSize()) {
+    Column(modifier = modifier.fillMaxSize().statusBarsPadding()) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            TextButton(onClick = onBack) { Text("← Back") }
+            Text("Scrobble", style = MaterialTheme.typography.titleLarge)
+        }
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
