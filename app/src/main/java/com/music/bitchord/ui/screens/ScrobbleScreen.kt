@@ -955,6 +955,7 @@ fun ScrobbleScreen(
         lastFmUsername,
         favouriteTracks,
         recentTracks,
+        mixTrackCount,
     ) {
         if (selectedSection != SCROBBLE_TAB_GENERATE || loadingHistory ||
             mixMode !in setOf(ScrobbleMixMode.TASTE_MIX, ScrobbleMixMode.DISCOVER)
