@@ -2173,6 +2173,24 @@ private fun playlistSharedElementKey(songs: List<Song>): String =
     "scrobble-playlist-art-${songs.joinToString(separator = "|") { songIdentity(it) }}"
 
 @Composable
+private fun PlaylistArtwork(
+    songs: List<Song>,
+    coverUri: String?,
+    modifier: Modifier = Modifier,
+) {
+    if (coverUri.isNullOrBlank()) {
+        ArtworkMosaic(songs, modifier)
+    } else {
+        AsyncImage(
+            model = coverUri,
+            contentDescription = "Playlist cover",
+            contentScale = ContentScale.Crop,
+            modifier = modifier.clip(RoundedCornerShape(18.dp)),
+        )
+    }
+}
+
+@Composable
 private fun ArtworkMosaic(songs: List<Song>, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(18.dp)
     val covers = songs.take(4)
