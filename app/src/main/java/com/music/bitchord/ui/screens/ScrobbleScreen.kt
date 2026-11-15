@@ -274,7 +274,7 @@ fun ScrobbleScreen(
                         .distinctBy(::songIdentity).take(mixTrackCount)
                 }
                 ScrobbleMixMode.ARTIST_MIX -> {
-                    val seed = selectedSeed?.takeIf { it.videoId.isNotBlank() }
+                    val seed = selectedSeed?.takeIf(::isYouTubeCatalogTrack)
                         ?: throw IllegalStateException("Choose a track by the artist you want to explore")
                     val artistBrowseId = seed.artistId
                         ?: YtMusicRepository.findArtistPageId(seed.artist).getOrThrow()
