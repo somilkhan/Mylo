@@ -91,9 +91,9 @@ internal fun buildTagMix(
 internal fun buildLibraryMix(
     library: LibraryPage,
     limit: Int = 25,
-): List<Song> = distinctRecommendationSongs(library.likedSongs + library.librarySongs)
-    .filter(::isYouTubeCatalogTrack)
-    .take(limit.coerceAtLeast(0))
+): List<Song> = distinctRecommendationSongs(
+    (library.likedSongs + library.librarySongs).filter(::isYouTubeCatalogTrack),
+).take(limit.coerceAtLeast(0))
 
 /**
  * Alternates two recommendation sources while preserving their order.
