@@ -17,8 +17,10 @@ class ScrobblePlaylistExportTest {
                     videoId = "abcdefghijk",
                     title = "A, \"quoted\" track",
                     artist = "Artist\nName",
+                    thumbnailUrl = null,
                     albumName = "Album, one",
                     durationText = "3:42",
+                    fromAutoplay = false,
                 ),
             ),
         )
