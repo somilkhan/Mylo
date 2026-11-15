@@ -179,5 +179,5 @@ private fun isLocalTasteJunk(title: String): Boolean {
         "slowed + reverb", "slowed reverb", "slowed & reverb", "bass boosted",
         "8d audio", "karaoke", "ringtone", "instrumental", "1 hour", "10 hour",
         "clean version", "sped up",
-    ).any(lower::contains)
+    ).any { keyword -> lower.contains(keyword) }
 }
