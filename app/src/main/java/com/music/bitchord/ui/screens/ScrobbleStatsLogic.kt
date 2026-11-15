@@ -1,5 +1,7 @@
 package com.music.bitchord.ui.screens
 
+import com.music.bitchord.data.stats.ReplayPeriod
+
 import kotlin.math.roundToInt
 
 internal data class ListeningDayPart(
@@ -155,4 +157,16 @@ internal fun buildSyncedHistorySummary(
         topArtists = topArtists,
         topAlbums = topAlbums,
     )
+}
+
+/** Last.fm's supported chart windows mapped from Mylo's shared stats periods. */
+internal fun lastFmPeriodValue(period: ReplayPeriod): String = when (period) {
+    ReplayPeriod.THIS_WEEK, ReplayPeriod.LAST_7_DAYS -> "7day"
+    ReplayPeriod.LAST_30_DAYS -> "1month"
+    ReplayPeriod.LAST_3_MONTHS -> "3month"
+    ReplayPeriod.LAST_6_MONTHS -> "6month"
+    ReplayPeriod.LAST_12_MONTHS -> "12month"
+    ReplayPeriod.THIS_MONTH -> "1month"
+    ReplayPeriod.THIS_YEAR -> "12month"
+    ReplayPeriod.ALL_TIME -> "overall"
 }
