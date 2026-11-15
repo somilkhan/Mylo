@@ -339,6 +339,34 @@ internal fun buildArtistCappedMix(
     return curated.take(targetSize)
 }
 
+/**
+ * Similar-artist mixes must not drift back to the seed artist just because
+ * YouTube Radio includes same-artist tracks. Last.fm's artist graph supplies
+ * the secondary pool; both sources are merged and artist-balanced.
+ */
+internal fun buildSimilarArtistMix(
+    youtubeRadio: List<Song>,
+    lastFmSimilar: List<Song>,
+    seedArtist: String,
+    limit: Int,
+): List<Song> {
+    if (limit <= 0) return emptyList()
+    val seedKey = com.music.bitchord.data.stats.ListeningStats.primaryArtist(seedArtist)
+        ?.trim()?.lowercase()
+        ?: seedArtist.trim().lowercase()
+    val candidates = (youtubeRadio + lastFmSimilar).filter { song ->
+        val primaryArtist = com.music.bitchord.data.stats.ListeningStats.primaryArtist(song.artist)
+            ?.trim()?.lowercase()
+            ?: song.artist.trim().lowercase()
+        primaryArtist != seedKey
+    }
+    return buildArtistCappedMix(
+        candidates = candidates,
+        seedArtist = seedArtist,
+        targetSize = limit,
+    )
+}
+
 /** Only catalogue tracks absent from the supplied listening history qualify as new-to-you. */
 internal fun buildNeverHeardMix(
     candidates: List<Song>,
