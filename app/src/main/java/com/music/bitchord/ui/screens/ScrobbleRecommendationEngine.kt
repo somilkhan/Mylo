@@ -23,6 +23,13 @@ import kotlinx.coroutines.sync.withPermit
  * is bounded, source failures are isolated, and cancellation is never swallowed.
  */
 internal object ScrobbleRecommendationEngine {
+    private data class SourceCandidate(
+        val track: LastFM.DiscoveryTrack,
+        val weight: Int,
+        val tag: String,
+        val primaryGenre: Boolean = false,
+    )
+
     private const val TASTE_PROFILE_TTL_MILLIS = 60L * 60 * 1000
     private data class CachedTasteTags(val username: String, val loadedAtMillis: Long, val tags: List<String>)
     private val tasteProfileMutex = Mutex()
@@ -83,13 +90,20 @@ internal object ScrobbleRecommendationEngine {
             .distinctBy { it.lowercase() }.take(8)
         val tags = loadTasteTags(lastFmUsername).take(8)
         val artistGraph = linkedSetOf<String>()
-        val lastFmTracks = mutableListOf<LastFM.DiscoveryTrack>()
+        val lastFmTracks = mutableListOf<SourceCandidate>()
+        fun addSource(tracks: List<LastFM.DiscoveryTrack>, weight: Int, tag: String, primaryGenre: Boolean = false) {
+            tracks.forEach { track ->
+                if (track.name.isNotBlank() && track.artist.isNotBlank()) {
+                    lastFmTracks += SourceCandidate(track, weight, tag, primaryGenre)
+                }
+            }
+        }
 
         onProgress("Finding tracks close to your listening taste…")
         val similarTracks = seeds.map { seed ->
             async { safe { LastFM.getSimilarTracks(seed.title, seed.artist, 12).getOrThrow() } }
         }.awaitAll().filterNotNull().flatten()
-        lastFmTracks += similarTracks
+        addSource(similarTracks, weight = 4, tag = "mood")
 
         onProgress("Following your similar-artist graph…")
         val similarArtistBatches = artists.take(4).map { artist ->
@@ -101,9 +115,15 @@ internal object ScrobbleRecommendationEngine {
 
         suspend fun artistCharts(names: List<String>, count: Int) {
             val charts = names.take(count).map { artist ->
-                async { safe { LastFM.getArtistTopTracks(artist, limit = 8).getOrThrow() } }
-            }.awaitAll().filterNotNull().flatten()
-            lastFmTracks += charts.map { LastFM.DiscoveryTrack(it.name, it.artist) }
+                async { artist to safe { LastFM.getArtistTopTracks(artist, limit = 8).getOrThrow() } }
+            }.awaitAll()
+            charts.forEach { (artist, rows) ->
+                addSource(
+                    rows.orEmpty().map { LastFM.DiscoveryTrack(it.name, it.artist) },
+                    weight = 2,
+                    tag = "artist:${artist.trim().lowercase()}",
+                )
+            }
         }
 
         onProgress("Exploring related artists…")
@@ -114,7 +134,10 @@ internal object ScrobbleRecommendationEngine {
         val primaryTagTracks = primaryTags.map { tag ->
             async { safe { LastFM.getTagTopTracks(tag, limit = 8, page = 2).getOrThrow() } }
         }.awaitAll().filterNotNull().flatten()
-        lastFmTracks += primaryTagTracks
+        primaryTagTracks.forEach { track ->
+            val tag = primaryTags.firstOrNull { it.equals(track.artist, ignoreCase = true) }
+            addSource(listOf(track), weight = 1, tag = "tag:${tag ?: "primary"}", primaryGenre = true)
+        }
 
         onProgress("Widening into neighbouring genres…")
         val neighborTags = primaryTags.mapNotNull { genreNeighbors[it.lowercase()] }
@@ -123,7 +146,12 @@ internal object ScrobbleRecommendationEngine {
         val neighborTracks = neighborTags.map { tag ->
             async { safe { LastFM.getTagTopTracks(tag, limit = 6, page = 1).getOrThrow() } }
         }.awaitAll().filterNotNull().flatten()
-        lastFmTracks += neighborTracks
+        neighborTracks.forEach { track ->
+            val tag = neighborTags.firstOrNull { candidate ->
+                track.name.isNotBlank() && candidate.isNotBlank()
+            } ?: "neighbour"
+            addSource(listOf(track), weight = 1, tag = "tag:$tag")
+        }
 
         onProgress("Finding another layer of related artists…")
         val secondWave = artistGraph.take(4).map { artist ->
@@ -139,14 +167,14 @@ internal object ScrobbleRecommendationEngine {
 
         // LastWave's pool is deduplicated before expensive catalogue resolution.
         // Keep YouTube Music picks first and cap Last.fm lookups to avoid request storms.
-        val uniqueLastFm = lastFmTracks.asSequence()
-            .filter { it.name.isNotBlank() && it.artist.isNotBlank() }
-            .distinctBy { "${it.name.trim().lowercase()}|${it.artist.trim().lowercase()}" }
+        val uniqueLastFm = lastFmTracks
+            .groupBy { "${it.track.name.trim().lowercase()}|${it.track.artist.trim().lowercase()}" }
+            .values
             .take((limit * 2).coerceIn(12, 30))
-            .toList()
+            .map { rows -> rows.first().track to rows }
         val resolverSlots = Semaphore(4)
         onProgress("Matching discoveries to playable YouTube Music tracks…")
-        val resolved = uniqueLastFm.map { candidate ->
+        val resolvedPairs = uniqueLastFm.map { (candidate, sourceRows) ->
             async {
                 resolverSlots.withPermit {
                     safe {
@@ -161,7 +189,7 @@ internal object ScrobbleRecommendationEngine {
                                 is SearchResult.Browse -> null
                             }
                         }.filter(::isYouTubeCatalogTrack)
-                        songs.firstOrNull { song ->
+                        val match = songs.firstOrNull { song ->
                             recommendationIdentity(song) == recommendationIdentity(
                                 Song(videoId = song.videoId, title = candidate.name, artist = candidate.artist, thumbnailUrl = null),
                             ) || isSameSongOrEdit(
@@ -169,10 +197,26 @@ internal object ScrobbleRecommendationEngine {
                                 Song(videoId = song.videoId, title = candidate.name, artist = candidate.artist, thumbnailUrl = null),
                             )
                         }
+                        match?.let { it to sourceRows }
                     }
                 }
             }
         }.awaitAll().filterNotNull()
+
+        val resolved = resolvedPairs.map { it.first }.distinctBy(::recommendationIdentity)
+        val youtubeKeys = youtubeCandidates.mapTo(mutableSetOf(), ::recommendationIdentity)
+        val sourceWeights = resolvedPairs.groupBy { recommendationIdentity(it.first) }
+            .mapValues { (key, rows) ->
+                if (key in youtubeKeys) 4 else rows.maxOf { row -> row.second.maxOf { it.weight } }
+            }
+        val sourceTags = resolvedPairs.groupBy { recommendationIdentity(it.first) }
+            .mapValues { (_, rows) ->
+                rows.flatMap { it.second.map(SourceCandidate::tag) }.toSet() +
+                    if (recommendationIdentity(rows.first().first) in youtubeKeys) setOf("yt-feed") else emptySet()
+            }
+        val sourceCounts = sourceTags.mapValues { (_, tags) -> tags.size }
+        val primaryGenres = resolvedPairs.filter { (_, rows) -> rows.any(SourceCandidate::primaryGenre) }
+            .mapTo(mutableSetOf()) { recommendationIdentity(it.first) }
 
         // Strict exclusions are applied after all sources have been pooled;
         // neither an alternate upload nor a Last.fm fallback can re-add a heard song.
@@ -182,6 +226,10 @@ internal object ScrobbleRecommendationEngine {
             heardSongs = heardSongs,
             topArtistNames = artists.toSet(),
             recentArtistNames = seeds.map { it.artist }.toSet(),
+            sourceWeights = sourceWeights,
+            sourceCounts = sourceCounts,
+            sourceTags = sourceTags,
+            primaryGenreIdentities = primaryGenres,
             limit = limit,
         )
     }
