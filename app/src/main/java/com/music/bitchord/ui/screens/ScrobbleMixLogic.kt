@@ -314,7 +314,29 @@ internal fun buildArtistCappedMix(
 internal fun buildNeverHeardMix(
     candidates: List<Song>,
     heardVideoIds: Set<String>,
+    heardSongs: List<Song> = emptyList(),
     limit: Int = 25,
-): List<Song> = distinctRecommendationSongs(
-    candidates.filter { it.videoId !in heardVideoIds && isYouTubeCatalogTrack(it) },
-).take(limit.coerceAtLeast(0))
+): List<Song> {
+    if (limit <= 0) return emptyList()
+
+    // A track can be heard under several YouTube IDs (official audio, video,
+    // lyric upload, remix). Match the normalized title/artist as well as the
+    // ID, following LastWave's never-heard exclusion rather than treating a
+    // new upload as a new song.
+    val heardByArtist = heardSongs
+        .filter { it.title.isNotBlank() && it.artist.isNotBlank() }
+        .groupBy { it.artist.trim().replace(Regex("\\s+"), " ").lowercase() }
+
+    val unheard = candidates.filter { candidate ->
+        if (!isYouTubeCatalogTrack(candidate) || candidate.videoId in heardVideoIds) {
+            false
+        } else {
+            val artistKey = candidate.artist.trim().replace(Regex("\\s+"), " ").lowercase()
+            heardByArtist[artistKey].orEmpty().none { heard ->
+                recommendationIdentity(candidate) == recommendationIdentity(heard) ||
+                    isSameSongOrEdit(candidate, heard)
+            }
+        }
+    }
+    return distinctRecommendationSongs(unheard).take(limit)
+}
