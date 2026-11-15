@@ -35,7 +35,6 @@ internal fun exportScrobblePlaylist(
         append('\n')
         playlist.songs.forEach { song ->
             val location = song.localPath?.takeIf(String::isNotBlank)
-                ?: song.localUri?.takeIf(String::isNotBlank)
                 ?: song.videoId.takeIf(::isYoutubeVideoId)
                     ?.let { "https://music.youtube.com/watch?v=$it" }
                 ?: return@forEach
