@@ -324,8 +324,8 @@ class ScrobbleMixLogicTest {
     @Test
     fun neverHeardExcludesAlternateUploadsAndEditsOfPreviouslyHeardTracks() {
         val heard = Song("heardtrack01", "Deep Swim", "Original Artist", null)
-        val alternateUpload = Song("alttrack001", "Deep Swim - Official Audio", "Original Artist", null)
-        val remix = Song("remixtrk001", "Deep Swim (VIP Remix)", "Original Artist", null)
+        val alternateUpload = Song("alttrack001", "Deep Swim - Official Audio", "Original Artist feat. Guest", null)
+        val remix = Song("remixtrk001", "Deep Swim (VIP Remix)", "Original Artist feat. Guest", null)
         val unrelated = Song("freshtrk001", "Ocean Lights", "Original Artist", null)
         val sameTitleOtherArtist = Song("freshtrk002", "Deep Swim", "Different Artist", null)
 
