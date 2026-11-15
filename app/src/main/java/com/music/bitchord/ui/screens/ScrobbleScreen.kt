@@ -149,6 +149,9 @@ private enum class StatsView(val label: String, val period: ReplayPeriod) {
     TOP_ALBUMS("Top Albums", ReplayPeriod.ALL_TIME),
 }
 
+private enum class ScrobbleStatsSource { DEVICE, YOUTUBE_MUSIC }
+
+
 private enum class ScrobbleTopPeriod(val label: String, val period: ReplayPeriod) {
     ALL_TIME("All time", ReplayPeriod.ALL_TIME),
     LAST_12_MONTHS("12 months", ReplayPeriod.LAST_12_MONTHS),
@@ -180,6 +183,8 @@ fun ScrobbleScreen(
     val context = LocalContext.current
     val historyRevision by ListeningHistory.revision.collectAsStateWithLifecycle()
     var statsView by remember { mutableStateOf(StatsView.RECENT) }
+    var statsSource by remember { mutableStateOf(ScrobbleStatsSource.DEVICE) }
+    val syncedStats = remember(syncedHistory) { buildSyncedHistorySummary(syncedHistory) }
     var statsMenuExpanded by remember { mutableStateOf(false) }
     var summary by remember { mutableStateOf<ReplaySummary?>(null) }
     var allTimeSummary by remember { mutableStateOf<ReplaySummary?>(null) }
@@ -854,48 +859,110 @@ fun ScrobbleScreen(
                         item("stats-view-selector") {
                             Column(
                                 modifier = Modifier.fillMaxWidth(),
-                                verticalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp),
                             ) {
-                                Box {
-                                    OutlinedButton(
-                                        onClick = { statsMenuExpanded = true },
-                                        shape = RoundedCornerShape(14.dp),
-                                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                                    ) {
-                                        Text(statsView.label)
-                                        Spacer(Modifier.width(8.dp))
-                                        Icon(Icons.Rounded.Sort, contentDescription = null)
-                                    }
-                                    DropdownMenu(
-                                        expanded = statsMenuExpanded,
-                                        onDismissRequest = { statsMenuExpanded = false },
-                                    ) {
-                                        StatsView.entries.forEach { option ->
-                                            DropdownMenuItem(
-                                                text = { Text(option.label) },
-                                                trailingIcon = {
-                                                    if (statsView == option) {
-                                                        Icon(Icons.Rounded.CheckCircle, contentDescription = "Selected")
-                                                    }
-                                                },
-                                                onClick = {
-                                                    statsView = option
-                                                    statsMenuExpanded = false
-                                                },
-                                            )
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    FilterChip(
+                                        selected = statsSource == ScrobbleStatsSource.DEVICE,
+                                        onClick = { statsSource = ScrobbleStatsSource.DEVICE },
+                                        label = { Text("Mylo") },
+                                    )
+                                    FilterChip(
+                                        selected = statsSource == ScrobbleStatsSource.YOUTUBE_MUSIC,
+                                        onClick = { statsSource = ScrobbleStatsSource.YOUTUBE_MUSIC },
+                                        label = { Text("YouTube Music") },
+                                    )
+                                }
+                                if (statsSource == ScrobbleStatsSource.DEVICE) {
+                                    Box {
+                                        OutlinedButton(
+                                            onClick = { statsMenuExpanded = true },
+                                            shape = RoundedCornerShape(14.dp),
+                                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                                        ) {
+                                            Text(statsView.label)
+                                            Spacer(Modifier.width(8.dp))
+                                            Icon(Icons.Rounded.Sort, contentDescription = null)
+                                        }
+                                        DropdownMenu(
+                                            expanded = statsMenuExpanded,
+                                            onDismissRequest = { statsMenuExpanded = false },
+                                        ) {
+                                            StatsView.entries.forEach { option ->
+                                                DropdownMenuItem(
+                                                    text = { Text(option.label) },
+                                                    trailingIcon = {
+                                                        if (statsView == option) {
+                                                            Icon(Icons.Rounded.CheckCircle, contentDescription = "Selected")
+                                                        }
+                                                    },
+                                                    onClick = {
+                                                        statsView = option
+                                                        statsMenuExpanded = false
+                                                    },
+                                                )
+                                            }
                                         }
                                     }
+                                    Text(
+                                        summary?.label ?: statsView.period.chip,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        textAlign = TextAlign.End,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                } else {
+                                    Text(
+                                        "ALL SYNCED HISTORY",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        fontWeight = FontWeight.SemiBold,
+                                        letterSpacing = 0.65.sp,
+                                    )
+                                    Text(
+                                        "${syncedStats.totalPlays} plays · ${syncedStats.distinctTracks} tracks",
+                                        modifier = Modifier.fillMaxWidth(),
+                                        textAlign = TextAlign.End,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
                                 }
-                                Text(
-                                    summary?.label ?: statsView.period.chip,
-                                    modifier = Modifier.fillMaxWidth(),
-                                    textAlign = TextAlign.End,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
                             }
                         }
                         when {
+                            statsSource == ScrobbleStatsSource.YOUTUBE_MUSIC && syncedStats.totalPlays == 0 -> {
+                                item("stats-youtube-empty") {
+                                    EmptyPanel(
+                                        "No synced listening history",
+                                        "Run account sync with Listening history enabled. YouTube Music history is separate from plays recorded by Mylo.",
+                                    )
+                                }
+                            }
+                            statsSource == ScrobbleStatsSource.YOUTUBE_MUSIC -> {
+                                item("stats-youtube-overview") {
+                                    SyncedHistoryOverviewCard(
+                                        summary = syncedStats,
+                                        reduceMotion = reduceMotion,
+                                    )
+                                }
+                                item("stats-youtube-top-tracks-heading") {
+                                    StatsSectionHeading("Most played", "${syncedStats.distinctTracks} tracks")
+                                }
+                                itemsIndexed(
+                                    syncedStats.topTracks.take(12),
+                                    key = { _, track -> "yt-history-${songIdentity(track.song)}" },
+                                ) { index, track ->
+                                    StatsRankedTrack(
+                                        rank = index + 1,
+                                        song = track.song,
+                                        supporting = "${track.plays} ${if (track.plays == 1) "play" else "plays"} · YouTube Music",
+                                        onClick = {
+                                            val songs = syncedStats.topTracks.map { it.song }
+                                            onPlayPlaylist("YouTube Music history", songs, index)
+                                        },
+                                    )
+                                }
+                            }
                             loadingStats -> item("stats-loading") {
                                 LoadingLine("Building your listening report")
                             }
@@ -1764,6 +1831,90 @@ private fun StatsOverviewCard(
                 letterSpacing = 0.65.sp,
             )
             HourlyActivityMiniChart(summary.hourOfDay, reduceMotion)
+        }
+    }
+}
+
+@Composable
+private fun SyncedHistoryOverviewCard(
+    summary: SyncedHistorySummary,
+    reduceMotion: Boolean,
+) {
+    val maxArtistPlays = summary.topArtists.firstOrNull()?.plays?.coerceAtLeast(1) ?: 1
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(24.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f))
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.24f),
+                shape = RoundedCornerShape(24.dp),
+            )
+            .padding(14.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(
+            modifier = Modifier.weight(0.95f),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(
+                "YOUTUBE MUSIC",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.65.sp,
+            )
+            StatsMetricLine("PLAYS", summary.totalPlays.toLong(), reduceMotion)
+            StatsMetricLine("TRACKS", summary.distinctTracks.toLong(), reduceMotion)
+            StatsMetricLine("ARTISTS", summary.distinctArtists.toLong(), reduceMotion)
+            StatsMetricLine("ALBUMS", summary.distinctAlbums.toLong(), reduceMotion)
+        }
+        Column(
+            modifier = Modifier.weight(1.05f),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(
+                "TOP ARTISTS",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.65.sp,
+            )
+            summary.topArtists.take(4).forEach { artist ->
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(
+                            artist.name,
+                            modifier = Modifier.weight(1f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Text(
+                            artist.plays.toString(),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Box(
+                        Modifier.fillMaxWidth().height(5.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(MaterialTheme.colorScheme.surface),
+                    ) {
+                        Box(
+                            Modifier.fillMaxWidth((artist.plays.toFloat() / maxArtistPlays).coerceIn(0f, 1f))
+                                .fillMaxHeight()
+                                .background(MaterialTheme.colorScheme.primary),
+                        )
+                    }
+                }
+            }
         }
     }
 }
