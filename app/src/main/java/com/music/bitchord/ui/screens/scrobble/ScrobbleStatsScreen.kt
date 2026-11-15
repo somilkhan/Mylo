@@ -15,6 +15,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -52,6 +53,7 @@ private val statsPeriods = listOf(
 @Composable
 internal fun ScrobbleStatsScreen(
     modifier: Modifier = Modifier,
+    onConnectLastFm: () -> Unit,
 ) {
     var selectedPeriod by rememberSaveable { mutableStateOf("overall") }
     var localSummary by remember { mutableStateOf<ReplaySummary?>(null) }
@@ -154,11 +156,16 @@ internal fun ScrobbleStatsScreen(
         }
         item {
             when {
-                username.isBlank() || !LastFM.isInitialized() -> Text(
-                    "Connect Last.fm in Account & Scrobbling to see account charts.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                username.isBlank() || !LastFM.isInitialized() -> Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        "Connect Last.fm to load your scrobbles, top tracks, artists and albums.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    TextButton(onClick = onConnectLastFm) { Text("Connect Last.fm") }
+                }
                 remoteLoading -> CircularProgressIndicator()
                 remoteError != null -> Text(
                     remoteError!!,
