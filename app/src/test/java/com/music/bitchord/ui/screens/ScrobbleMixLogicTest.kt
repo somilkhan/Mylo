@@ -24,6 +24,37 @@ class ScrobbleMixLogicTest {
     }
 
     @Test
+    fun radioMixUsesSeedRadioFirstAndFillsShortResultsWithoutSeedEditsOrDuplicates() {
+        val seed = Song("seedtrack01", "Deep Swim", "Seed Artist", null)
+        val radioOne = Song("radio000001", "Ocean Lights", "Other Artist", null)
+        val radioEdit = Song("radio000002", "Deep Swim (VIP Remix)", "Remixer", null)
+        val favourite = Song("favourite01", "Favourite", "Seed Artist", null)
+        val recent = Song("recent00001", "Recent", "Recent Artist", null)
+        val duplicate = radioOne.copy(title = "Duplicate metadata")
+        val discovery = Song("discover001", "Discovery", "Discovery Artist", null)
+
+        val result = buildRadioMix(
+            radio = listOf(seed, radioOne, radioEdit),
+            favourites = listOf(favourite, duplicate),
+            recent = listOf(recent),
+            discovery = listOf(discovery),
+            seed = seed,
+            limit = 4,
+        )
+
+        assertEquals(listOf(radioOne, favourite, recent, discovery), result)
+    }
+
+    @Test
+    fun radioMixReturnsOnlyAvailableTracksAndHonoursZeroLimit() {
+        val seed = Song("seedtrack01", "Seed", "Artist", null)
+        val onlyEdit = Song("edittrack001", "Seed (Live)", "Artist", null)
+
+        assertEquals(emptyList<Song>(), buildRadioMix(emptyList(), listOf(onlyEdit), emptyList(), emptyList(), seed, 10))
+        assertEquals(emptyList<Song>(), buildRadioMix(listOf(onlyEdit), emptyList(), emptyList(), emptyList(), seed, 0))
+    }
+
+    @Test
     fun artistCapLimitsSeedAndOtherArtistsThenRelaxesOnlyWhenPoolIsShort() {
         val candidates = listOf(
             com.music.bitchord.data.model.Song("aaaaaaaaaaa", "Seed 1", "Seed Artist", null),
