@@ -221,10 +221,12 @@ fun ScrobbleScreen(
     var generationTopRankedTracks by remember { mutableStateOf<List<RankedSong>>(emptyList()) }
     var loadingGenerationTopTracks by remember { mutableStateOf(true) }
     var generationTopTracksFailed by remember { mutableStateOf(false) }
-    val favouriteTracks = remember(generationTopRankedTracks, syncedStats) {
+    val favouriteTracks = remember(generationTopRankedTracks, syncedStats, generationTopPeriod) {
         buildCombinedFavouriteTracks(
             local = generationTopRankedTracks,
-            synced = syncedStats.topTracks,
+            // The account snapshot has no per-play timestamps, so it can only
+            // participate in an honest all-time ranking.
+            synced = if (generationTopPeriod == ScrobbleTopPeriod.ALL_TIME) syncedStats.topTracks else emptyList(),
             limit = 25,
         )
     }
@@ -1390,6 +1392,13 @@ fun ScrobbleScreen(
                                             )
                                         }
                                     }
+                                    if (generationTopPeriod != ScrobbleTopPeriod.ALL_TIME && syncedStats.totalPlays > 0) {
+                                        Text(
+                                            "Date filters use Mylo listens; synced YouTube Music history is included in All time only.",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -1596,7 +1605,7 @@ fun ScrobbleScreen(
                         if (mixMode == ScrobbleMixMode.REDISCOVER && loadingAllTimeStats) {
                             item("rediscover-loading") { LoadingLine("Checking your all-time play counts") }
                         }
-                        if (mixMode == ScrobbleMixMode.FAVOURITES) {
+                        if (mixMode == ScrobbleMixMode.FAVOURITES || mixMode == ScrobbleMixMode.TASTE_MIX) {
                             item("generate-top-period") {
                                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                     Text("Listening period", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
