@@ -206,22 +206,38 @@ internal fun buildRadioMix(
 ): List<Song> {
     if (limit <= 0) return emptyList()
     val seen = mutableSetOf<String>()
-    val result = ArrayList<Song>(limit)
+    val candidates = ArrayList<Song>()
     listOf(radio, similar, favourites, recent, discovery).forEach { pool ->
         pool.forEach { candidate ->
-            if (result.size < limit &&
-                candidate.title.isNotBlank() &&
+            if (candidate.title.isNotBlank() &&
                 candidate.artist.isNotBlank() &&
                 candidate.videoId.isNotBlank() &&
                 candidate.videoId != seed.videoId &&
                 !isSameSongOrEdit(candidate, seed) &&
                 seen.add(songIdentity(candidate))
             ) {
-                result += candidate
+                candidates += candidate
             }
         }
     }
-    return result
+
+    // LastWave's track radio removes alternate uploads by normalized title
+    // before applying its artist-diversity cap. Different video IDs alone
+    // must not put the same recording into the queue twice.
+    fun cleanTitle(title: String): String = title.lowercase()
+        .replace(Regex("""\s*[({\[][^)\]]*[)}\]]"""), " ")
+        .replace(
+            Regex("""(?i)\b(official\s+video|official\s+audio|lyrics?|remix|mix|edit|bootleg|flip|vip|slowed|reverb|sped\s+up|speed\s+up|cover|version|live|acoustic|instrumental|feat\.?|ft\.?)\b.*"""),
+            " ",
+        )
+        .replace(Regex("[^a-z0-9]"), "")
+        .trim()
+    val seenTitles = mutableSetOf<String>()
+    val titleDistinct = candidates.filter { candidate ->
+        val key = cleanTitle(candidate.title)
+        key.isBlank() || seenTitles.add(key)
+    }
+    return buildArtistCappedMix(titleDistinct, seed.artist, limit)
 }
 
 /**
