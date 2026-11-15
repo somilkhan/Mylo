@@ -235,6 +235,10 @@ fun ScrobbleScreen(
     var playlistSelectionMode by remember { mutableStateOf(false) }
     var selectedPlaylistTitles by remember { mutableStateOf<Set<String>>(emptySet()) }
     var showBulkRemoveConfirm by remember { mutableStateOf(false) }
+    var createPlaylistDialog by remember { mutableStateOf(false) }
+    var createPlaylistTitle by remember { mutableStateOf("") }
+    var createPlaylistError by remember { mutableStateOf<String?>(null) }
+    var addingTracksPlaylist by remember { mutableStateOf<String?>(null) }
     var pendingExport by remember { mutableStateOf<Pair<String, String>?>(null) }
     var coverEditorPlaylist by remember { mutableStateOf<String?>(null) }
     var coverPickerPlaylist by remember { mutableStateOf<String?>(null) }
@@ -399,6 +403,13 @@ fun ScrobbleScreen(
     val allTimePlayCounts = allTimeSummary?.songs.orEmpty().associate { songIdentity(it.song) to it.plays }
     val rediscoverTracks = buildRediscoverMix(listens, allTimePlayCounts, System.currentTimeMillis())
     val savedPlaylists = ScrobblePlaylistStore.playlists.toList()
+    val addableHistoryTracks = remember(syncedHistory, listens, allTimeSummary) {
+        (syncedHistory + listens.sortedByDescending { it.startedAt }.map { it.song } +
+            allTimeSummary?.songs.orEmpty().map { it.song })
+            .filter { it.videoId.isNotBlank() || !it.localUri.isNullOrBlank() || !it.localPath.isNullOrBlank() }
+            .distinctBy(::songIdentity)
+            .take(40)
+    }
     val savePlaylistExport: (SavedScrobblePlaylist, ScrobblePlaylistExportFormat) -> Unit = { playlist, format ->
         val filename = scrobblePlaylistExportFilename(playlist.title, format)
         pendingExport = filename to exportScrobblePlaylist(playlist, format)
@@ -771,6 +782,59 @@ fun ScrobbleScreen(
                     }) { Text("Save") }
                 },
                 dismissButton = { TextButton(onClick = { pendingRenamePlaylist = null; renamePlaylistError = null }) { Text("Cancel") } },
+            )
+        }
+        if (createPlaylistDialog) {
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = {
+                    createPlaylistDialog = false
+                    createPlaylistError = null
+                },
+                title = { Text("Create playlist") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = createPlaylistTitle,
+                            onValueChange = {
+                                createPlaylistTitle = it
+                                createPlaylistError = null
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            label = { Text("Playlist name") },
+                            placeholder = { Text("e.g. Late night drive") },
+                            shape = RoundedCornerShape(14.dp),
+                        )
+                        createPlaylistError?.let {
+                            Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        val title = createPlaylistTitle.trim()
+                        if (ScrobblePlaylistStore.create(title)) {
+                            createPlaylistDialog = false
+                            createPlaylistTitle = ""
+                            createPlaylistError = null
+                            playlistQuery = ""
+                            playlistSortMode = ScrobblePlaylistSortMode.RECENT
+                            openedPlaylist = title
+                        } else {
+                            createPlaylistError = if (savedPlaylists.size >= 20) {
+                                "You can save up to 20 playlists on this device."
+                            } else {
+                                "Choose a name that isn't already in use."
+                            }
+                        }
+                    }) { Text("Create") }
+                },
+                dismissButton = {
+                    TextButton(onClick = {
+                        createPlaylistDialog = false
+                        createPlaylistError = null
+                    }) { Text("Cancel") }
+                },
             )
         }
         if (showBulkRemoveConfirm) {
@@ -1615,7 +1679,7 @@ fun ScrobbleScreen(
                         val selected = openedPlaylist?.let { title -> ScrobblePlaylistStore.playlists.firstOrNull { it.title == title } }
                         if (selected != null) {
                             item("playlist-back") {
-                                TextButton(onClick = { openedPlaylist = null }) {
+                                TextButton(onClick = { openedPlaylist = null; addingTracksPlaylist = null }) {
                                     Icon(Icons.Rounded.History, null)
                                     Spacer(Modifier.width(6.dp))
                                     Text("All playlists")
@@ -1633,10 +1697,76 @@ fun ScrobbleScreen(
                                         Text(selected.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                                         Text(selected.reason, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                         Text("${selected.songs.size} tracks · Saved on this device", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-                                        Button(onClick = { onPlayPlaylist(selected.title, selected.songs, 0) }, modifier = Modifier.fillMaxWidth()) {
+                                        Button(
+                                            onClick = { onPlayPlaylist(selected.title, selected.songs, 0) },
+                                            modifier = Modifier.fillMaxWidth(),
+                                            enabled = selected.songs.isNotEmpty(),
+                                        ) {
                                             Icon(Icons.Rounded.PlayArrow, null)
                                             Spacer(Modifier.width(8.dp))
                                             Text("Play all · ${selected.songs.size} tracks")
+                                        }
+                                    }
+                                }
+                            }
+                            item("playlist-add-tracks") {
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    if (selected.songs.isEmpty()) {
+                                        EmptyPanel(
+                                            "Your playlist is empty",
+                                            "Add tracks from your synced YouTube Music history or your recent Mylo listens.",
+                                        )
+                                    }
+                                    OutlinedButton(
+                                        onClick = {
+                                            addingTracksPlaylist = if (addingTracksPlaylist == selected.title) null else selected.title
+                                        },
+                                        modifier = Modifier.fillMaxWidth(),
+                                    ) {
+                                        Text(if (addingTracksPlaylist == selected.title) "Done adding tracks" else "Add tracks from history")
+                                    }
+                                }
+                            }
+                            if (addingTracksPlaylist == selected.title) {
+                                if (addableHistoryTracks.isEmpty()) {
+                                    item("playlist-add-empty") {
+                                        EmptyPanel("No tracks to add", "Sync YouTube Music listening history or play a few tracks in Mylo first.")
+                                    }
+                                } else {
+                                    item("playlist-add-heading") {
+                                        StatsSectionHeading("Available tracks", "Recent and most-played listens")
+                                    }
+                                    itemsIndexed(
+                                        addableHistoryTracks,
+                                        key = { _, song -> "add-${songIdentity(song)}" },
+                                    ) { _, song ->
+                                        val alreadyAdded = selected.songs.any { songIdentity(it) == songIdentity(song) }
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                        ) {
+                                            AsyncImage(
+                                                model = song.thumbnailUrl,
+                                                contentDescription = null,
+                                                contentScale = ContentScale.Crop,
+                                                modifier = Modifier.size(44.dp).clip(RoundedCornerShape(10.dp)),
+                                            )
+                                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                                Text(song.title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium)
+                                                Text(song.artist, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            }
+                                            TextButton(
+                                                enabled = !alreadyAdded && selected.songs.size < 50,
+                                                onClick = {
+                                                    val added = ScrobblePlaylistStore.addSongs(selected.title, listOf(song))
+                                                    if (added > 0) {
+                                                        Toast.makeText(context, "Added to ${selected.title}", Toast.LENGTH_SHORT).show()
+                                                    }
+                                                },
+                                            ) {
+                                                Text(if (alreadyAdded) "Added" else "Add")
+                                            }
                                         }
                                     }
                                 }
@@ -1673,6 +1803,15 @@ fun ScrobbleScreen(
                                                 style = MaterialTheme.typography.bodySmall,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             )
+                                        }
+                                        if (!playlistSelectionMode) {
+                                            TextButton(
+                                                onClick = {
+                                                    createPlaylistTitle = ""
+                                                    createPlaylistError = null
+                                                    createPlaylistDialog = true
+                                                },
+                                            ) { Text("New") }
                                         }
                                         TextButton(
                                             onClick = {
@@ -1751,7 +1890,7 @@ fun ScrobbleScreen(
                             }
                             if (savedPlaylists.isEmpty()) {
                                 item("playlists-empty") {
-                                    EmptyPanel("Your library is ready", "Create a mix in Generate and save it here. Your saved playlists stay separate from listening history.")
+                                    EmptyPanel("Your library is ready", "Create a playlist here or build a mix in Generate. Saved playlists stay separate from listening history.")
                                 }
                             } else if (visiblePlaylists.isEmpty()) {
                                 item("playlists-no-results") {
