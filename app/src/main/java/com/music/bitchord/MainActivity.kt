@@ -63,7 +63,6 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
 import androidx.compose.foundation.layout.windowInsetsTopHeight
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -247,7 +246,6 @@ import com.music.bitchord.ui.components.BottomFadeScrim
 import com.music.bitchord.ui.components.FloatingBarsTapGuard
 import com.music.bitchord.ui.components.BottomTab
 import com.music.bitchord.ui.components.FLOATING_BAR_MAX_WIDTH
-import com.music.bitchord.ui.components.floatingBarInsets
 import com.music.bitchord.ui.components.FloatingBottomBar
 import com.music.bitchord.ui.components.GlassNavBar
 import com.music.bitchord.ui.components.floatingtabbar.rememberFloatingTabBarScrollConnection
