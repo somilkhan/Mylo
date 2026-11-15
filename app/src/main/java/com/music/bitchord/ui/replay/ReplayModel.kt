@@ -186,6 +186,9 @@ fun ReplayPeriod.localizedChip(context: Context): String = when (this) {
     ReplayPeriod.THIS_WEEK -> context.getString(R.string.replay_this_week)
     ReplayPeriod.LAST_7_DAYS -> ReplayPeriod.LAST_7_DAYS.chip
     ReplayPeriod.LAST_30_DAYS -> ReplayPeriod.LAST_30_DAYS.chip
+    ReplayPeriod.LAST_3_MONTHS -> ReplayPeriod.LAST_3_MONTHS.chip
+    ReplayPeriod.LAST_6_MONTHS -> ReplayPeriod.LAST_6_MONTHS.chip
+    ReplayPeriod.LAST_12_MONTHS -> ReplayPeriod.LAST_12_MONTHS.chip
     ReplayPeriod.THIS_MONTH -> context.getString(R.string.this_month)
     ReplayPeriod.THIS_YEAR -> context.getString(R.string.this_year)
     ReplayPeriod.ALL_TIME -> context.getString(R.string.all_time)
@@ -195,6 +198,9 @@ fun ReplaySummary.localizedLabel(context: Context): String = when (period) {
     ReplayPeriod.THIS_WEEK -> "This week"
     ReplayPeriod.LAST_7_DAYS -> ReplayPeriod.LAST_7_DAYS.chip
     ReplayPeriod.LAST_30_DAYS -> ReplayPeriod.LAST_30_DAYS.chip
+    ReplayPeriod.LAST_3_MONTHS -> ReplayPeriod.LAST_3_MONTHS.chip
+    ReplayPeriod.LAST_6_MONTHS -> ReplayPeriod.LAST_6_MONTHS.chip
+    ReplayPeriod.LAST_12_MONTHS -> ReplayPeriod.LAST_12_MONTHS.chip
     ReplayPeriod.THIS_MONTH -> DateTimeFormatter.ofPattern("MMMM yyyy", Locale.getDefault())
         .format(LocalDate.now())
         .replaceFirstChar { it.titlecase(Locale.getDefault()) }
