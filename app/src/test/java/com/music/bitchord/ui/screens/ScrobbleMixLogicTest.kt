@@ -137,7 +137,9 @@ class ScrobbleMixLogicTest {
         val lastFmOne = Song("lastfm00001", "Last.fm one", "Artist", null)
 
         assertEquals(
-            listOf(ytOne, shared, ytTwo, lastFmOne),
+            // Shared identities keep the primary row; secondary-only picks
+            // alternate into the mix without replacing primary metadata.
+            listOf(ytOne, lastFmOne, shared, ytTwo),
             buildBalancedSourceMix(
                 primary = listOf(ytOne, shared, ytTwo),
                 secondary = listOf(shared.copy(title = "Duplicate"), lastFmOne),
