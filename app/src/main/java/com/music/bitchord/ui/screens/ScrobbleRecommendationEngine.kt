@@ -61,13 +61,9 @@ internal object ScrobbleRecommendationEngine {
                 it.username.equals(cleanUsername, ignoreCase = true) &&
                     now - it.loadedAtMillis in 0 until TASTE_PROFILE_TTL_MILLIS
             }?.let { return@withLock it.tags }
-            val fresh = try {
+            val fresh = safe {
                 LastFM.getTopTags(cleanUsername, limit = 12).getOrThrow().map { it.name }
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (_: Exception) {
-                emptyList()
-            }
+            }.orEmpty()
             if (fresh.isNotEmpty()) {
                 cachedTasteTags = CachedTasteTags(cleanUsername, now, fresh)
             }
