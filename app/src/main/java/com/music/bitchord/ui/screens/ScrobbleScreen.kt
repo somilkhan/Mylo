@@ -877,14 +877,9 @@ fun ScrobbleScreen(
                                                     verticalAlignment = Alignment.CenterVertically,
                                                 ) {
                                                     ArtworkMosaic(
-                                                        playlist.songs,
-                                                        Modifier.size(96.dp)
-                                                            .then(if (reduceMotion) Modifier else Modifier.sharedElement(
-                                                                sharedContentState = sharedArtworkState,
-                                                                animatedVisibilityScope = pageVisibilityScope,
-                                                            ))
-                                                            .clip(RoundedCornerShape(18.dp)),
-                                                    )
+            songs = listOf(song),
+            modifier = Modifier.size(48.dp),
+        )
                                                     Spacer(Modifier.width(13.dp))
                                                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                                         Text(playlist.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
