@@ -1,6 +1,11 @@
 package com.music.bitchord.ui.screens
 
+import android.app.Activity
+import android.content.Intent
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
@@ -73,6 +78,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -102,6 +108,7 @@ import com.music.bitchord.data.stats.RankedSong
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlin.math.roundToLong
 
@@ -119,6 +126,8 @@ private enum class ScrobbleMixMode(val title: String, val description: String) {
 }
 
 private val SCROBBLE_GENRE_TAGS = listOf("pop", "rock", "hip-hop", "electronic", "jazz", "lofi", "metal", "indie", "classical", "r&b", "ambient", "punk")
+
+private enum class ScrobblePlaylistSortMode { RECENT, NAME, TRACK_COUNT }
 
 private enum class StatsView(val label: String, val period: ReplayPeriod) {
     RECENT("Recent", ReplayPeriod.LAST_30_DAYS),
@@ -173,9 +182,35 @@ fun ScrobbleScreen(
     var generatedTitle by remember { mutableStateOf("") }
     var mixSaved by remember { mutableStateOf(false) }
     var pendingRemovePlaylist by remember { mutableStateOf<String?>(null) }
+    var pendingRenamePlaylist by remember { mutableStateOf<String?>(null) }
+    var renamePlaylistDraft by remember { mutableStateOf("") }
+    var renamePlaylistError by remember { mutableStateOf<String?>(null) }
     var openedPlaylist by remember { mutableStateOf<String?>(null) }
     var playlistQuery by remember { mutableStateOf("") }
-    var playlistSortNewest by remember { mutableStateOf(true) }
+    var playlistSortMode by remember { mutableStateOf(ScrobblePlaylistSortMode.RECENT) }
+    var pendingExport by remember { mutableStateOf<Pair<String, String>?>(null) }
+    val exportScope = rememberCoroutineScope()
+    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val destination = result.data?.data
+        val payload = pendingExport
+        pendingExport = null
+        if (result.resultCode == Activity.RESULT_OK && destination != null && payload != null) {
+            exportScope.launch {
+                val saved = runCatching {
+                    withContext(Dispatchers.IO) {
+                        context.contentResolver.openOutputStream(destination)?.use { output ->
+                            output.write(payload.second.toByteArray(Charsets.UTF_8))
+                        } ?: error("Couldn't open the selected destination")
+                    }
+                }.isSuccess
+                Toast.makeText(
+                    context,
+                    if (saved) "Saved ${payload.first}" else "Couldn't save ${payload.first}",
+                    Toast.LENGTH_SHORT,
+                ).show()
+            }
+        }
+    }
     val statsListState = rememberLazyListState()
     val generateListState = rememberLazyListState()
     val playlistsListState = rememberLazyListState()
@@ -244,6 +279,29 @@ fun ScrobbleScreen(
     val allTimePlayCounts = allTimeSummary?.songs.orEmpty().associate { songIdentity(it.song) to it.plays }
     val rediscoverTracks = buildRediscoverMix(listens, allTimePlayCounts, System.currentTimeMillis())
     val savedPlaylists = ScrobblePlaylistStore.playlists.toList()
+    val savePlaylistExport: (SavedScrobblePlaylist, ScrobblePlaylistExportFormat) -> Unit = { playlist, format ->
+        val filename = scrobblePlaylistExportFilename(playlist.title, format)
+        pendingExport = filename to exportScrobblePlaylist(playlist, format)
+        val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = format.mimeType
+            putExtra(Intent.EXTRA_TITLE, filename)
+        }
+        runCatching { exportLauncher.launch(intent) }.onFailure {
+            pendingExport = null
+            Toast.makeText(context, "Couldn't open the file picker", Toast.LENGTH_SHORT).show()
+        }
+    }
+    val sharePlaylistExport: (SavedScrobblePlaylist, ScrobblePlaylistExportFormat) -> Unit = { playlist, format ->
+        val filename = scrobblePlaylistExportFilename(playlist.title, format)
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = format.mimeType
+            putExtra(Intent.EXTRA_SUBJECT, filename)
+            putExtra(Intent.EXTRA_TEXT, exportScrobblePlaylist(playlist, format))
+        }
+        runCatching { context.startActivity(Intent.createChooser(intent, "Share playlist")) }
+            .onFailure { Toast.makeText(context, "Couldn't share this playlist", Toast.LENGTH_SHORT).show() }
+    }
     val savedPlaylistForGeneratedMix = savedPlaylists.firstOrNull { playlist ->
         playlist.songs.map(::songIdentity) == generatedMix.map(::songIdentity)
     }
@@ -365,6 +423,39 @@ fun ScrobbleScreen(
     Column(
         modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
     ) {
+        pendingRenamePlaylist?.let { oldTitle ->
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { pendingRenamePlaylist = null; renamePlaylistError = null },
+                title = { Text("Rename playlist") },
+                text = {
+                    androidx.compose.material3.OutlinedTextField(
+                        value = renamePlaylistDraft,
+                        onValueChange = { renamePlaylistDraft = it; renamePlaylistError = null },
+                        singleLine = true,
+                        label = { Text("Playlist name") },
+                        isError = renamePlaylistError != null,
+                        supportingText = { renamePlaylistError?.let { Text(it) } },
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        val newTitle = renamePlaylistDraft.trim()
+                        if (ScrobblePlaylistStore.rename(oldTitle, newTitle)) {
+                            if (openedPlaylist == oldTitle) openedPlaylist = newTitle
+                            pendingRenamePlaylist = null
+                            renamePlaylistError = null
+                        } else {
+                            renamePlaylistError = when {
+                                newTitle.isBlank() -> "Enter a playlist name"
+                                ScrobblePlaylistStore.playlists.none { it.title == oldTitle } -> "This playlist is no longer available"
+                                else -> "A playlist with that name already exists"
+                            }
+                        }
+                    }) { Text("Save") }
+                },
+                dismissButton = { TextButton(onClick = { pendingRenamePlaylist = null; renamePlaylistError = null }) { Text("Cancel") } },
+            )
+        }
         pendingRemovePlaylist?.let { title ->
             androidx.compose.material3.AlertDialog(
                 onDismissRequest = { pendingRemovePlaylist = null },
@@ -909,7 +1000,7 @@ fun ScrobbleScreen(
                                             }
                                             TextButton(onClick = {
                                                 playlistQuery = ""
-                                                playlistSortNewest = true
+                                                playlistSortMode = ScrobblePlaylistSortMode.RECENT
                                                 openedPlaylist = null
                                                 onViewPlaylists()
                                             }) { Text("View playlists") }
@@ -980,7 +1071,14 @@ fun ScrobbleScreen(
                                         playlist.reason.contains(playlistQuery, ignoreCase = true) ||
                                         playlist.songs.any { it.title.contains(playlistQuery, ignoreCase = true) || it.artist.contains(playlistQuery, ignoreCase = true) }
                                 }
-                                .let { matches -> if (playlistSortNewest) matches else matches.sortedBy { it.title.lowercase() } }
+                                .let { matches -> when (playlistSortMode) {
+                                    ScrobblePlaylistSortMode.RECENT -> matches
+                                    ScrobblePlaylistSortMode.NAME -> matches.sortedBy { it.title.lowercase() }
+                                    ScrobblePlaylistSortMode.TRACK_COUNT -> matches.sortedWith(
+                                        compareByDescending<SavedScrobblePlaylist> { it.songs.size }
+                                            .thenBy { it.title.lowercase() },
+                                    )
+                                } }
                             item("playlists-heading") {
                                 PageHeading("Your collections", "${savedPlaylists.size} saved mixes · Made by you, kept on this device")
                             }
@@ -1002,10 +1100,15 @@ fun ScrobbleScreen(
                                     )
                                 }
                                 item("playlists-sort") {
-                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    ) {
                                         Icon(Icons.Rounded.Sort, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                                        FilterChip(selected = playlistSortNewest, onClick = { playlistSortNewest = true }, label = { Text("Recently saved") })
-                                        FilterChip(selected = !playlistSortNewest, onClick = { playlistSortNewest = false }, label = { Text("Name") })
+                                        FilterChip(selected = playlistSortMode == ScrobblePlaylistSortMode.RECENT, onClick = { playlistSortMode = ScrobblePlaylistSortMode.RECENT }, label = { Text("Recently saved") })
+                                        FilterChip(selected = playlistSortMode == ScrobblePlaylistSortMode.NAME, onClick = { playlistSortMode = ScrobblePlaylistSortMode.NAME }, label = { Text("Name") })
+                                        FilterChip(selected = playlistSortMode == ScrobblePlaylistSortMode.TRACK_COUNT, onClick = { playlistSortMode = ScrobblePlaylistSortMode.TRACK_COUNT }, label = { Text("Most tracks") })
                                     }
                                 }
                             }
@@ -1062,6 +1165,28 @@ fun ScrobbleScreen(
                                                     IconButton(onClick = { menuExpanded = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "More playlist actions") }
                                                     DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
                                                         DropdownMenuItem(text = { Text("Open") }, onClick = { menuExpanded = false; openedPlaylist = playlist.title })
+                                                        DropdownMenuItem(text = { Text("Rename") }, onClick = {
+                                                            menuExpanded = false
+                                                            renamePlaylistDraft = playlist.title
+                                                            renamePlaylistError = null
+                                                            pendingRenamePlaylist = playlist.title
+                                                        })
+                                                        DropdownMenuItem(text = { Text("Save as CSV") }, onClick = {
+                                                            menuExpanded = false
+                                                            savePlaylistExport(playlist, ScrobblePlaylistExportFormat.CSV)
+                                                        })
+                                                        DropdownMenuItem(text = { Text("Save as M3U") }, onClick = {
+                                                            menuExpanded = false
+                                                            savePlaylistExport(playlist, ScrobblePlaylistExportFormat.M3U)
+                                                        })
+                                                        DropdownMenuItem(text = { Text("Share CSV") }, onClick = {
+                                                            menuExpanded = false
+                                                            sharePlaylistExport(playlist, ScrobblePlaylistExportFormat.CSV)
+                                                        })
+                                                        DropdownMenuItem(text = { Text("Share M3U") }, onClick = {
+                                                            menuExpanded = false
+                                                            sharePlaylistExport(playlist, ScrobblePlaylistExportFormat.M3U)
+                                                        })
                                                         DropdownMenuItem(text = { Text("Remove") }, leadingIcon = { Icon(Icons.Rounded.DeleteOutline, null) }, onClick = { menuExpanded = false; pendingRemovePlaylist = playlist.title })
                                                     }
                                                 }
