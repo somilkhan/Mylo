@@ -1809,6 +1809,20 @@ private fun SectionHeading(title: String) {
 }
 
 @Composable
+private fun StatsSectionHeading(title: String, subtitle: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Text(
+            subtitle,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
 private fun MetricCard(value: Long, label: String, reduceMotion: Boolean, modifier: Modifier = Modifier) {
     Card(
         modifier = modifier,
