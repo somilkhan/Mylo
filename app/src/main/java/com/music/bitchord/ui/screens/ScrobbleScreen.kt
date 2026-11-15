@@ -953,19 +953,11 @@ fun ScrobbleScreen(
             }
             if (generated.isEmpty()) throw IllegalStateException("No tracks were available for this mix. Try another mode or refresh your listening data.")
             generatedMix = generated
-            generatedTitle = when (mixMode) {
-                ScrobbleMixMode.FAVOURITES -> "Your favourites"
-                ScrobbleMixMode.RECENT -> "Recently played"
-                ScrobbleMixMode.TASTE_MIX -> "Your taste mix"
-                ScrobbleMixMode.RADIO -> "Radio · ${selectedSeed?.title.orEmpty()}"
-                ScrobbleMixMode.ARTIST_MIX -> "More by ${selectedSeed?.artist.orEmpty()}"
-                ScrobbleMixMode.SIMILAR_ARTISTS -> "Similar to ${similarArtistQuery.trim().ifBlank { selectedSeed?.artist.orEmpty() }}" 
-                ScrobbleMixMode.NEVER_HEARD -> "New to you"
-                ScrobbleMixMode.DISCOVER -> "Discover"
-                ScrobbleMixMode.TAG -> "${tagQuery.trim().replaceFirstChar { it.uppercase() }} mix"
-                ScrobbleMixMode.LIBRARY -> "Your library mix"
-                ScrobbleMixMode.REDISCOVER -> "Rediscover"
-            }
+            // LastWave uses a global unique-name bank for generated playlists;
+            // keep the generation mode in the descriptive subtitle instead.
+            generatedTitle = ScrobblePlaylistNamer.generateUniqueName(
+                ScrobblePlaylistStore.playlists.map { it.title },
+            )
         } catch (_: TimeoutCancellationException) {
             generationError = "Playlist generation timed out. Check your connection and try again."
         } catch (cancelled: CancellationException) {
