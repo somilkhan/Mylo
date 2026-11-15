@@ -373,6 +373,60 @@ internal fun buildPrecheckedMix(
 }
 
 /**
+ * LastWave LocalTasteSuggestionEngine's radio-pool curation, adapted to
+ * Mylo's Song identity. Excludes already-heard recordings and junk uploads,
+ * deduplicates alternate uploads, and caps any one artist at three tracks.
+ */
+internal fun buildLocalTasteCandidates(
+    seeds: List<Song>,
+    relatedBySeed: List<List<Song>>,
+    heardSongs: List<Song>,
+    limit: Int,
+): List<Song> {
+    if (limit <= 0) return emptyList()
+    val seedIds = seeds.mapTo(mutableSetOf()) { it.videoId }
+    val knownSongs = (heardSongs + seeds)
+        .filter { it.title.isNotBlank() && it.artist.isNotBlank() }
+        .groupBy { recommendationArtistKey(it.artist) }
+    val seen = mutableSetOf<String>()
+    val artistCounts = mutableMapOf<String, Int>()
+    val suggestions = mutableListOf<Song>()
+    val junkTerms = listOf(
+        "mashup", "mash up", "mash-up", "jukebox", "mega mix", "megamix",
+        "non stop", "nonstop", "audio jukebox", "full album", "full songs", "compilation",
+        "slowed + reverb", "slowed reverb", "slowed & reverb", "bass boosted", "8d audio",
+        "karaoke", "ringtone", "instrumental", "1 hour", "10 hour", "clean version", "sped up",
+    )
+
+    relatedBySeed.forEach { tracks ->
+        var addedForSeed = 0
+        for (candidate in tracks) {
+            if (suggestions.size >= limit) break
+            if (!isYouTubeCatalogTrack(candidate) || candidate.videoId in seedIds ||
+                candidate.title.isBlank() || candidate.artist.isBlank()
+            ) continue
+            val title = candidate.title.lowercase()
+            if (junkTerms.any(title::contains)) continue
+            val key = recommendationIdentity(candidate)
+            if (key in seen) continue
+            val artistKey = recommendationArtistKey(candidate.artist)
+            if ((artistCounts[artistKey] ?: 0) >= 3) continue
+            val alreadyHeard = knownSongs[artistKey].orEmpty().any { heard ->
+                key == recommendationIdentity(heard) || isSameSongOrEdit(candidate, heard)
+            }
+            if (alreadyHeard) continue
+
+            seen += key
+            suggestions += candidate
+            artistCounts[artistKey] = (artistCounts[artistKey] ?: 0) + 1
+            addedForSeed++
+            if (addedForSeed >= 10) break
+        }
+    }
+    return suggestions.take(limit)
+}
+
+/**
  * Weighted, deterministic blend for the Taste mix. Favourites and recent
  * listening remain the primary sources; discovery fills the remaining space.
  * A track appearing in multiple sources is attributed to its highest-priority
