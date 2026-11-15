@@ -13,6 +13,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Dependency-adapted port of LastWave RecommendationEngine's seven discovery
@@ -31,6 +32,7 @@ internal object ScrobbleRecommendationEngine {
     )
 
     private const val TASTE_PROFILE_TTL_MILLIS = 60L * 60 * 1000
+    private const val SOURCE_TIMEOUT_MILLIS = 5_000L
     private data class CachedTasteTags(val username: String, val loadedAtMillis: Long, val tags: List<String>)
     private val tasteProfileMutex = Mutex()
     private var cachedTasteTags: CachedTasteTags? = null
@@ -259,8 +261,9 @@ internal object ScrobbleRecommendationEngine {
         )
     }
 
+    /** A single slow source must not hold the whole discovery pipeline hostage. */
     private suspend fun <T> safe(block: suspend () -> T): T? = try {
-        block()
+        withTimeoutOrNull(SOURCE_TIMEOUT_MILLIS) { block() }
     } catch (cancelled: CancellationException) {
         throw cancelled
     } catch (_: Exception) {
