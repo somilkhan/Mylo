@@ -11,6 +11,16 @@ import org.junit.Test
 
 class ScrobbleStatsLogicTest {
     @Test
+    fun mapsMyloStatsPeriodsToLastFmChartWindows() {
+        assertEquals("overall", lastFmPeriodValue(com.music.bitchord.data.stats.ReplayPeriod.ALL_TIME))
+        assertEquals("7day", lastFmPeriodValue(com.music.bitchord.data.stats.ReplayPeriod.LAST_7_DAYS))
+        assertEquals("1month", lastFmPeriodValue(com.music.bitchord.data.stats.ReplayPeriod.LAST_30_DAYS))
+        assertEquals("3month", lastFmPeriodValue(com.music.bitchord.data.stats.ReplayPeriod.LAST_3_MONTHS))
+        assertEquals("6month", lastFmPeriodValue(com.music.bitchord.data.stats.ReplayPeriod.LAST_6_MONTHS))
+        assertEquals("12month", lastFmPeriodValue(com.music.bitchord.data.stats.ReplayPeriod.LAST_12_MONTHS))
+    }
+
+    @Test
     fun lastSevenDaysUsesAnInclusiveRollingRangeAndOnlyLoadsOverlappingMonths() {
         val today = LocalDate.of(2026, 11, 15)
         val period = ReplayPeriod.LAST_7_DAYS
