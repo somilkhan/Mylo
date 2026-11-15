@@ -85,6 +85,31 @@ internal fun buildLibraryMix(
     .take(limit.coerceAtLeast(0))
     .toList()
 
+/** Alternates two independent recommendation sources while preserving their order. */
+internal fun buildBalancedSourceMix(
+    primary: List<Song>,
+    secondary: List<Song>,
+    limit: Int,
+): List<Song> {
+    if (limit <= 0) return emptyList()
+    val primaryTracks = primary.distinctBy(::songIdentity)
+    val secondaryTracks = secondary.distinctBy(::songIdentity)
+    val result = ArrayList<Song>(limit)
+    var primaryIndex = 0
+    var secondaryIndex = 0
+    while (result.size < limit && (primaryIndex < primaryTracks.size || secondaryIndex < secondaryTracks.size)) {
+        if (primaryIndex < primaryTracks.size && result.size < limit) {
+            val next = primaryTracks[primaryIndex++]
+            if (result.none { songIdentity(it) == songIdentity(next) }) result += next
+        }
+        if (secondaryIndex < secondaryTracks.size && result.size < limit) {
+            val next = secondaryTracks[secondaryIndex++]
+            if (result.none { songIdentity(it) == songIdentity(next) }) result += next
+        }
+    }
+    return result
+}
+
 /**
  * Weighted, deterministic blend for the Taste mix. Favourites and recent
  * listening remain the primary sources; discovery fills the remaining space.
