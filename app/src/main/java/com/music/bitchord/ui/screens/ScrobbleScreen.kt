@@ -977,8 +977,22 @@ fun ScrobbleScreen(
         }
     }
 
-    LaunchedEffect(selectedSection, syncedHistory, listens, loadingHistory, generationTopTracks, recommendationRequest) {
-        if (selectedSection != SCROBBLE_TAB_GENERATE || loadingHistory) return@LaunchedEffect
+    LaunchedEffect(
+        selectedSection,
+        syncedHistory,
+        listens,
+        loadingHistory,
+        generationTopTracks,
+        recommendationRequest,
+        mixMode,
+        lastFmDiscoveryAvailable,
+        lastFmUsername,
+        favouriteTracks,
+        recentTracks,
+    ) {
+        if (selectedSection != SCROBBLE_TAB_GENERATE || loadingHistory ||
+            mixMode !in setOf(ScrobbleMixMode.TASTE_MIX, ScrobbleMixMode.DISCOVER)
+        ) return@LaunchedEffect
         // Do not leave picks from an older history/profile visible while this
         // request is refreshing. Generate is gated below until this request settles.
         recommendations = emptyList()
@@ -988,10 +1002,35 @@ fun ScrobbleScreen(
             val excluded = (syncedHistory.map { it.videoId } + listens.map { it.song.videoId } + generationTopTracks.map { it.videoId })
                 .filter(String::isNotBlank).toSet()
             val result = withTimeout(SCROBBLE_GENERATION_TIMEOUT_MS) {
-                YtMusicRepository.quickPicks(excluded).getOrThrow()
+                val youtubePicks = YtMusicRepository.quickPicks(excluded).getOrThrow()
+                if (lastFmDiscoveryAvailable) {
+                    val tags = if (lastFmUsername.isNotBlank()) {
+                        LastFM.getTopTags(lastFmUsername, limit = 12).getOrElse { emptyList() }.map { it.name }
+                    } else {
+                        emptyList()
+                    }
+                    ScrobbleRecommendationEngine.discover(
+                        seedTracks = favouriteTracks + recentTracks,
+                        seedArtists = favouriteTracks.map {
+                            ListeningStats.primaryArtist(it.artist) ?: it.artist
+                        },
+                        topTags = tags,
+                        youtubeCandidates = youtubePicks,
+                        heardVideoIds = excluded,
+                        heardSongs = syncedHistory + listens.map { it.song } + generationTopTracks,
+                        limit = maxOf(20, mixTrackCount),
+                    )
+                } else {
+                    buildDiscoverMix(
+                        candidates = youtubePicks,
+                        heardVideoIds = excluded,
+                        heardSongs = syncedHistory + listens.map { it.song } + generationTopTracks,
+                        limit = maxOf(20, mixTrackCount),
+                    )
+                }
             }
             recommendations = result
-                 .filter { it.videoId.isNotBlank() && it.videoId !in excluded }
+                .filter { it.videoId.isNotBlank() && it.videoId !in excluded }
                 .distinctBy(::songIdentity)
             recommendationsFailed = false
         } catch (_: TimeoutCancellationException) {
