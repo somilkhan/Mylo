@@ -32,9 +32,10 @@ class ScrobbleMixLogicTest {
         val recent = Song("recent00001", "Recent", "Recent Artist", null)
         val duplicate = radioOne.copy(title = "Duplicate metadata")
         val discovery = Song("discover001", "Discovery", "Discovery Artist", null)
+        val incomplete = Song("incomplete01", "", "Unknown", null)
 
         val result = buildRadioMix(
-            radio = listOf(seed, radioOne, radioEdit),
+            radio = listOf(seed, radioOne, radioEdit, incomplete),
             favourites = listOf(favourite, duplicate),
             recent = listOf(recent),
             discovery = listOf(discovery),
