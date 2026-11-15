@@ -16,6 +16,7 @@ internal data class SavedScrobblePlaylist(
     val reason: String,
     val songs: List<Song>,
     val coverUri: String? = null,
+    val pinned: Boolean = false,
 )
 
 /**
@@ -144,6 +145,17 @@ internal object ScrobblePlaylistStore {
         return true
     }
 
+    /** Pins a playlist so it can be kept ahead of ordinary saved mixes. */
+    fun setPinned(title: String, pinned: Boolean): Boolean {
+        val index = playlists.indexOfFirst { it.title == title }
+        if (index < 0) return false
+        val existing = playlists[index]
+        if (existing.pinned == pinned) return true
+        playlists[index] = existing.copy(pinned = pinned)
+        persist()
+        return true
+    }
+
     /** Removes one saved mix and returns its persisted cover URI for permission cleanup. */
     fun remove(title: String): String? {
         val index = playlists.indexOfFirst { it.title == title }
@@ -189,6 +201,7 @@ internal object ScrobblePlaylistCodec {
         val reason: String,
         val songs: List<SongRecord>,
         val coverUri: String? = null,
+        val pinned: Boolean = false,
     )
 
     @Serializable
@@ -244,6 +257,7 @@ internal object ScrobblePlaylistCodec {
                 reason = playlist.reason,
                 songs = playlist.songs.map { it.toSong() },
                 coverUri = playlist.coverUri,
+                pinned = playlist.pinned,
             )
         }.filter { it.title.isNotBlank() }
     }.getOrNull()
