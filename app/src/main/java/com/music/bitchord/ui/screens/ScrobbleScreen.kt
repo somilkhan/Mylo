@@ -685,7 +685,7 @@ fun ScrobbleScreen(
                                         buildTagMix(
                                             YtMusicRepository.search("$artist songs", SearchFilter.SONGS).getOrThrow(),
                                             limit = 3,
-                                        ).filterNot { it.artist.equals(seed.artist, ignoreCase = true) }
+                                        ).filterNot { it.artist.equals(artistName, ignoreCase = true) }
                                     } catch (cancelled: CancellationException) {
                                         throw cancelled
                                     } catch (_: Exception) {
