@@ -750,9 +750,44 @@ fun ScrobbleScreen(
                     ScrobbleMixMode.RADIO -> {
                         val seed = selectedSeed?.takeIf(::isYouTubeCatalogTrack)
                             ?: throw IllegalStateException("Choose a YouTube Music track for Song radio")
-                        YtMusicRepository.radio(seed.videoId).getOrThrow()
-                            .filter { it.videoId.isNotBlank() && it.videoId != seed.videoId && !isSameSongOrEdit(it, seed) }
-                            .distinctBy(::songIdentity).take(mixTrackCount)
+                        // Keep seed-specific radio as the primary source, but do
+                        // not fail or return a tiny mix when YouTube's radio is
+                        // temporarily empty. Mirror LastWave's layered approach:
+                        // personal favourites/recent listens first, then discovery.
+                        val radioTracks = try {
+                            YtMusicRepository.radio(seed.videoId).getOrThrow()
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                            emptyList()
+                        }
+                        val initial = buildRadioMix(
+                            radio = radioTracks,
+                            favourites = favouriteTracks,
+                            recent = recentTracks,
+                            discovery = recommendations,
+                            seed = seed,
+                            limit = mixTrackCount,
+                        )
+                        if (initial.size >= mixTrackCount) {
+                            initial
+                        } else {
+                            val quickPicks = try {
+                                YtMusicRepository.quickPicks(setOf(seed.videoId)).getOrThrow()
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (_: Exception) {
+                                emptyList()
+                            }
+                            buildRadioMix(
+                                radio = radioTracks,
+                                favourites = favouriteTracks,
+                                recent = recentTracks,
+                                discovery = recommendations + quickPicks,
+                                seed = seed,
+                                limit = mixTrackCount,
+                            )
+                        }
                     }
                     ScrobbleMixMode.ARTIST_MIX -> {
                         val seed = selectedSeed?.takeIf(::isYouTubeCatalogTrack)
