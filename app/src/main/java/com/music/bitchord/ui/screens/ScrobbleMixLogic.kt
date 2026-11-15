@@ -22,6 +22,17 @@ internal fun songIdentity(song: Song): String =
 internal fun recommendationIdentity(song: Song): String =
     "${song.title.trim().replace(Regex("\\s+"), " ").lowercase()}|${song.artist.trim().replace(Regex("\\s+"), " ").lowercase()}"
 
+/** Deduplicate playable recommendation rows by video ID and normalized title+artist. */
+internal fun distinctRecommendationSongs(candidates: List<Song>): List<Song> {
+    val seenVideoIds = mutableSetOf<String>()
+    val seenNames = mutableSetOf<String>()
+    return candidates.filter {
+        it.title.isNotBlank() && it.artist.isNotBlank() && it.videoId.isNotBlank()
+    }.filter { song ->
+        seenVideoIds.add(song.videoId) && seenNames.add(recommendationIdentity(song))
+    }
+}
+
 /**
  * Rediscover only counts completed plays from ListeningStats, not raw history
  * rows: a two-second skip is recorded in ListeningHistory but is not a play.
@@ -62,18 +73,15 @@ internal fun buildRediscoverMix(
 internal fun buildTagMix(
     results: List<SearchResult>,
     limit: Int = 25,
-): List<Song> = results.asSequence()
-    .mapNotNull { result ->
+): List<Song> = distinctRecommendationSongs(
+    results.mapNotNull { result ->
         when (result) {
             is SearchResult.TopTrack -> result.song
             is SearchResult.Track -> result.song
             is SearchResult.Browse -> null
         }
-    }
-    .filter(::isYouTubeCatalogTrack)
-    .distinctBy(::recommendationIdentity)
-    .take(limit.coerceAtLeast(0))
-    .toList()
+    }.filter(::isYouTubeCatalogTrack),
+).take(limit.coerceAtLeast(0))
 
 /**
  * Library generation combines Liked Music and tracks added to the YouTube
@@ -83,11 +91,9 @@ internal fun buildTagMix(
 internal fun buildLibraryMix(
     library: LibraryPage,
     limit: Int = 25,
-): List<Song> = (library.likedSongs + library.librarySongs).asSequence()
+): List<Song> = distinctRecommendationSongs(library.likedSongs + library.librarySongs)
     .filter(::isYouTubeCatalogTrack)
-    .distinctBy(::recommendationIdentity)
     .take(limit.coerceAtLeast(0))
-    .toList()
 
 /**
  * Alternates two recommendation sources while preserving their order.
@@ -133,18 +139,8 @@ internal fun buildPrecheckedMix(
     limit: Int = 25,
 ): List<Song> {
     if (limit <= 0) return emptyList()
-    val seenVideoIds = mutableSetOf<String>()
-    val seenNames = mutableSetOf<String>()
-    val valid = candidates.filter {
-        it.title.isNotBlank() && it.artist.isNotBlank() && it.videoId.isNotBlank()
-    }.filter { song ->
-        val nameKey = recommendationIdentity(song)
-        // Match LastWave GeneratedTrack.sameSongAs: exact catalogue ID or
-        // normalized title+artist identity, whichever catches the duplicate.
-        // Like LastWave's distinctSongs(), a duplicate video ID is
-        // rejected before its alternate metadata can claim a title key.
-        seenVideoIds.add(song.videoId) && seenNames.add(nameKey)
-    }
+    // Same identity semantics as LastWave GeneratedTrack.distinctSongs().
+    val valid = distinctRecommendationSongs(candidates)
     val artistCounts = mutableMapOf<String, Int>()
     return valid.filter { song ->
         val key = song.artist.trim().lowercase()
@@ -319,9 +315,6 @@ internal fun buildNeverHeardMix(
     candidates: List<Song>,
     heardVideoIds: Set<String>,
     limit: Int = 25,
-): List<Song> = candidates.asSequence()
-    .filter { it.videoId.isNotBlank() && it.videoId !in heardVideoIds }
-    .filter { it.title.isNotBlank() && it.artist.isNotBlank() }
-    .distinctBy(::recommendationIdentity)
+): List<Song> = distinctRecommendationSongs(candidates.filter { it.videoId !in heardVideoIds })
+    .filter(::isYouTubeCatalogTrack)
     .take(limit.coerceAtLeast(0))
-    .toList()
