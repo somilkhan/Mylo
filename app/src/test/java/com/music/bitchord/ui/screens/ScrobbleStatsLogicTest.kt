@@ -62,4 +62,26 @@ class ScrobbleStatsLogicTest {
         assertEquals(15L, short.first().listeningMs)
         assertEquals(listOf(0L, 0L, 0L), short.drop(1).map { it.listeningMs })
     }
+
+    @Test
+    fun rollingThreeSixAndTwelveMonthRangesIncludeTodayAndFilterOldMonths() {
+        val today = LocalDate.of(2026, 11, 15)
+
+        assertEquals(today.minusMonths(3).plusDays(1) to today, ReplayPeriod.LAST_3_MONTHS.range(today))
+        assertEquals(today.minusMonths(6).plusDays(1) to today, ReplayPeriod.LAST_6_MONTHS.range(today))
+        assertEquals(today.minusMonths(12).plusDays(1) to today, ReplayPeriod.LAST_12_MONTHS.range(today))
+
+        assertEquals("Last 3 months", ReplayPeriod.LAST_3_MONTHS.label(today))
+        assertEquals("Last 6 months", ReplayPeriod.LAST_6_MONTHS.label(today))
+        assertEquals("Last 12 months", ReplayPeriod.LAST_12_MONTHS.label(today))
+
+        assertTrue(ReplayPeriod.LAST_3_MONTHS.needsDayFilter())
+        assertTrue(ReplayPeriod.LAST_3_MONTHS.covers(YearMonth.of(2026, 8), today))
+        assertFalse(ReplayPeriod.LAST_3_MONTHS.covers(YearMonth.of(2026, 7), today))
+        assertTrue(ReplayPeriod.LAST_6_MONTHS.covers(YearMonth.of(2026, 5), today))
+        assertFalse(ReplayPeriod.LAST_6_MONTHS.covers(YearMonth.of(2026, 4), today))
+        assertTrue(ReplayPeriod.LAST_12_MONTHS.covers(YearMonth.of(2025, 11), today))
+        assertFalse(ReplayPeriod.LAST_12_MONTHS.covers(YearMonth.of(2025, 10), today))
+    }
+
 }
