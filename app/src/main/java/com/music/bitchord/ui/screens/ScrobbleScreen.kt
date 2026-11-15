@@ -1392,13 +1392,6 @@ fun ScrobbleScreen(
                                             )
                                         }
                                     }
-                                    if (generationTopPeriod != ScrobbleTopPeriod.ALL_TIME && syncedStats.totalPlays > 0) {
-                                        Text(
-                                            "Date filters use Mylo listens; synced YouTube Music history is included in All time only.",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                    }
                                 }
                             }
                         }
@@ -1628,6 +1621,13 @@ fun ScrobbleScreen(
                                                 label = { Text(period.label) },
                                             )
                                         }
+                                    }
+                                    if (generationTopPeriod != ScrobbleTopPeriod.ALL_TIME && syncedStats.totalPlays > 0) {
+                                        Text(
+                                            "Date filters use Mylo listens; synced YouTube Music history is included in All time only.",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
                                     }
                                     when {
                                         loadingGenerationTopTracks -> LoadingLine("Loading your top tracks")
