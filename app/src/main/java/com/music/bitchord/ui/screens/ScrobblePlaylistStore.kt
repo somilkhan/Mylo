@@ -67,6 +67,28 @@ internal object ScrobblePlaylistStore {
             ?: song.videoId.takeIf(String::isNotBlank)?.let { "video:$it" }
             ?: "${song.title.lowercase()}|${song.artist.lowercase()}"
 
+    /**
+     * Renames one saved snapshot without changing its tracks or order.
+     * Names are unique ignoring case so playlist identity remains unambiguous
+     * in search, detail navigation and persistence.
+     */
+    fun rename(oldTitle: String, newTitle: String): Boolean {
+        val cleanTitle = newTitle.trim()
+        if (cleanTitle.isBlank()) return false
+        val index = playlists.indexOfFirst { it.title == oldTitle }
+        if (index < 0) return false
+        if (playlists.withIndex().any { (otherIndex, playlist) ->
+                otherIndex != index && playlist.title.equals(cleanTitle, ignoreCase = true)
+            }
+        ) return false
+
+        val existing = playlists[index]
+        if (existing.title == cleanTitle) return true
+        playlists[index] = existing.copy(title = cleanTitle)
+        persist()
+        return true
+    }
+
     fun remove(title: String) {
         if (playlists.removeAll { it.title == title }) persist()
     }
