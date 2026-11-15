@@ -389,6 +389,7 @@ internal fun buildLocalTasteCandidates(
         .filter { it.title.isNotBlank() && it.artist.isNotBlank() }
         .groupBy { recommendationArtistKey(it.artist) }
     val seen = mutableSetOf<String>()
+    val seenVideoIds = mutableSetOf<String>()
     val artistCounts = mutableMapOf<String, Int>()
     val suggestions = mutableListOf<Song>()
     val junkTerms = listOf(
@@ -409,7 +410,7 @@ internal fun buildLocalTasteCandidates(
             if (junkTerms.any(title::contains)) continue
             val key = recommendationIdentity(candidate)
             val artistKey = recommendationArtistKey(candidate.artist)
-            if (key in seen || suggestions.any { existing ->
+            if (key in seen || candidate.videoId in seenVideoIds || suggestions.any { existing ->
                     recommendationArtistKey(existing.artist) == artistKey && isSameSongOrEdit(candidate, existing)
                 }
             ) continue
@@ -420,6 +421,7 @@ internal fun buildLocalTasteCandidates(
             if (alreadyHeard) continue
 
             seen += key
+            seenVideoIds += candidate.videoId
             suggestions += candidate
             artistCounts[artistKey] = (artistCounts[artistKey] ?: 0) + 1
             addedForSeed++
