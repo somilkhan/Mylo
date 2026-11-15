@@ -283,7 +283,7 @@ class ScrobbleMixLogicTest {
     @Test
     fun discoverPrefersHigherLastWaveSourceWeight() {
         val low = Song("lowweight01", "Low weight", "Unknown Artist", null)
-        val high = Song("highweight01", "High weight", "Unknown Artist", null)
+        val high = Song("highwght001", "High weight", "Unknown Artist", null)
 
         val result = buildDiscoverMix(
             candidates = listOf(low, high),
