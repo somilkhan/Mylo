@@ -671,7 +671,15 @@ fun ScrobbleScreen(
                     ScrobbleMixMode.FAVOURITES -> favouriteTracks.take(mixTrackCount)
                     ScrobbleMixMode.RECENT -> recentTracks.take(mixTrackCount)
                     ScrobbleMixMode.TASTE_MIX -> {
-                        val excluded = (syncedHistory.map { it.videoId } + listens.map { it.song.videoId }).filter(String::isNotBlank).toSet()
+                        val heardSongs = syncedHistory + listens.map { it.song } + generationTopTracks
+                        val excluded = heardSongs.map { it.videoId }.filter(String::isNotBlank).toSet()
+                        // LastWave LocalTasteSuggestionEngine: seed YouTube's own
+                        // related-song radio from the strongest local listening signals.
+                        val localTaste = ScrobbleLocalTasteEngine.discover(
+                            seedTracks = favouriteTracks.take(5) + recentTracks.take(5),
+                            heardSongs = heardSongs,
+                            limit = maxOf(20, mixTrackCount * 2),
+                        )
                         val fresh = recommendations.ifEmpty {
                             try {
                                 YtMusicRepository.quickPicks(excluded).getOrThrow()
@@ -684,7 +692,10 @@ fun ScrobbleScreen(
                         buildTasteMix(
                             favourites = favouriteTracks.take(12),
                             recent = recentTracks.take(12),
-                            fresh = fresh.filter { it.videoId.isNotBlank() && it.videoId !in excluded }.take(25),
+                            fresh = (localTaste + fresh)
+                                .filter { it.videoId.isNotBlank() && it.videoId !in excluded }
+                                .distinctBy(::songIdentity)
+                                .take(35),
                             limit = mixTrackCount,
                         )
                     }
