@@ -741,20 +741,6 @@ fun ScrobbleScreen(
                             candidates = YtMusicRepository.quickPicks(heard).getOrThrow(),
                             heardVideoIds = heard,
                             heardSongs = heardSongs,
-                            topArtistNames = favouriteTracks.take(12).mapTo(mutableSetOf()) {
-                                com.music.bitchord.data.stats.ListeningStats.primaryArtist(it.artist) ?: it.artist
-                            },
-                            recentArtistNames = recentTracks.take(12).mapTo(mutableSetOf()) {
-                                com.music.bitchord.data.stats.ListeningStats.primaryArtist(it.artist) ?: it.artist
-                            },
-                            artistAffinity = run {
-                                val counts = generationTopRankedTracks.groupBy {
-                                    com.music.bitchord.data.stats.ListeningStats.primaryArtist(it.song.artist)
-                                        ?.lowercase() ?: it.song.artist.lowercase()
-                                }.mapValues { (_, rows) -> rows.sumOf { it.plays }.toDouble() }
-                                val max = counts.values.maxOrNull() ?: 0.0
-                                if (max <= 0.0) emptyMap() else counts.mapValues { (_, value) -> value / max }
-                            },
                             limit = mixTrackCount,
                         )
                     }
@@ -770,6 +756,20 @@ fun ScrobbleScreen(
                             },
                             heardVideoIds = excluded,
                             heardSongs = heardSongs,
+                            topArtistNames = favouriteTracks.take(12).mapTo(mutableSetOf()) {
+                                com.music.bitchord.data.stats.ListeningStats.primaryArtist(it.artist) ?: it.artist
+                            },
+                            recentArtistNames = recentTracks.take(12).mapTo(mutableSetOf()) {
+                                com.music.bitchord.data.stats.ListeningStats.primaryArtist(it.artist) ?: it.artist
+                            },
+                            artistAffinity = run {
+                                val counts = generationTopRankedTracks.groupBy {
+                                    com.music.bitchord.data.stats.ListeningStats.primaryArtist(it.song.artist)
+                                        ?.lowercase() ?: it.song.artist.lowercase()
+                                }.mapValues { (_, rows) -> rows.sumOf { it.plays }.toDouble() }
+                                val max = counts.values.maxOrNull() ?: 0.0
+                                if (max <= 0.0) emptyMap() else counts.mapValues { (_, value) -> value / max }
+                            },
                             limit = mixTrackCount,
                         )
                     }
