@@ -319,11 +319,11 @@ internal fun buildArtistCappedMix(
 ): List<Song> {
     if (targetSize <= 0) return emptyList()
     val distinctSongs = candidates.distinctBy(::songIdentity)
-    val seedKey = seedArtist.trim().lowercase()
+    val seedKey = recommendationArtistKey(seedArtist)
     fun applyArtistCap(maxSeedArtist: Int, maxOtherArtist: Int): List<Song> {
         val counts = mutableMapOf<String, Int>()
         return distinctSongs.filter { song ->
-            val artistKey = song.artist.trim().lowercase()
+            val artistKey = recommendationArtistKey(song.artist)
             val maxAllowed = if (artistKey == seedKey) maxSeedArtist else maxOtherArtist
             val current = counts[artistKey] ?: 0
             if (current < maxAllowed) {
