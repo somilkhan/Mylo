@@ -376,7 +376,7 @@ fun ScrobbleScreen(
                 when (section) {
                     SCROBBLE_TAB_STATS -> {
                         item("stats-heading") {
-                            PageHeading("Your listening", "A clear picture of what you play in Mylo")
+                            PageHeading("Your listening", "A personal replay of what you play in Mylo")
                         }
                         item("stats-periods") {
                             Row(
@@ -393,106 +393,130 @@ fun ScrobbleScreen(
                             }
                         }
                         when {
-                            loadingStats -> item("stats-loading") { LoadingLine("Calculating your listening") }
+                            loadingStats -> item("stats-loading") {
+                                LoadingLine("Building your listening report")
+                            }
                             statsFailed -> item("stats-error") {
-                                EmptyPanel("Statistics unavailable", "Your listening totals could not be read. Reopen Scrobble to retry.")
+                                EmptyPanel(
+                                    "Statistics unavailable",
+                                    "Your listening totals could not be read. Reopen Scrobble to try again.",
+                                )
                             }
                             summary == null || summary?.isEmpty == true -> item("stats-empty") {
-                                EmptyPanel("Your story starts here", "Play music in Mylo. Your listening time, play count and favourite tracks will build here.")
+                                EmptyPanel(
+                                    "Your story starts here",
+                                    "Play music in Mylo. Your listening time, favourite tracks and listening patterns will appear here.",
+                                )
                             }
                             else -> {
                                 item("stats-overview") {
-                                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                        Text(summary!!.label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                        val listeningHeroShape = RoundedCornerShape(22.dp)
-                                        Card(
-                                            modifier = Modifier.fillMaxWidth().border(
-                                                width = 1.dp,
-                                                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.26f),
-                                                shape = listeningHeroShape,
-                                            ),
-                                            shape = listeningHeroShape,
-                                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.82f)),
-                                            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                                        ) {
-                                            Row(
-                                                Modifier.fillMaxWidth().padding(20.dp),
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                                            ) {
-                                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                                    Text("YOUR LISTENING JOURNAL", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, letterSpacing = 1.3.sp)
-                                                    AnimatedValueText(
-                                                        value = summary!!.totalMs / 60_000L,
-                                                        reduceMotion = reduceMotion,
-                                                        style = MaterialTheme.typography.headlineMedium,
-                                                        color = MaterialTheme.colorScheme.onSurface,
-                                                        formatter = { formatListeningTime(it * 60_000L) },
-                                                    )
-                                                    Text("${summary!!.totalPlays} plays · ${summary!!.distinctSongs} tracks", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                                }
-                                                ArtworkMosaic(topTracks.take(4), Modifier.size(88.dp))
-                                            }
-                                        }
-                                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                            MetricCard(summary!!.totalPlays.toLong(), "Total plays", reduceMotion, Modifier.weight(1f))
-                                            MetricCard(summary!!.distinctSongs.toLong(), "Unique tracks", reduceMotion, Modifier.weight(1f))
-                                        }
-                                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                            MetricCard(summary!!.distinctArtists.toLong(), "Artists", reduceMotion, Modifier.weight(1f))
-                                            MetricCard(summary!!.distinctAlbums.toLong(), "Albums", reduceMotion, Modifier.weight(1f))
-                                        }
-                                    }
+                                    StatsOverviewCard(
+                                        summary = summary!!,
+                                        topTracks = topTracks,
+                                        reduceMotion = reduceMotion,
+                                    )
                                 }
                                 if (summary!!.hourOfDay.any { it > 0L }) {
                                     item("stats-hourly-activity") {
-                                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                            SectionHeading("When you listen")
+                                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                            SectionHeading("Your listening rhythm")
                                             HourlyActivityChart(summary!!.hourOfDay, reduceMotion)
                                         }
                                     }
                                 }
-                                item("stats-top-heading") { SectionHeading("Most played") }
-                                items(summary!!.songs.sortedWith(compareByDescending<RankedSong> { it.plays }.thenByDescending { it.ms }).take(12), key = { "stat-${songIdentity(it.song)}" }) { ranked ->
-                                    TrackRow(
-                                        song = ranked.song,
-                                        supporting = "${ranked.plays} ${if (ranked.plays == 1) "play" else "plays"} · ${formatListeningTime(ranked.ms)}",
-                                        onClick = { onPlayPlaylist("Most played", listOf(ranked.song), 0) },
-                                    )
+                                if (summary!!.busiestDay != null || summary!!.peakHour != null) {
+                                    item("stats-insights") {
+                                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                            SectionHeading("A little about your habits")
+                                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                                summary!!.busiestDay?.let { day ->
+                                                    StatsInsightTile(
+                                                        title = "Biggest day",
+                                                        value = day,
+                                                        detail = "${summary!!.busiestDayMs / 60_000} min listened",
+                                                        modifier = Modifier.weight(1f),
+                                                    )
+                                                }
+                                                summary!!.peakHour?.let { hour ->
+                                                    StatsInsightTile(
+                                                        title = "Peak hour",
+                                                        value = "%02d:00".format(hour),
+                                                        detail = "Your most active hour",
+                                                        modifier = Modifier.weight(1f),
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                val rankedTracks = summary!!.songs
+                                    .sortedWith(compareByDescending<RankedSong> { it.plays }.thenByDescending { it.ms })
+                                    .take(12)
+                                if (rankedTracks.isNotEmpty()) {
+                                    item("stats-top-heading") {
+                                        StatsSectionHeading("Most played", "${summary!!.songs.size} tracks")
+                                    }
+                                    itemsIndexed(
+                                        rankedTracks,
+                                        key = { index, ranked -> "stat-${index}-${songIdentity(ranked.song)}" },
+                                    ) { index, ranked ->
+                                        StatsRankedTrack(
+                                            rank = index + 1,
+                                            song = ranked.song,
+                                            supporting = "${ranked.plays} ${if (ranked.plays == 1) "play" else "plays"} · ${formatListeningTime(ranked.ms)}",
+                                            onClick = { onPlayPlaylist("Most played", listOf(ranked.song), 0) },
+                                        )
+                                    }
                                 }
                                 if (summary!!.artists.isNotEmpty()) {
-                                    item("stats-artists-heading") { SectionHeading("Top artists") }
-                                    items(summary!!.artists.take(5), key = { "artist-${it.title}" }) { artist ->
-                                        InfoPanel(artist.title, "${artist.plays} plays · ${artist.ms / 60_000} min")
+                                    item("stats-artists-heading") {
+                                        StatsSectionHeading("Top artists", "Your most-played")
+                                    }
+                                    items(
+                                        summary!!.artists.take(5),
+                                        key = { "artist-${it.title.lowercase()}" },
+                                    ) { artist ->
+                                        StatsEntityRow(
+                                            title = artist.title,
+                                            subtitle = "${artist.plays} plays · ${formatListeningTime(artist.ms)}",
+                                            artworkUrl = artist.artworkUrl,
+                                        )
                                     }
                                 }
                                 if (summary!!.albums.isNotEmpty()) {
-                                    item("stats-albums-heading") { SectionHeading("Top albums") }
-                                    items(summary!!.albums.take(5), key = { "album-${it.title}-${it.subtitle.orEmpty()}" }) { album ->
-                                        InfoPanel(album.title, "${album.subtitle.orEmpty()} · ${album.plays} plays")
+                                    item("stats-albums-heading") {
+                                        StatsSectionHeading("Top albums", "By listening time")
+                                    }
+                                    items(
+                                        summary!!.albums.take(5),
+                                        key = { "album-${it.title}-${it.subtitle.orEmpty()}" },
+                                    ) { album ->
+                                        StatsEntityRow(
+                                            title = album.title,
+                                            subtitle = listOfNotNull(album.subtitle, "${album.plays} plays").joinToString(" · "),
+                                            artworkUrl = album.artworkUrl,
+                                        )
                                     }
                                 }
                                 if (summary!!.genres.isNotEmpty()) {
-                                    item("stats-genres-heading") { SectionHeading("Top genres") }
-                                    items(summary!!.genres.take(5), key = { "genre-${it.title}" }) { genre ->
-                                        InfoPanel(genre.title, "${genre.plays} plays · ${genre.ms / 60_000} min")
+                                    item("stats-genres-heading") {
+                                        StatsSectionHeading("Top genres", "From your listening")
                                     }
-                                }
-                                summary!!.busiestDay?.let { day ->
-                                    item("stats-busiest-day") {
-                                        InfoPanel("Your biggest day", "$day · ${summary!!.busiestDayMs / 60_000} minutes")
-                                    }
-                                }
-                                summary!!.peakHour?.let { hour ->
-                                    item("stats-peak-hour") {
-                                        InfoPanel("Peak listening hour", "%02d:00–%02d:00".format(hour, (hour + 1) % 24))
+                                    items(
+                                        summary!!.genres.take(5),
+                                        key = { "genre-${it.title.lowercase()}" },
+                                    ) { genre ->
+                                        InfoPanel(
+                                            genre.title,
+                                            "${genre.plays} plays · ${formatListeningTime(genre.ms)}",
+                                        )
                                     }
                                 }
                             }
                         }
                         item("stats-device-note") {
                             Text(
-                                "These totals come from Mylo's on-device listening statistics. Account history remains separate.",
+                                "Private by design · These insights are calculated from listening data stored on this device.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -1052,6 +1076,294 @@ private fun HourlyActivityChart(hours: List<Long>, reduceMotion: Boolean) {
                     Text(hour, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
+        }
+    }
+}
+
+
+@Composable
+private fun StatsOverviewCard(
+    summary: ReplaySummary,
+    topTracks: List<Song>,
+    reduceMotion: Boolean,
+) {
+    val shape = RoundedCornerShape(26.dp)
+    Card(
+        modifier = Modifier.fillMaxWidth().border(
+            width = 1.dp,
+            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.34f),
+            shape = shape,
+        ),
+        shape = shape,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.78f),
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(7.dp),
+                ) {
+                    Text(
+                        "LISTENING TIME",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.25.sp,
+                    )
+                    AnimatedValueText(
+                        value = summary.totalMs / 60_000L,
+                        reduceMotion = reduceMotion,
+                        style = MaterialTheme.typography.headlineLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        formatter = { formatListeningTime(it * 60_000L) },
+                    )
+                    Text(
+                        summary.label,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                ArtworkMosaic(
+                    songs = topTracks.take(4),
+                    modifier = Modifier.size(82.dp),
+                )
+            }
+            Box(
+                modifier = Modifier.fillMaxWidth().height(1.dp)
+                    .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.28f)),
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                StatsMetricTile(
+                    value = summary.totalPlays.toLong(),
+                    label = "PLAYS",
+                    reduceMotion = reduceMotion,
+                    modifier = Modifier.weight(1f),
+                )
+                StatsMetricTile(
+                    value = summary.distinctSongs.toLong(),
+                    label = "TRACKS",
+                    reduceMotion = reduceMotion,
+                    modifier = Modifier.weight(1f),
+                )
+                StatsMetricTile(
+                    value = summary.distinctArtists.toLong(),
+                    label = "ARTISTS",
+                    reduceMotion = reduceMotion,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatsMetricTile(
+    value: Long,
+    label: String,
+    reduceMotion: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
+        AnimatedValueText(
+            value = value,
+            reduceMotion = reduceMotion,
+            style = MaterialTheme.typography.titleLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 0.7.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun StatsInsightTile(
+    title: String,
+    value: String,
+    detail: String,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f))
+            .padding(horizontal = 14.dp, vertical = 15.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(
+            title.uppercase(),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 0.6.sp,
+        )
+        Text(
+            value,
+            style = MaterialTheme.typography.titleLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            detail,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun StatsSectionHeading(title: String, supporting: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(
+            title,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Text(
+            supporting,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun StatsRankedTrack(
+    rank: Int,
+    song: Song,
+    supporting: String,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(horizontal = 4.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(
+            rank.toString().padStart(2, '0'),
+            modifier = Modifier.width(25.dp),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = FontWeight.Bold,
+        )
+        ArtworkMosaic(
+            songs = listOf(song),
+            modifier = Modifier.size(50.dp),
+        )
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+            Text(
+                song.title,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                supporting.ifBlank { song.artist },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Icon(
+            Icons.Rounded.PlayArrow,
+            contentDescription = "Play ${song.title}",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(22.dp),
+        )
+    }
+}
+
+@Composable
+private fun StatsEntityRow(
+    title: String,
+    subtitle: String,
+    artworkUrl: String?,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.32f))
+            .padding(horizontal = 10.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        if (artworkUrl.isNullOrBlank()) {
+            Box(
+                modifier = Modifier.size(48.dp).clip(RoundedCornerShape(13.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Rounded.GraphicEq,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        } else {
+            AsyncImage(
+                model = artworkUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.size(48.dp).clip(RoundedCornerShape(13.dp)),
+            )
+        }
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+            Text(
+                title,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
