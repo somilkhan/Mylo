@@ -2448,7 +2448,26 @@ fun ScrobbleScreen(
                                                     )
                                                     Spacer(Modifier.width(13.dp))
                                                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                                        Text(playlist.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                        Row(
+                                                            verticalAlignment = Alignment.CenterVertically,
+                                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                        ) {
+                                                            Text(
+                                                                playlist.title,
+                                                                modifier = Modifier.weight(1f, fill = false),
+                                                                style = MaterialTheme.typography.titleMedium,
+                                                                fontWeight = FontWeight.SemiBold,
+                                                                maxLines = 1,
+                                                                overflow = TextOverflow.Ellipsis,
+                                                            )
+                                                            if (playlist.pinned) {
+                                                                Text(
+                                                                    "PINNED",
+                                                                    style = MaterialTheme.typography.labelSmall,
+                                                                    color = MaterialTheme.colorScheme.primary,
+                                                                )
+                                                            }
+                                                        }
                                                         Text("${playlist.songs.size} tracks", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                                                         Text(playlist.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
                                                     }
