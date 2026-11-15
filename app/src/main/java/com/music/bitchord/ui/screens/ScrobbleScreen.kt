@@ -180,6 +180,7 @@ fun ScrobbleScreen(
     var recommendations by remember { mutableStateOf<List<Song>>(emptyList()) }
     var loadingRecommendations by remember { mutableStateOf(false) }
     var recommendationsFailed by remember { mutableStateOf(false) }
+    var lastFmDiscoveryAvailable by remember { mutableStateOf(false) }
     var recommendationRequest by remember { mutableIntStateOf(0) }
     var mixMode by remember { mutableStateOf(ScrobbleMixMode.FAVOURITES) }
     var selectedSeed by remember { mutableStateOf<Song?>(null) }
@@ -259,6 +260,7 @@ fun ScrobbleScreen(
                 )
             }
         }
+        lastFmDiscoveryAvailable = apiKey.isNotBlank() && secret.isNotBlank() && LastFM.isInitialized()
     }
 
     LaunchedEffect(context, historyRevision) {
@@ -408,7 +410,7 @@ fun ScrobbleScreen(
                             YtMusicRepository.search("${tagQuery.trim()} music", SearchFilter.SONGS).getOrThrow(),
                             limit = mixTrackCount * 2,
                         )
-                        val lastFmTracks = if (LastFM.isInitialized()) {
+                        val lastFmTracks = if (lastFmDiscoveryAvailable) {
                             val tagTracks = try {
                                 LastFM.getTagTopTracks(tagQuery, limit = minOf(8, mixTrackCount)).getOrThrow()
                             } catch (cancelled: CancellationException) {
@@ -826,7 +828,7 @@ fun ScrobbleScreen(
                                 )
                             }
                         }
-                        if (mixMode == ScrobbleMixMode.SIMILAR_ARTISTS && !LastFM.isInitialized()) {
+                        if (mixMode == ScrobbleMixMode.SIMILAR_ARTISTS && !lastFmDiscoveryAvailable) {
                             item("generate-similar-artists-warning") {
                                 InfoPanel(
                                     "Last.fm discovery unavailable",
@@ -1095,7 +1097,7 @@ fun ScrobbleScreen(
                                         }
                                     }
                                     Text(
-                                        if (LastFM.isInitialized()) "Blends YouTube Music search results with Last.fm's top tracks for this tag."
+                                        if (lastFmDiscoveryAvailable) "Blends YouTube Music search results with Last.fm's top tracks for this tag."
                                         else "Searches YouTube Music for real tracks matching this tag.",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1131,7 +1133,7 @@ fun ScrobbleScreen(
                                     (mixMode !in setOf(ScrobbleMixMode.TASTE_MIX, ScrobbleMixMode.DISCOVER) || !loadingRecommendations) &&
                                     (mixMode !in setOf(ScrobbleMixMode.FAVOURITES, ScrobbleMixMode.TASTE_MIX) || !loadingStats) &&
                                     (mixMode != ScrobbleMixMode.TAG || tagQuery.isNotBlank()) &&
-                                    (mixMode != ScrobbleMixMode.SIMILAR_ARTISTS || LastFM.isInitialized()) &&
+                                    (mixMode != ScrobbleMixMode.SIMILAR_ARTISTS || lastFmDiscoveryAvailable) &&
                                     (mixMode != ScrobbleMixMode.REDISCOVER || !loadingAllTimeStats) &&
                                     (mixMode != ScrobbleMixMode.REDISCOVER || !allTimeStatsFailed) &&
                                     (mixMode !in setOf(ScrobbleMixMode.REDISCOVER, ScrobbleMixMode.NEVER_HEARD) || !historyFailed) &&
