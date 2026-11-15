@@ -87,7 +87,7 @@ internal object ScrobbleRecommendationEngine {
         if (limit <= 0) return@coroutineScope emptyList()
         val seeds = seedTracks.filter { it.title.isNotBlank() && it.artist.isNotBlank() }
             .distinctBy(::recommendationIdentity).take(5)
-        val artists = seedArtists.map(String::trim).filter(String::isNotBlank)
+        val artists = seedArtists.map { it.trim() }.filter(String::isNotBlank)
             .distinctBy { it.lowercase() }.take(8)
         val tags = loadTasteTags(lastFmUsername).take(8)
         val artistGraph = linkedSetOf<String>()
@@ -226,7 +226,7 @@ internal object ScrobbleRecommendationEngine {
         }
         youtubeKeys.forEach { key -> sourceTags[key] = sourceTags[key].orEmpty() + "yt-feed" }
         val sourceCounts = sourceTags.mapValues { (_, tags) -> tags.size }
-        val primaryGenres = resolvedPairs.filter { (_, rows) -> rows.any(SourceCandidate::primaryGenre) }
+        val primaryGenres = resolvedPairs.filter { (_, rows) -> rows.any { it.primaryGenre } }
             .mapTo(mutableSetOf()) { recommendationIdentity(it.first) }
         val trackSignals = resolvedPairs.groupBy { recommendationIdentity(it.first) }
             .mapValues { (_, rows) ->
