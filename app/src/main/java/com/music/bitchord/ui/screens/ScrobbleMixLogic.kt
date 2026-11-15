@@ -118,6 +118,27 @@ internal fun buildYouTubeFirstMix(
 }
 
 /**
+ * Port of LastWave's precheck: reject incomplete rows, deduplicate by track
+ * identity and cap any one artist at three entries.
+ */
+internal fun buildPrecheckedMix(
+    candidates: List<Song>,
+    limit: Int = 25,
+): List<Song> {
+    if (limit <= 0) return emptyList()
+    val valid = candidates.filter {
+        it.title.isNotBlank() && it.artist.isNotBlank() && it.videoId.isNotBlank()
+    }.distinctBy(::songIdentity)
+    val artistCounts = mutableMapOf<String, Int>()
+    return valid.filter { song ->
+        val key = song.artist.trim().lowercase()
+        val count = (artistCounts[key] ?: 0) + 1
+        artistCounts[key] = count
+        count <= 3
+    }.take(limit)
+}
+
+/**
  * Weighted, deterministic blend for the Taste mix. Favourites and recent
  * listening remain the primary sources; discovery fills the remaining space.
  * A track appearing in multiple sources is attributed to its highest-priority
@@ -150,7 +171,7 @@ internal fun buildTasteMix(
         }
         if (!added) break
     }
-    return result
+    return buildPrecheckedMix(result, limit)
 }
 
 /**
