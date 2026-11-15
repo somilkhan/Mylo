@@ -151,16 +151,6 @@ private enum class StatsView(val label: String, val period: ReplayPeriod) {
 
 private enum class ScrobbleStatsSource { DEVICE, YOUTUBE_MUSIC, LAST_FM }
 
-private fun ScrobbleTopPeriod.lastFmValue(): String = when (this) {
-    ScrobbleTopPeriod.ALL_TIME -> "overall"
-    ScrobbleTopPeriod.LAST_12_MONTHS -> "12month"
-    ScrobbleTopPeriod.LAST_6_MONTHS -> "6month"
-    ScrobbleTopPeriod.LAST_3_MONTHS -> "3month"
-    ScrobbleTopPeriod.LAST_30_DAYS -> "1month"
-    ScrobbleTopPeriod.LAST_7_DAYS -> "7day"
-}
-
-
 private enum class ScrobbleTopPeriod(val label: String, val period: ReplayPeriod) {
     ALL_TIME("All time", ReplayPeriod.ALL_TIME),
     LAST_12_MONTHS("12 months", ReplayPeriod.LAST_12_MONTHS),
@@ -403,7 +393,7 @@ fun ScrobbleScreen(
             val username = lastFmUsername.trim()
             val (profile, charts) = coroutineScope {
                 val profileCall = async { LastFM.getUserStats(username).getOrThrow() }
-                val tracksCall = async { LastFM.getTopTracks(username, period = lastFmStatsPeriod.lastFmValue(), limit = 12).getOrThrow() }
+                val tracksCall = async { LastFM.getTopTracks(username, period = lastFmPeriodValue(lastFmStatsPeriod.period), limit = 12).getOrThrow() }
                 val artistsCall = async { LastFM.getTopArtists(username, period = lastFmStatsPeriod.lastFmValue(), limit = 12).getOrThrow() }
                 val albumsCall = async { LastFM.getTopAlbums(username, period = lastFmStatsPeriod.lastFmValue(), limit = 12).getOrThrow() }
                 profileCall.await() to Triple(tracksCall.await(), artistsCall.await(), albumsCall.await())
