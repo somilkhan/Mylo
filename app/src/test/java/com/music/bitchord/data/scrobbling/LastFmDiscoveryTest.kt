@@ -61,6 +61,36 @@ class LastFmDiscoveryTest {
     }
 
     @Test
+    fun parsesSimilarTrackArraysAndSingleObjectsWithDeduplication() {
+        val response = """
+            {
+              "similartracks": {
+                "track": [
+                  {"name":"Track One","artist":{"name":"Artist One"}},
+                  {"name":"Track Two","artist":"Artist Two"},
+                  {"name":"Track One","artist":{"name":"artist one"}},
+                  {"name":"Missing artist","artist":{}},
+                  {"artist":{"name":"Missing title"}}
+                ]
+              }
+            }
+        """.trimIndent()
+
+        assertEquals(
+            listOf(
+                LastFM.DiscoveryTrack("Track One", "Artist One"),
+                LastFM.DiscoveryTrack("Track Two", "Artist Two"),
+            ),
+            parseLastFmSimilarTracks(response, limit = 10),
+        )
+        assertEquals(
+            listOf(LastFM.DiscoveryTrack("Solo", "Artist")),
+            parseLastFmSimilarTracks("""{"similartracks":{"track":{"name":"Solo","artist":"Artist"}}}"""),
+        )
+        assertEquals(emptyList<LastFM.DiscoveryTrack>(), parseLastFmSimilarTracks(response, limit = 0))
+    }
+
+    @Test
     fun discoveryEndpointsFailClearlyWithoutApiCredentials() = runBlocking {
         val previous = LastFM.currentConfig()
         try {
@@ -72,6 +102,7 @@ class LastFmDiscoveryTest {
             )
 
             assertTrue(LastFM.getSimilarArtists("Artist").isFailure)
+            assertTrue(LastFM.getSimilarTracks("Track", "Artist").isFailure)
             assertTrue(LastFM.getTagTopTracks("rock").isFailure)
         } finally {
             LastFM.configure(
@@ -86,6 +117,7 @@ class LastFmDiscoveryTest {
     @Test
     fun missingDiscoveryNodesReturnEmptyLists() {
         assertEquals(emptyList<String>(), parseLastFmSimilarArtists("""{"similarartists":{}}"""))
+        assertEquals(emptyList<LastFM.DiscoveryTrack>(), parseLastFmSimilarTracks("""{"similartracks":{}}"""))
         assertEquals(emptyList<LastFM.DiscoveryTrack>(), parseLastFmTagTracks("""{"tracks":{}}"""))
     }
     @Test
