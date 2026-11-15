@@ -149,7 +149,7 @@ private enum class StatsView(val label: String, val period: ReplayPeriod) {
     TOP_ALBUMS("Top Albums", ReplayPeriod.ALL_TIME),
 }
 
-private enum class ScrobbleStatsSource { DEVICE, YOUTUBE_MUSIC }
+private enum class ScrobbleStatsSource { DEVICE, YOUTUBE_MUSIC, LAST_FM }
 
 
 private enum class ScrobbleTopPeriod(val label: String, val period: ReplayPeriod) {
@@ -182,6 +182,11 @@ fun ScrobbleScreen(
     reduceMotion: Boolean = false,
 ) {
     val context = LocalContext.current
+    val lastFmUsername by AppSettings.lastfmUsername.collectAsStateWithLifecycle()
+    val lastFmApiKey by AppSettings.lastfmApiKey.collectAsStateWithLifecycle()
+    val lastFmSecret by AppSettings.lastfmSecret.collectAsStateWithLifecycle()
+    val lastFmSessionKey by AppSettings.lastfmSessionKey.collectAsStateWithLifecycle()
+    val lastFmEndpoint by AppSettings.lastfmEndpoint.collectAsStateWithLifecycle()
     val historyRevision by ListeningHistory.revision.collectAsStateWithLifecycle()
     var statsView by remember { mutableStateOf(StatsView.RECENT) }
     var statsSource by remember { mutableStateOf(ScrobbleStatsSource.DEVICE) }
@@ -216,6 +221,12 @@ fun ScrobbleScreen(
     var allTimeStatsFailed by remember { mutableStateOf(false) }
     var loadingStats by remember { mutableStateOf(true) }
     var statsFailed by remember { mutableStateOf(false) }
+    var lastFmProfile by remember { mutableStateOf<LastFM.UserStats?>(null) }
+    var lastFmTopTracks by remember { mutableStateOf<List<LastFM.RankedTrack>>(emptyList()) }
+    var lastFmTopArtists by remember { mutableStateOf<List<LastFM.RankedArtist>>(emptyList()) }
+    var lastFmTopAlbums by remember { mutableStateOf<List<LastFM.RankedAlbum>>(emptyList()) }
+    var loadingLastFmStats by remember { mutableStateOf(false) }
+    var lastFmStatsFailed by remember { mutableStateOf(false) }
     var generationTopPeriod by remember { mutableStateOf(ScrobbleTopPeriod.ALL_TIME) }
     var generationTopTracks by remember { mutableStateOf<List<Song>>(emptyList()) }
     var generationTopRankedTracks by remember { mutableStateOf<List<RankedSong>>(emptyList()) }
@@ -330,13 +341,13 @@ fun ScrobbleScreen(
         openedPlaylist = null
     }
 
-    LaunchedEffect(context) {
+    LaunchedEffect(context, lastFmApiKey, lastFmSecret, lastFmSessionKey, lastFmEndpoint) {
         ScrobblePlaylistStore.init(context)
-        val apiKey = AppSettings.lastfmApiKey.value
-        val secret = AppSettings.lastfmSecret.value
+        val apiKey = lastFmApiKey
+        val secret = lastFmSecret
         if (apiKey.isNotBlank() && secret.isNotBlank()) {
-            val sessionKey = AppSettings.lastfmSessionKey.value.takeIf(String::isNotBlank) ?: LastFM.sessionKey
-            val endpoint = AppSettings.lastfmEndpoint.value.ifBlank { LastFM.DEFAULT_API_ENDPOINT }
+            val sessionKey = lastFmSessionKey.takeIf(String::isNotBlank) ?: LastFM.sessionKey
+            val endpoint = lastFmEndpoint.ifBlank { LastFM.DEFAULT_API_ENDPOINT }
             runCatching {
                 LastFM.configure(
                     endpoint = endpoint,
@@ -356,6 +367,47 @@ fun ScrobbleScreen(
             }
         }
         lastFmDiscoveryAvailable = apiKey.isNotBlank() && secret.isNotBlank() && LastFM.isInitialized()
+    }
+
+    LaunchedEffect(statsSource, lastFmUsername, lastFmDiscoveryAvailable) {
+        if (statsSource != ScrobbleStatsSource.LAST_FM) return@LaunchedEffect
+        if (!lastFmDiscoveryAvailable || lastFmUsername.isBlank()) {
+            lastFmProfile = null
+            lastFmTopTracks = emptyList()
+            lastFmTopArtists = emptyList()
+            lastFmTopAlbums = emptyList()
+            lastFmStatsFailed = true
+            loadingLastFmStats = false
+            return@LaunchedEffect
+        }
+        loadingLastFmStats = true
+        lastFmStatsFailed = false
+        try {
+            val username = lastFmUsername.trim()
+            val (profile, charts) = coroutineScope {
+                val profileCall = async { LastFM.getUserStats(username).getOrThrow() }
+                val tracksCall = async { LastFM.getTopTracks(username, period = "overall", limit = 12).getOrThrow() }
+                val artistsCall = async { LastFM.getTopArtists(username, period = "overall", limit = 12).getOrThrow() }
+                val albumsCall = async { LastFM.getTopAlbums(username, period = "overall", limit = 12).getOrThrow() }
+                profileCall.await() to Triple(tracksCall.await(), artistsCall.await(), albumsCall.await())
+            }
+            lastFmProfile = profile
+            lastFmTopTracks = charts.first
+            lastFmTopArtists = charts.second
+            lastFmTopAlbums = charts.third
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            lastFmStatsFailed = true
+        } finally {
+            loadingLastFmStats = false
+        }
+    }
+
+    LaunchedEffect(lastFmUsername, lastFmDiscoveryAvailable) {
+        if (statsSource == ScrobbleStatsSource.LAST_FM &&
+            (!lastFmDiscoveryAvailable || lastFmUsername.isBlank())
+        ) statsSource = ScrobbleStatsSource.DEVICE
     }
 
     LaunchedEffect(context, historyRevision) {
@@ -692,7 +744,7 @@ fun ScrobbleScreen(
                         val seed = selectedSeed?.takeIf(::isYouTubeCatalogTrack)
                             ?: throw IllegalStateException("Choose a YouTube Music track for Song radio")
                         YtMusicRepository.radio(seed.videoId).getOrThrow()
-                            .filter { it.videoId.isNotBlank() && it.videoId != seed.videoId }
+                            .filter { it.videoId.isNotBlank() && it.videoId != seed.videoId && !isSameSongOrEdit(it, seed) }
                             .distinctBy(::songIdentity).take(mixTrackCount)
                     }
                     ScrobbleMixMode.ARTIST_MIX -> {
@@ -701,9 +753,15 @@ fun ScrobbleScreen(
                         val artistBrowseId = seed.artistId
                             ?: YtMusicRepository.findArtistPageId(seed.artist).getOrThrow()
                             ?: throw IllegalStateException("Couldn't find an exact artist match for ${seed.artist}")
-                        YtMusicRepository.artistPage(artistBrowseId).getOrThrow().songs
-                            .filter { it.videoId.isNotBlank() && it.videoId != seed.videoId }
-                            .distinctBy(::songIdentity).take(mixTrackCount)
+                        buildArtistCappedMix(
+                            candidates = YtMusicRepository.artistPage(artistBrowseId).getOrThrow().songs
+                                .filter {
+                                    it.videoId.isNotBlank() && it.videoId != seed.videoId &&
+                                        !isSameSongOrEdit(it, seed)
+                                },
+                            seedArtist = seed.artist,
+                            targetSize = mixTrackCount,
+                        )
                     }
                     ScrobbleMixMode.SIMILAR_ARTISTS -> {
                         val artistName = similarArtistQuery.trim().ifBlank {
@@ -993,7 +1051,10 @@ fun ScrobbleScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 verticalArrangement = Arrangement.spacedBy(10.dp),
                             ) {
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Row(
+                                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
                                     FilterChip(
                                         selected = statsSource == ScrobbleStatsSource.DEVICE,
                                         onClick = {
@@ -1010,6 +1071,16 @@ fun ScrobbleScreen(
                                         },
                                         label = { Text("YouTube Music") },
                                     )
+                                    if (lastFmDiscoveryAvailable && lastFmUsername.isNotBlank()) {
+                                        FilterChip(
+                                            selected = statsSource == ScrobbleStatsSource.LAST_FM,
+                                            onClick = {
+                                                statsSourceManuallySelected = true
+                                                statsSource = ScrobbleStatsSource.LAST_FM
+                                            },
+                                            label = { Text("Last.fm") },
+                                        )
+                                    }
                                 }
                                 if (statsSource == ScrobbleStatsSource.DEVICE) {
                                     Box {
@@ -1049,7 +1120,7 @@ fun ScrobbleScreen(
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
-                                } else {
+                                } else if (statsSource == ScrobbleStatsSource.YOUTUBE_MUSIC) {
                                     Text(
                                         if (syncingYouTubeHistory) "UPDATING HISTORY" else "ALL SYNCED HISTORY",
                                         style = MaterialTheme.typography.labelSmall,
@@ -1064,10 +1135,65 @@ fun ScrobbleScreen(
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
+                                } else {
+                                    Text(
+                                        "LAST.FM ACCOUNT · @" + lastFmUsername.trim(),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        fontWeight = FontWeight.SemiBold,
+                                        letterSpacing = 0.45.sp,
+                                    )
+                                    Text(
+                                        "ALL-TIME SCROBBLE CHARTS",
+                                        modifier = Modifier.fillMaxWidth(),
+                                        textAlign = TextAlign.End,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
                                 }
                             }
                         }
                         when {
+                            statsSource == ScrobbleStatsSource.LAST_FM && loadingLastFmStats -> {
+                                item("stats-lastfm-loading") { LoadingLine("Loading your Last.fm profile and charts") }
+                            }
+                            statsSource == ScrobbleStatsSource.LAST_FM && lastFmStatsFailed -> {
+                                item("stats-lastfm-error") {
+                                    EmptyPanel("Last.fm statistics unavailable", "Check the connected username and API settings, then reopen Statistics to retry.")
+                                }
+                            }
+                            statsSource == ScrobbleStatsSource.LAST_FM && lastFmProfile != null -> {
+                                item("stats-lastfm-overview") {
+                                    InfoPanel(
+                                        "Last.fm profile",
+                                        lastFmProfile!!.playCount.toString() + " scrobbles · " +
+                                            lastFmProfile!!.trackCount + " tracks · " +
+                                            lastFmProfile!!.artistCount + " artists · " +
+                                            lastFmProfile!!.albumCount + " albums",
+                                    )
+                                }
+                                if (lastFmTopTracks.isNotEmpty()) {
+                                    item("stats-lastfm-tracks-heading") { StatsSectionHeading("Top tracks", "All-time Last.fm chart") }
+                                    items(lastFmTopTracks, key = { "lastfm-track-" + it.artist.lowercase() + "-" + it.name.lowercase() }) { track ->
+                                        StatsEntityRow(track.name, track.artist + " · " + track.playCount + " plays", track.artworkUrl)
+                                    }
+                                }
+                                if (lastFmTopArtists.isNotEmpty()) {
+                                    item("stats-lastfm-artists-heading") { StatsSectionHeading("Top artists", "All-time Last.fm chart") }
+                                    items(lastFmTopArtists, key = { "lastfm-artist-" + it.name.lowercase() }) { artist ->
+                                        StatsEntityRow(artist.name, artist.playCount.toString() + " plays", artist.artworkUrl)
+                                    }
+                                }
+                                if (lastFmTopAlbums.isNotEmpty()) {
+                                    item("stats-lastfm-albums-heading") { StatsSectionHeading("Top albums", "All-time Last.fm chart") }
+                                    items(lastFmTopAlbums, key = { "lastfm-album-" + it.artist.lowercase() + "-" + it.name.lowercase() }) { album ->
+                                        StatsEntityRow(album.name, album.artist + " · " + album.playCount + " plays", album.artworkUrl)
+                                    }
+                                }
+                            }
+                            statsSource == ScrobbleStatsSource.LAST_FM && !loadingLastFmStats -> {
+                                item("stats-lastfm-empty") { EmptyPanel("No Last.fm scrobbles yet", "This account has no listening charts to show.") }
+                            }
                             statsSource == ScrobbleStatsSource.YOUTUBE_MUSIC && syncedStats.totalPlays == 0 &&
                                 (syncingYouTubeHistory || loadingSyncedStats) -> {
                                 item("stats-youtube-syncing") {
