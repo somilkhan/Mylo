@@ -899,10 +899,28 @@ fun ScrobbleScreen(
                                 similarArtists.map { artist ->
                                     async {
                                         try {
-                                            buildTagMix(
-                                                YtMusicRepository.search("$artist songs", SearchFilter.SONGS).getOrThrow(),
-                                                limit = 3,
-                                            ).filterNot { it.artist.equals(artistName, ignoreCase = true) }
+                                            // LastWave srcArtistTopTracks: use each related artist's
+                                            // actual chart instead of a broad artist-name search.
+                                            val chart = LastFM.getArtistTopTracks(artist, limit = 8).getOrThrow()
+                                            coroutineScope {
+                                                chart.map { candidate ->
+                                                    async {
+                                                        try {
+                                                            buildTagMix(
+                                                                YtMusicRepository.search(
+                                                                    "${candidate.name} ${candidate.artist}",
+                                                                    SearchFilter.SONGS,
+                                                                ).getOrThrow(),
+                                                                limit = 1,
+                                                            ).firstOrNull()
+                                                        } catch (cancelled: CancellationException) {
+                                                            throw cancelled
+                                                        } catch (_: Exception) {
+                                                            null
+                                                        }
+                                                    }
+                                                }.awaitAll().filterNotNull()
+                                            }.filterNot { it.artist.equals(artistName, ignoreCase = true) }
                                         } catch (cancelled: CancellationException) {
                                             throw cancelled
                                         } catch (_: Exception) {
