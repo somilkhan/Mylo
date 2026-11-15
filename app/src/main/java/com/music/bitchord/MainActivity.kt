@@ -43,6 +43,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -156,6 +157,9 @@ import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.data.settings.LibrarySort
 import com.music.bitchord.data.settings.ThemeMode
 import com.music.bitchord.ui.components.AccountProfileSelector
+import com.music.bitchord.ui.components.ScrobbleFab
+import com.music.bitchord.ui.components.SCROBBLE_FAB_SIZE
+import com.music.bitchord.ui.components.scrobbleFabVisible
 import com.music.bitchord.ui.components.SpotifyImportAlert
 import com.music.bitchord.ui.screens.WearOsScreen
 import com.music.bitchord.ui.screens.AccountAndScrobblingScreen
@@ -314,6 +318,7 @@ import com.music.bitchord.ui.screens.LibraryGridPage
 import com.music.bitchord.ui.screens.LibraryScreen
 import com.music.bitchord.ui.screens.MoodGenrePlaylistsScreen
 import com.music.bitchord.ui.screens.SearchScreen
+import com.music.bitchord.ui.screens.scrobble.ScrobbleStatsScreen
 import com.music.bitchord.data.settings.SongSort
 import com.music.bitchord.ui.onboarding.OnboardingScreen
 import com.music.bitchord.ui.replay.ReplayScreen
@@ -565,6 +570,7 @@ private fun BitChordApp(
     // opened from the page and the share sheet from either, and closing one
     // has to reveal what it was opened from.
     var showReplay by rememberSaveable { mutableStateOf(false) }
+    var showScrobble by rememberSaveable { mutableStateOf(false) }
     // Library cards use the same Replay page as every other entry point, but
     // category cards ask it to start at their matching ranked section.
     var replayLandingPage by rememberSaveable { mutableStateOf(ReplayStoryPage.INTRO) }
@@ -2608,6 +2614,7 @@ private fun BitChordApp(
         BackHandler(enabled = editingPartyServer) { editingPartyServer = false }
         BackHandler(enabled = editingSignatureApi) { editingSignatureApi = false }
         BackHandler(enabled = showHistory) { showHistory = false }
+        BackHandler(enabled = showScrobble) { showScrobble = false }
         // Disabled while a detail page is open over the grid: that one's own
         // BackHandler below has to close first, or back would skip past it
         // straight to Library. See [onLibraryItemClick].
@@ -2626,6 +2633,7 @@ private fun BitChordApp(
                         showSpotify && detail == null -> "spotify"
                         showDiscord -> "discord"
                         showHistory -> "history"
+                        showScrobble -> "scrobble"
                         // `&& detail == null`: a card opened from the grid
                         // stacks a detail page over it exactly as one opened
                         // from the Library tab does — see
@@ -2732,7 +2740,11 @@ private fun BitChordApp(
                     val pageDetailListState = remember(key) {
                         detailListStates.getOrPut(key) { LazyListState() }
                     }
-                    if (key == "history") {
+                    if (key == "scrobble") {
+                        ScrobbleStatsScreen(
+                            modifier = Modifier.padding(bottom = if (player.song != null) 180.dp else 120.dp),
+                        )
+                    } else if (key == "history") {
                         HistoryScreen(
                             state = historyState,
                             sections = historySections,
@@ -3577,6 +3589,7 @@ private fun BitChordApp(
                         showSpotify && detail == null -> stringResource(R.string.spotify)
                         showDiscord -> "Discord"
                         showHistory -> stringResource(R.string.history)
+                        showScrobble -> "Scrobble"
                         libraryShowAll != null && detail == null -> libraryShowAll?.title.orEmpty()
                         showAccountScrobbling -> stringResource(R.string.account_scrobbling)
                         showSources -> stringResource(R.string.sources)
@@ -3603,7 +3616,7 @@ private fun BitChordApp(
                     scrolled = when {
                         showSettings || showAccountScrobbling || showSources || showListenTogether || showWearOs ||
                             showEqualizer ||
-                            showDiscord || showHistory ||
+                            showDiscord || showHistory || showScrobble ||
                             (libraryShowAll != null && detail == null) ||
                             (detail != null && detailActiveShelf != null) ||
                             selectedMoodGenre != null -> true
@@ -3619,6 +3632,7 @@ private fun BitChordApp(
                         showSpotify && detail == null -> ({ showSpotify = false })
                         showDiscord -> ({ showDiscord = false })
                         showHistory -> ({ showHistory = false })
+                        showScrobble -> ({ showScrobble = false })
                         libraryShowAll != null && detail == null -> ({ libraryShowAll = null })
                         showAccountScrobbling -> ({
                             showAccountScrobbling = false
@@ -3654,7 +3668,7 @@ private fun BitChordApp(
                         selectedTab == TAB_SEARCH && detail == null && selectedMoodGenre == null &&
                         libraryShowAll == null && !showSettings && !showAccountScrobbling &&
                         !showSources && !showListenTogether && !showWearOs && !showEqualizer && !showDiscord &&
-                        !showHistory && !showReplay
+                        !showHistory && !showReplay && !showScrobble
                     ) {
                         {
                             // The search field lives up here in the bar, beside the
@@ -3970,6 +3984,7 @@ private fun BitChordApp(
                     showReplay = false
                     settingsSubScreen = null
                     showHistory = false
+                    showScrobble = false
                     libraryShowAll = null
                     selectedTab = index
 
@@ -4063,6 +4078,30 @@ private fun BitChordApp(
                         onTabSelected = onTabSelected,
                     )
                 }
+                val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+                val measuredBarsHeight = with(LocalDensity.current) { floatingBarsHeight.intValue.toDp() }
+                val fabBottom = (measuredBarsHeight.takeIf { it > 0.dp } ?: 72.dp) + 10.dp
+                ScrobbleFab(
+                    visible = scrobbleFabVisible(
+                        selectedTab = selectedTab,
+                        homeTab = TAB_HOME,
+                        overlayOpen = showSettings || showReplay || showHistory || showAccountScrobbling ||
+                            showSources || showListenTogether || showWearOs || showEqualizer || showDiscord ||
+                            showSpotify || showSpotifyCanvasAuth || showNowPlaying ||
+                            detail != null || selectedMoodGenre != null || libraryShowAll != null ||
+                            settingsSubScreen != null,
+                        playerOpen = showNowPlaying && playerSong != null,
+                        keyboardVisible = imeVisible,
+                    ),
+                    open = showScrobble,
+                    onClick = { showScrobble = !showScrobble },
+                    surface = Modifier.background(MaterialTheme.colorScheme.surfaceVariant, CircleShape),
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 16.dp, bottom = fabBottom),
+                    reduceMotion = reducePlayerMotion,
+                    folded = glassActive && navBarScroll.isInline,
+                )
             }
 
         }
