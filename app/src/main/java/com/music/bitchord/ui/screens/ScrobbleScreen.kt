@@ -747,9 +747,17 @@ fun ScrobbleScreen(
                     ScrobbleMixMode.DISCOVER -> {
                         val excluded = (syncedHistory.map { it.videoId } + listens.map { it.song.videoId } + generationTopTracks.map { it.videoId })
                             .filter(String::isNotBlank).toSet()
-                        (recommendations.ifEmpty { YtMusicRepository.quickPicks(excluded).getOrThrow() })
-                            .filter { it.videoId.isNotBlank() && it.videoId !in excluded }
-                            .distinctBy(::songIdentity).take(mixTrackCount)
+                        val heardSongs = (syncedHistory + listens.map { it.song } +
+                            generationTopTracks + recentTracks)
+                            .distinctBy(::recommendationIdentity)
+                        buildDiscoverMix(
+                            candidates = recommendations.ifEmpty {
+                                YtMusicRepository.quickPicks(excluded).getOrThrow()
+                            },
+                            heardVideoIds = excluded,
+                            heardSongs = heardSongs,
+                            limit = mixTrackCount,
+                        )
                     }
                     ScrobbleMixMode.RADIO -> {
                         val seed = selectedSeed?.takeIf(::isYouTubeCatalogTrack)
