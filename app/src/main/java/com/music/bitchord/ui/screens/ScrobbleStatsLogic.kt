@@ -73,8 +73,14 @@ internal fun buildCombinedFavouriteTracks(
     val localByKey = local.associateBy { songIdentity(it.song) }
     val syncedByKey = synced.associateBy { songIdentity(it.song) }
     val songs = LinkedHashMap<String, com.music.bitchord.data.model.Song>()
-    local.forEach { songs.putIfAbsent(songIdentity(it.song), it.song) }
-    synced.forEach { songs.putIfAbsent(songIdentity(it.song), it.song) }
+    local.forEach {
+        val key = songIdentity(it.song)
+        if (key !in songs) songs[key] = it.song
+    }
+    synced.forEach {
+        val key = songIdentity(it.song)
+        if (key !in songs) songs[key] = it.song
+    }
 
     return songs.entries
         .sortedWith(
