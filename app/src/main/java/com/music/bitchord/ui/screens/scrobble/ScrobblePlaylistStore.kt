@@ -28,6 +28,12 @@ data class SavedScrobblePlaylist(
 )
 
 @Serializable
+private data class StoredScrobbleSnapshot(
+    val version: Int = 1,
+    val playlists: List<StoredScrobblePlaylist> = emptyList(),
+)
+
+@Serializable
 private data class StoredScrobblePlaylist(
     val id: String,
     val title: String,
@@ -73,16 +79,25 @@ internal object ScrobblePlaylistCodec {
     }
 
     fun encode(playlists: List<SavedScrobblePlaylist>): String =
-        json.encodeToString(playlists.map(SavedScrobblePlaylist::toStored))
+        json.encodeToString(StoredScrobbleSnapshot(playlists = playlists.map { it.toStored() }))
 
-    fun decode(raw: String): List<SavedScrobblePlaylist> =
-        json.decodeFromString<List<StoredScrobblePlaylist>>(raw).map(StoredScrobblePlaylist::toDomain)
+    fun decode(raw: String): List<SavedScrobblePlaylist> {
+        val stored = if (raw.trimStart().startsWith("[")) {
+            // The first port snapshots were bare arrays; keep them readable.
+            json.decodeFromString<List<StoredScrobblePlaylist>>(raw)
+        } else {
+            val snapshot = json.decodeFromString<StoredScrobbleSnapshot>(raw)
+            require(snapshot.version == 1) { "Unsupported playlist snapshot version" }
+            snapshot.playlists
+        }
+        return stored.map { it.toDomain() }
+    }
 
     private fun SavedScrobblePlaylist.toStored() = StoredScrobblePlaylist(
         id = id,
         title = title,
         subtitle = subtitle,
-        tracks = tracks.map(Song::toStored),
+        tracks = tracks.map { it.toStored() },
         createdAtMillis = createdAtMillis,
         pinned = pinned,
         customCoverUri = customCoverUri,
@@ -112,7 +127,7 @@ internal object ScrobblePlaylistCodec {
         id = id,
         title = title,
         subtitle = subtitle,
-        tracks = tracks.map(StoredScrobbleSong::toDomain),
+        tracks = tracks.map { it.toDomain() },
         createdAtMillis = createdAtMillis,
         pinned = pinned,
         customCoverUri = customCoverUri,
@@ -202,6 +217,7 @@ object ScrobblePlaylistStore {
         val clean = title.trim()
         require(clean.isNotBlank()) { "Playlist name cannot be empty" }
         mutate { current ->
+            require(current.any { it.id == id }) { "Playlist not found" }
             require(current.none { it.id != id && it.title.equals(clean, ignoreCase = true) }) {
                 "A playlist with this name already exists"
             }
@@ -215,18 +231,21 @@ object ScrobblePlaylistStore {
 
     suspend fun setPinned(id: String, pinned: Boolean) {
         mutate { current ->
+            require(current.any { it.id == id }) { "Playlist not found" }
             current.map { if (it.id == id) it.copy(pinned = pinned) else it } to Unit
         }
     }
 
     suspend fun setCustomCover(id: String, uri: String?) {
         mutate { current ->
+            require(current.any { it.id == id }) { "Playlist not found" }
             current.map { if (it.id == id) it.copy(customCoverUri = uri) else it } to Unit
         }
     }
 
     suspend fun addTracks(id: String, tracks: List<Song>) {
         mutate { current ->
+            require(current.any { it.id == id }) { "Playlist not found" }
             current.map { playlist ->
                 if (playlist.id != id) playlist else {
                     val additions = tracks.filterNot { candidate ->
@@ -240,6 +259,7 @@ object ScrobblePlaylistStore {
 
     suspend fun removeTrack(id: String, videoId: String) {
         mutate { current ->
+            require(current.any { it.id == id }) { "Playlist not found" }
             current.map { playlist ->
                 if (playlist.id == id) playlist.copy(
                     tracks = playlist.tracks.filterNot { it.videoId == videoId },
@@ -250,6 +270,7 @@ object ScrobblePlaylistStore {
 
     suspend fun moveTrack(id: String, fromIndex: Int, toIndex: Int) {
         mutate { current ->
+            require(current.any { it.id == id }) { "Playlist not found" }
             current.map { playlist ->
                 if (playlist.id != id || fromIndex !in playlist.tracks.indices ||
                     toIndex !in playlist.tracks.indices || fromIndex == toIndex
