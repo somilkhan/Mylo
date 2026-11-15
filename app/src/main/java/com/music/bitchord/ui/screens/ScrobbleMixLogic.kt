@@ -100,7 +100,8 @@ internal fun buildYouTubeFirstMix(
     limit: Int,
 ): List<Song> {
     if (limit <= 0) return emptyList()
-    val seen = mutableSetOf<String>()
+    val seenVideoIds = mutableSetOf<String>()
+    val seenNames = mutableSetOf<String>()
     val youtubeTracks = youtube.filter { it.title.isNotBlank() && it.artist.isNotBlank() && it.videoId.isNotBlank() }
         .distinctBy(::recommendationIdentity)
     val lastFmTracks = lastFm.filter { it.title.isNotBlank() && it.artist.isNotBlank() && it.videoId.isNotBlank() }
@@ -112,7 +113,7 @@ internal fun buildYouTubeFirstMix(
         repeat(2) {
             if (youtubeIndex < youtubeTracks.size && result.size < limit) {
                 val track = youtubeTracks[youtubeIndex++]
-                if (seen.add(recommendationIdentity(track))) result += track
+                if (seenVideoIds.add(track.videoId) && seenNames.add(recommendationIdentity(track))) result += track
             }
         }
         if (lastFmIndex < lastFmTracks.size && result.size < limit) {
