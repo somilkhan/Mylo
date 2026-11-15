@@ -9,7 +9,9 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 
 /**
@@ -21,6 +23,11 @@ import kotlinx.coroutines.sync.withPermit
  * is bounded, source failures are isolated, and cancellation is never swallowed.
  */
 internal object ScrobbleRecommendationEngine {
+    private const val TASTE_PROFILE_TTL_MILLIS = 60L * 60 * 1000
+    private data class CachedTasteTags(val username: String, val loadedAtMillis: Long, val tags: List<String>)
+    private val tasteProfileMutex = Mutex()
+    private var cachedTasteTags: CachedTasteTags? = null
+
     private val genreNeighbors = mapOf(
         "indie rock" to "alternative rock", "alternative rock" to "indie rock",
         "house" to "deep house", "deep house" to "tech house", "tech house" to "techno", "techno" to "trance",
@@ -34,10 +41,35 @@ internal object ScrobbleRecommendationEngine {
         "trap" to "drill", "drill" to "trap", "drum and bass" to "jungle", "jungle" to "drum and bass",
     )
 
+    /** LastWave TasteProfileProvider's one-hour profile cache, narrowed to the
+     * user-tag signal Mylo currently consumes. Failed reads are not cached. */
+    private suspend fun loadTasteTags(username: String): List<String> {
+        val cleanUsername = username.trim()
+        if (cleanUsername.isBlank()) return emptyList()
+        return tasteProfileMutex.withLock {
+            val now = System.currentTimeMillis()
+            cachedTasteTags?.takeIf {
+                it.username.equals(cleanUsername, ignoreCase = true) &&
+                    now - it.loadedAtMillis in 0 until TASTE_PROFILE_TTL_MILLIS
+            }?.let { return@withLock it.tags }
+            val fresh = try {
+                LastFM.getTopTags(cleanUsername, limit = 12).getOrThrow().map { it.name }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                emptyList()
+            }
+            if (fresh.isNotEmpty()) {
+                cachedTasteTags = CachedTasteTags(cleanUsername, now, fresh)
+            }
+            fresh
+        }
+    }
+
     suspend fun discover(
         seedTracks: List<Song>,
         seedArtists: List<String>,
-        topTags: List<String>,
+        lastFmUsername: String,
         youtubeCandidates: List<Song>,
         heardVideoIds: Set<String>,
         heardSongs: List<Song>,
@@ -49,8 +81,7 @@ internal object ScrobbleRecommendationEngine {
             .distinctBy(::recommendationIdentity).take(5)
         val artists = seedArtists.map(String::trim).filter(String::isNotBlank)
             .distinctBy { it.lowercase() }.take(8)
-        val tags = topTags.map(String::trim).filter(String::isNotBlank)
-            .distinctBy { it.lowercase() }.take(8)
+        val tags = loadTasteTags(lastFmUsername).take(8)
         val artistGraph = linkedSetOf<String>()
         val lastFmTracks = mutableListOf<LastFM.DiscoveryTrack>()
 
