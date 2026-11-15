@@ -204,13 +204,6 @@ fun ScrobbleScreen(
             loadingSyncedStats = false
         }
     }
-    val favouriteTracks = remember(allTimeSummary, syncedStats) {
-        buildCombinedFavouriteTracks(
-            local = allTimeSummary?.songs.orEmpty(),
-            synced = syncedStats.topTracks,
-            limit = 25,
-        )
-    }
     LaunchedEffect(syncedHistory.isNotEmpty(), syncingYouTubeHistory) {
         if ((syncedHistory.isNotEmpty() || syncingYouTubeHistory) && !statsSourceManuallySelected) {
             statsSource = ScrobbleStatsSource.YOUTUBE_MUSIC
@@ -221,10 +214,18 @@ fun ScrobbleScreen(
     var allTimeSummary by remember { mutableStateOf<ReplaySummary?>(null) }
     var loadingAllTimeStats by remember { mutableStateOf(true) }
     var allTimeStatsFailed by remember { mutableStateOf(false) }
+    val favouriteTracks = remember(generationTopRankedTracks, syncedStats) {
+        buildCombinedFavouriteTracks(
+            local = generationTopRankedTracks,
+            synced = syncedStats.topTracks,
+            limit = 25,
+        )
+    }
     var loadingStats by remember { mutableStateOf(true) }
     var statsFailed by remember { mutableStateOf(false) }
     var generationTopPeriod by remember { mutableStateOf(ScrobbleTopPeriod.ALL_TIME) }
     var generationTopTracks by remember { mutableStateOf<List<Song>>(emptyList()) }
+    var generationTopRankedTracks by remember { mutableStateOf<List<RankedSong>>(emptyList()) }
     var loadingGenerationTopTracks by remember { mutableStateOf(true) }
     var generationTopTracksFailed by remember { mutableStateOf(false) }
     var listens by remember { mutableStateOf<List<ListeningHistory.Entry>>(emptyList()) }
@@ -406,15 +407,16 @@ fun ScrobbleScreen(
         generationTopTracksFailed = false
         try {
             val periodSummary = ListeningStats.summary(generationTopPeriod.period)
-            generationTopTracks = periodSummary.songs
+            generationTopRankedTracks = periodSummary.songs
                 .sortedWith(compareByDescending<RankedSong> { it.plays }.thenByDescending { it.ms })
-                .map { it.song }
-                .distinctBy(::songIdentity)
+                .distinctBy { songIdentity(it.song) }
                 .take(25)
+            generationTopTracks = generationTopRankedTracks.map { it.song }
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {
             generationTopTracks = emptyList()
+            generationTopRankedTracks = emptyList()
             generationTopTracksFailed = true
         } finally {
             loadingGenerationTopTracks = false
