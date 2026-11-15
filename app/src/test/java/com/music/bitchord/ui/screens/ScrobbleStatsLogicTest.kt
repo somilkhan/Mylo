@@ -84,4 +84,50 @@ class ScrobbleStatsLogicTest {
         assertFalse(ReplayPeriod.LAST_12_MONTHS.covers(YearMonth.of(2025, 10), today))
     }
 
+
+    @Test
+    fun syncedHistoryCountsRepeatedRowsWithoutInventingDurations() {
+        val first = com.music.bitchord.data.model.Song(
+            videoId = "abcdefghijk",
+            title = "First song",
+            artist = "Artist A",
+            thumbnailUrl = null,
+            albumName = "Album A",
+        )
+        val second = com.music.bitchord.data.model.Song(
+            videoId = "lmnopqrstuv",
+            title = "Second song",
+            artist = "Artist A",
+            thumbnailUrl = null,
+            albumName = "Album A",
+        )
+        val summary = buildSyncedHistorySummary(listOf(first, first, second))
+
+        assertEquals(3, summary.totalPlays)
+        assertEquals(2, summary.distinctTracks)
+        assertEquals(1, summary.distinctArtists)
+        assertEquals(1, summary.distinctAlbums)
+        assertEquals(2, summary.topTracks.first().plays)
+        assertEquals("First song", summary.topTracks.first().song.title)
+        assertEquals(3, summary.topArtists.single().plays)
+    }
+
+    @Test
+    fun syncedHistoryHandlesEmptyAndMissingAlbumMetadata() {
+        val empty = buildSyncedHistorySummary(emptyList())
+        assertEquals(0, empty.totalPlays)
+        assertEquals(0, empty.distinctTracks)
+        assertTrue(empty.topTracks.isEmpty())
+
+        val noAlbum = com.music.bitchord.data.model.Song(
+            videoId = "abcdefghijk",
+            title = "No album",
+            artist = "Unknown",
+            thumbnailUrl = null,
+        )
+        val summary = buildSyncedHistorySummary(listOf(noAlbum))
+        assertEquals(1, summary.totalPlays)
+        assertEquals(0, summary.distinctAlbums)
+    }
+
 }
