@@ -65,7 +65,14 @@ internal fun parseLastFmTagTracks(
             is JsonPrimitive -> artistElement.contentOrNull?.trim().orEmpty()
             else -> ""
         }
-        if (name.isBlank() || artist.isBlank()) null else LastFM.DiscoveryTrack(name, artist)
+        if (name.isBlank() || artist.isBlank()) null else LastFM.DiscoveryTrack(
+            name = name,
+            artist = artist,
+            listeners = track.textValue("listeners").toLongOrNull(),
+            playCount = track.textValue("playcount").toLongOrNull(),
+            match = track.textValue("match").toDoubleOrNull(),
+            album = (track["album"] as? JsonObject)?.textValue("title"),
+        )
     }
         .distinctBy { "${it.name.lowercase(Locale.ROOT)}|${it.artist.lowercase(Locale.ROOT)}" }
         .take(limit.coerceAtMost(50))
@@ -86,7 +93,14 @@ internal fun parseLastFmSimilarTracks(
         val artistObject = track["artist"] as? JsonObject
         val artist = artistObject?.textValue("name")
             ?: (track["artist"] as? JsonPrimitive)?.contentOrNull?.trim().orEmpty()
-        if (name.isBlank() || artist.isBlank()) null else LastFM.DiscoveryTrack(name, artist)
+        if (name.isBlank() || artist.isBlank()) null else LastFM.DiscoveryTrack(
+            name = name,
+            artist = artist,
+            listeners = track.textValue("listeners").toLongOrNull(),
+            playCount = track.textValue("playcount").toLongOrNull(),
+            match = track.textValue("match").toDoubleOrNull(),
+            album = (track["album"] as? JsonObject)?.textValue("title"),
+        )
     }.distinctBy { "${it.name.lowercase(Locale.ROOT)}|${it.artist.lowercase(Locale.ROOT)}" }
         .take(limit.coerceAtMost(100))
 }
@@ -135,6 +149,9 @@ internal fun parseLastFmTopTracks(response: String, limit: Int = 50): List<LastF
             artist = artist,
             playCount = track.textValue("playcount").toLongOrNull() ?: 0L,
             artworkUrl = track.lastFmArtwork(),
+            listeners = track.textValue("listeners").toLongOrNull(),
+            match = track.textValue("match").toDoubleOrNull(),
+            album = (track["album"] as? JsonObject)?.textValue("title"),
         )
     }.distinctBy { "${it.name.lowercase(Locale.ROOT)}|${it.artist.lowercase(Locale.ROOT)}" }.take(limit)
 }
@@ -359,7 +376,14 @@ object LastFM {
         )
     }
 
-    data class DiscoveryTrack(val name: String, val artist: String)
+    data class DiscoveryTrack(
+        val name: String,
+        val artist: String,
+        val listeners: Long? = null,
+        val playCount: Long? = null,
+        val match: Double? = null,
+        val album: String? = null,
+    )
     data class UserStats(
         val playCount: Long,
         val trackCount: Long,
@@ -367,7 +391,15 @@ object LastFM {
         val albumCount: Long,
         val avatarUrl: String?,
     )
-    data class RankedTrack(val name: String, val artist: String, val playCount: Long, val artworkUrl: String?)
+    data class RankedTrack(
+        val name: String,
+        val artist: String,
+        val playCount: Long,
+        val artworkUrl: String?,
+        val listeners: Long? = null,
+        val match: Double? = null,
+        val album: String? = null,
+    )
     data class RankedArtist(val name: String, val playCount: Long, val artworkUrl: String?)
     data class RankedAlbum(val name: String, val artist: String, val playCount: Long, val artworkUrl: String?)
     data class RankedTag(val name: String, val count: Long)
