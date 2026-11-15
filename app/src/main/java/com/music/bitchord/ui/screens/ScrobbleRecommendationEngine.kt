@@ -104,14 +104,14 @@ internal object ScrobbleRecommendationEngine {
         artistCharts(secondWave, 4)
 
         onProgress("Building a wider discovery pool…")
-        artistCharts(artists.sortedBy { it.lowercase() }.take(3), 3)
+        artistCharts(artists.take(3), 3)
 
         // LastWave's pool is deduplicated before expensive catalogue resolution.
         // Keep YouTube Music picks first and cap Last.fm lookups to avoid request storms.
         val uniqueLastFm = lastFmTracks.asSequence()
             .filter { it.name.isNotBlank() && it.artist.isNotBlank() }
             .distinctBy { "${it.name.trim().lowercase()}|${it.artist.trim().lowercase()}" }
-            .take((limit * 2).coerceIn(20, 50))
+            .take((limit * 2).coerceIn(12, 30))
             .toList()
         val resolverSlots = Semaphore(4)
         onProgress("Matching discoveries to playable YouTube Music tracks…")
