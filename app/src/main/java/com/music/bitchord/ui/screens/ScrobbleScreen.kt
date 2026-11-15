@@ -433,7 +433,7 @@ fun ScrobbleScreen(
                                                 summary!!.busiestDay?.let { day ->
                                                     StatsInsightTile(
                                                         title = "Biggest day",
-                                                        value = day,
+                                                        value = formatStatsDay(day),
                                                         detail = "${summary!!.busiestDayMs / 60_000} min listened",
                                                         modifier = Modifier.weight(1f),
                                                     )
@@ -459,7 +459,7 @@ fun ScrobbleScreen(
                                     }
                                     itemsIndexed(
                                         rankedTracks,
-                                        key = { index, ranked -> "stat-${index}-${songIdentity(ranked.song)}" },
+                                        key = { _, ranked -> "stat-${songIdentity(ranked.song)}" },
                                     ) { index, ranked ->
                                         StatsRankedTrack(
                                             rank = index + 1,
@@ -1614,6 +1614,11 @@ private fun ArtworkMosaic(songs: List<Song>, modifier: Modifier = Modifier) {
         }
     }
 }
+private fun formatStatsDay(day: String): String = runCatching {
+    java.time.LocalDate.parse(day).format(
+        java.time.format.DateTimeFormatter.ofPattern("EEE, d MMM", java.util.Locale.getDefault()),
+    )
+}.getOrDefault(day)
 private fun formatListeningTime(totalMs: Long): String {
     val totalMinutes = totalMs / 60_000
     val hours = totalMinutes / 60
