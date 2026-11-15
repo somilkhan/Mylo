@@ -123,7 +123,7 @@ import kotlinx.coroutines.delay
 import kotlin.math.roundToLong
 
 private enum class ScrobbleMixMode(val title: String, val description: String) {
-    FAVOURITES("Your favourites", "Your most-played tracks from Mylo listening stats"),
+    FAVOURITES("Your favourites", "Most-played tracks from synced history and Mylo listens"),
     RECENT("Recently played", "Your latest unique listens"),
     TASTE_MIX("Taste mix", "A balanced blend of favourites, recent listens and fresh picks"),
     RADIO("Song radio", "Build a radio mix from a track you choose"),
@@ -203,6 +203,13 @@ fun ScrobbleScreen(
         } finally {
             loadingSyncedStats = false
         }
+    }
+    val favouriteTracks = remember(allTimeSummary, syncedStats) {
+        buildCombinedFavouriteTracks(
+            local = allTimeSummary?.songs.orEmpty(),
+            synced = syncedStats.topTracks,
+            limit = 25,
+        )
     }
     LaunchedEffect(syncedHistory.isNotEmpty(), syncingYouTubeHistory) {
         if ((syncedHistory.isNotEmpty() || syncingYouTubeHistory) && !statsSourceManuallySelected) {
@@ -598,7 +605,7 @@ fun ScrobbleScreen(
         try {
             val generated = withTimeout(SCROBBLE_GENERATION_TIMEOUT_MS) {
                 when (mixMode) {
-                    ScrobbleMixMode.FAVOURITES -> generationTopTracks.take(mixTrackCount)
+                    ScrobbleMixMode.FAVOURITES -> favouriteTracks.take(mixTrackCount)
                     ScrobbleMixMode.RECENT -> recentTracks.take(mixTrackCount)
                     ScrobbleMixMode.TASTE_MIX -> {
                         val excluded = (syncedHistory.map { it.videoId } + listens.map { it.song.videoId }).filter(String::isNotBlank).toSet()
@@ -612,7 +619,7 @@ fun ScrobbleScreen(
                             }
                         }
                         buildTasteMix(
-                            favourites = generationTopTracks.take(12),
+                            favourites = favouriteTracks.take(12),
                             recent = recentTracks.take(12),
                             fresh = fresh.filter { it.videoId.isNotBlank() && it.videoId !in excluded }.take(25),
                             limit = mixTrackCount,
@@ -1635,7 +1642,8 @@ fun ScrobbleScreen(
                                 enabled = !generatingMix && !loadingHistory &&
                                     (mixMode !in setOf(ScrobbleMixMode.TASTE_MIX, ScrobbleMixMode.DISCOVER) || !loadingRecommendations) &&
                                     (mixMode !in setOf(ScrobbleMixMode.FAVOURITES, ScrobbleMixMode.TASTE_MIX, ScrobbleMixMode.DISCOVER, ScrobbleMixMode.NEVER_HEARD) || !loadingGenerationTopTracks) &&
-                                    (mixMode != ScrobbleMixMode.FAVOURITES || (!generationTopTracksFailed && generationTopTracks.isNotEmpty())) &&
+                                    (mixMode !in setOf(ScrobbleMixMode.FAVOURITES, ScrobbleMixMode.TASTE_MIX) || !loadingSyncedStats) &&
+                                    (mixMode != ScrobbleMixMode.FAVOURITES || favouriteTracks.isNotEmpty()) &&
                                     (mixMode != ScrobbleMixMode.TAG || tagQuery.isNotBlank()) &&
                                     (mixMode != ScrobbleMixMode.SIMILAR_ARTISTS || lastFmDiscoveryAvailable) &&
                                     (mixMode != ScrobbleMixMode.REDISCOVER || !loadingAllTimeStats) &&
