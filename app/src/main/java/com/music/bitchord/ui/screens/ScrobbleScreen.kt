@@ -79,6 +79,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -1043,7 +1044,11 @@ private fun HourlyActivityChart(hours: List<Long>, reduceMotion: Boolean) {
             }
             Text("Hourly activity", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.SemiBold)
             Row(
-                modifier = Modifier.fillMaxWidth().height(76.dp),
+                modifier = Modifier.fillMaxWidth().height(76.dp).semantics {
+                    contentDescription = "Hourly listening activity: " + hours.withIndex()
+                        .filter { it.value > 0L }
+                        .joinToString { (hour, value) -> "%02d:00 %s".format(hour, formatListeningTime(value)) }
+                },
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.Bottom,
             ) {
@@ -1305,7 +1310,7 @@ private fun StatsRankedTrack(
         }
         Icon(
             Icons.Rounded.PlayArrow,
-            contentDescription = "Play ${song.title}",
+            contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(22.dp),
         )
