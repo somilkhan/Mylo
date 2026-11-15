@@ -149,6 +149,15 @@ private enum class StatsView(val label: String, val period: ReplayPeriod) {
     TOP_ALBUMS("Top Albums", ReplayPeriod.ALL_TIME),
 }
 
+private enum class ScrobbleTopPeriod(val label: String, val period: ReplayPeriod) {
+    ALL_TIME("All time", ReplayPeriod.ALL_TIME),
+    LAST_12_MONTHS("12 months", ReplayPeriod.LAST_12_MONTHS),
+    LAST_6_MONTHS("6 months", ReplayPeriod.LAST_6_MONTHS),
+    LAST_3_MONTHS("3 months", ReplayPeriod.LAST_3_MONTHS),
+    LAST_30_DAYS("30 days", ReplayPeriod.LAST_30_DAYS),
+    LAST_7_DAYS("7 days", ReplayPeriod.LAST_7_DAYS),
+}
+
 private const val SCROBBLE_GENERATION_TIMEOUT_MS = 60_000L
 
 internal const val SCROBBLE_TAB_STATS = 0
@@ -177,6 +186,10 @@ fun ScrobbleScreen(
     var allTimeStatsFailed by remember { mutableStateOf(false) }
     var loadingStats by remember { mutableStateOf(true) }
     var statsFailed by remember { mutableStateOf(false) }
+    var generationTopPeriod by remember { mutableStateOf(ScrobbleTopPeriod.ALL_TIME) }
+    var generationTopTracks by remember { mutableStateOf<List<Song>>(emptyList()) }
+    var loadingGenerationTopTracks by remember { mutableStateOf(true) }
+    var generationTopTracksFailed by remember { mutableStateOf(false) }
     var listens by remember { mutableStateOf<List<ListeningHistory.Entry>>(emptyList()) }
     var loadingHistory by remember { mutableStateOf(true) }
     var historyFailed by remember { mutableStateOf(false) }
@@ -341,9 +354,27 @@ fun ScrobbleScreen(
         }
     }
 
-    val topTracks = summary?.songs.orEmpty()
-        .sortedWith(compareByDescending<RankedSong> { it.plays }.thenByDescending { it.ms })
-        .map { it.song }.distinctBy(::songIdentity).take(25)
+    // Generator period is independent of the Statistics dropdown. Changing a
+    // chart view must never silently change which tracks "Your favourites" uses.
+    LaunchedEffect(generationTopPeriod, historyRevision) {
+        loadingGenerationTopTracks = true
+        generationTopTracksFailed = false
+        try {
+            val periodSummary = ListeningStats.summary(generationTopPeriod.period)
+            generationTopTracks = periodSummary.songs
+                .sortedWith(compareByDescending<RankedSong> { it.plays }.thenByDescending { it.ms })
+                .map { it.song }
+                .distinctBy(::songIdentity)
+                .take(25)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            generationTopTracks = emptyList()
+            generationTopTracksFailed = true
+        } finally {
+            loadingGenerationTopTracks = false
+        }
+    }
     val recentTracks = (syncedHistory + listens.sortedByDescending { it.startedAt }.map { it.song })
         .asSequence()
         .filter { it.videoId.isNotBlank() || !it.localUri.isNullOrBlank() || !it.localPath.isNullOrBlank() }
@@ -479,8 +510,8 @@ fun ScrobbleScreen(
         playlist.songs.map(::songIdentity) == generatedMix.map(::songIdentity)
     }
 
-    LaunchedEffect(recentTracks, topTracks) {
-        if (selectedSeed == null) selectedSeed = (recentTracks + topTracks).firstOrNull(::isYouTubeCatalogTrack)
+    LaunchedEffect(recentTracks, generationTopTracks) {
+        if (selectedSeed == null) selectedSeed = (recentTracks + generationTopTracks).firstOrNull(::isYouTubeCatalogTrack)
     }
 
     LaunchedEffect(seedSearchRequest) {
@@ -518,7 +549,7 @@ fun ScrobbleScreen(
         try {
             val generated = withTimeout(SCROBBLE_GENERATION_TIMEOUT_MS) {
                 when (mixMode) {
-                    ScrobbleMixMode.FAVOURITES -> topTracks.take(mixTrackCount)
+                    ScrobbleMixMode.FAVOURITES -> generationTopTracks.take(mixTrackCount)
                     ScrobbleMixMode.RECENT -> recentTracks.take(mixTrackCount)
                     ScrobbleMixMode.TASTE_MIX -> {
                         val excluded = (syncedHistory.map { it.videoId } + listens.map { it.song.videoId }).filter(String::isNotBlank).toSet()
@@ -532,7 +563,7 @@ fun ScrobbleScreen(
                             }
                         }
                         buildTasteMix(
-                            favourites = topTracks.take(12),
+                            favourites = generationTopTracks.take(12),
                             recent = recentTracks.take(12),
                             fresh = fresh.filter { it.videoId.isNotBlank() && it.videoId !in excluded }.take(25),
                             limit = mixTrackCount,
@@ -582,7 +613,7 @@ fun ScrobbleScreen(
                     ScrobbleMixMode.REDISCOVER -> rediscoverTracks.take(mixTrackCount)
                     ScrobbleMixMode.NEVER_HEARD -> {
                         val heard = (syncedHistory.map { it.videoId } + listens.map { it.song.videoId } +
-                            topTracks.map { it.videoId } + recentTracks.map { it.videoId })
+                            generationTopTracks.map { it.videoId } + recentTracks.map { it.videoId })
                             .filter(String::isNotBlank).toSet()
                         buildNeverHeardMix(
                             YtMusicRepository.quickPicks(heard).getOrThrow(),
@@ -591,7 +622,7 @@ fun ScrobbleScreen(
                         )
                     }
                     ScrobbleMixMode.DISCOVER -> {
-                        val excluded = (syncedHistory.map { it.videoId } + listens.map { it.song.videoId } + topTracks.map { it.videoId })
+                        val excluded = (syncedHistory.map { it.videoId } + listens.map { it.song.videoId } + generationTopTracks.map { it.videoId })
                             .filter(String::isNotBlank).toSet()
                         (recommendations.ifEmpty { YtMusicRepository.quickPicks(excluded).getOrThrow() })
                             .filter { it.videoId.isNotBlank() && it.videoId !in excluded }
@@ -663,7 +694,7 @@ fun ScrobbleScreen(
         }
     }
 
-    LaunchedEffect(selectedSection, syncedHistory, listens, loadingHistory, summary, recommendationRequest) {
+    LaunchedEffect(selectedSection, syncedHistory, listens, loadingHistory, generationTopTracks, recommendationRequest) {
         if (selectedSection != SCROBBLE_TAB_GENERATE || loadingHistory) return@LaunchedEffect
         // Do not leave picks from an older history/profile visible while this
         // request is refreshing. Generate is gated below until this request settles.
@@ -671,7 +702,7 @@ fun ScrobbleScreen(
         loadingRecommendations = true
         recommendationsFailed = false
         try {
-            val excluded = (syncedHistory.map { it.videoId } + listens.map { it.song.videoId } + topTracks.map { it.videoId })
+            val excluded = (syncedHistory.map { it.videoId } + listens.map { it.song.videoId } + generationTopTracks.map { it.videoId })
                 .filter(String::isNotBlank).toSet()
             val result = withTimeout(SCROBBLE_GENERATION_TIMEOUT_MS) {
                 YtMusicRepository.quickPicks(excluded).getOrThrow()
@@ -1127,7 +1158,7 @@ fun ScrobbleScreen(
                             item("generate-seed") {
                                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                     Text(if (mixMode == ScrobbleMixMode.RADIO) "Choose a starting track" else "Choose an artist", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                                    val seeds = (recentTracks + topTracks).filter(::isYouTubeCatalogTrack).distinctBy(::songIdentity).take(12)
+                                    val seeds = (recentTracks + generationTopTracks).filter(::isYouTubeCatalogTrack).distinctBy(::songIdentity).take(12)
                                     selectedSeed?.takeIf(::isYouTubeCatalogTrack)?.let { seed ->
                                         Row(
                                             modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
@@ -1299,6 +1330,38 @@ fun ScrobbleScreen(
                         if (mixMode == ScrobbleMixMode.REDISCOVER && loadingAllTimeStats) {
                             item("rediscover-loading") { LoadingLine("Checking your all-time play counts") }
                         }
+                        if (mixMode == ScrobbleMixMode.FAVOURITES) {
+                            item("generate-top-period") {
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text("Listening period", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    ) {
+                                        ScrobbleTopPeriod.values().forEach { period ->
+                                            FilterChip(
+                                                selected = generationTopPeriod == period,
+                                                onClick = {
+                                                    if (generationTopPeriod != period) {
+                                                        generationTopPeriod = period
+                                                        generatedMix = emptyList()
+                                                        generationError = null
+                                                        mixSaved = false
+                                                    }
+                                                },
+                                                enabled = !generatingMix,
+                                                label = { Text(period.label) },
+                                            )
+                                        }
+                                    }
+                                    when {
+                                        loadingGenerationTopTracks -> LoadingLine("Loading your top tracks")
+                                        generationTopTracksFailed -> EmptyPanel("Couldn't load top tracks", "Check your listening statistics and try again.")
+                                        generationTopTracks.isEmpty() -> EmptyPanel("No top tracks yet", "Listen to a few tracks on this device, then build a favourites mix.")
+                                    }
+                                }
+                            }
+                        }
                         item("generate-count") {
                             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1314,7 +1377,8 @@ fun ScrobbleScreen(
                                 onClick = { generationRequest++ },
                                 enabled = !generatingMix && !loadingHistory &&
                                     (mixMode !in setOf(ScrobbleMixMode.TASTE_MIX, ScrobbleMixMode.DISCOVER) || !loadingRecommendations) &&
-                                    (mixMode !in setOf(ScrobbleMixMode.FAVOURITES, ScrobbleMixMode.TASTE_MIX) || !loadingStats) &&
+                                    (mixMode !in setOf(ScrobbleMixMode.FAVOURITES, ScrobbleMixMode.TASTE_MIX) || !loadingGenerationTopTracks) &&
+                                    (mixMode != ScrobbleMixMode.FAVOURITES || (!generationTopTracksFailed && generationTopTracks.isNotEmpty())) &&
                                     (mixMode != ScrobbleMixMode.TAG || tagQuery.isNotBlank()) &&
                                     (mixMode != ScrobbleMixMode.SIMILAR_ARTISTS || lastFmDiscoveryAvailable) &&
                                     (mixMode != ScrobbleMixMode.REDISCOVER || !loadingAllTimeStats) &&
