@@ -643,10 +643,10 @@ object ListeningStats {
             // the artist, not about the evening they were played on: written
             // into every month it would freeze at whatever was known the first
             // time they came up, and be missing from every month before that.
-            val rankedArtists = if (weekRange != null) {
+            val rankedArtists = if (dayRange != null) {
                 artists.values
                     .mapNotNull { entry ->
-                        val (ms, plays) = entry.weekRange(weekRange)
+                        val (ms, plays) = entry.weekRange(dayRange)
                         if (ms > 0) entry to (ms to plays) else null
                     }
                     .sortedWith(compareByDescending<Pair<NameEntry, Pair<Long, Int>>> { it.second.first }
@@ -677,10 +677,10 @@ object ListeningStats {
                     }
             }
 
-            val rankedAlbums = if (weekRange != null) {
+            val rankedAlbums = if (dayRange != null) {
                 albums.values
                     .mapNotNull { entry ->
-                        val (ms, plays) = entry.weekRange(weekRange)
+                        val (ms, plays) = entry.weekRange(dayRange)
                         if (ms > 0) entry to (ms to plays) else null
                     }
                     .sortedWith(compareByDescending<Pair<NameEntry, Pair<Long, Int>>> { it.second.first }
