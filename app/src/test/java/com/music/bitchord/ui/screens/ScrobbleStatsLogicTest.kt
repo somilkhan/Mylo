@@ -1,9 +1,39 @@
 package com.music.bitchord.ui.screens
 
+import com.music.bitchord.data.stats.ReplayPeriod
+import java.time.LocalDate
+import java.time.YearMonth
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ScrobbleStatsLogicTest {
+    @Test
+    fun lastSevenDaysUsesAnInclusiveRollingRangeAndOnlyLoadsOverlappingMonths() {
+        val today = LocalDate.of(2026, 11, 15)
+        val period = ReplayPeriod.LAST_7_DAYS
+
+        assertEquals(today.minusDays(6) to today, period.range(today))
+        assertEquals("Last 7 days", period.label(today))
+        assertTrue(period.needsDayFilter())
+        assertTrue(period.covers(YearMonth.of(2026, 11), today))
+        assertFalse(period.covers(YearMonth.of(2026, 10), today))
+    }
+
+    @Test
+    fun lastThirtyDaysIncludesBothSidesOfMonthBoundaryWithoutLeakingOlderDays() {
+        val today = LocalDate.of(2026, 11, 5)
+        val period = ReplayPeriod.LAST_30_DAYS
+
+        assertEquals(today.minusDays(29) to today, period.range(today))
+        assertEquals(LocalDate.of(2026, 10, 7) to today, period.range(today))
+        assertEquals("Last 30 days", period.label(today))
+        assertTrue(period.covers(YearMonth.of(2026, 10), today))
+        assertTrue(period.covers(YearMonth.of(2026, 11), today))
+        assertFalse(period.covers(YearMonth.of(2026, 9), today))
+    }
+
     @Test
     fun groupsHourlyListeningIntoDaypartsAndPreservesTotal() {
         val parts = buildListeningDayParts((1L..24L).toList())
