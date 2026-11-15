@@ -914,7 +914,7 @@ fun ScrobbleScreen(
                         } else {
                             emptyList()
                         }
-                        buildYouTubeFirstMix(youtubeRadio, lastFmTracks, mixTrackCount)
+                        buildSimilarArtistMix(youtubeRadio, lastFmTracks, artistName, mixTrackCount)
                     }
                 }
             }
