@@ -281,6 +281,30 @@ class ScrobbleMixLogicTest {
     }
 
     @Test
+    fun discoverUsesLastWaveTasteAffinityAndArtistDiversityBeforeRelaxingCaps() {
+        val topArtistA = Song("topartist001", "Top artist song", "Top Artist", null)
+        val recentArtistA = Song("recentart01", "Recent artist song", "Recent Artist", null)
+        val newArtistA = Song("newartist001", "New artist one", "New Artist", null)
+        val newArtistB = Song("newartist002", "New artist two", "New Artist", null)
+        val newArtistC = Song("newartist003", "New artist three", "New Artist", null)
+        val newArtistD = Song("newartist004", "New artist four", "New Artist", null)
+
+        val result = buildDiscoverMix(
+            candidates = listOf(newArtistA, newArtistB, newArtistC, newArtistD, topArtistA, recentArtistA),
+            heardVideoIds = emptySet(),
+            topArtistNames = setOf("Top Artist"),
+            recentArtistNames = setOf("Recent Artist"),
+            artistAffinity = mapOf("top artist" to 1.0),
+            limit = 5,
+        )
+
+        assertEquals(5, result.size)
+        assertEquals("Top Artist", result.first().artist)
+        assertEquals("Recent Artist", result.last().artist)
+        assertEquals(2, result.count { it.artist == "New Artist" })
+    }
+
+    @Test
     fun neverHeardExcludesKnownTracksAndDuplicatesAndHonoursLimit() {
         val heard = Song("knowntrk001", "Already heard", "Artist", null)
         val fresh = Song("freshtrk001", "New track", "Artist", null)
