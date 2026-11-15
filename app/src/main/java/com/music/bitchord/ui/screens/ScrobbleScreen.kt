@@ -214,13 +214,6 @@ fun ScrobbleScreen(
     var allTimeSummary by remember { mutableStateOf<ReplaySummary?>(null) }
     var loadingAllTimeStats by remember { mutableStateOf(true) }
     var allTimeStatsFailed by remember { mutableStateOf(false) }
-    val favouriteTracks = remember(generationTopRankedTracks, syncedStats) {
-        buildCombinedFavouriteTracks(
-            local = generationTopRankedTracks,
-            synced = syncedStats.topTracks,
-            limit = 25,
-        )
-    }
     var loadingStats by remember { mutableStateOf(true) }
     var statsFailed by remember { mutableStateOf(false) }
     var generationTopPeriod by remember { mutableStateOf(ScrobbleTopPeriod.ALL_TIME) }
@@ -228,6 +221,13 @@ fun ScrobbleScreen(
     var generationTopRankedTracks by remember { mutableStateOf<List<RankedSong>>(emptyList()) }
     var loadingGenerationTopTracks by remember { mutableStateOf(true) }
     var generationTopTracksFailed by remember { mutableStateOf(false) }
+    val favouriteTracks = remember(generationTopRankedTracks, syncedStats) {
+        buildCombinedFavouriteTracks(
+            local = generationTopRankedTracks,
+            synced = syncedStats.topTracks,
+            limit = 25,
+        )
+    }
     var listens by remember { mutableStateOf<List<ListeningHistory.Entry>>(emptyList()) }
     var loadingHistory by remember { mutableStateOf(true) }
     var historyFailed by remember { mutableStateOf(false) }
