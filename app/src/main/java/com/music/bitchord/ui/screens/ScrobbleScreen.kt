@@ -186,7 +186,24 @@ fun ScrobbleScreen(
     var statsView by remember { mutableStateOf(StatsView.RECENT) }
     var statsSource by remember { mutableStateOf(ScrobbleStatsSource.DEVICE) }
     var statsSourceManuallySelected by remember { mutableStateOf(false) }
-    val syncedStats = remember(syncedHistory) { buildSyncedHistorySummary(syncedHistory) }
+    var syncedStats by remember { mutableStateOf(buildSyncedHistorySummary(emptyList())) }
+    var loadingSyncedStats by remember { mutableStateOf(syncedHistory.isNotEmpty()) }
+    var syncedStatsFailed by remember { mutableStateOf(false) }
+    LaunchedEffect(syncedHistory) {
+        loadingSyncedStats = true
+        syncedStatsFailed = false
+        try {
+            syncedStats = withContext(Dispatchers.Default) {
+                buildSyncedHistorySummary(syncedHistory)
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            syncedStatsFailed = true
+        } finally {
+            loadingSyncedStats = false
+        }
+    }
     LaunchedEffect(syncedHistory.isNotEmpty(), syncingYouTubeHistory) {
         if ((syncedHistory.isNotEmpty() || syncingYouTubeHistory) && !statsSourceManuallySelected) {
             statsSource = ScrobbleStatsSource.YOUTUBE_MUSIC
@@ -1036,9 +1053,18 @@ fun ScrobbleScreen(
                             }
                         }
                         when {
-                            statsSource == ScrobbleStatsSource.YOUTUBE_MUSIC && syncedStats.totalPlays == 0 && syncingYouTubeHistory -> {
+                            statsSource == ScrobbleStatsSource.YOUTUBE_MUSIC && syncedStats.totalPlays == 0 &&
+                                (syncingYouTubeHistory || loadingSyncedStats) -> {
                                 item("stats-youtube-syncing") {
-                                    LoadingLine("Syncing YouTube Music listening history")
+                                    LoadingLine(if (syncingYouTubeHistory) "Syncing YouTube Music listening history" else "Preparing synced listening statistics")
+                                }
+                            }
+                            statsSource == ScrobbleStatsSource.YOUTUBE_MUSIC && syncedStats.totalPlays == 0 && syncedStatsFailed -> {
+                                item("stats-youtube-error") {
+                                    EmptyPanel(
+                                        "Couldn't prepare synced statistics",
+                                        "Your account history is still saved. Reopen Statistics to try processing it again.",
+                                    )
                                 }
                             }
                             statsSource == ScrobbleStatsSource.YOUTUBE_MUSIC && syncedStats.totalPlays == 0 -> {
