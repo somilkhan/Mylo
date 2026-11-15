@@ -53,6 +53,7 @@ internal object ScrobbleRecommendationEngine {
         seeds: List<Song>,
         heardSongs: List<Song>,
         total: Int,
+        freshOnly: Boolean = false,
         onProgress: (String) -> Unit = {},
     ): List<Song> = withTimeout(75_000L) {
         if (total <= 0) return@withTimeout emptyList()
@@ -83,9 +84,13 @@ internal object ScrobbleRecommendationEngine {
                 )
             }
             onProgress("Applying freshness and diversity…")
-            val selected = ScrobbleRecommendationSelection.select(remoteCandidates + localCandidates, total)
+            val eligible = (remoteCandidates + localCandidates).filter { !freshOnly || it.fresh }
+            val selected = ScrobbleRecommendationSelection.select(eligible, total)
             val selectedKeys = selected.mapTo(HashSet()) { it.scrobbleIdentityKey }
-            val fill = localSongs.filter { it.scrobbleIdentityKey !in selectedKeys }
+            val fill = localSongs.filter {
+                it.scrobbleIdentityKey !in selectedKeys &&
+                    (!freshOnly || isScrobbleFreshCandidate(it, heardSongs, profile?.tracks.orEmpty()))
+            }
             (selected + fill).distinctScrobbleSongs().take(total)
         }
     }
