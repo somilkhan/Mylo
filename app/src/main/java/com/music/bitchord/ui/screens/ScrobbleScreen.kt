@@ -753,9 +753,12 @@ fun ScrobbleScreen(
                         val artistBrowseId = seed.artistId
                             ?: YtMusicRepository.findArtistPageId(seed.artist).getOrThrow()
                             ?: throw IllegalStateException("Couldn't find an exact artist match for ${seed.artist}")
-                        YtMusicRepository.artistPage(artistBrowseId).getOrThrow().songs
-                            .filter { it.videoId.isNotBlank() && it.videoId != seed.videoId }
-                            .distinctBy(::songIdentity).take(mixTrackCount)
+                        buildArtistCappedMix(
+                            candidates = YtMusicRepository.artistPage(artistBrowseId).getOrThrow().songs
+                                .filter { it.videoId.isNotBlank() && it.videoId != seed.videoId },
+                            seedArtist = seed.artist,
+                            targetSize = mixTrackCount,
+                        )
                     }
                     ScrobbleMixMode.SIMILAR_ARTISTS -> {
                         val artistName = similarArtistQuery.trim().ifBlank {
@@ -777,7 +780,13 @@ fun ScrobbleScreen(
                                     }
                                 }
                             }.awaitAll().flatten()
-                        }.distinctBy(::songIdentity).take(mixTrackCount)
+                        }.let { candidates ->
+                            buildArtistCappedMix(
+                                candidates = candidates,
+                                seedArtist = artistName,
+                                targetSize = mixTrackCount,
+                            )
+                        }
                     }
                 }
             }

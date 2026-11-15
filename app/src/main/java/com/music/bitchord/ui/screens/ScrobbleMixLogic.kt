@@ -151,6 +151,43 @@ internal fun buildTasteMix(
     return result
 }
 
+/**
+ * Port of LastWave GenerateRepository.applyArtistCap: cap the seed artist at
+ * one and other artists at two, relax to two/three only when that would leave
+ * the requested mix short, then preserve the full deduplicated pool as a final
+ * fallback rather than returning an unexpectedly tiny playlist.
+ */
+internal fun buildArtistCappedMix(
+    candidates: List<Song>,
+    seedArtist: String,
+    targetSize: Int,
+): List<Song> {
+    if (targetSize <= 0) return emptyList()
+    val distinctSongs = candidates.distinctBy(::songIdentity)
+    val seedKey = seedArtist.trim().lowercase()
+    fun applyArtistCap(maxSeedArtist: Int, maxOtherArtist: Int): List<Song> {
+        val counts = mutableMapOf<String, Int>()
+        return distinctSongs.filter { song ->
+            val artistKey = song.artist.trim().lowercase()
+            val maxAllowed = if (artistKey == seedKey) maxSeedArtist else maxOtherArtist
+            val current = counts[artistKey] ?: 0
+            if (current < maxAllowed) {
+                counts[artistKey] = current + 1
+                true
+            } else {
+                false
+            }
+        }
+    }
+
+    var curated = applyArtistCap(maxSeedArtist = 1, maxOtherArtist = 2)
+    if (curated.size < targetSize) {
+        curated = applyArtistCap(maxSeedArtist = 2, maxOtherArtist = 3)
+    }
+    if (curated.size < targetSize) curated = distinctSongs
+    return curated.take(targetSize)
+}
+
 /** Only catalogue tracks absent from the supplied listening history qualify as new-to-you. */
 internal fun buildNeverHeardMix(
     candidates: List<Song>,

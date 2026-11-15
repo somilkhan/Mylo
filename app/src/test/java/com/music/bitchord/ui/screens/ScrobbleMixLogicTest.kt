@@ -8,6 +8,34 @@ import org.junit.Test
 
 class ScrobbleMixLogicTest {
     @Test
+    fun artistCapLimitsSeedAndOtherArtistsThenRelaxesOnlyWhenPoolIsShort() {
+        val candidates = listOf(
+            com.music.bitchord.data.model.Song("aaaaaaaaaaa", "Seed 1", "Seed Artist", null),
+            com.music.bitchord.data.model.Song("bbbbbbbbbbb", "Seed 2", "Seed Artist", null),
+            com.music.bitchord.data.model.Song("ccccccccccc", "Seed 3", "Seed Artist", null),
+            com.music.bitchord.data.model.Song("ddddddddddd", "Other 1", "Other Artist", null),
+            com.music.bitchord.data.model.Song("eeeeeeeeeee", "Other 2", "Other Artist", null),
+            com.music.bitchord.data.model.Song("fffffffffff", "Other 3", "Other Artist", null),
+            com.music.bitchord.data.model.Song("ggggggggggg", "Third 1", "Third Artist", null),
+            com.music.bitchord.data.model.Song("hhhhhhhhhhh", "Third 2", "Third Artist", null),
+            com.music.bitchord.data.model.Song("iiiiiiiiiii", "Third 3", "Third Artist", null),
+        )
+
+        val strict = buildArtistCappedMix(candidates, "seed artist", targetSize = 3)
+        assertEquals(listOf("Seed 1", "Other 1", "Other 2"), strict.map { it.title })
+
+        val relaxed = buildArtistCappedMix(candidates, "Seed Artist", targetSize = 7)
+        assertEquals(7, relaxed.size)
+        assertEquals(2, relaxed.count { it.artist == "Seed Artist" })
+        assertEquals(3, relaxed.count { it.artist == "Other Artist" })
+        assertEquals(2, relaxed.count { it.artist == "Third Artist" })
+
+        val fallback = buildArtistCappedMix(candidates.take(3), "Seed Artist", targetSize = 5)
+        assertEquals(3, fallback.size)
+        assertEquals(emptyList<com.music.bitchord.data.model.Song>(), buildArtistCappedMix(candidates, "Seed Artist", 0))
+    }
+
+    @Test
     fun rediscoverRequiresThreeCompletedPlaysAndSixtyQuietDays() {
         val now = 100L * DAY
         val oldFavourite = Song("oldtrack001", "Old favourite", "Artist", null)
