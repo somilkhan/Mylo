@@ -114,7 +114,7 @@ internal object ScrobbleRecommendationEngine {
 
         suspend fun artistCharts(names: List<String>, count: Int) {
             val charts = names.take(count).map { artist ->
-                async { artist to safe { LastFM.getArtistTopTracks(artist, limit = 8).getOrThrow() } }
+                async { artist to safe { LastFM.getArtistTopTracks(artist, limit = 8, page = (1..6).random()).getOrThrow() } }
             }.awaitAll()
             charts.forEach { (artist, rows) ->
                 addSource(
@@ -140,7 +140,7 @@ internal object ScrobbleRecommendationEngine {
         onProgress("Matching your favourite genres…")
         val primaryTags = tags.take(4)
         val primaryTagBatches = primaryTags.map { tag ->
-            async { tag to safe { LastFM.getTagTopTracks(tag, limit = 8, page = 2).getOrThrow() } }
+            async { tag to safe { LastFM.getTagTopTracks(tag, limit = 8, page = (2..11).random()).getOrThrow() } }
         }.awaitAll()
         primaryTagBatches.forEach { (tag, tracks) ->
             tracks.orEmpty().forEach { track ->
@@ -153,7 +153,7 @@ internal object ScrobbleRecommendationEngine {
             .distinct().filterNot { candidate -> tags.any { it.equals(candidate, ignoreCase = true) } }
             .take(4)
         val neighborTagBatches = neighborTags.map { tag ->
-            async { tag to safe { LastFM.getTagTopTracks(tag, limit = 6, page = 1).getOrThrow() } }
+            async { tag to safe { LastFM.getTagTopTracks(tag, limit = 6, page = (1..6).random()).getOrThrow() } }
         }.awaitAll()
         neighborTagBatches.forEach { (tag, tracks) ->
             tracks.orEmpty().forEach { track ->
