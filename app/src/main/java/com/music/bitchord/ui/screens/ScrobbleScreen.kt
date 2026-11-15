@@ -394,8 +394,8 @@ fun ScrobbleScreen(
             val (profile, charts) = coroutineScope {
                 val profileCall = async { LastFM.getUserStats(username).getOrThrow() }
                 val tracksCall = async { LastFM.getTopTracks(username, period = lastFmPeriodValue(lastFmStatsPeriod.period), limit = 12).getOrThrow() }
-                val artistsCall = async { LastFM.getTopArtists(username, period = lastFmStatsPeriod.lastFmValue(), limit = 12).getOrThrow() }
-                val albumsCall = async { LastFM.getTopAlbums(username, period = lastFmStatsPeriod.lastFmValue(), limit = 12).getOrThrow() }
+                val artistsCall = async { LastFM.getTopArtists(username, period = lastFmPeriodValue(lastFmStatsPeriod.period), limit = 12).getOrThrow() }
+                val albumsCall = async { LastFM.getTopAlbums(username, period = lastFmPeriodValue(lastFmStatsPeriod.period), limit = 12).getOrThrow() }
                 profileCall.await() to Triple(tracksCall.await(), artistsCall.await(), albumsCall.await())
             }
             lastFmProfile = profile
