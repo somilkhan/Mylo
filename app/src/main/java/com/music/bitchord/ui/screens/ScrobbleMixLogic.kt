@@ -507,7 +507,7 @@ internal fun buildArtistCappedMix(
     targetSize: Int,
 ): List<Song> {
     if (targetSize <= 0) return emptyList()
-    val distinctSongs = buildList {
+    val distinctSongs = buildList<Song> {
         candidates.filter(::isYouTubeCatalogTrack).forEach { candidate ->
             val duplicate = any { existing ->
                 existing.videoId == candidate.videoId ||
