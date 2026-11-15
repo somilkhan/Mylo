@@ -312,6 +312,9 @@ fun ScrobbleScreen(
 
     LaunchedEffect(selectedSection, syncedHistory, listens, loadingHistory, summary, recommendationRequest) {
         if (selectedSection != SCROBBLE_TAB_GENERATE || loadingHistory) return@LaunchedEffect
+        // Do not leave picks from an older history/profile visible while this
+        // request is refreshing. Generate is gated below until this request settles.
+        recommendations = emptyList()
         loadingRecommendations = true
         recommendationsFailed = false
         try {
@@ -710,6 +713,7 @@ fun ScrobbleScreen(
                             Button(
                                 onClick = { generationRequest++ },
                                 enabled = !generatingMix && !loadingHistory &&
+                                    (mixMode !in setOf(ScrobbleMixMode.TASTE_MIX, ScrobbleMixMode.DISCOVER) || !loadingRecommendations) &&
                                     (mixMode !in setOf(ScrobbleMixMode.FAVOURITES, ScrobbleMixMode.TASTE_MIX) || !loadingStats) &&
                                     (mixMode != ScrobbleMixMode.REDISCOVER || !loadingAllTimeStats) &&
                                     (mixMode != ScrobbleMixMode.REDISCOVER || !allTimeStatsFailed) &&
