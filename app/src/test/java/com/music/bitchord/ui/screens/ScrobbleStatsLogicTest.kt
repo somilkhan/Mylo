@@ -1,6 +1,7 @@
 package com.music.bitchord.ui.screens
 
 import com.music.bitchord.data.stats.ReplayPeriod
+import com.music.bitchord.data.stats.RankedSong
 import java.time.LocalDate
 import java.time.YearMonth
 import org.junit.Assert.assertEquals
@@ -110,6 +111,28 @@ class ScrobbleStatsLogicTest {
         assertEquals(2, summary.topTracks.first().plays)
         assertEquals("First song", summary.topTracks.first().song.title)
         assertEquals(3, summary.topArtists.single().plays)
+    }
+
+    @Test
+    fun combinedFavouritesDeduplicateAcrossSourcesAndKeepLocalOnlyTracks() {
+        val shared = com.music.bitchord.data.model.Song("abcdefghijk", "Shared", "Artist A", null)
+        val localOnly = com.music.bitchord.data.model.Song("lmnopqrstuv", "Local only", "Artist B", null)
+        val remoteOnly = com.music.bitchord.data.model.Song("zyxwvutsrqp", "Remote only", "Artist C", null)
+        val result = buildCombinedFavouriteTracks(
+            local = listOf(
+                RankedSong(shared, ms = 900_000L, plays = 4),
+                RankedSong(localOnly, ms = 600_000L, plays = 5),
+            ),
+            synced = listOf(
+                SyncedHistoryTrack(shared, plays = 6),
+                SyncedHistoryTrack(remoteOnly, plays = 3),
+            ),
+        )
+
+        assertEquals(listOf(shared, localOnly, remoteOnly), result.take(3))
+        assertEquals(3, result.distinctBy(::songIdentity).size)
+        assertTrue(buildCombinedFavouriteTracks(emptyList(), emptyList()).isEmpty())
+        assertTrue(buildCombinedFavouriteTracks(emptyList(), emptyList(), limit = 0).isEmpty())
     }
 
     @Test
