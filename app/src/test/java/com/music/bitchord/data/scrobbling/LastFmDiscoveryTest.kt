@@ -41,7 +41,7 @@ class LastFmDiscoveryTest {
             {
               "tracks": {
                 "track": [
-                  {"name":"Track One","artist":{"name":"Artist One"}},
+                  {"name":"Track One","artist":{"name":"Artist One"},"listeners":"1000","playcount":"6000","match":"0.75","album":{"title":"Album One"}},
                   {"name":"Track Two","artist":"Artist Two"},
                   {"name":"Track One","artist":{"name":"artist one"}},
                   {"name":"Missing artist","artist":{}},
@@ -51,12 +51,13 @@ class LastFmDiscoveryTest {
             }
         """.trimIndent()
 
+        val parsed = parseLastFmTagTracks(response, limit = 10)
         assertEquals(
             listOf(
-                LastFM.DiscoveryTrack("Track One", "Artist One"),
+                LastFM.DiscoveryTrack("Track One", "Artist One", 1_000L, 6_000L, 0.75, "Album One"),
                 LastFM.DiscoveryTrack("Track Two", "Artist Two"),
             ),
-            parseLastFmTagTracks(response, limit = 10),
+            parsed,
         )
     }
 
