@@ -39,6 +39,32 @@ internal object ScrobblePlaylistStore {
         playlists.addAll(restored)
     }
 
+    /** Creates an empty user-owned playlist; tracks can be added from listening history. */
+    fun create(title: String): Boolean {
+        val cleanTitle = title.trim()
+        if (cleanTitle.isBlank() || playlists.size >= MAX_SAVED_PLAYLISTS) return false
+        if (playlists.any { it.title.equals(cleanTitle, ignoreCase = true) }) return false
+        playlists.add(0, SavedScrobblePlaylist(cleanTitle, "Custom playlist", emptyList()))
+        persist()
+        return true
+    }
+
+    /** Adds only new tracks and preserves the existing playlist order. Returns the number added. */
+    fun addSongs(title: String, songs: List<Song>): Int {
+        val index = playlists.indexOfFirst { it.title == title }
+        if (index < 0 || songs.isEmpty()) return 0
+        val existing = playlists[index]
+        val seen = existing.songs.mapTo(mutableSetOf(), ::songKey)
+        val additions = songs.asSequence()
+            .filter { seen.add(songKey(it)) }
+            .take((MAX_TRACKS_PER_PLAYLIST - existing.songs.size).coerceAtLeast(0))
+            .toList()
+        if (additions.isEmpty()) return 0
+        playlists[index] = existing.copy(songs = existing.songs + additions)
+        persist()
+        return additions.size
+    }
+
     fun save(title: String, reason: String, songs: List<Song>): Boolean {
         if (title.isBlank() || songs.isEmpty()) return false
         val cleanTitle = title.trim()
@@ -191,7 +217,7 @@ internal object ScrobblePlaylistCodec {
                 songs = playlist.songs.map { it.toSong() },
                 coverUri = playlist.coverUri,
             )
-        }.filter { it.title.isNotBlank() && it.songs.isNotEmpty() }
+        }.filter { it.title.isNotBlank() }
     }.getOrNull()
 
     private fun Song.toRecord() = SongRecord(
