@@ -333,7 +333,7 @@ object ListeningStats {
         val merged = MergedBucket()
         when {
             period.needsDayFilter() -> {
-                // Week may span two months: read both, filter by day.
+                // A bounded range may span two months: read overlaps, then filter exact days.
                 val range = period.range(today)!!
                 months().filter { month ->
                     val start = month.atDay(1)
@@ -590,13 +590,13 @@ object ListeningStats {
         }
 
         fun toSummary(period: ReplayPeriod, today: LocalDate): ReplaySummary {
-            // For weekly mode, compute per-entity totals from day-level sub-buckets.
-            val weekRange = if (period.needsDayFilter()) period.range(today) else null
+            // Bounded periods use day-level sub-buckets so 7/30-day totals do not include the rest of an overlapping month.
+            val dayRange = if (period.needsDayFilter()) period.range(today) else null
 
-            val rankedSongs = if (weekRange != null) {
+            val rankedSongs = if (dayRange != null) {
                 tracks.values
                     .mapNotNull { entry ->
-                        val (ms, plays) = entry.weekRange(weekRange)
+                        val (ms, plays) = entry.weekRange(dayRange)
                         if (ms > 0) entry to (ms to plays) else null
                     }
                     .sortedWith(compareByDescending<Pair<TrackEntry, Pair<Long, Int>>> { it.second.first }
@@ -988,17 +988,18 @@ data class RankedSong(val song: Song, val ms: Long, val plays: Int)
 /** How far back a Replay reaches. */
 enum class ReplayPeriod(val chip: String) {
     THIS_WEEK("This week"),
+    LAST_7_DAYS("Last 7 days"),
+    LAST_30_DAYS("Last 30 days"),
     THIS_MONTH("This month"),
     THIS_YEAR("This year"),
     ALL_TIME("All time"),
     ;
 
-    /** The inclusive date range this period covers. Null for ALL_TIME. */
+    /** The inclusive date range this period covers. Null for unbounded ALL_TIME. */
     fun range(today: LocalDate): Pair<LocalDate, LocalDate>? = when (this) {
-        THIS_WEEK -> {
-            val start = today.with(java.time.DayOfWeek.MONDAY)
-            start to today
-        }
+        THIS_WEEK -> today.with(java.time.DayOfWeek.MONDAY) to today
+        LAST_7_DAYS -> today.minusDays(6) to today
+        LAST_30_DAYS -> today.minusDays(29) to today
         THIS_MONTH -> {
             val ym = YearMonth.from(today)
             ym.atDay(1) to ym.atEndOfMonth()
@@ -1008,22 +1009,24 @@ enum class ReplayPeriod(val chip: String) {
     }
 
     fun covers(month: YearMonth, today: LocalDate): Boolean = when (this) {
-        THIS_WEEK -> {
-            val range = month.atDay(1)..month.atEndOfMonth()
-            val weekStart = today.with(java.time.DayOfWeek.MONDAY)
-            val weekEnd = today
-            !(weekEnd < range.start || weekStart > range.endInclusive)
+        THIS_WEEK, LAST_7_DAYS, LAST_30_DAYS -> {
+            val dateRange = range(today)!!
+            val monthStart = month.atDay(1)
+            val monthEnd = month.atEndOfMonth()
+            !(dateRange.second < monthStart || dateRange.first > monthEnd)
         }
         THIS_MONTH -> month == YearMonth.from(today)
         THIS_YEAR -> month.year == today.year
         ALL_TIME -> true
     }
 
-    /** Whether this period needs day-level filtering (week spans potentially multiple months). */
-    fun needsDayFilter(): Boolean = this == THIS_WEEK
+    /** Bounded day ranges need exact filtering after their overlapping months are loaded. */
+    fun needsDayFilter(): Boolean = this == THIS_WEEK || this == LAST_7_DAYS || this == LAST_30_DAYS
 
     fun label(today: LocalDate): String = when (this) {
         THIS_WEEK -> "This week"
+        LAST_7_DAYS -> "Last 7 days"
+        LAST_30_DAYS -> "Last 30 days"
         THIS_MONTH -> YearMonth.from(today).month.name.lowercase(Locale.ROOT)
             .replaceFirstChar { it.uppercase(Locale.ROOT) } + " ${today.year}"
         THIS_YEAR -> today.year.toString()
