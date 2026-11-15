@@ -230,12 +230,14 @@ internal object ScrobbleRecommendationEngine {
             .mapTo(mutableSetOf()) { recommendationIdentity(it.first) }
         val trackSignals = resolvedPairs.groupBy { recommendationIdentity(it.first) }
             .mapValues { (_, rows) ->
-                val metadata = rows.flatMap { pair -> pair.second.map { it.track } }
+                // Match LastWave's pool semantics: preserve the first source's
+                // metadata instead of combining unrelated max values.
+                val metadata = rows.first().second.firstOrNull()?.track
                 LastWaveTrackSignals(
-                    listeners = metadata.mapNotNull { it.listeners }.maxOrNull(),
-                    playCount = metadata.mapNotNull { it.playCount }.maxOrNull(),
-                    match = metadata.mapNotNull { it.match }.maxOrNull(),
-                    album = metadata.firstNotNullOfOrNull { it.album },
+                    listeners = metadata?.listeners,
+                    playCount = metadata?.playCount,
+                    match = metadata?.match,
+                    album = metadata?.album,
                 )
             }
 
