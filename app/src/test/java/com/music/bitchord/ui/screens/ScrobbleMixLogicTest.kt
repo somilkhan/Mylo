@@ -281,6 +281,33 @@ class ScrobbleMixLogicTest {
     }
 
     @Test
+    fun discoverUsesLastWaveHiddenGemCommunityAndMatchSignals() {
+        val popular = Song("populartrk1", "Popular track", "Artist A", null)
+        val hiddenGem = Song("hiddengem01", "Hidden gem", "Artist B", null)
+
+        val result = buildDiscoverMix(
+            candidates = listOf(popular, hiddenGem),
+            heardVideoIds = emptySet(),
+            trackSignals = mapOf(
+                recommendationIdentity(popular) to LastWaveTrackSignals(
+                    listeners = 2_000_000,
+                    playCount = 2_000_000,
+                    match = 0.1,
+                ),
+                recommendationIdentity(hiddenGem) to LastWaveTrackSignals(
+                    listeners = 1_000,
+                    playCount = 6_000,
+                    match = 0.5,
+                    album = "Hidden album",
+                ),
+            ),
+            limit = 2,
+        )
+
+        assertEquals(listOf(hiddenGem, popular), result)
+    }
+
+    @Test
     fun discoverPrefersHigherLastWaveSourceWeight() {
         val low = Song("lowweight01", "Low weight", "Unknown Artist", null)
         val high = Song("highwght001", "High weight", "Unknown Artist", null)
