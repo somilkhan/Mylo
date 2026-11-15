@@ -64,8 +64,13 @@ internal fun scrobblePlaylistExportFilename(
 }
 
 private fun csvEscape(value: String): String {
-    val escaped = value.replace("\"", "\"\"")
-    return if (value.any { it == ',' || it == '"' || it == '\r' || it == '\n' }) {
+    // Spreadsheet applications may evaluate cells beginning with formula
+    // operators. Check past leading whitespace too, then prefix an apostrophe
+    // so user-controlled track metadata remains inert when opened as a CSV.
+    val firstMeaningfulCharacter = value.firstOrNull { !it.isWhitespace() }
+    val safeValue = if (firstMeaningfulCharacter in setOf('=', '+', '-', '@')) "'$value" else value
+    val escaped = safeValue.replace("\"", "\"\"")
+    return if (safeValue.any { it == ',' || it == '"' || it == '\r' || it == '\n' }) {
         "\"$escaped\""
     } else {
         escaped
