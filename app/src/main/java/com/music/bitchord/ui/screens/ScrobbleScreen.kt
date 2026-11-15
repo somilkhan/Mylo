@@ -761,8 +761,43 @@ fun ScrobbleScreen(
                         } catch (_: Exception) {
                             emptyList()
                         }
+                        val similarTracks = if (lastFmDiscoveryAvailable && radioTracks.size < mixTrackCount) {
+                            val similarCandidates = try {
+                                LastFM.getSimilarTracks(
+                                    track = seed.title,
+                                    artist = seed.artist,
+                                    limit = minOf(30, mixTrackCount * 2),
+                                ).getOrThrow()
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (_: Exception) {
+                                emptyList()
+                            }
+                            coroutineScope {
+                                similarCandidates.map { candidate ->
+                                    async {
+                                        try {
+                                            buildTagMix(
+                                                YtMusicRepository.search(
+                                                    "${candidate.name} ${candidate.artist}",
+                                                    SearchFilter.SONGS,
+                                                ).getOrThrow(),
+                                                limit = 1,
+                                            ).firstOrNull()
+                                        } catch (cancelled: CancellationException) {
+                                            throw cancelled
+                                        } catch (_: Exception) {
+                                            null
+                                        }
+                                    }
+                                }.awaitAll().filterNotNull()
+                            }
+                        } else {
+                            emptyList()
+                        }
                         val initial = buildRadioMix(
                             radio = radioTracks,
+                            similar = similarTracks,
                             favourites = favouriteTracks,
                             recent = recentTracks,
                             discovery = recommendations,
@@ -781,6 +816,7 @@ fun ScrobbleScreen(
                             }
                             buildRadioMix(
                                 radio = radioTracks,
+                                similar = similarTracks,
                                 favourites = favouriteTracks,
                                 recent = recentTracks,
                                 discovery = recommendations + quickPicks,
