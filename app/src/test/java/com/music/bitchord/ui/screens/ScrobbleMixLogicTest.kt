@@ -1,6 +1,7 @@
 package com.music.bitchord.ui.screens
 
 import com.music.bitchord.data.ListeningHistory
+import com.music.bitchord.data.model.SearchResult
 import com.music.bitchord.data.model.Song
 import org.junit.Assert.assertEquals
 import org.junit.Test
