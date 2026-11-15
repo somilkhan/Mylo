@@ -138,7 +138,7 @@ private enum class ScrobbleMixMode(val title: String, val description: String) {
 
 private val SCROBBLE_GENRE_TAGS = listOf("pop", "rock", "hip-hop", "electronic", "jazz", "lofi", "metal", "indie", "classical", "r&b", "ambient", "punk")
 
-private enum class ScrobblePlaylistSortMode { RECENT, OLDEST, NAME, TRACK_COUNT }
+private enum class ScrobblePlaylistSortMode { RECENT, PINNED, OLDEST, NAME, TRACK_COUNT }
 
 private enum class StatsView(val label: String, val period: ReplayPeriod) {
     RECENT("Recent", ReplayPeriod.LAST_30_DAYS),
@@ -2281,6 +2281,10 @@ fun ScrobbleScreen(
                                 }
                                 .let { matches -> when (playlistSortMode) {
                                     ScrobblePlaylistSortMode.RECENT -> matches
+                                    ScrobblePlaylistSortMode.PINNED -> matches.sortedWith(
+                                        compareByDescending<SavedScrobblePlaylist> { it.pinned }
+                                            .thenByDescending { savedPlaylists.indexOf(it) },
+                                    )
                                     ScrobblePlaylistSortMode.OLDEST -> matches.reversed()
                                     ScrobblePlaylistSortMode.NAME -> matches.sortedBy { it.title.lowercase() }
                                     ScrobblePlaylistSortMode.TRACK_COUNT -> matches.sortedWith(
@@ -2381,6 +2385,7 @@ fun ScrobbleScreen(
                                     ) {
                                         Icon(Icons.Rounded.Sort, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                                         FilterChip(selected = playlistSortMode == ScrobblePlaylistSortMode.RECENT, onClick = { playlistSortMode = ScrobblePlaylistSortMode.RECENT }, label = { Text("Recently saved") })
+                                        FilterChip(selected = playlistSortMode == ScrobblePlaylistSortMode.PINNED, onClick = { playlistSortMode = ScrobblePlaylistSortMode.PINNED }, label = { Text("Pinned first") })
                                         FilterChip(selected = playlistSortMode == ScrobblePlaylistSortMode.OLDEST, onClick = { playlistSortMode = ScrobblePlaylistSortMode.OLDEST }, label = { Text("Oldest") })
                                         FilterChip(selected = playlistSortMode == ScrobblePlaylistSortMode.NAME, onClick = { playlistSortMode = ScrobblePlaylistSortMode.NAME }, label = { Text("Name") })
                                         FilterChip(selected = playlistSortMode == ScrobblePlaylistSortMode.TRACK_COUNT, onClick = { playlistSortMode = ScrobblePlaylistSortMode.TRACK_COUNT }, label = { Text("Most tracks") })
@@ -2469,6 +2474,10 @@ fun ScrobbleScreen(
                                                     IconButton(onClick = { menuExpanded = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "More playlist actions") }
                                                     DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
                                                         DropdownMenuItem(text = { Text("Open") }, onClick = { menuExpanded = false; openedPlaylist = playlist.title })
+                                                        DropdownMenuItem(
+                                                            text = { Text(if (playlist.pinned) "Unpin playlist" else "Pin playlist") },
+                                                            onClick = { menuExpanded = false; ScrobblePlaylistStore.setPinned(playlist.title, !playlist.pinned) },
+                                                        )
                                                         DropdownMenuItem(
                                                             text = { Text(if (generatingSimilarPlaylist == playlist.title) "Generating similar…" else "Generate similar") },
                                                             enabled = generatingSimilarPlaylist == null && playlist.songs.any(::isYouTubeCatalogTrack),
