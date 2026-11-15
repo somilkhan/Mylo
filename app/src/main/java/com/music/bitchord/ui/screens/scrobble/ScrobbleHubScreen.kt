@@ -119,28 +119,64 @@ private fun ScrobbleGeneratorScreen(
             )
         }
         item {
-            Text("DISCOVERY MODE", style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary)
-            val modes = listOf(
-                ScrobbleGenerateMode.RECOMMENDATIONS,
-                ScrobbleGenerateMode.NEVER_HEARD,
-                ScrobbleGenerateMode.MIX,
-                ScrobbleGenerateMode.TOP,
-                ScrobbleGenerateMode.LIBRARY,
-                ScrobbleGenerateMode.RECENT,
-                ScrobbleGenerateMode.SIMILAR_TRACKS,
-                ScrobbleGenerateMode.SIMILAR_ARTISTS,
-                ScrobbleGenerateMode.TAG,
-            )
-            modes.chunked(2).forEach { group ->
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    group.forEach { option ->
-                        FilterChip(
-                            selected = mode == option.name,
-                            onClick = { mode = option.name; error = null },
-                            label = { Text(option.name.replace('_', ' ').lowercase()
-                                .replaceFirstChar { it.uppercase() }) },
-                        )
+            Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                Text("DISCOVERY MODE", style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary)
+                val modes = listOf(
+                    ScrobbleGenerateMode.TOP,
+                    ScrobbleGenerateMode.RECENT,
+                    ScrobbleGenerateMode.SIMILAR_TRACKS,
+                    ScrobbleGenerateMode.SIMILAR_ARTISTS,
+                    ScrobbleGenerateMode.TAG,
+                    ScrobbleGenerateMode.MIX,
+                    ScrobbleGenerateMode.RECOMMENDATIONS,
+                    ScrobbleGenerateMode.NEVER_HEARD,
+                    ScrobbleGenerateMode.LIBRARY,
+                )
+                modes.forEach { option ->
+                    val label = when (option) {
+                        ScrobbleGenerateMode.TOP -> "Top Tracks"
+                        ScrobbleGenerateMode.RECENT -> "Recent Tracks"
+                        ScrobbleGenerateMode.SIMILAR_TRACKS -> "Song Radio"
+                        ScrobbleGenerateMode.SIMILAR_ARTISTS -> "Similar Artists"
+                        ScrobbleGenerateMode.TAG -> "By Tag / Genre"
+                        ScrobbleGenerateMode.MIX -> "My Mix"
+                        ScrobbleGenerateMode.RECOMMENDATIONS -> "My Recommendation"
+                        ScrobbleGenerateMode.NEVER_HEARD -> "Never Heard"
+                        ScrobbleGenerateMode.LIBRARY -> "My Library"
+                    }
+                    val description = when (option) {
+                        ScrobbleGenerateMode.TOP -> "Your most played tracks of all time"
+                        ScrobbleGenerateMode.RECENT -> "What you've been listening to lately"
+                        ScrobbleGenerateMode.SIMILAR_TRACKS -> "Discover music around a song"
+                        ScrobbleGenerateMode.SIMILAR_ARTISTS -> "Discover music around an artist"
+                        ScrobbleGenerateMode.TAG -> "Explore a genre or music tag"
+                        ScrobbleGenerateMode.MIX -> "Your taste, mixes and local favourites"
+                        ScrobbleGenerateMode.RECOMMENDATIONS -> "Fresh picks based on your listening"
+                        ScrobbleGenerateMode.NEVER_HEARD -> "Discover tracks absent from your history"
+                        ScrobbleGenerateMode.LIBRARY -> "Rediscover music from your library"
+                    }
+                    Card(
+                        modifier = Modifier.fillMaxWidth().clickable {
+                            mode = option.name
+                            error = null
+                        },
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 13.dp),
+                            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        ) {
+                            Text(
+                                if (mode == option.name) "●" else "○",
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text(label, style = MaterialTheme.typography.titleMedium)
+                                Text(description, style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
                     }
                 }
             }
