@@ -111,6 +111,7 @@ class ScrobbleStatsLogicTest {
         assertEquals(2, summary.topTracks.first().plays)
         assertEquals("First song", summary.topTracks.first().song.title)
         assertEquals(3, summary.topArtists.single().plays)
+        assertEquals(null, summary.topArtists.single().artworkUrl)
     }
 
     @Test

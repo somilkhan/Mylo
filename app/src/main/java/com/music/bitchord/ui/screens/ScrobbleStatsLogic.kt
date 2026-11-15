@@ -39,6 +39,7 @@ internal data class SyncedHistoryTrack(
 internal data class SyncedHistoryArtist(
     val name: String,
     val plays: Int,
+    val artworkUrl: String? = null,
 )
 
 internal data class SyncedHistoryAlbum(
@@ -97,7 +98,7 @@ internal fun buildSyncedHistorySummary(
     history: List<com.music.bitchord.data.model.Song>,
 ): SyncedHistorySummary {
     val tracks = LinkedHashMap<String, Pair<com.music.bitchord.data.model.Song, Int>>()
-    val artists = LinkedHashMap<String, Pair<String, Int>>()
+    val artists = LinkedHashMap<String, SyncedHistoryArtist>()
     val albums = LinkedHashMap<String, SyncedHistoryAlbum>()
 
     history.forEach { song ->
@@ -111,7 +112,11 @@ internal fun buildSyncedHistorySummary(
         primaryArtist?.let { artist ->
             val artistKey = artist.lowercase()
             val existingArtist = artists[artistKey]
-            artists[artistKey] = (existingArtist?.first ?: artist) to ((existingArtist?.second ?: 0) + 1)
+            artists[artistKey] = SyncedHistoryArtist(
+                name = existingArtist?.name ?: artist,
+                plays = (existingArtist?.plays ?: 0) + 1,
+                artworkUrl = existingArtist?.artworkUrl ?: song.thumbnailUrl,
+            )
         }
         song.albumName?.trim()?.takeIf(String::isNotBlank)?.let { album ->
             val artist = primaryArtist ?: song.artist.trim()
@@ -130,7 +135,6 @@ internal fun buildSyncedHistorySummary(
         .map { (song, plays) -> SyncedHistoryTrack(song, plays) }
         .sortedWith(compareByDescending<SyncedHistoryTrack> { it.plays }.thenBy { it.song.title.lowercase() })
     val topArtists = artists.values
-        .map { (name, plays) -> SyncedHistoryArtist(name, plays) }
         .sortedWith(compareByDescending<SyncedHistoryArtist> { it.plays }.thenBy { it.name.lowercase() })
     val topAlbums = albums.values
         .sortedWith(compareByDescending<SyncedHistoryAlbum> { it.plays }.thenBy { it.name.lowercase() })

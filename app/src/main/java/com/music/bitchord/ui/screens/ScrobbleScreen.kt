@@ -1240,6 +1240,21 @@ fun ScrobbleScreen(
                                         },
                                     )
                                 }
+                                if (syncedStats.topArtists.isNotEmpty()) {
+                                    item("stats-youtube-top-artists-heading") {
+                                        StatsSectionHeading("Top artists", syncedStats.distinctArtists.toString() + " artists")
+                                    }
+                                    items(
+                                        syncedStats.topArtists.take(12),
+                                        key = { "yt-artist-" + it.name.lowercase() },
+                                    ) { artist ->
+                                        StatsEntityRow(
+                                            title = artist.name,
+                                            subtitle = artist.plays.toString() + " plays",
+                                            artworkUrl = artist.artworkUrl,
+                                        )
+                                    }
+                                }
                                 if (syncedStats.topAlbums.isNotEmpty()) {
                                     item("stats-youtube-top-albums-heading") {
                                         StatsSectionHeading("Top albums", "${syncedStats.distinctAlbums} albums")
