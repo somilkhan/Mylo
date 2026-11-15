@@ -495,7 +495,7 @@ fun ScrobbleScreen(
                                             val recentSongs = recentListens.map { it.song }
                                             itemsIndexed(
                                                 recentListens,
-                                                key = { _, entry -> "recent-${entry.startedAt}-${songIdentity(entry.song)}" },
+                                                key = { index, entry -> "recent-$index-${entry.startedAt}-${songIdentity(entry.song)}" },
                                             ) { index, entry ->
                                                 StatsRankedTrack(
                                                     rank = index + 1,
@@ -1088,117 +1088,6 @@ fun ScrobbleScreen(
 }
 
 @Composable
-private fun HourlyActivityChart(hours: List<Long>, reduceMotion: Boolean) {
-    val peak = hours.maxOrNull()?.takeIf { it > 0L } ?: return
-    val dayParts = remember(hours) { buildListeningDayParts(hours) }
-    val totalDayPartMs = remember(dayParts) { dayParts.sumOf { it.listeningMs } }
-    if (totalDayPartMs <= 0L) return
-    var barsVisible by remember(hours) { mutableStateOf(false) }
-    LaunchedEffect(hours, reduceMotion) {
-        barsVisible = false
-        if (reduceMotion) {
-            barsVisible = true
-        } else {
-            delay(40)
-            barsVisible = true
-        }
-    }
-    val dayPartBarProgress by androidx.compose.animation.core.animateFloatAsState(
-        targetValue = if (barsVisible) 1f else 0f,
-        animationSpec = if (reduceMotion) snap() else tween(durationMillis = 600, easing = FastOutSlowInEasing),
-        label = "daypart-split-bar",
-    )
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-    ) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text("Listening by time of day", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                    Text("Share of recorded listening time", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Box(
-                    modifier = Modifier.fillMaxWidth().height(12.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
-                    contentAlignment = Alignment.CenterStart,
-                ) {
-                    Row(Modifier.fillMaxWidth(dayPartBarProgress).fillMaxHeight()) {
-                        dayParts.forEachIndexed { index, part ->
-                            if (part.listeningMs > 0L) {
-                                val fraction = part.listeningMs.toFloat() / totalDayPartMs.toFloat()
-                                val alpha = when (index) {
-                                    0 -> 1f
-                                    1 -> 0.78f
-                                    2 -> 0.56f
-                                    else -> 0.34f
-                                }
-                                Box(
-                                    Modifier.weight(fraction).fillMaxHeight()
-                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = alpha)),
-                                )
-                            }
-                        }
-                    }
-                }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    dayParts.forEach { part ->
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Text("${part.percentageOf(totalDayPartMs)}%", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                            Text(part.name, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text(part.timeRange, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f))
-                        }
-                    }
-                }
-            }
-            Text("Hourly activity", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.SemiBold)
-            Row(
-                modifier = Modifier.fillMaxWidth().height(76.dp).semantics {
-                    contentDescription = "Hourly listening activity: " + hours.withIndex()
-                        .filter { it.value > 0L }
-                        .joinToString { (hour, value) -> "%02d:00 %s".format(hour, formatListeningTime(value)) }
-                },
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalAlignment = Alignment.Bottom,
-            ) {
-                hours.forEachIndexed { hour, value ->
-                    val targetFraction = if (value <= 0L) 0f else (value.toFloat() / peak.toFloat()).coerceIn(0f, 1f)
-                    val fraction by androidx.compose.animation.core.animateFloatAsState(
-                        targetValue = if (barsVisible) targetFraction else 0f,
-                        animationSpec = if (reduceMotion) snap() else tween(
-                            durationMillis = 520,
-                            delayMillis = hour * 12,
-                            easing = FastOutSlowInEasing,
-                        ),
-                        label = "hourly-bar-$hour",
-                    )
-                    val barHeight = if (value <= 0L) 3.dp else (3f + 63f * fraction).dp
-                    Box(
-                        modifier = Modifier.weight(1f).height(76.dp),
-                        contentAlignment = Alignment.BottomCenter,
-                    ) {
-                        Box(
-                            modifier = Modifier.width(6.dp).height(barHeight)
-                                .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
-                                .background(if (value == peak) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.22f)),
-                        )
-                    }
-                }
-            }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                listOf("00", "06", "12", "18", "23").forEach { hour ->
-                    Text(hour, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-        }
-    }
-}
-
-
-@Composable
 private fun StatsOverviewCard(
     summary: ReplaySummary,
     reduceMotion: Boolean,
@@ -1318,7 +1207,34 @@ private fun HourlyActivityMiniChart(
         animationSpec = if (reduceMotion) snap() else tween(480, easing = FastOutSlowInEasing),
         label = "compact-hourly-activity",
     )
+    val dayParts = remember(hours) { buildListeningDayParts(hours) }
+    val totalDayPartMs = dayParts.sumOf { it.listeningMs }
     Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth()
+                .height(7.dp)
+                .clip(RoundedCornerShape(5.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            horizontalArrangement = Arrangement.Start,
+        ) {
+            if (totalDayPartMs > 0L) {
+                dayParts.forEachIndexed { index, part ->
+                    if (part.listeningMs > 0L) {
+                        val alpha = when (index) {
+                            0 -> 1f
+                            1 -> 0.78f
+                            2 -> 0.56f
+                            else -> 0.34f
+                        }
+                        Box(
+                            Modifier.weight(part.listeningMs.toFloat() / totalDayPartMs.toFloat())
+                                .fillMaxHeight()
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = alpha)),
+                        )
+                    }
+                }
+            }
+        }
         Row(
             modifier = Modifier.fillMaxWidth().height(112.dp).semantics {
                 contentDescription = if (description.isBlank()) "No hourly listening activity recorded"
@@ -1354,66 +1270,6 @@ private fun HourlyActivityMiniChart(
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun StatsInsightTile(
-    title: String,
-    value: String,
-    detail: String,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f))
-            .padding(horizontal = 14.dp, vertical = 15.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Text(
-            title.uppercase(),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontWeight = FontWeight.SemiBold,
-            letterSpacing = 0.6.sp,
-        )
-        Text(
-            value,
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-            fontWeight = FontWeight.Bold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-            detail,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
-}
-
-@Composable
-private fun StatsSectionHeading(title: String, supporting: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Text(
-            title,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        Text(
-            supporting,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }
 
@@ -1833,11 +1689,6 @@ private fun formatStatsTimestamp(timestamp: Long): String = runCatching {
         )
 }.getOrDefault("Played recently")
 
-private fun formatStatsDay(day: String): String = runCatching {
-    java.time.LocalDate.parse(day).format(
-        java.time.format.DateTimeFormatter.ofPattern("EEE, d MMM", java.util.Locale.getDefault()),
-    )
-}.getOrDefault(day)
 private fun formatListeningTime(totalMs: Long): String {
     val totalMinutes = totalMs / 60_000
     val hours = totalMinutes / 60
