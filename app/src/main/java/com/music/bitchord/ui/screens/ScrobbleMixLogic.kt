@@ -94,17 +94,26 @@ internal fun buildBalancedSourceMix(
     if (limit <= 0) return emptyList()
     val primaryTracks = primary.distinctBy(::songIdentity)
     val secondaryTracks = secondary.distinctBy(::songIdentity)
+    val seen = mutableSetOf<String>()
     val result = ArrayList<Song>(limit)
     var primaryIndex = 0
     var secondaryIndex = 0
     while (result.size < limit && (primaryIndex < primaryTracks.size || secondaryIndex < secondaryTracks.size)) {
-        if (primaryIndex < primaryTracks.size && result.size < limit) {
+        // A duplicate does not consume this source's turn. Advance until this
+        // source contributes one new track or is exhausted, then alternate.
+        while (primaryIndex < primaryTracks.size && result.size < limit) {
             val next = primaryTracks[primaryIndex++]
-            if (result.none { songIdentity(it) == songIdentity(next) }) result += next
+            if (seen.add(songIdentity(next))) {
+                result += next
+                break
+            }
         }
-        if (secondaryIndex < secondaryTracks.size && result.size < limit) {
+        while (secondaryIndex < secondaryTracks.size && result.size < limit) {
             val next = secondaryTracks[secondaryIndex++]
-            if (result.none { songIdentity(it) == songIdentity(next) }) result += next
+            if (seen.add(songIdentity(next))) {
+                result += next
+                break
+            }
         }
     }
     return result
