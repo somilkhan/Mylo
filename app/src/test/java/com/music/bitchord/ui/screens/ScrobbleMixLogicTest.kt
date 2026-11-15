@@ -316,6 +316,24 @@ class ScrobbleMixLogicTest {
     }
 
     @Test
+    fun discoverExcludesPreviouslyHeardTracksAndAlternateUploads() {
+        val heard = Song("heardtrack01", "Deep Swim", "Original Artist", null)
+        val alternate = Song("alttrack001", "Deep Swim - Official Audio", "Original Artist", null)
+        val fresh = Song("freshtrk001", "Ocean Lights", "Original Artist", null)
+        val sameTitleOtherArtist = Song("freshtrk002", "Deep Swim", "Different Artist", null)
+
+        assertEquals(
+            listOf(fresh, sameTitleOtherArtist),
+            buildDiscoverMix(
+                candidates = listOf(alternate, fresh, sameTitleOtherArtist),
+                heardVideoIds = setOf(heard.videoId),
+                heardSongs = listOf(heard),
+            ),
+        )
+        assertTrue(buildDiscoverMix(listOf(fresh), emptySet(), limit = 0).isEmpty())
+    }
+
+    @Test
     fun neverHeardReturnsNoMoreThanRequestedAndZeroLimitIsEmpty() {
         val first = Song("freshtrk001", "First", "Artist", null)
         val second = Song("freshtrk002", "Second", "Artist", null)
