@@ -753,7 +753,8 @@ fun ScrobbleScreen(
                         // Keep seed-specific radio as the primary source, but do
                         // not fail or return a tiny mix when YouTube's radio is
                         // temporarily empty. Mirror LastWave's layered approach:
-                        // personal favourites/recent listens first, then discovery.
+                        // YouTube radio first, Last.fm similar tracks second, then
+                        // personal favourites/recent listens and discovery.
                         val radioTracks = try {
                             YtMusicRepository.radio(seed.videoId).getOrThrow()
                         } catch (cancelled: CancellationException) {
@@ -761,7 +762,16 @@ fun ScrobbleScreen(
                         } catch (_: Exception) {
                             emptyList()
                         }
-                        val similarTracks = if (lastFmDiscoveryAvailable && radioTracks.size < mixTrackCount) {
+                        val radioOnly = buildRadioMix(
+                            radio = radioTracks,
+                            similar = emptyList(),
+                            favourites = emptyList(),
+                            recent = emptyList(),
+                            discovery = emptyList(),
+                            seed = seed,
+                            limit = mixTrackCount,
+                        )
+                        val similarTracks = if (lastFmDiscoveryAvailable && radioOnly.size < mixTrackCount) {
                             val similarCandidates = try {
                                 LastFM.getSimilarTracks(
                                     track = seed.title,
@@ -774,7 +784,7 @@ fun ScrobbleScreen(
                                 emptyList()
                             }
                             coroutineScope {
-                                similarCandidates.map { candidate ->
+                                similarCandidates.take(minOf(12, mixTrackCount)).map { candidate ->
                                     async {
                                         try {
                                             buildTagMix(
