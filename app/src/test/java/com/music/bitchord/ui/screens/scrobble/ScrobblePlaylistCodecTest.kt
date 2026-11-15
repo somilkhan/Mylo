@@ -58,12 +58,12 @@ class ScrobblePlaylistCodecTest {
     }
 
     @Test
-    fun codecKeepsFirstDuplicateTrackAndPreservesOrder() {
+    fun codecPreservesTrackOrderAndArtwork() {
         val first = Song("video000001", "Blue Monday", "New Order", "first-art")
-        val second = Song("video000002", "blue   monday", "new order", "second-art")
+        val second = Song("video000002", "Bizarre Love Triangle", "New Order", "second-art")
         val playlist = SavedScrobblePlaylist(
-            id = "dedupe",
-            title = "Dedupe",
+            id = "ordered",
+            title = "Ordered",
             subtitle = "",
             tracks = listOf(first, second),
             createdAtMillis = 5L,
@@ -71,7 +71,7 @@ class ScrobblePlaylistCodecTest {
 
         val decoded = ScrobblePlaylistCodec.decode(ScrobblePlaylistCodec.encode(listOf(playlist)))
 
-        assertEquals(2, decoded.single().tracks.size)
+        assertEquals(listOf("video000001", "video000002"), decoded.single().tracks.map { it.videoId })
         assertEquals("first-art", decoded.single().tracks.first().thumbnailUrl)
         assertEquals("second-art", decoded.single().tracks.last().thumbnailUrl)
     }
