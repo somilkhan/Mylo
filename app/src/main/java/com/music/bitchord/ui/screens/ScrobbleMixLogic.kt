@@ -3,6 +3,12 @@ package com.music.bitchord.ui.screens
 import com.music.bitchord.data.ListeningHistory
 import com.music.bitchord.data.model.Song
 
+/** YouTube's radio and artist catalogue endpoints require an 11-character video id. */
+private val YOUTUBE_VIDEO_ID = Regex("^[A-Za-z0-9_-]{11}$")
+
+internal fun isYouTubeCatalogTrack(song: Song): Boolean =
+    YOUTUBE_VIDEO_ID.matches(song.videoId)
+
 /** Stable identity across local history rows, synced history and queue snapshots. */
 internal fun songIdentity(song: Song): String =
     song.localUri?.takeIf(String::isNotBlank)?.let { "local:$it" }
