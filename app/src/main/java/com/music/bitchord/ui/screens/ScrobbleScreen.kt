@@ -80,7 +80,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -171,6 +170,7 @@ fun ScrobbleScreen(
     onPlayPlaylist: (String, List<Song>, Int) -> Unit,
     onBrowseMoods: () -> Unit,
     onViewPlaylists: () -> Unit,
+    workScope: kotlinx.coroutines.CoroutineScope,
     syncedHistory: List<Song> = emptyList(),
     modifier: Modifier = Modifier,
     reduceMotion: Boolean = false,
@@ -223,7 +223,7 @@ fun ScrobbleScreen(
     var coverEditorPlaylist by remember { mutableStateOf<String?>(null) }
     var coverPickerPlaylist by remember { mutableStateOf<String?>(null) }
     var generatingSimilarPlaylist by remember { mutableStateOf<String?>(null) }
-    val exportScope = rememberCoroutineScope()
+    val exportScope = workScope
     fun releaseCoverPermission(uri: String?) {
         if (!uri.isNullOrBlank()) {
             runCatching {
