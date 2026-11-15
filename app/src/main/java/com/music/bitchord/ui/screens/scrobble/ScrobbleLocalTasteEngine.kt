@@ -13,6 +13,7 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import java.util.Locale
 
 private const val RADIO_SEED_LIMIT = 5
 private const val RADIO_CONCURRENCY = 3
@@ -115,6 +116,7 @@ internal fun buildLocalTasteCandidates(
     val heardBaseKeys = heardSongs.mapTo(HashSet()) { baseTrackKey(it.title, it.artist) }
     val seenIds = HashSet<String>()
     val seenKeys = HashSet<String>()
+    val seenBaseKeys = HashSet<String>()
     val artistCounts = HashMap<String, Int>()
     val result = ArrayList<Song>(total)
 
@@ -127,9 +129,9 @@ internal fun buildLocalTasteCandidates(
             if (song.videoId in heardIds || song.scrobbleIdentityKey in heardKeys) continue
             if (isLocalTasteJunk(song.title)) continue
             val baseKey = baseTrackKey(song.title, song.artist)
-            if (baseKey in heardBaseKeys) continue
+            if (baseKey in heardBaseKeys || baseKey in seenBaseKeys) continue
 
-            val artistKey = song.artist.normalizeScrobbleText().lowercase()
+            val artistKey = song.artist.normalizeScrobbleText().lowercase(Locale.ROOT)
             if ((artistCounts[artistKey] ?: 0) >= MAX_TRACKS_PER_ARTIST) continue
             if (song.videoId in seenIds || song.scrobbleIdentityKey in seenKeys) continue
 
@@ -137,6 +139,7 @@ internal fun buildLocalTasteCandidates(
             acceptedForSeed++
             seenIds += song.videoId
             seenKeys += song.scrobbleIdentityKey
+            seenBaseKeys += baseKey
             artistCounts[artistKey] = (artistCounts[artistKey] ?: 0) + 1
         }
         if (result.size >= total) break
@@ -156,7 +159,7 @@ private fun baseTrackKey(title: String, artist: String): String {
         previous = clean
         clean = clean.replace(editSuffix, "").trim()
     } while (clean != previous)
-    return clean.lowercase() + "|" + artist.normalizeScrobbleText().lowercase()
+    return clean.lowercase(Locale.ROOT) + "|" + artist.normalizeScrobbleText().lowercase(Locale.ROOT)
 }
 
 private fun isLocalTasteJunk(title: String): Boolean {
