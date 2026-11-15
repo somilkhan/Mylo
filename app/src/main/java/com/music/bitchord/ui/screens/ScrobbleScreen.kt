@@ -500,6 +500,22 @@ fun ScrobbleScreen(
                         item("generate-heading") {
                             PageHeading("The mix studio", "A soundtrack shaped around your listening. Choose a direction, then let Mylo do the rest.")
                         }
+                        if (historyFailed) {
+                            item("generate-history-warning") {
+                                InfoPanel(
+                                    "Device history unavailable",
+                                    "Local listening data could not be read. Rediscover and Never heard are unavailable until you reopen Scrobble to retry.",
+                                )
+                            }
+                        }
+                        if (recommendationsFailed) {
+                            item("generate-recommendations-warning") {
+                                InfoPanel(
+                                    "Fresh picks unavailable",
+                                    "Check your connection, then use Refresh picks below to try again.",
+                                )
+                            }
+                        }
                         item("generate-modes") {
                             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -659,6 +675,7 @@ fun ScrobbleScreen(
                                 enabled = !generatingMix && !loadingHistory &&
                                     (mixMode !in setOf(ScrobbleMixMode.FAVOURITES, ScrobbleMixMode.TASTE_MIX) || !loadingStats) &&
                                     (mixMode != ScrobbleMixMode.REDISCOVER || !loadingAllTimeStats) &&
+                                    (mixMode !in setOf(ScrobbleMixMode.REDISCOVER, ScrobbleMixMode.NEVER_HEARD) || !historyFailed) &&
                                     (mixMode !in setOf(ScrobbleMixMode.RADIO, ScrobbleMixMode.ARTIST_MIX) || selectedSeed?.let(::isYouTubeCatalogTrack) == true),
                                 modifier = Modifier.fillMaxWidth(),
                             ) {
