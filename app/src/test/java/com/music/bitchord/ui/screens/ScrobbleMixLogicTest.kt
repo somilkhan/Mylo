@@ -153,6 +153,7 @@ class ScrobbleMixLogicTest {
     fun tagMixKeepsOnlyPlayableSongRowsDeduplicatesAndHonoursLimit() {
         val first = Song("abcdefghijk", "First", "Artist", null)
         val duplicate = first.copy(title = "Duplicate title")
+        val alternateUpload = first.copy(videoId = "alternate001")
         val second = Song("lmnopqrstuv", "Second", "Artist", null)
         val invalid = Song("local-file", "Local", "Artist", null)
         val browse = com.music.bitchord.data.model.BrowseItem(
@@ -167,14 +168,15 @@ class ScrobbleMixLogicTest {
             listOf(
                 SearchResult.Track(first),
                 SearchResult.TopTrack(duplicate),
+                SearchResult.Track(alternateUpload),
                 SearchResult.Browse(browse),
                 SearchResult.Track(invalid),
                 SearchResult.Track(second),
             ),
-            limit = 1,
+            limit = 10,
         )
 
-        assertEquals(listOf(first), result)
+        assertEquals(listOf(first, second), result)
     }
 
     @Test
