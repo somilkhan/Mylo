@@ -158,6 +158,7 @@ class ScrobbleStatsLogicTest {
         assertEquals(1, summary.distinctArtists)
         assertEquals("Artist A", summary.topArtists.single().name)
         assertEquals(2, summary.topArtists.single().plays)
+        assertEquals("https://example.com/album.jpg", summary.topArtists.single().artworkUrl)
         assertEquals(1, summary.distinctAlbums)
         assertEquals("Shared album", summary.topAlbums.single().name)
         assertEquals("Artist A", summary.topAlbums.single().artist)
