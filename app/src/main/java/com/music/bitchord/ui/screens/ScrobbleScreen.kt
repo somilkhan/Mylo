@@ -735,7 +735,7 @@ fun ScrobbleScreen(
                             generationTopTracks.map { it.videoId } + recentTracks.map { it.videoId })
                             .filter(String::isNotBlank).toSet()
                         val heardSongs = (syncedHistory + listens.map { it.song } +
-                            generationTopTracks.map { it.song } + recentTracks)
+                            generationTopTracks + recentTracks)
                             .distinctBy(::recommendationIdentity)
                         buildNeverHeardMix(
                             candidates = YtMusicRepository.quickPicks(heard).getOrThrow(),
