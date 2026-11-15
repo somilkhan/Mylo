@@ -47,6 +47,7 @@ private enum class ScrobbleHubTab(val label: String) {
 internal fun ScrobbleHubScreen(
     modifier: Modifier = Modifier,
     onBack: () -> Unit,
+    onConnectLastFm: () -> Unit,
     onPlay: (List<Song>, Int) -> Unit,
 ) {
     var tab by rememberSaveable { mutableStateOf(ScrobbleHubTab.STATS.name) }
@@ -76,8 +77,14 @@ internal fun ScrobbleHubScreen(
         }
         when (tab) {
             ScrobbleHubTab.GENERATE.name -> ScrobbleGeneratorScreen(onPlay = onPlay)
-            ScrobbleHubTab.PLAYLISTS.name -> ScrobblePlaylistsScreen(onPlay = onPlay)
-            else -> ScrobbleStatsScreen(modifier = Modifier.weight(1f))
+            ScrobbleHubTab.PLAYLISTS.name -> ScrobblePlaylistsScreen(
+                onPlay = onPlay,
+                onGenerate = { tab = ScrobbleHubTab.GENERATE.name },
+            )
+            else -> ScrobbleStatsScreen(
+                modifier = Modifier.weight(1f),
+                onConnectLastFm = onConnectLastFm,
+            )
         }
     }
 }
@@ -317,6 +324,7 @@ private fun ScrobbleGeneratorScreen(
 @Composable
 private fun ScrobblePlaylistsScreen(
     onPlay: (List<Song>, Int) -> Unit,
+    onGenerate: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     val playlists by ScrobblePlaylistStore.playlists.collectAsState()
@@ -354,8 +362,16 @@ private fun ScrobblePlaylistsScreen(
 
     if (playlists.isEmpty()) {
         Column(modifier = Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.Center) {
-            Text("No saved playlists yet", style = MaterialTheme.typography.titleLarge)
-            Text("Generate a mix and save it here.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("♫", style = MaterialTheme.typography.displayLarge,
+                color = MaterialTheme.colorScheme.primary)
+            Text("Your playlists", style = MaterialTheme.typography.headlineSmall)
+            Text(
+                "Your saved mixes will live here. Generate a playlist, then save it to build your collection.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Button(onClick = onGenerate, modifier = Modifier.fillMaxWidth()) {
+                Text("Create a playlist")
+            }
         }
         return
     }
