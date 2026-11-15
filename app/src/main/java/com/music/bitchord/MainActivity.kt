@@ -2742,7 +2742,7 @@ private fun BitChordApp(
                     }
                     if (key == "scrobble") {
                         ScrobbleHubScreen(
-                            modifier = Modifier.padding(bottom = if (player.song != null) 180.dp else 120.dp),
+                            modifier = Modifier,
                             onPlay = { songs, index ->
                                 playFrom(songs, index, QueueSource("Scrobble", PlaybackSourceType.HISTORY))
                             },
@@ -3587,7 +3587,7 @@ private fun BitChordApp(
                         .graphicsLayer { alpha = topFadeAlpha },
                 )
 
-                FrostedTopBar(
+                if (!showScrobble)                 FrostedTopBar(
                     title = when {
                         showSpotify && detail == null -> stringResource(R.string.spotify)
                         showDiscord -> "Discord"
@@ -3956,6 +3956,7 @@ private fun BitChordApp(
                     },
                 )
 
+
                 // Drawn before the bars so their own glass reads on top of it.
                 BottomFadeScrim(
                     withMiniPlayer = player.song != null,
@@ -3999,6 +4000,7 @@ private fun BitChordApp(
                     }
                 }
 
+                if (!showScrobble) {
                 if (glassActive) Column(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
@@ -4081,11 +4083,12 @@ private fun BitChordApp(
                         onTabSelected = onTabSelected,
                     )
                 }
+                }
                 val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
                 val measuredBarsHeight = with(LocalDensity.current) { floatingBarsHeight.intValue.toDp() }
                 val fabBottom = (measuredBarsHeight.takeIf { it > 0.dp } ?: 72.dp) + 10.dp
                 ScrobbleFab(
-                    visible = scrobbleFabVisible(
+                    visible = !showScrobble && scrobbleFabVisible(
                         selectedTab = selectedTab,
                         homeTab = TAB_HOME,
                         overlayOpen = showSettings || showReplay || showHistory || showAccountScrobbling ||
