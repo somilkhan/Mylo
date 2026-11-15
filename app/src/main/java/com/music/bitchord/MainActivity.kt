@@ -2743,6 +2743,7 @@ private fun BitChordApp(
                     if (key == "scrobble") {
                         ScrobbleHubScreen(
                             modifier = Modifier,
+                            onBack = { showScrobble = false },
                             onPlay = { songs, index ->
                                 playFrom(songs, index, QueueSource("Scrobble", PlaybackSourceType.HISTORY))
                             },
