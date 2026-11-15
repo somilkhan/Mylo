@@ -4,6 +4,7 @@ import com.music.bitchord.data.ListeningHistory
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.model.LibraryPage
 import com.music.bitchord.data.model.SearchResult
+import kotlin.math.roundToInt
 
 /** YouTube's radio and artist catalogue endpoints require an 11-character video id. */
 private val YOUTUBE_VIDEO_ID = Regex("^[A-Za-z0-9_-]{11}$")
@@ -129,6 +130,42 @@ internal fun buildRediscoverMix(
  * discovery feed is available, but still rejects previously heard tracks and
  * alternate catalogue uploads by title/artist, not only by video ID.
  */
+/** Last.fm-only metadata used by LastWave's hidden-gem/community/match score. */
+internal data class LastWaveTrackSignals(
+    val listeners: Long? = null,
+    val playCount: Long? = null,
+    val match: Double? = null,
+    val album: String? = null,
+)
+
+private fun LastWaveTrackSignals.gemScore(): Int {
+    val count = listeners ?: return 0
+    return when {
+        count < 3_000 -> 4
+        count < 10_000 -> 7
+        count < 30_000 -> 9
+        count < 100_000 -> 6
+        count < 400_000 -> 2
+        count < 1_500_000 -> 0
+        else -> -2
+    }
+}
+
+private fun LastWaveTrackSignals.communityScore(): Int {
+    val listenerCount = listeners ?: return 0
+    val plays = playCount ?: return 0
+    if (listenerCount == 0L) return 0
+    val ratio = plays.toDouble() / listenerCount.toDouble()
+    return when {
+        ratio >= 6 -> 8
+        ratio >= 3 -> 5
+        ratio >= 1.5 -> 2
+        else -> 0
+    }
+}
+
+private fun Double?.orZero(): Double = this ?: 0.0
+
 internal fun buildDiscoverMix(
     candidates: List<Song>,
     heardVideoIds: Set<String>,
@@ -140,6 +177,7 @@ internal fun buildDiscoverMix(
     sourceCounts: Map<String, Int> = emptyMap(),
     sourceTags: Map<String, Set<String>> = emptyMap(),
     primaryGenreIdentities: Set<String> = emptySet(),
+    trackSignals: Map<String, LastWaveTrackSignals> = emptyMap(),
     limit: Int = 25,
 ): List<Song> {
     if (limit <= 0) return emptyList()
@@ -168,6 +206,7 @@ internal fun buildDiscoverMix(
         val key = recommendationIdentity(song)
         val artist = recommendationArtistKey(song.artist)
         val tags = sourceTags[key].orEmpty()
+        val signals = trackSignals[key] ?: LastWaveTrackSignals()
         val weight = sourceWeights[key] ?: 4
         val known = artist in top || artist in recent
         val base = when {
@@ -186,6 +225,9 @@ internal fun buildDiscoverMix(
             (if ("yt-recent" in tags) 4.0 else 0.0) +
             (if (key in primaryGenreIdentities) 4.0 else 0.0) +
             (when (sourceCounts[key] ?: 1) { in 3..Int.MAX_VALUE -> 20.0; 2 -> 10.0; else -> 0.0 }) +
+            signals.match?.let { (it * 34.0).roundToInt().toDouble() }.orZero() +
+            signals.gemScore() +
+            signals.communityScore() +
             6.0 // all candidates surviving strict heard filtering are fresh
         Triple(song, score, index)
     }.sortedWith(compareByDescending<Triple<Song, Double, Int>> { it.second }.thenBy { it.third })
@@ -198,7 +240,7 @@ internal fun buildDiscoverMix(
         for ((song, _, _) in scored) {
             val key = recommendationIdentity(song)
             val artist = recommendationArtistKey(song.artist)
-            val album = song.albumName?.trim()?.lowercase().orEmpty()
+            val album = (trackSignals[key]?.album ?: song.albumName)?.trim()?.lowercase().orEmpty()
             val genreTag = sourceTags[key].orEmpty().firstOrNull { it.startsWith("tag:") }
             if ((artistCounts[artist] ?: 0) >= artistCap) continue
             if (albumCapOn && album.isNotBlank() && (albumCounts[album] ?: 0) >= 2) continue
