@@ -70,6 +70,65 @@ class ScrobbleMixLogicTest {
     }
 
     @Test
+    fun tagMixKeepsOnlyPlayableSongRowsDeduplicatesAndHonoursLimit() {
+        val first = Song("abcdefghijk", "First", "Artist", null)
+        val duplicate = first.copy(title = "Duplicate title")
+        val second = Song("lmnopqrstuv", "Second", "Artist", null)
+        val invalid = Song("local-file", "Local", "Artist", null)
+        val browse = com.music.bitchord.data.model.BrowseItem(
+            browseId = "MPREb123",
+            title = "Album",
+            subtitle = "Artist",
+            thumbnailUrl = null,
+            type = com.music.bitchord.data.model.BrowseType.ALBUM,
+        )
+
+        val result = buildTagMix(
+            listOf(
+                SearchResult.Track(first),
+                SearchResult.TopTrack(duplicate),
+                SearchResult.Browse(browse),
+                SearchResult.Track(invalid),
+                SearchResult.Track(second),
+            ),
+            limit = 1,
+        )
+
+        assertEquals(listOf(first), result)
+    }
+
+    @Test
+    fun libraryMixMergesLikedAndAddedTracksWithoutDuplicates() {
+        val liked = Song("abcdefghijk", "Liked", "Artist", null)
+        val overlap = liked.copy(title = "Duplicate liked row")
+        val added = Song("lmnopqrstuv", "Added", "Artist", null)
+        val local = Song("content://media/1", "Local", "Artist", null)
+
+        val result = buildLibraryMix(
+            com.music.bitchord.data.model.LibraryPage(
+                likedSongs = listOf(liked, local),
+                librarySongs = listOf(overlap, added),
+                shelves = emptyList(),
+            ),
+        )
+
+        assertEquals(listOf(liked, added), result)
+    }
+
+    @Test
+    fun tagAndLibraryMixesReturnEmptyForZeroLimitOrNoPlayableTracks() {
+        val local = Song("content://media/1", "Local", "Artist", null)
+        val library = com.music.bitchord.data.model.LibraryPage(
+            likedSongs = listOf(local),
+            librarySongs = emptyList(),
+            shelves = emptyList(),
+        )
+
+        assertEquals(emptyList<Song>(), buildTagMix(emptyList(), limit = 0))
+        assertEquals(emptyList<Song>(), buildLibraryMix(library))
+    }
+
+    @Test
     fun neverHeardExcludesKnownTracksAndDuplicatesAndHonoursLimit() {
         val heard = Song("knowntrack01", "Already heard", "Artist", null)
         val fresh = Song("freshtrack01", "New track", "Artist", null)
