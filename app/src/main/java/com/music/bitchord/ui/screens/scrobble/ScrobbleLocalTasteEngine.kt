@@ -27,20 +27,21 @@ private const val MAX_TRACKS_PER_ARTIST = 3
  * YouTube Music radio endpoint for the related-song queues.
  */
 internal object ScrobbleLocalTasteEngine {
-    suspend fun discover(total: Int): List<Song> = withContext(Dispatchers.IO) {
+    suspend fun discover(
+        total: Int,
+        seedSongs: List<Song>? = null,
+        heardSongs: List<Song>? = null,
+    ): List<Song> = withContext(Dispatchers.IO) {
         if (total <= 0) return@withContext emptyList()
 
-        val local = runCatching { ListeningStats.summary(ReplayPeriod.ALL_TIME) }
-            .getOrElse { error ->
-                if (error is CancellationException) throw error
-                null
-            }
-        val history = safeSongs { YtMusicRepository.history() }
-        val recents = safeSongs { YtMusicRepository.recents() }
-        val liked = safeLibrary()?.likedSongs.orEmpty()
-        val heard = (local?.songs.orEmpty().map { it.song } + history + recents + liked)
+        val local = if (heardSongs == null) safeLocalSummary() else null
+        val history = if (heardSongs == null) safeSongs { YtMusicRepository.history() } else emptyList()
+        val recents = if (heardSongs == null) safeSongs { YtMusicRepository.recents() } else emptyList()
+        val liked = if (heardSongs == null) safeLibrary()?.likedSongs.orEmpty() else emptyList()
+        val heard = (heardSongs ?: (local?.songs.orEmpty().map { it.song } + history + recents + liked))
             .distinctScrobbleSongs()
-        val seeds = heard.filter { it.videoId.isNotBlank() }.take(RADIO_SEED_LIMIT)
+        val seeds = (seedSongs ?: heard).filter { it.videoId.isNotBlank() }
+            .distinctScrobbleSongs().take(RADIO_SEED_LIMIT)
 
         if (seeds.isEmpty()) {
             val quickPicks = safeSongs { YtMusicRepository.quickPicks() }
@@ -85,6 +86,14 @@ internal object ScrobbleLocalTasteEngine {
             heardSongs = heard + curated,
             total = total - curated.size,
         )
+    }
+
+    private suspend fun safeLocalSummary() = try {
+        ListeningStats.summary(ReplayPeriod.ALL_TIME)
+    } catch (cancellation: CancellationException) {
+        throw cancellation
+    } catch (_: Exception) {
+        null
     }
 
     private suspend fun safeLibrary() = try {

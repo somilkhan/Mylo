@@ -57,7 +57,7 @@ internal object ScrobbleRecommendationEngine {
     ): List<Song> = withTimeout(75_000L) {
         if (total <= 0) return@withTimeout emptyList()
         coroutineScope {
-            val localRadio = async { ScrobbleLocalTasteEngine.discover(total) }
+            val localRadio = async { ScrobbleLocalTasteEngine.discover(total, seeds, heardSongs) }
             onProgress("Building Last.fm discovery sources…")
             val sourced = if (profile == null) emptyList() else fetchSources(profile, seeds)
             onProgress("Matching recommendations to YouTube Music…")
@@ -90,10 +90,7 @@ internal object ScrobbleRecommendationEngine {
         }
     }
 
-    internal suspend fun resolveChartEntries(
-        entries: List<ScrobbleChartEntry>,
-        limit: Int,
-    ): List<Song> {
+    internal suspend fun resolveChartEntries(entries: List<ScrobbleChartEntry>, limit: Int): List<Song> {
         val sources = entries.map { SourcedTrack(it, "lastfm-chart", 1) }
         return resolvePlayable(mergeSources(sources).take(limit.coerceAtLeast(0)), {}).map { it.first }
     }
@@ -107,13 +104,9 @@ internal object ScrobbleRecommendationEngine {
         val sourced = fetchTrackSource(
             "track.getsimilar",
             mapOf("track" to seed.title, "artist" to seed.artist),
-            "similartracks",
-            "track",
-            "similar-track",
-            3,
+            "similartracks", "track", "similar-track", 3,
         )
-        val radio = safeRadio(seed)
-        return selectResolved(sourced, profile, listOf(seed), heardSongs, total, radio)
+        return selectResolved(sourced, profile, listOf(seed), heardSongs, total, safeRadio(seed))
     }
 
     internal suspend fun generateSimilarArtists(
@@ -125,12 +118,8 @@ internal object ScrobbleRecommendationEngine {
         val names = fetchSimilarArtists(artist).take(3)
         val sourced = parallel(names) { name ->
             fetchTrackSource(
-                "artist.gettoptracks",
-                mapOf("artist" to name),
-                "toptracks",
-                "track",
-                "similar-artist-top-tracks",
-                2,
+                "artist.gettoptracks", mapOf("artist" to name),
+                "toptracks", "track", "similar-artist-top-tracks", 2,
             )
         }.flatten()
         return selectResolved(sourced, profile, emptyList(), heardSongs, total, emptyList())
@@ -143,14 +132,8 @@ internal object ScrobbleRecommendationEngine {
         total: Int,
     ): List<Song> {
         val sourced = fetchTrackSource(
-            "tag.gettoptracks",
-            mapOf("tag" to tag),
-            "tracks",
-            "track",
-            "user-tag",
-            3,
-            genreTag = tag,
-            primaryGenre = true,
+            "tag.gettoptracks", mapOf("tag" to tag),
+            "tracks", "track", "user-tag", 3, genreTag = tag, primaryGenre = true,
         )
         return selectResolved(sourced, profile, emptyList(), heardSongs, total, emptyList())
     }
@@ -170,10 +153,7 @@ internal object ScrobbleRecommendationEngine {
             val fresh = isScrobbleFreshCandidate(song, heardSongs, profile?.tracks.orEmpty())
             val familiar = song.scrobbleIdentityKey in familiarKeys
             ScrobbleRecommendationCandidate(
-                song = song,
-                tags = candidate.tags,
-                fresh = fresh,
-                familiar = familiar,
+                song = song, tags = candidate.tags, fresh = fresh, familiar = familiar,
                 score = score(song, candidate, profile, seeds, fresh, familiar),
             )
         }
@@ -181,18 +161,14 @@ internal object ScrobbleRecommendationEngine {
             val fresh = isScrobbleFreshCandidate(song, heardSongs, profile?.tracks.orEmpty())
             val familiar = song.scrobbleIdentityKey in familiarKeys
             ScrobbleRecommendationCandidate(
-                song = song,
-                tags = setOf("source:youtube-radio"),
-                fresh = fresh,
-                familiar = familiar,
-                score = scoreLocal(song, profile, seeds, fresh, familiar),
+                song = song, tags = setOf("source:youtube-radio"), fresh = fresh,
+                familiar = familiar, score = scoreLocal(song, profile, seeds, fresh, familiar),
             )
         }
         val selected = ScrobbleRecommendationSelection.select(remote + local, total)
         val selectedKeys = selected.mapTo(HashSet()) { it.scrobbleIdentityKey }
         return (selected + radio.filter { it.scrobbleIdentityKey !in selectedKeys })
-            .distinctScrobbleSongs()
-            .take(total)
+            .distinctScrobbleSongs().take(total)
     }
 
     private suspend fun safeRadio(seed: Song): List<Song> = try {

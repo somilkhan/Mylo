@@ -23,10 +23,7 @@ internal enum class ScrobbleGenerateMode(val storageValue: String) {
     NEVER_HEARD("never-heard"),
 }
 
-/**
- * Mode orchestration for the LastWave Generator port. All modes return Mylo
- * Song values so the existing queue and playback pipeline remain authoritative.
- */
+/** LastWave generator mode orchestration adapted to Mylo's existing Song/playback APIs. */
 internal object ScrobbleGeneratorRepository {
     suspend fun generate(
         mode: ScrobbleGenerateMode,
@@ -47,33 +44,51 @@ internal object ScrobbleGeneratorRepository {
             .distinctScrobbleSongs()
         val seeds = heard.filter { it.videoId.isNotBlank() }.take(5)
         val username = AppSettings.lastfmUsername.value.trim()
-        val profile = loadProfile(username, period)
+
+        onProgress("Analyzing listening taste…")
+        val needsLastFm = mode in setOf(
+            ScrobbleGenerateMode.TOP,
+            ScrobbleGenerateMode.SIMILAR_TRACKS,
+            ScrobbleGenerateMode.SIMILAR_ARTISTS,
+            ScrobbleGenerateMode.TAG,
+            ScrobbleGenerateMode.RECOMMENDATIONS,
+            ScrobbleGenerateMode.NEVER_HEARD,
+        )
+        val profile = if (needsLastFm) loadProfile(username, period) else null
 
         when (mode) {
             ScrobbleGenerateMode.TOP -> {
-                val chart = profile?.tracks.orEmpty()
-                if (chart.isNotEmpty()) ScrobbleRecommendationEngine.resolveChartEntries(chart, target)
-                else local?.songs.orEmpty().map { it.song }.take(target)
+                val chartSongs = ScrobbleRecommendationEngine.resolveChartEntries(
+                    profile?.tracks.orEmpty(), target,
+                )
+                chartSongs.ifEmpty {
+                    local?.songs.orEmpty().map { it.song }.ifEmpty {
+                        safeSongs { YtMusicRepository.quickPicks() }
+                    }
+                }.take(target)
             }
             ScrobbleGenerateMode.LIBRARY -> (liked + library?.librarySongs.orEmpty())
-                .distinctScrobbleSongs().take(target)
+                .distinctScrobbleSongs().ifEmpty { local?.songs.orEmpty().map { it.song } }.take(target)
             ScrobbleGenerateMode.RECENT -> (history + recents)
-                .distinctScrobbleSongs().take(target)
+                .distinctScrobbleSongs().ifEmpty { local?.songs.orEmpty().map { it.song } }.take(target)
             ScrobbleGenerateMode.SIMILAR_TRACKS -> {
                 val seed = requireNotNull(seedTrack) { "Choose a track to find similar songs" }
                 ScrobbleRecommendationEngine.generateSimilarTracks(seed, profile, heard, target)
+                    .ifEmpty { ScrobbleLocalTasteEngine.discover(target, seeds, heard) }
             }
             ScrobbleGenerateMode.SIMILAR_ARTISTS -> {
                 require(seedArtist.isNotBlank()) { "Enter an artist to find similar artists" }
                 ScrobbleRecommendationEngine.generateSimilarArtists(seedArtist.trim(), profile, heard, target)
+                    .ifEmpty { ScrobbleLocalTasteEngine.discover(target, seeds, heard) }
             }
             ScrobbleGenerateMode.TAG -> {
                 require(tagInput.isNotBlank()) { "Enter a genre or tag" }
                 ScrobbleRecommendationEngine.generateTagTracks(tagInput.trim(), profile, heard, target)
+                    .ifEmpty { ScrobbleLocalTasteEngine.discover(target, seeds, heard) }
             }
             ScrobbleGenerateMode.MIX -> {
                 onProgress("Building a mix from your listening taste…")
-                ScrobbleLocalTasteEngine.discover(target)
+                ScrobbleLocalTasteEngine.discover(target, seeds, heard)
             }
             ScrobbleGenerateMode.RECOMMENDATIONS,
             ScrobbleGenerateMode.NEVER_HEARD -> ScrobbleRecommendationEngine.generate(
