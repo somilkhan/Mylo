@@ -123,11 +123,12 @@ class ScrobbleStatsLogicTest {
         val result = buildCombinedFavouriteTracks(
             local = listOf(
                 RankedSong(localShared, ms = 900_000L, plays = 4),
+                RankedSong(localShared.copy(videoId = "anotherid001"), ms = 100_000L, plays = 2),
                 RankedSong(localOnly, ms = 600_000L, plays = 5),
             ),
             synced = listOf(
-                SyncedHistoryTrack(shared, plays = 6),
-                SyncedHistoryTrack(remoteOnly, plays = 3),
+                SyncedHistoryTrack(shared, plays = 3),
+                SyncedHistoryTrack(remoteOnly, plays = 4),
             ),
         )
 
