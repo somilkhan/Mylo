@@ -108,7 +108,6 @@ import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.stats.ListeningStats
 import com.music.bitchord.data.stats.ReplayPeriod
 import com.music.bitchord.data.stats.ReplaySummary
-import com.music.bitchord.data.stats.RankedSong
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -1377,7 +1376,7 @@ fun ScrobbleScreen(
                                 onClick = { generationRequest++ },
                                 enabled = !generatingMix && !loadingHistory &&
                                     (mixMode !in setOf(ScrobbleMixMode.TASTE_MIX, ScrobbleMixMode.DISCOVER) || !loadingRecommendations) &&
-                                    (mixMode !in setOf(ScrobbleMixMode.FAVOURITES, ScrobbleMixMode.TASTE_MIX) || !loadingGenerationTopTracks) &&
+                                    (mixMode !in setOf(ScrobbleMixMode.FAVOURITES, ScrobbleMixMode.TASTE_MIX, ScrobbleMixMode.DISCOVER, ScrobbleMixMode.NEVER_HEARD) || !loadingGenerationTopTracks) &&
                                     (mixMode != ScrobbleMixMode.FAVOURITES || (!generationTopTracksFailed && generationTopTracks.isNotEmpty())) &&
                                     (mixMode != ScrobbleMixMode.TAG || tagQuery.isNotBlank()) &&
                                     (mixMode != ScrobbleMixMode.SIMILAR_ARTISTS || lastFmDiscoveryAvailable) &&
