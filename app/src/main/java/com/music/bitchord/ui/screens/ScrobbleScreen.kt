@@ -1226,33 +1226,46 @@ private fun playlistSharedElementKey(songs: List<Song>): String =
 private fun ArtworkMosaic(songs: List<Song>, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(18.dp)
     val covers = songs.take(4)
-    if (covers.isEmpty()) {
-        Box(
+    when (covers.size) {
+        0 -> Box(
             modifier.clip(shape).background(MaterialTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center,
         ) {
             Icon(Icons.Rounded.GraphicEq, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp))
         }
-    } else {
-        Row(modifier.clip(shape), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-            val left = covers.take(2)
-            Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                left.forEach { song ->
-                    AsyncImage(model = song.thumbnailUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.weight(1f).fillMaxWidth())
-                }
-                if (left.size == 1) Spacer(Modifier.weight(1f))
+        1 -> AsyncImage(
+            model = covers.first().thumbnailUrl,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = modifier.clip(shape),
+        )
+        2 -> Row(modifier.clip(shape), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+            covers.forEach { song ->
+                AsyncImage(
+                    model = song.thumbnailUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                )
             }
-            val right = covers.drop(2).take(2)
-            Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                right.forEach { song ->
-                    AsyncImage(model = song.thumbnailUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.weight(1f).fillMaxWidth())
+        }
+        else -> Row(modifier.clip(shape), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+            listOf(covers.take(2), covers.drop(2)).forEach { columnSongs ->
+                Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    columnSongs.forEach { song ->
+                        AsyncImage(
+                            model = song.thumbnailUrl,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.weight(1f).fillMaxWidth(),
+                        )
+                    }
+                    if (columnSongs.size == 1) Spacer(Modifier.weight(1f))
                 }
-                if (right.size < 2) Spacer(Modifier.weight((2 - right.size).toFloat()))
             }
         }
     }
 }
-
 private fun formatListeningTime(totalMs: Long): String {
     val totalMinutes = totalMs / 60_000
     val hours = totalMinutes / 60
