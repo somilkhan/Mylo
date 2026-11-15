@@ -117,7 +117,7 @@ internal fun buildYouTubeFirstMix(
         }
         if (lastFmIndex < lastFmTracks.size && result.size < limit) {
             val track = lastFmTracks[lastFmIndex++]
-            if (seen.add(songIdentity(track))) result += track
+            if (seen.add(recommendationIdentity(track))) result += track
         }
     }
     return result
@@ -320,6 +320,7 @@ internal fun buildNeverHeardMix(
     limit: Int = 25,
 ): List<Song> = candidates.asSequence()
     .filter { it.videoId.isNotBlank() && it.videoId !in heardVideoIds }
-    .distinctBy(::songIdentity)
+    .filter { it.title.isNotBlank() && it.artist.isNotBlank() }
+    .distinctBy(::recommendationIdentity)
     .take(limit.coerceAtLeast(0))
     .toList()
