@@ -315,6 +315,6 @@ internal fun buildNeverHeardMix(
     candidates: List<Song>,
     heardVideoIds: Set<String>,
     limit: Int = 25,
-): List<Song> = distinctRecommendationSongs(candidates.filter { it.videoId !in heardVideoIds })
-    .filter(::isYouTubeCatalogTrack)
-    .take(limit.coerceAtLeast(0))
+): List<Song> = distinctRecommendationSongs(
+    candidates.filter { it.videoId !in heardVideoIds && isYouTubeCatalogTrack(it) },
+).take(limit.coerceAtLeast(0))
