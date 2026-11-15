@@ -153,7 +153,7 @@ class ScrobbleMixLogicTest {
     fun tagMixKeepsOnlyPlayableSongRowsDeduplicatesAndHonoursLimit() {
         val first = Song("abcdefghijk", "First", "Artist", null)
         val duplicate = first.copy(title = "Duplicate title")
-        val alternateUpload = first.copy(videoId = "alternate001")
+        val alternateUpload = first.copy(videoId = "alttrack001")
         val second = Song("lmnopqrstuv", "Second", "Artist", null)
         val invalid = Song("local-file", "Local", "Artist", null)
         val browse = com.music.bitchord.data.model.BrowseItem(
@@ -282,8 +282,8 @@ class ScrobbleMixLogicTest {
 
     @Test
     fun neverHeardExcludesKnownTracksAndDuplicatesAndHonoursLimit() {
-        val heard = Song("knowntrack01", "Already heard", "Artist", null)
-        val fresh = Song("freshtrack01", "New track", "Artist", null)
+        val heard = Song("knowntrk001", "Already heard", "Artist", null)
+        val fresh = Song("freshtrk001", "New track", "Artist", null)
         val duplicate = fresh.copy(title = "Duplicate row")
         val blankId = Song("", "Local-only", "Artist", null)
 
@@ -298,8 +298,8 @@ class ScrobbleMixLogicTest {
 
     @Test
     fun neverHeardReturnsNoMoreThanRequestedAndZeroLimitIsEmpty() {
-        val first = Song("freshtrack01", "First", "Artist", null)
-        val second = Song("freshtrack02", "Second", "Artist", null)
+        val first = Song("freshtrk001", "First", "Artist", null)
+        val second = Song("freshtrk002", "Second", "Artist", null)
 
         assertEquals(listOf(first), buildNeverHeardMix(listOf(first, second), emptySet(), limit = 1))
         assertEquals(emptyList<Song>(), buildNeverHeardMix(listOf(first), emptySet(), limit = 0))
