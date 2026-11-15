@@ -229,12 +229,12 @@ class ScrobbleMixLogicTest {
 
     @Test
     fun tasteMixUsesWeightedSourcesAndDeduplicatesByTrackIdentity() {
-        val favouriteOne = Song("favourite001", "Favourite one", "Artist", null)
-        val favouriteTwo = Song("favourite002", "Favourite two", "Artist", null)
-        val favouriteThree = Song("favourite003", "Favourite three", "Artist", null)
-        val recentOne = Song("recent00001", "Recent one", "Artist", null)
-        val recentTwo = Song("recent00002", "Recent two", "Artist", null)
-        val freshOne = Song("fresh000001", "Fresh one", "Artist", null)
+        val favouriteOne = Song("favourite001", "Favourite one", "Favourite Artist", null)
+        val favouriteTwo = Song("favourite002", "Favourite two", "Favourite Artist", null)
+        val favouriteThree = Song("favourite003", "Favourite three", "Favourite Artist", null)
+        val recentOne = Song("recent00001", "Recent one", "Recent Artist", null)
+        val recentTwo = Song("recent00002", "Recent two", "Recent Artist", null)
+        val freshOne = Song("fresh000001", "Fresh one", "Fresh Artist", null)
 
         val result = buildTasteMix(
             favourites = listOf(favouriteOne, favouriteTwo, favouriteThree),
@@ -247,6 +247,25 @@ class ScrobbleMixLogicTest {
             listOf(favouriteOne, favouriteTwo, recentOne, recentTwo, freshOne),
             result,
         )
+    }
+
+    @Test
+    fun precheckRejectsIncompleteRowsDeduplicatesAndCapsThreePerArtist() {
+        val sameArtist = listOf(
+            Song("artisttrack01", "One", "Artist", null),
+            Song("artisttrack02", "Two", "Artist", null),
+            Song("artisttrack03", "Three", "Artist", null),
+            Song("artisttrack04", "Four", "Artist", null),
+        )
+        val other = Song("othertrack01", "Other", "Other Artist", null)
+        val duplicate = sameArtist.first().copy(title = "Duplicate")
+        val incomplete = Song("incomplete01", "", "Unknown", null)
+
+        assertEquals(
+            listOf(sameArtist[0], sameArtist[1], sameArtist[2], other),
+            buildPrecheckedMix(sameArtist + duplicate + incomplete + other),
+        )
+        assertEquals(emptyList<Song>(), buildPrecheckedMix(sameArtist, limit = 0))
     }
 
     @Test
