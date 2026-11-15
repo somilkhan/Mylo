@@ -80,6 +80,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -223,7 +224,7 @@ fun ScrobbleScreen(
     var coverEditorPlaylist by remember { mutableStateOf<String?>(null) }
     var coverPickerPlaylist by remember { mutableStateOf<String?>(null) }
     var generatingSimilarPlaylist by remember { mutableStateOf<String?>(null) }
-    val exportScope = workScope
+    val exportScope = rememberCoroutineScope()
     fun releaseCoverPermission(uri: String?) {
         if (!uri.isNullOrBlank()) {
             runCatching {
@@ -433,7 +434,7 @@ fun ScrobbleScreen(
         } else if (seeds.isEmpty()) {
             Toast.makeText(context, "This playlist has no playable YouTube Music seed tracks", Toast.LENGTH_SHORT).show()
         } else {
-            exportScope.launch {
+            workScope.launch {
                 generatingSimilarPlaylist = playlist.title
                 try {
                     val generated = withTimeout(SCROBBLE_GENERATION_TIMEOUT_MS) {
