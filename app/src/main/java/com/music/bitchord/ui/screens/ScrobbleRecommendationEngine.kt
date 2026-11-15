@@ -180,7 +180,7 @@ internal object ScrobbleRecommendationEngine {
         val uniqueLastFm = lastFmTracks
             .groupBy { "${it.track.name.trim().lowercase()}|${it.track.artist.trim().lowercase()}" }
             .values
-            .take((limit * 2).coerceIn(12, 30))
+            .take((limit * 2).coerceIn(12, 24))
             .map { rows -> rows.first().track to rows }
         val resolverSlots = Semaphore(4)
         onProgress("Matching discoveries to playable YouTube Music tracks…")
