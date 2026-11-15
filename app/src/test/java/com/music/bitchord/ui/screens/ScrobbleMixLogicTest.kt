@@ -302,7 +302,7 @@ class ScrobbleMixLogicTest {
         val seedOne = Song("seedtrk0001", "Seed song", "Seed Artist", null)
         val seedTwo = Song("seedtrk0002", "Another seed song", "Seed Artist feat. Guest", null)
         val relatedA1 = Song("relAtrack01", "A one", "Related A", null)
-        val relatedA2 = Song("relAtrack02", "A two", "Related A", null)
+        val relatedA2 = Song("relAtrack02", "A two", "Related A feat. Guest", null)
         val relatedA3 = Song("relAtrack03", "A three", "Related A", null)
         val relatedB1 = Song("relBtrack01", "B one", "Related B", null)
         val relatedB2 = Song("relBtrack02", "B two", "Related B", null)
@@ -317,7 +317,7 @@ class ScrobbleMixLogicTest {
 
         assertEquals(4, result.size)
         assertTrue(result.none { it.artist.startsWith("Seed Artist") })
-        assertEquals(2, result.count { it.artist == "Related A" })
+        assertEquals(2, result.count { com.music.bitchord.data.stats.ListeningStats.primaryArtist(it.artist) == "Related A" })
         assertEquals(2, result.count { it.artist == "Related B" })
     }
 
