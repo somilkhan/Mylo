@@ -96,6 +96,30 @@ class ScrobblePlaylistStoreTest {
     }
 
     @Test
+    fun pinnedStateRoundTripsAndCanBeToggledWithoutChangingTracks() {
+        val song = Song("abcdefghijk", "Track", "Artist", null)
+        val original = SavedScrobblePlaylist("Pinned mix", "Reason", listOf(song), pinned = true)
+
+        val restored = ScrobblePlaylistCodec.decodeOrNull(
+            ScrobblePlaylistCodec.encode(listOf(original)),
+        ).orEmpty().single()
+
+        assertEquals(true, restored.pinned)
+        assertEquals(listOf(song), restored.songs)
+
+        ScrobblePlaylistStore.playlists.clear()
+        try {
+            ScrobblePlaylistStore.playlists.add(restored)
+            assertEquals(true, ScrobblePlaylistStore.setPinned("Pinned mix", false))
+            assertEquals(false, ScrobblePlaylistStore.playlists.single().pinned)
+            assertEquals(listOf(song), ScrobblePlaylistStore.playlists.single().songs)
+            assertEquals(false, ScrobblePlaylistStore.setPinned("Missing", true))
+        } finally {
+            ScrobblePlaylistStore.playlists.clear()
+        }
+    }
+
+    @Test
     fun removingTrackOnlyChangesTheTargetPlaylistSnapshot() {
         val first = Song("abcdefghijk", "First", "Artist", null)
         val second = Song("lmnopqrstuv", "Second", "Artist", null)
