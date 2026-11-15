@@ -177,6 +177,11 @@ fun ScrobbleScreen(
     var recommendationRequest by remember { mutableIntStateOf(0) }
     var mixMode by remember { mutableStateOf(ScrobbleMixMode.FAVOURITES) }
     var selectedSeed by remember { mutableStateOf<Song?>(null) }
+    var seedSearchQuery by remember { mutableStateOf("") }
+    var seedSearchResults by remember { mutableStateOf<List<Song>>(emptyList()) }
+    var seedSearchLoading by remember { mutableStateOf(false) }
+    var seedSearchError by remember { mutableStateOf<String?>(null) }
+    var seedSearchRequest by remember { mutableIntStateOf(0) }
     var tagQuery by remember { mutableStateOf("") }
     var mixTrackCount by remember { mutableIntStateOf(20) }
     var generationRequest by remember { mutableIntStateOf(0) }
@@ -312,6 +317,32 @@ fun ScrobbleScreen(
 
     LaunchedEffect(recentTracks, topTracks) {
         if (selectedSeed == null) selectedSeed = (recentTracks + topTracks).firstOrNull(::isYouTubeCatalogTrack)
+    }
+
+    LaunchedEffect(seedSearchRequest) {
+        if (seedSearchRequest == 0 || seedSearchQuery.isBlank()) return@LaunchedEffect
+        val query = seedSearchQuery.trim()
+        seedSearchLoading = true
+        seedSearchError = null
+        seedSearchResults = emptyList()
+        try {
+            val results = withTimeout(SCROBBLE_GENERATION_TIMEOUT_MS) {
+                YtMusicRepository.search(query, SearchFilter.SONGS).getOrThrow()
+            }
+            val tracks = buildTagMix(results, limit = 12)
+            if (seedSearchQuery.trim() == query) {
+                seedSearchResults = tracks
+                if (tracks.isEmpty()) seedSearchError = "No playable tracks found. Try another search."
+            }
+        } catch (_: TimeoutCancellationException) {
+            if (seedSearchQuery.trim() == query) seedSearchError = "Search timed out. Check your connection and try again."
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            if (seedSearchQuery.trim() == query) seedSearchError = error.message ?: "Couldn't search YouTube Music."
+        } finally {
+            seedSearchLoading = false
+        }
     }
 
     LaunchedEffect(generationRequest) {
@@ -818,12 +849,66 @@ fun ScrobbleScreen(
                             item("generate-seed") {
                                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                     Text(if (mixMode == ScrobbleMixMode.RADIO) "Choose a starting track" else "Choose an artist", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                                    OutlinedTextField(
+                                        value = seedSearchQuery,
+                                        onValueChange = {
+                                            seedSearchQuery = it
+                                            seedSearchResults = emptyList()
+                                            seedSearchError = null
+                                        },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        singleLine = true,
+                                        enabled = !generatingMix && !seedSearchLoading,
+                                        label = { Text(if (mixMode == ScrobbleMixMode.RADIO) "Search tracks" else "Search an artist's tracks") },
+                                        placeholder = { Text("Track or artist name") },
+                                        trailingIcon = {
+                                            IconButton(
+                                                onClick = { seedSearchRequest++ },
+                                                enabled = seedSearchQuery.isNotBlank() && !generatingMix && !seedSearchLoading,
+                                            ) { Icon(Icons.Rounded.Search, contentDescription = "Search YouTube Music") }
+                                        },
+                                        shape = RoundedCornerShape(16.dp),
+                                    )
+                                    if (seedSearchLoading) {
+                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                                            Text("Searching YouTube Music…", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                    }
+                                    seedSearchError?.let { message ->
+                                        Text(message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                                    }
+                                    seedSearchResults.forEach { song ->
+                                        val seedSelected = selectedSeed?.videoId == song.videoId
+                                        Row(
+                                            Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
+                                                .background(if (seedSelected) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.background)
+                                                .border(1.dp, if (seedSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.62f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.24f), RoundedCornerShape(14.dp))
+                                                .semantics { selected = seedSelected }
+                                                .clickable(enabled = !generatingMix, role = Role.RadioButton) {
+                                                    selectedSeed = song
+                                                    generatedMix = emptyList()
+                                                    generationError = null
+                                                    mixSaved = false
+                                                }
+                                                .padding(8.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                        ) {
+                                            AsyncImage(model = song.thumbnailUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(44.dp).clip(RoundedCornerShape(10.dp)))
+                                            Spacer(Modifier.width(10.dp))
+                                            Column(Modifier.weight(1f)) {
+                                                Text(song.title, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Medium)
+                                                Text(song.artist, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            }
+                                            if (seedSelected) Text("Selected", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                                        }
+                                    }
                                     val seeds = (recentTracks + topTracks).filter(::isYouTubeCatalogTrack).distinctBy(::songIdentity).take(12)
                                     if (seeds.isEmpty()) {
                                         if (mixMode == ScrobbleMixMode.RADIO) {
-                                            EmptyPanel("No radio seed yet", "Play or sync a YouTube Music track first. Local-only files cannot start YouTube Music radio.")
+                                            EmptyPanel("No radio seed yet", "Search YouTube Music above to choose a track, even if your listening history is empty.")
                                         } else {
-                                            EmptyPanel("No artist seed yet", "Play or sync a track by the artist you want to explore. Local-only files cannot look up an artist catalogue.")
+                                            EmptyPanel("No artist seed yet", "Search for a track by the artist you want to explore, then select it above.")
                                         }
                                     } else {
                                         seeds.forEach { song ->
