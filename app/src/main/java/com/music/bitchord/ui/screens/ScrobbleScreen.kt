@@ -1631,8 +1631,19 @@ fun ScrobbleScreen(
                                     }
                                     when {
                                         loadingGenerationTopTracks -> LoadingLine("Loading your top tracks")
-                                        generationTopTracksFailed -> EmptyPanel("Couldn't load top tracks", "Check your listening statistics and try again.")
-                                        generationTopTracks.isEmpty() -> EmptyPanel("No top tracks yet", "Listen to a few tracks on this device, then build a favourites mix.")
+                                        generationTopPeriod == ScrobbleTopPeriod.ALL_TIME &&
+                                            generationTopTracks.isEmpty() && syncedStats.topTracks.isNotEmpty() -> InfoPanel(
+                                                "Using synced YouTube Music history",
+                                                "Your account listening history is supplying this all-time favourites mix.",
+                                            )
+                                        generationTopTracksFailed && syncedStats.topTracks.isEmpty() -> EmptyPanel(
+                                            "Couldn't load top tracks",
+                                            "Check your listening statistics and try again.",
+                                        )
+                                        generationTopTracks.isEmpty() && syncedStats.topTracks.isEmpty() -> EmptyPanel(
+                                            "No top tracks yet",
+                                            "Listen to a few tracks in Mylo or sync YouTube Music listening history, then build a favourites mix.",
+                                        )
                                     }
                                 }
                             }
