@@ -85,6 +85,42 @@ internal fun buildLibraryMix(
     .take(limit.coerceAtLeast(0))
     .toList()
 
+/**
+ * Weighted, deterministic blend for the Taste mix. Favourites and recent
+ * listening remain the primary sources; discovery fills the remaining space.
+ * A track appearing in multiple sources is attributed to its highest-priority
+ * source and can never occupy two queue positions.
+ */
+internal fun buildTasteMix(
+    favourites: List<Song>,
+    recent: List<Song>,
+    fresh: List<Song>,
+    limit: Int = 20,
+): List<Song> {
+    if (limit <= 0) return emptyList()
+
+    val seen = mutableSetOf<String>()
+    val pools = listOf(favourites, recent, fresh).map { source ->
+        source.filter { seen.add(songIdentity(it)) }
+    }
+    val weights = intArrayOf(2, 2, 1)
+    val positions = IntArray(pools.size)
+    val result = ArrayList<Song>(limit)
+
+    while (result.size < limit) {
+        var added = false
+        pools.indices.forEach { sourceIndex ->
+            repeat(weights[sourceIndex]) {
+                val next = pools[sourceIndex].getOrNull(positions[sourceIndex]++) ?: return@repeat
+                result += next
+                added = true
+            }
+        }
+        if (!added) break
+    }
+    return result
+}
+
 /** Only catalogue tracks absent from the supplied listening history qualify as new-to-you. */
 internal fun buildNeverHeardMix(
     candidates: List<Song>,
