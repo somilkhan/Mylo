@@ -15,6 +15,7 @@ internal data class SavedScrobblePlaylist(
     val title: String,
     val reason: String,
     val songs: List<Song>,
+    val coverUri: String? = null,
 )
 
 /**
@@ -89,8 +90,24 @@ internal object ScrobblePlaylistStore {
         return true
     }
 
-    fun remove(title: String) {
-        if (playlists.removeAll { it.title == title }) persist()
+    /** Removes one saved mix and returns its persisted cover URI for permission cleanup. */
+    fun remove(title: String): String? {
+        val index = playlists.indexOfFirst { it.title == title }
+        if (index < 0) return null
+        val removed = playlists.removeAt(index)
+        persist()
+        return removed.coverUri
+    }
+
+    /** Updates only the custom artwork; track snapshots and their order remain untouched. */
+    fun setCover(title: String, uri: String?): String? {
+        val index = playlists.indexOfFirst { it.title == title }
+        if (index < 0) return null
+        val existing = playlists[index]
+        if (existing.coverUri == uri) return null
+        playlists[index] = existing.copy(coverUri = uri)
+        persist()
+        return existing.coverUri
     }
 
     private fun persist() {
@@ -117,6 +134,7 @@ internal object ScrobblePlaylistCodec {
         val title: String,
         val reason: String,
         val songs: List<SongRecord>,
+        val coverUri: String? = null,
     )
 
     @Serializable
@@ -170,6 +188,7 @@ internal object ScrobblePlaylistCodec {
                 title = playlist.title,
                 reason = playlist.reason,
                 songs = playlist.songs.map { it.toSong() },
+                coverUri = playlist.coverUri,
             )
         }.filter { it.title.isNotBlank() && it.songs.isNotEmpty() }
     }.getOrNull()
