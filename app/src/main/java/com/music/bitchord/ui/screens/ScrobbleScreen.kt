@@ -876,7 +876,7 @@ fun ScrobbleScreen(
                                                         .clickable(role = Role.Button) { openedPlaylist = playlist.title },
                                                     verticalAlignment = Alignment.CenterVertically,
                                                 ) {
-                                                    ArtworkMosaic(
+                                                                                                ArtworkMosaic(
             songs = listOf(song),
             modifier = Modifier.size(48.dp),
         )
