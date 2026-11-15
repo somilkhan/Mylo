@@ -1597,34 +1597,33 @@ private fun ArtworkMosaic(songs: List<Song>, modifier: Modifier = Modifier) {
             modifier.clip(shape).background(MaterialTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(Icons.Rounded.GraphicEq, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp))
+            Icon(
+                Icons.Rounded.GraphicEq,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(28.dp),
+            )
         }
-        1 -> AsyncImage(
-            model = covers.first().thumbnailUrl,
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = modifier.clip(shape),
-        )
-        2 -> Row(modifier.clip(shape), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+        1 -> ArtworkTile(covers.first(), modifier.clip(shape))
+        2 -> Row(
+            modifier.clip(shape),
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
             covers.forEach { song ->
-                AsyncImage(
-                    model = song.thumbnailUrl,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.weight(1f).fillMaxHeight(),
-                )
+                ArtworkTile(song, Modifier.weight(1f).fillMaxHeight())
             }
         }
-        else -> Row(modifier.clip(shape), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+        else -> Row(
+            modifier.clip(shape),
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
             listOf(covers.take(2), covers.drop(2)).forEach { columnSongs ->
-                Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Column(
+                    Modifier.weight(1f).fillMaxHeight(),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
                     columnSongs.forEach { song ->
-                        AsyncImage(
-                            model = song.thumbnailUrl,
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.weight(1f).fillMaxWidth(),
-                        )
+                        ArtworkTile(song, Modifier.weight(1f).fillMaxWidth())
                     }
                     if (columnSongs.size == 1) Spacer(Modifier.weight(1f))
                 }
@@ -1632,6 +1631,32 @@ private fun ArtworkMosaic(songs: List<Song>, modifier: Modifier = Modifier) {
         }
     }
 }
+
+@Composable
+private fun ArtworkTile(song: Song, modifier: Modifier = Modifier) {
+    val artwork = song.thumbnailUrl?.takeIf(String::isNotBlank)
+    if (artwork == null) {
+        Box(
+            modifier.background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Rounded.GraphicEq,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+                modifier = Modifier.size(22.dp),
+            )
+        }
+    } else {
+        AsyncImage(
+            model = artwork,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = modifier,
+        )
+    }
+}
+
 private fun formatStatsDay(day: String): String = runCatching {
     java.time.LocalDate.parse(day).format(
         java.time.format.DateTimeFormatter.ofPattern("EEE, d MMM", java.util.Locale.getDefault()),
