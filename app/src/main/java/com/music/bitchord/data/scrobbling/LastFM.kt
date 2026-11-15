@@ -14,9 +14,61 @@ import io.ktor.http.isSuccess
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.coroutines.CancellationException
 import java.net.URI
 import java.security.MessageDigest
 import java.util.Locale
+
+internal fun parseLastFmSimilarArtists(response: String, limit: Int = 8): List<String> {
+    if (limit <= 0) return emptyList()
+    val root = Json.parseToJsonElement(response) as? JsonObject ?: return emptyList()
+    val similarArtists = root["similarartists"] as? JsonObject ?: return emptyList()
+    val rawArtists = similarArtists["artist"] ?: return emptyList()
+    val entries = when (rawArtists) {
+        is JsonArray -> rawArtists
+        is JsonObject -> listOf(rawArtists)
+        else -> emptyList()
+    }
+    return entries.mapNotNull { element ->
+        val artist = element as? JsonObject ?: return@mapNotNull null
+        (artist["name"] as? JsonPrimitive)?.contentOrNull?.trim()
+    }
+        .filter(String::isNotBlank)
+        .distinctBy { it.lowercase(Locale.ROOT) }
+        .take(limit.coerceAtMost(20))
+}
+
+internal fun parseLastFmTagTracks(
+    response: String,
+    limit: Int = 12,
+): List<LastFM.DiscoveryTrack> {
+    if (limit <= 0) return emptyList()
+    val root = Json.parseToJsonElement(response) as? JsonObject ?: return emptyList()
+    val tracks = root["tracks"] as? JsonObject ?: return emptyList()
+    val rawTracks = tracks["track"] ?: return emptyList()
+    val entries = when (rawTracks) {
+        is JsonArray -> rawTracks
+        is JsonObject -> listOf(rawTracks)
+        else -> emptyList()
+    }
+    return entries.mapNotNull { element ->
+        val track = element as? JsonObject ?: return@mapNotNull null
+        val name = (track["name"] as? JsonPrimitive)?.contentOrNull?.trim().orEmpty()
+        val artistElement = track["artist"]
+        val artist = when (artistElement) {
+            is JsonObject -> (artistElement["name"] as? JsonPrimitive)?.contentOrNull?.trim().orEmpty()
+            is JsonPrimitive -> artistElement.contentOrNull?.trim().orEmpty()
+            else -> ""
+        }
+        if (name.isBlank() || artist.isBlank()) null else LastFM.DiscoveryTrack(name, artist)
+    }
+        .distinctBy { "${it.name.lowercase(Locale.ROOT)}|${it.artist.lowercase(Locale.ROOT)}" }
+        .take(limit.coerceAtMost(50))
+}
 
 object LastFM {
     const val DEFAULT_API_ENDPOINT = "https://ws.audioscrobbler.com/2.0/"
@@ -190,6 +242,43 @@ object LastFM {
                 },
         )
     }
+
+    data class DiscoveryTrack(val name: String, val artist: String)
+
+    /** Public Last.fm discovery endpoint; does not require a user session. */
+    suspend fun getSimilarArtists(artist: String, limit: Int = 8): Result<List<String>> =
+        discoveryResult {
+            require(isInitialized()) { "Last.fm API credentials are not configured for this build" }
+            val cleanArtist = artist.trim()
+            require(cleanArtist.isNotBlank()) { "Choose an artist first" }
+            val response = postAndRead(
+                method = "artist.getsimilar",
+                extra = mapOf("artist" to cleanArtist, "limit" to limit.coerceIn(1, 20).toString()),
+            )
+            parseLastFmSimilarArtists(response, limit)
+        }
+
+    /** Public Last.fm tag chart; results are later resolved to playable YouTube Music tracks. */
+    suspend fun getTagTopTracks(tag: String, limit: Int = 12): Result<List<DiscoveryTrack>> =
+        discoveryResult {
+            require(isInitialized()) { "Last.fm API credentials are not configured for this build" }
+            val cleanTag = tag.trim()
+            require(cleanTag.isNotBlank()) { "Enter a genre or tag first" }
+            val response = postAndRead(
+                method = "tag.gettoptracks",
+                extra = mapOf("tag" to cleanTag, "limit" to limit.coerceIn(1, 50).toString()),
+            )
+            parseLastFmTagTracks(response, limit)
+        }
+
+    private suspend fun <T> discoveryResult(block: suspend () -> T): Result<T> =
+        try {
+            Result.success(block())
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            Result.failure(error)
+        }
 
     fun initialize(
         apiKey: String,
