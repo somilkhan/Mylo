@@ -1092,84 +1092,98 @@ private fun StatsOverviewCard(
     topTracks: List<Song>,
     reduceMotion: Boolean,
 ) {
-    val shape = RoundedCornerShape(26.dp)
-    Card(
-        modifier = Modifier.fillMaxWidth().border(
-            width = 1.dp,
-            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.34f),
-            shape = shape,
-        ),
-        shape = shape,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.78f),
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+    val shape = RoundedCornerShape(28.dp)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.62f))
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.26f),
+                shape = shape,
+            )
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(18.dp),
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(7.dp),
+                Box(
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
                 ) {
                     Text(
                         "LISTENING TIME",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.25.sp,
-                    )
-                    AnimatedValueText(
-                        value = summary.totalMs / 60_000L,
-                        reduceMotion = reduceMotion,
-                        style = MaterialTheme.typography.headlineLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        formatter = { formatListeningTime(it * 60_000L) },
-                    )
-                    Text(
-                        summary.label,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        letterSpacing = 1.05.sp,
                     )
                 }
-                ArtworkMosaic(
-                    songs = topTracks.take(4),
-                    modifier = Modifier.size(82.dp),
+                AnimatedValueText(
+                    value = summary.totalMs / 60_000L,
+                    reduceMotion = reduceMotion,
+                    style = MaterialTheme.typography.displaySmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    formatter = { formatListeningTime(it * 60_000L) },
+                )
+                Text(
+                    summary.label,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Box(
-                modifier = Modifier.fillMaxWidth().height(1.dp)
-                    .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.28f)),
+            ArtworkMosaic(
+                songs = topTracks.take(4),
+                modifier = Modifier
+                    .size(96.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .border(
+                        width = 1.dp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f),
+                        shape = RoundedCornerShape(20.dp),
+                    ),
             )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                StatsMetricTile(
-                    value = summary.totalPlays.toLong(),
-                    label = "PLAYS",
-                    reduceMotion = reduceMotion,
-                    modifier = Modifier.weight(1f),
-                )
-                StatsMetricTile(
-                    value = summary.distinctSongs.toLong(),
-                    label = "TRACKS",
-                    reduceMotion = reduceMotion,
-                    modifier = Modifier.weight(1f),
-                )
-                StatsMetricTile(
-                    value = summary.distinctArtists.toLong(),
-                    label = "ARTISTS",
-                    reduceMotion = reduceMotion,
-                    modifier = Modifier.weight(1f),
-                )
-            }
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(1.dp)
+                .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.24f)),
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            StatsMetricTile(
+                value = summary.totalPlays.toLong(),
+                label = "PLAYS",
+                reduceMotion = reduceMotion,
+                modifier = Modifier.weight(1f),
+            )
+            StatsMetricTile(
+                value = summary.distinctSongs.toLong(),
+                label = "TRACKS",
+                reduceMotion = reduceMotion,
+                modifier = Modifier.weight(1f),
+            )
+            StatsMetricTile(
+                value = summary.distinctArtists.toLong(),
+                label = "ARTISTS",
+                reduceMotion = reduceMotion,
+                modifier = Modifier.weight(1f),
+            )
         }
     }
 }
@@ -1182,7 +1196,10 @@ private fun StatsMetricTile(
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier,
+        modifier = modifier
+            .clip(RoundedCornerShape(17.dp))
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.46f))
+            .padding(horizontal = 10.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(5.dp),
     ) {
         AnimatedValueText(
@@ -1196,7 +1213,7 @@ private fun StatsMetricTile(
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontWeight = FontWeight.SemiBold,
-            letterSpacing = 0.7.sp,
+            letterSpacing = 0.55.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
