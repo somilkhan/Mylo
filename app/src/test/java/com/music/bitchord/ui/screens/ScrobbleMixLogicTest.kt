@@ -301,7 +301,7 @@ class ScrobbleMixLogicTest {
     fun artistCapDeduplicatesAlternateUploadsBeforeApplyingDiversity() {
         val original = Song("original001", "Night Drive", "Artist A", null)
         val alternate = Song("alternate01", "Night Drive - Official Audio", "Artist A", null)
-        val other = Song("othertrack01", "Morning Light", "Artist B", null)
+        val other = Song("othertrk001", "Morning Light", "Artist B", null)
 
         assertEquals(
             listOf(original, other),
