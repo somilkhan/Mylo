@@ -904,7 +904,7 @@ fun ScrobbleScreen(
                                         }
                                     }
                                     val seeds = (recentTracks + topTracks).filter(::isYouTubeCatalogTrack).distinctBy(::songIdentity).take(12)
-                                    if (seeds.isEmpty()) {
+                                    if (seeds.isEmpty() && seedSearchResults.isEmpty()) {
                                         if (mixMode == ScrobbleMixMode.RADIO) {
                                             EmptyPanel("No radio seed yet", "Search YouTube Music above to choose a track, even if your listening history is empty.")
                                         } else {
