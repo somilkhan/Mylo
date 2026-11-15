@@ -384,14 +384,17 @@ fun ScrobbleScreen(
         lastFmStatsFailed = false
         try {
             val username = lastFmUsername.trim()
-            val profileCall = async { LastFM.getUserStats(username).getOrThrow() }
-            val tracksCall = async { LastFM.getTopTracks(username, period = "overall", limit = 12).getOrThrow() }
-            val artistsCall = async { LastFM.getTopArtists(username, period = "overall", limit = 12).getOrThrow() }
-            val albumsCall = async { LastFM.getTopAlbums(username, period = "overall", limit = 12).getOrThrow() }
-            lastFmProfile = profileCall.await()
-            lastFmTopTracks = tracksCall.await()
-            lastFmTopArtists = artistsCall.await()
-            lastFmTopAlbums = albumsCall.await()
+            val (profile, charts) = coroutineScope {
+                val profileCall = async { LastFM.getUserStats(username).getOrThrow() }
+                val tracksCall = async { LastFM.getTopTracks(username, period = "overall", limit = 12).getOrThrow() }
+                val artistsCall = async { LastFM.getTopArtists(username, period = "overall", limit = 12).getOrThrow() }
+                val albumsCall = async { LastFM.getTopAlbums(username, period = "overall", limit = 12).getOrThrow() }
+                profileCall.await() to Triple(tracksCall.await(), artistsCall.await(), albumsCall.await())
+            }
+            lastFmProfile = profile
+            lastFmTopTracks = charts.first
+            lastFmTopArtists = charts.second
+            lastFmTopAlbums = charts.third
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {
