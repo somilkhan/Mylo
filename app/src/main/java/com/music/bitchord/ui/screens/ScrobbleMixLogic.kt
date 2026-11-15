@@ -209,6 +209,8 @@ internal fun buildRadioMix(
     listOf(radio, favourites, recent, discovery).forEach { pool ->
         pool.forEach { candidate ->
             if (result.size < limit &&
+                candidate.title.isNotBlank() &&
+                candidate.artist.isNotBlank() &&
                 candidate.videoId.isNotBlank() &&
                 candidate.videoId != seed.videoId &&
                 !isSameSongOrEdit(candidate, seed) &&
