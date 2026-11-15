@@ -810,6 +810,7 @@ private fun BitChordApp(
     val activeProfileId by viewModel.activeProfileId.collectAsStateWithLifecycle()
     val historyState by viewModel.history.collectAsStateWithLifecycle()
     val historySections by viewModel.historySections.collectAsStateWithLifecycle()
+    val accountSyncedHistory by viewModel.accountSyncedHistory.collectAsStateWithLifecycle()
     val historyIsLocal by viewModel.historyIsLocal.collectAsStateWithLifecycle()
     val historyContinuation by viewModel.historyContinuation.collectAsStateWithLifecycle()
     val historyLoadingMore by viewModel.historyLoadingMore.collectAsStateWithLifecycle()
@@ -2780,7 +2781,7 @@ private fun BitChordApp(
                             },
                             onViewPlaylists = { scrobbleSection = SCROBBLE_TAB_PLAYLISTS },
                             workScope = scope,
-                            syncedHistory = historySections.flatMap { it.songs },
+                            syncedHistory = accountSyncedHistory,
                             reduceMotion = reducePlayerMotion,
                         )
                     } else if (key == "history") {
