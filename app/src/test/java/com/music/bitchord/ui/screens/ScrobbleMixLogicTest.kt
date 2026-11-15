@@ -50,6 +50,33 @@ class ScrobbleMixLogicTest {
     }
 
     @Test
+    fun localTasteRadioExcludesHeardJunkSeedEditsAndCapsArtists() {
+        val seed = Song("seedtrack01", "Seed song", "Seed Artist", null)
+        val known = Song("knownsong01", "Known track", "Known Artist", null)
+        val candidates = listOf(
+            seed,
+            known.copy(videoId = "knownalt001", title = "Known track - Official Audio"),
+            Song("junkmix0001", "Mega Mix Collection", "Mix Artist", null),
+            Song("artisttrk01", "Signal One", "Artist A", null),
+            Song("artisttrk02", "Signal Two", "Artist A", null),
+            Song("artisttrk03", "Signal Three", "Artist A", null),
+            Song("artisttrk04", "Signal Four", "Artist A", null),
+            Song("artisttrk05", "Signal One - Official Audio", "Artist A", null),
+            Song("othertrk001", "Another signal", "Artist B", null),
+        )
+
+        val result = buildLocalTasteCandidates(
+            seeds = listOf(seed),
+            relatedBySeed = listOf(candidates),
+            heardSongs = listOf(known),
+            limit = 10,
+        )
+
+        assertEquals(listOf("Signal One", "Signal Two", "Signal Three", "Another signal"), result.map { it.title })
+        assertEquals(3, result.count { it.artist == "Artist A" })
+    }
+
+    @Test
     fun radioMixReturnsOnlyAvailableTracksAndHonoursZeroLimit() {
         val seed = Song("seedtrack01", "Seed", "Artist", null)
         val onlyEdit = Song("edittrack001", "Seed (Live)", "Artist", null)
