@@ -131,26 +131,26 @@ internal object ScrobbleRecommendationEngine {
 
         onProgress("Matching your favourite genres…")
         val primaryTags = tags.take(4)
-        val primaryTagTracks = primaryTags.map { tag ->
-            async { safe { LastFM.getTagTopTracks(tag, limit = 8, page = 2).getOrThrow() } }
-        }.awaitAll().filterNotNull().flatten()
-        primaryTagTracks.forEach { track ->
-            val tag = primaryTags.firstOrNull { it.equals(track.artist, ignoreCase = true) }
-            addSource(listOf(track), weight = 1, tag = "tag:${tag ?: "primary"}", primaryGenre = true)
+        val primaryTagBatches = primaryTags.map { tag ->
+            async { tag to safe { LastFM.getTagTopTracks(tag, limit = 8, page = 2).getOrThrow() } }
+        }.awaitAll()
+        primaryTagBatches.forEach { (tag, tracks) ->
+            tracks.orEmpty().forEach { track ->
+                addSource(listOf(track), weight = 1, tag = "tag:$tag", primaryGenre = true)
+            }
         }
 
         onProgress("Widening into neighbouring genres…")
         val neighborTags = primaryTags.mapNotNull { genreNeighbors[it.lowercase()] }
             .distinct().filterNot { candidate -> tags.any { it.equals(candidate, ignoreCase = true) } }
             .take(4)
-        val neighborTracks = neighborTags.map { tag ->
-            async { safe { LastFM.getTagTopTracks(tag, limit = 6, page = 1).getOrThrow() } }
-        }.awaitAll().filterNotNull().flatten()
-        neighborTracks.forEach { track ->
-            val tag = neighborTags.firstOrNull { candidate ->
-                track.name.isNotBlank() && candidate.isNotBlank()
-            } ?: "neighbour"
-            addSource(listOf(track), weight = 1, tag = "tag:$tag")
+        val neighborTagBatches = neighborTags.map { tag ->
+            async { tag to safe { LastFM.getTagTopTracks(tag, limit = 6, page = 1).getOrThrow() } }
+        }.awaitAll()
+        neighborTagBatches.forEach { (tag, tracks) ->
+            tracks.orEmpty().forEach { track ->
+                addSource(listOf(track), weight = 1, tag = "tag:$tag")
+            }
         }
 
         onProgress("Finding another layer of related artists…")
@@ -209,11 +209,12 @@ internal object ScrobbleRecommendationEngine {
             .mapValues { (key, rows) ->
                 if (key in youtubeKeys) 4 else rows.maxOf { row -> row.second.maxOf { it.weight } }
             }
-        val sourceTags = resolvedPairs.groupBy { recommendationIdentity(it.first) }
-            .mapValues { (_, rows) ->
-                rows.flatMap { it.second.map(SourceCandidate::tag) }.toSet() +
-                    if (recommendationIdentity(rows.first().first) in youtubeKeys) setOf("yt-feed") else emptySet()
-            }
+        val sourceTags = mutableMapOf<String, Set<String>>()
+        resolvedPairs.groupBy { recommendationIdentity(it.first) }.forEach { (key, rows) ->
+            sourceTags[key] = rows.flatMap { it.second.map(SourceCandidate::tag) }.toSet() +
+                if (key in youtubeKeys) setOf("yt-feed") else emptySet()
+        }
+        youtubeKeys.forEach { key -> sourceTags[key] = sourceTags[key].orEmpty() + "yt-feed" }
         val sourceCounts = sourceTags.mapValues { (_, tags) -> tags.size }
         val primaryGenres = resolvedPairs.filter { (_, rows) -> rows.any(SourceCandidate::primaryGenre) }
             .mapTo(mutableSetOf()) { recommendationIdentity(it.first) }
