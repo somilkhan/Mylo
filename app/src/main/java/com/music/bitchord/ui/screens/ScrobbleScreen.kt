@@ -1094,6 +1094,11 @@ private fun StatsOverviewCard(
     reduceMotion: Boolean,
 ) {
     val shape = RoundedCornerShape(28.dp)
+    val listeningTimeStyle = if (formatListeningTime(summary.totalMs).length > 7) {
+        MaterialTheme.typography.headlineMedium
+    } else {
+        MaterialTheme.typography.displaySmall
+    }
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -1133,7 +1138,7 @@ private fun StatsOverviewCard(
                 AnimatedValueText(
                     value = summary.totalMs / 60_000L,
                     reduceMotion = reduceMotion,
-                    style = MaterialTheme.typography.displaySmall,
+                    style = listeningTimeStyle,
                     color = MaterialTheme.colorScheme.onSurface,
                     formatter = { formatListeningTime(it * 60_000L) },
                 )
