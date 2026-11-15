@@ -120,7 +120,16 @@ internal object ScrobbleRecommendationEngine {
             }.awaitAll()
             charts.forEach { (artist, rows) ->
                 addSource(
-                    rows.orEmpty().map { LastFM.DiscoveryTrack(it.name, it.artist) },
+                    rows.orEmpty().map {
+                        LastFM.DiscoveryTrack(
+                            name = it.name,
+                            artist = it.artist,
+                            listeners = it.listeners,
+                            playCount = it.playCount,
+                            match = it.match,
+                            album = it.album,
+                        )
+                    },
                     weight = 2,
                     tag = "artist:${artist.trim().lowercase()}",
                 )
