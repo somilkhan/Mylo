@@ -258,12 +258,13 @@ class ScrobbleMixLogicTest {
             Song("artisttrack04", "Four", "Artist", null),
         )
         val other = Song("othertrack01", "Other", "Other Artist", null)
-        val duplicate = sameArtist.first().copy(title = "Duplicate")
+        val duplicateId = sameArtist.first().copy(title = "Different metadata")
+        val duplicateName = sameArtist.first().copy(videoId = "alternate001")
         val incomplete = Song("incomplete01", "", "Unknown", null)
 
         assertEquals(
             listOf(sameArtist[0], sameArtist[1], sameArtist[2], other),
-            buildPrecheckedMix(sameArtist + duplicate + incomplete + other),
+            buildPrecheckedMix(sameArtist + duplicateId + duplicateName + incomplete + other),
         )
         assertEquals(emptyList<Song>(), buildPrecheckedMix(sameArtist, limit = 0))
     }
