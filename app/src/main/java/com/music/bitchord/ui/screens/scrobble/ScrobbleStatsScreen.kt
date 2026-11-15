@@ -3,6 +3,7 @@ package com.music.bitchord.ui.screens.scrobble
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -204,8 +205,8 @@ private fun LocalStatsSummary(summary: ReplaySummary) {
 }
 
 @Composable
-private fun LocalStatTile(label: String, value: String) {
-    Card(modifier = Modifier.weightedStatTile()) {
+private fun RowScope.LocalStatTile(label: String, value: String) {
+    Card(modifier = Modifier.weight(1f)) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Text(value, style = MaterialTheme.typography.titleLarge)
             Text(label, style = MaterialTheme.typography.labelSmall,
@@ -213,8 +214,6 @@ private fun LocalStatTile(label: String, value: String) {
         }
     }
 }
-
-private fun Modifier.weightedStatTile(): Modifier = this.fillMaxWidth(1f / 3f)
 
 @Composable
 private fun StatsChartSection(
