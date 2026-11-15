@@ -62,7 +62,7 @@ private fun String.lastWaveFoldCase(): String {
 
 /** Same normalized title+artist identity used by LastWave GeneratedTrack.key. */
 internal fun recommendationIdentity(song: Song): String =
-    "\${song.title.normalizeLastWaveTrackText().lowercase()}|\${song.artist.normalizeLastWaveTrackText().lowercase()}"
+    "${song.title.normalizeLastWaveTrackText().lowercase()}|${song.artist.normalizeLastWaveTrackText().lowercase()}"
 
 /** Direct port of LastWave GeneratedTrack.distinctSongs(), adapted to Song. */
 internal fun distinctRecommendationSongs(candidates: List<Song>): List<Song> {
