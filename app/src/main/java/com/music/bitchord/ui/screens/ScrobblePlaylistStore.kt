@@ -243,6 +243,7 @@ internal object ScrobblePlaylistCodec {
                         reason = playlist.reason,
                         songs = playlist.songs.map { it.toRecord() },
                         coverUri = playlist.coverUri,
+                        pinned = playlist.pinned,
                     )
                 },
             ),
