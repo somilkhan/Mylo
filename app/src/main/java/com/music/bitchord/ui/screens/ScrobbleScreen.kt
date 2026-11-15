@@ -1073,6 +1073,21 @@ fun ScrobbleScreen(
                                         },
                                     )
                                 }
+                                if (syncedStats.topAlbums.isNotEmpty()) {
+                                    item("stats-youtube-top-albums-heading") {
+                                        StatsSectionHeading("Top albums", "${syncedStats.distinctAlbums} albums")
+                                    }
+                                    items(
+                                        syncedStats.topAlbums.take(12),
+                                        key = { "yt-album-${it.artist.lowercase()}-${it.name.lowercase()}" },
+                                    ) { album ->
+                                        StatsEntityRow(
+                                            title = album.name,
+                                            subtitle = "${album.artist} · ${album.plays} ${if (album.plays == 1) "play" else "plays"}",
+                                            artworkUrl = album.artworkUrl,
+                                        )
+                                    }
+                                }
                             }
                             loadingStats -> item("stats-loading") {
                                 LoadingLine("Building your listening report")
