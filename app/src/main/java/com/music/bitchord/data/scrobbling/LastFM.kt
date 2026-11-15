@@ -72,6 +72,25 @@ internal fun parseLastFmTagTracks(
 }
 
 
+/** Parse Last.fm track.getsimilar responses without assuming an array payload. */
+internal fun parseLastFmSimilarTracks(
+    response: String,
+    limit: Int = 50,
+): List<LastFM.DiscoveryTrack> {
+    if (limit <= 0) return emptyList()
+    val root = runCatching { Json.parseToJsonElement(response) as? JsonObject }.getOrNull()
+        ?: return emptyList()
+    val rows = root["similartracks"] as? JsonObject ?: return emptyList()
+    return parseLastFmObjects(rows["track"]).mapNotNull { track ->
+        val name = track.textValue("name")
+        val artistObject = track["artist"] as? JsonObject
+        val artist = artistObject?.textValue("name")
+            ?: (track["artist"] as? JsonPrimitive)?.contentOrNull?.trim().orEmpty()
+        if (name.isBlank() || artist.isBlank()) null else LastFM.DiscoveryTrack(name, artist)
+    }.distinctBy { "${it.name.lowercase(Locale.ROOT)}|${it.artist.lowercase(Locale.ROOT)}" }
+        .take(limit.coerceAtMost(100))
+}
+
 internal fun parseLastFmObjects(value: JsonElement?): List<JsonObject> = when (value) {
     is JsonArray -> value.mapNotNull { it as? JsonObject }
     is JsonObject -> listOf(value)
@@ -399,6 +418,27 @@ object LastFM {
             )
             parseLastFmSimilarArtists(response, limit)
         }
+
+    /** Public Last.fm similar-track fallback; callers resolve these to playable catalogue tracks. */
+    suspend fun getSimilarTracks(
+        track: String,
+        artist: String,
+        limit: Int = 50,
+    ): Result<List<DiscoveryTrack>> = discoveryResult {
+        require(isInitialized()) { "Last.fm API credentials are not configured for this build" }
+        val cleanTrack = track.trim()
+        val cleanArtist = artist.trim()
+        require(cleanTrack.isNotBlank() && cleanArtist.isNotBlank()) { "Choose a track first" }
+        val response = postAndRead(
+            method = "track.getsimilar",
+            extra = mapOf(
+                "track" to cleanTrack,
+                "artist" to cleanArtist,
+                "limit" to limit.coerceIn(1, 100).toString(),
+            ),
+        )
+        parseLastFmSimilarTracks(response, limit)
+    }
 
     /** Public Last.fm tag chart; results are later resolved to playable YouTube Music tracks. */
     suspend fun getTagTopTracks(tag: String, limit: Int = 12): Result<List<DiscoveryTrack>> =
