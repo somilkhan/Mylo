@@ -214,6 +214,7 @@ class ScrobbleMixLogicTest {
         val shared = Song("shared00001", "Shared", "Artist", null)
         val ytTwo = Song("youtube0002", "YouTube two", "Artist", null)
         val lastFmOne = Song("lastfm00001", "Last.fm one", "Artist", null)
+        val alternateUpload = shared.copy(videoId = "alternate001")
 
         assertEquals(
             // LastWave's youtubeFirstBlend keeps YouTube first in a 2:1 ratio;
@@ -221,7 +222,7 @@ class ScrobbleMixLogicTest {
             listOf(ytOne, shared, ytTwo, lastFmOne),
             buildYouTubeFirstMix(
                 youtube = listOf(ytOne, shared, ytTwo),
-                lastFm = listOf(shared.copy(title = "Duplicate"), lastFmOne),
+                lastFm = listOf(shared.copy(title = "Duplicate"), alternateUpload, lastFmOne),
                 limit = 10,
             ),
         )
