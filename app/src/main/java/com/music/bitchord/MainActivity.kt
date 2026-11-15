@@ -2779,6 +2779,7 @@ private fun BitChordApp(
                                 selectedTab = TAB_EXPLORE
                             },
                             onViewPlaylists = { scrobbleSection = SCROBBLE_TAB_PLAYLISTS },
+                            workScope = scope,
                             syncedHistory = historySections.flatMap { it.songs },
                             reduceMotion = reducePlayerMotion,
                         )
