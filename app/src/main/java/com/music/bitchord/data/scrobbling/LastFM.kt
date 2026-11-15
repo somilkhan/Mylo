@@ -14,6 +14,8 @@ import io.ktor.http.isSuccess
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 import java.net.URI
 import java.security.MessageDigest
 import java.util.Locale
@@ -290,6 +292,22 @@ object LastFM {
             throw LastFmException(error.error, error.message)
         }
         return responseText
+    }
+
+    /**
+     * Read-only Last.fm discovery endpoint used by the LastWave generator port.
+     * Session keys are intentionally omitted for public chart methods; Last.fm
+     * still receives the configured API key and a valid request signature.
+     */
+    suspend fun apiCall(
+        method: String,
+        extra: Map<String, String> = emptyMap(),
+    ): JsonObject {
+        if (!isInitialized()) {
+            throw LastFmException(10, "Last.fm API credentials are not configured")
+        }
+        val response = postAndRead(method = method, extra = extra)
+        return json.parseToJsonElement(response).jsonObject
     }
 
     const val DEFAULT_SCROBBLE_DELAY_PERCENT = 0.5f
