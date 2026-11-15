@@ -896,12 +896,13 @@ fun ScrobbleScreen(
                                 emptyList()
                             }
                             coroutineScope {
-                                similarArtists.map { artist ->
+                                // Bound the fan-out: four artists × five chart tracks keeps this fallback responsive.
+                            similarArtists.take(4).map { artist ->
                                     async {
                                         try {
                                             // LastWave srcArtistTopTracks: use each related artist's
                                             // actual chart instead of a broad artist-name search.
-                                            val chart = LastFM.getArtistTopTracks(artist, limit = 8).getOrThrow()
+                                            val chart = LastFM.getArtistTopTracks(artist, limit = 5).getOrThrow()
                                             coroutineScope {
                                                 chart.map { candidate ->
                                                     async {
