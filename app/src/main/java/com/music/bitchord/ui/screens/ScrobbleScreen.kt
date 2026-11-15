@@ -1127,97 +1127,103 @@ fun ScrobbleScreen(
                             }
                         }
                         item("generate-modes") {
-                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
                                     Text("Choose your sound", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                                     Spacer(Modifier.weight(1f))
-                                    Text("${ScrobbleMixMode.entries.size} MODES", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = 1.sp)
+                                    Text(
+                                        "${ScrobbleMixMode.entries.size} MODES",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        letterSpacing = 1.sp,
+                                    )
                                 }
-                                ScrobbleMixMode.entries.chunked(2).forEach { rowModes ->
-                                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                        rowModes.forEach { mode ->
-                                            val selectedMode = mixMode == mode
-                                            Column(
-                                                modifier = Modifier.weight(1f)
-                                                    .clip(RoundedCornerShape(16.dp))
-                                                    .background(
-                                                        if (selectedMode) MaterialTheme.colorScheme.surfaceVariant
-                                                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f),
-                                                    )
-                                                    .border(
-                                                        width = if (selectedMode) 1.25.dp else 1.dp,
-                                                        color = if (selectedMode) MaterialTheme.colorScheme.primary.copy(alpha = 0.62f)
-                                                        else MaterialTheme.colorScheme.outline.copy(alpha = 0.32f),
-                                                        shape = RoundedCornerShape(16.dp),
-                                                    )
-                                                    .semantics { selected = selectedMode }
-                                                    .clickable(enabled = !generatingMix, role = Role.RadioButton) {
-                                                        mixMode = mode
-                                                        generatedMix = emptyList()
-                                                        generationError = null
-                                                        mixSaved = false
-                                                    }
-                                                    .padding(horizontal = 13.dp, vertical = 14.dp),
-                                                verticalArrangement = Arrangement.spacedBy(9.dp),
-                                            ) {
-                                                Box(
-                                                    Modifier.size(34.dp).clip(RoundedCornerShape(11.dp))
-                                                        .background(if (selectedMode) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f) else MaterialTheme.colorScheme.surfaceVariant),
-                                                    contentAlignment = Alignment.Center,
-                                                ) {
-                                                    Icon(
-                                                        imageVector = when (mode) {
-                                                            ScrobbleMixMode.FAVOURITES -> Icons.Rounded.History
-                                                            ScrobbleMixMode.RECENT -> Icons.Rounded.Refresh
-                                                            ScrobbleMixMode.TASTE_MIX -> Icons.Rounded.GraphicEq
-                                                            ScrobbleMixMode.RADIO -> Icons.Rounded.PlayArrow
-                                                            ScrobbleMixMode.ARTIST_MIX -> Icons.Rounded.Explore
-                                    ScrobbleMixMode.SIMILAR_ARTISTS -> Icons.Rounded.Explore
-                                                            ScrobbleMixMode.NEVER_HEARD -> Icons.Rounded.Search
-                                                            ScrobbleMixMode.DISCOVER -> Icons.Rounded.Explore
-                                                            ScrobbleMixMode.TAG -> Icons.Rounded.Search
-                                                            ScrobbleMixMode.LIBRARY -> Icons.Rounded.GraphicEq
-                                                            ScrobbleMixMode.REDISCOVER -> Icons.Rounded.History
-                                                        },
-                                                        contentDescription = null,
-                                                        tint = if (selectedMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                                        modifier = Modifier.size(19.dp),
-                                                    )
+                                ScrobbleMixMode.entries.forEach { mode ->
+                                    val selectedMode = mixMode == mode
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(18.dp))
+                                            .background(
+                                                if (selectedMode) MaterialTheme.colorScheme.surfaceVariant
+                                                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.24f),
+                                            )
+                                            .border(
+                                                width = if (selectedMode) 1.25.dp else 1.dp,
+                                                color = if (selectedMode) MaterialTheme.colorScheme.primary.copy(alpha = 0.62f)
+                                                else MaterialTheme.colorScheme.outline.copy(alpha = 0.26f),
+                                                shape = RoundedCornerShape(18.dp),
+                                            )
+                                            .semantics { selected = selectedMode }
+                                            .clickable(enabled = !generatingMix, role = Role.RadioButton) {
+                                                if (mixMode != mode) {
+                                                    mixMode = mode
+                                                    generatedMix = emptyList()
+                                                    generationError = null
+                                                    mixSaved = false
                                                 }
-                                                Row(
-                                                    modifier = Modifier.fillMaxWidth(),
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                                ) {
-                                                    Text(
-                                                        mode.title,
-                                                        modifier = Modifier.weight(1f),
-                                                        style = MaterialTheme.typography.titleSmall,
-                                                        fontWeight = FontWeight.SemiBold,
-                                                        color = MaterialTheme.colorScheme.onSurface,
-                                                        maxLines = 1,
-                                                        overflow = TextOverflow.Ellipsis,
-                                                    )
-                                                    if (selectedMode) {
-                                                        Icon(
-                                                            Icons.Rounded.CheckCircle,
-                                                            contentDescription = "Selected",
-                                                            tint = MaterialTheme.colorScheme.primary,
-                                                            modifier = Modifier.size(17.dp),
-                                                        )
-                                                    }
-                                                }
-                                                Text(
-                                                    mode.description,
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                    maxLines = 2,
-                                                    minLines = 2,
-                                                    overflow = TextOverflow.Ellipsis,
-                                                )
                                             }
+                                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    ) {
+                                        Box(
+                                            Modifier
+                                                .size(42.dp)
+                                                .clip(RoundedCornerShape(14.dp))
+                                                .background(
+                                                    if (selectedMode) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                                                    else MaterialTheme.colorScheme.surfaceVariant,
+                                                ),
+                                            contentAlignment = Alignment.Center,
+                                        ) {
+                                            Icon(
+                                                imageVector = when (mode) {
+                                                    ScrobbleMixMode.FAVOURITES -> Icons.Rounded.History
+                                                    ScrobbleMixMode.RECENT -> Icons.Rounded.Refresh
+                                                    ScrobbleMixMode.TASTE_MIX -> Icons.Rounded.GraphicEq
+                                                    ScrobbleMixMode.RADIO -> Icons.Rounded.PlayArrow
+                                                    ScrobbleMixMode.ARTIST_MIX -> Icons.Rounded.Explore
+                                                    ScrobbleMixMode.SIMILAR_ARTISTS -> Icons.Rounded.Explore
+                                                    ScrobbleMixMode.NEVER_HEARD -> Icons.Rounded.Search
+                                                    ScrobbleMixMode.DISCOVER -> Icons.Rounded.Explore
+                                                    ScrobbleMixMode.TAG -> Icons.Rounded.Search
+                                                    ScrobbleMixMode.LIBRARY -> Icons.Rounded.GraphicEq
+                                                    ScrobbleMixMode.REDISCOVER -> Icons.Rounded.History
+                                                },
+                                                contentDescription = null,
+                                                tint = if (selectedMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(20.dp),
+                                            )
                                         }
-                                        if (rowModes.size == 1) Spacer(Modifier.weight(1f))
+                                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                            Text(
+                                                mode.title,
+                                                style = MaterialTheme.typography.titleSmall,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = MaterialTheme.colorScheme.onSurface,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                            )
+                                            Text(
+                                                mode.description,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                maxLines = 2,
+                                                overflow = TextOverflow.Ellipsis,
+                                            )
+                                        }
+                                        if (selectedMode) {
+                                            Icon(
+                                                Icons.Rounded.CheckCircle,
+                                                contentDescription = "Selected",
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(20.dp),
+                                            )
+                                        }
                                     }
                                 }
                             }
