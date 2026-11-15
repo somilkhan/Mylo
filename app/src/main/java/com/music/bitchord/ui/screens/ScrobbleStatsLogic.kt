@@ -71,11 +71,11 @@ internal fun buildCombinedFavouriteTracks(
     limit: Int = 25,
 ): List<com.music.bitchord.data.model.Song> {
     if (limit <= 0) return emptyList()
-    val localByKey = local.associateBy { songIdentity(it.song) }
-    val syncedByKey = synced.associateBy { songIdentity(it.song) }
+    val localByKey = local.associateBy { recommendationIdentity(it.song) }
+    val syncedByKey = synced.associateBy { recommendationIdentity(it.song) }
     val songs = LinkedHashMap<String, com.music.bitchord.data.model.Song>()
     local.forEach {
-        val key = songIdentity(it.song)
+        val key = recommendationIdentity(it.song)
         if (key !in songs) songs[key] = it.song
     }
     synced.forEach {
