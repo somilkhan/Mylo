@@ -86,6 +86,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -119,6 +120,15 @@ private enum class ScrobbleMixMode(val title: String, val description: String) {
 
 private val SCROBBLE_GENRE_TAGS = listOf("pop", "rock", "hip-hop", "electronic", "jazz", "lofi", "metal", "indie", "classical", "r&b", "ambient", "punk")
 
+private enum class StatsView(val label: String, val period: ReplayPeriod) {
+    RECENT("Recent", ReplayPeriod.LAST_30_DAYS),
+    MOST_PLAYED("Most Played", ReplayPeriod.ALL_TIME),
+    LAST_7_DAYS("Last 7 Days", ReplayPeriod.LAST_7_DAYS),
+    LAST_30_DAYS("Last 30 Days", ReplayPeriod.LAST_30_DAYS),
+    TOP_ARTISTS("Top Artists", ReplayPeriod.ALL_TIME),
+    TOP_ALBUMS("Top Albums", ReplayPeriod.ALL_TIME),
+}
+
 internal const val SCROBBLE_TAB_STATS = 0
 internal const val SCROBBLE_TAB_GENERATE = 1
 internal const val SCROBBLE_TAB_PLAYLISTS = 2
@@ -137,7 +147,8 @@ fun ScrobbleScreen(
 ) {
     val context = LocalContext.current
     val historyRevision by ListeningHistory.revision.collectAsStateWithLifecycle()
-    var period by remember { mutableStateOf(ReplayPeriod.THIS_MONTH) }
+    var statsView by remember { mutableStateOf(StatsView.RECENT) }
+    var statsMenuExpanded by remember { mutableStateOf(false) }
     var summary by remember { mutableStateOf<ReplaySummary?>(null) }
     var allTimeSummary by remember { mutableStateOf<ReplaySummary?>(null) }
     var loadingAllTimeStats by remember { mutableStateOf(true) }
@@ -207,11 +218,11 @@ fun ScrobbleScreen(
         }
     }
 
-    LaunchedEffect(period, historyRevision) {
+    LaunchedEffect(statsView, historyRevision) {
         loadingStats = true
         statsFailed = false
         try {
-            summary = ListeningStats.summary(period)
+            summary = ListeningStats.summary(statsView.period)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {
@@ -396,21 +407,48 @@ fun ScrobbleScreen(
             ) {
                 when (section) {
                     SCROBBLE_TAB_STATS -> {
-                        item("stats-heading") {
-                            PageHeading("Your listening", "A personal replay of what you play in Mylo")
-                        }
-                        item("stats-periods") {
-                            Row(
-                                modifier = Modifier.horizontalScroll(rememberScrollState()),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        item("stats-view-selector") {
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(4.dp),
                             ) {
-                                ReplayPeriod.entries.forEach { option ->
-                                    FilterChip(
-                                        selected = period == option,
-                                        onClick = { period = option },
-                                        label = { Text(option.chip) },
-                                    )
+                                Box {
+                                    OutlinedButton(
+                                        onClick = { statsMenuExpanded = true },
+                                        shape = RoundedCornerShape(14.dp),
+                                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                                    ) {
+                                        Text(statsView.label)
+                                        Spacer(Modifier.width(8.dp))
+                                        Icon(Icons.Rounded.Sort, contentDescription = null)
+                                    }
+                                    DropdownMenu(
+                                        expanded = statsMenuExpanded,
+                                        onDismissRequest = { statsMenuExpanded = false },
+                                    ) {
+                                        StatsView.entries.forEach { option ->
+                                            DropdownMenuItem(
+                                                text = { Text(option.label) },
+                                                trailingIcon = {
+                                                    if (statsView == option) {
+                                                        Icon(Icons.Rounded.CheckCircle, contentDescription = "Selected")
+                                                    }
+                                                },
+                                                onClick = {
+                                                    statsView = option
+                                                    statsMenuExpanded = false
+                                                },
+                                            )
+                                        }
+                                    }
                                 }
+                                Text(
+                                    summary?.label ?: statsView.period.chip,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    textAlign = TextAlign.End,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
                             }
                         }
                         when {
@@ -433,114 +471,111 @@ fun ScrobbleScreen(
                                 item("stats-overview") {
                                     StatsOverviewCard(
                                         summary = summary!!,
-                                        topTracks = topTracks,
                                         reduceMotion = reduceMotion,
                                     )
                                 }
-                                if (summary!!.hourOfDay.any { it > 0L }) {
-                                    item("stats-hourly-activity") {
-                                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                            SectionHeading("Your listening rhythm")
-                                            HourlyActivityChart(summary!!.hourOfDay, reduceMotion)
-                                        }
-                                    }
-                                }
-                                if (summary!!.busiestDay != null || summary!!.peakHour != null) {
-                                    item("stats-insights") {
-                                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                            SectionHeading("A little about your habits")
-                                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                                summary!!.busiestDay?.let { day ->
-                                                    StatsInsightTile(
-                                                        title = "Biggest day",
-                                                        value = formatStatsDay(day),
-                                                        detail = "${summary!!.busiestDayMs / 60_000} min listened",
-                                                        modifier = Modifier.weight(1f),
-                                                    )
-                                                }
-                                                summary!!.peakHour?.let { hour ->
-                                                    StatsInsightTile(
-                                                        title = "Peak hour",
-                                                        value = "%02d:00".format(hour),
-                                                        detail = "Your most active hour",
-                                                        modifier = Modifier.weight(1f),
-                                                    )
-                                                }
+                                when (statsView) {
+                                    StatsView.RECENT -> {
+                                        val recentCutoff = java.time.LocalDate.now().minusDays(29)
+                                            .atStartOfDay(java.time.ZoneId.systemDefault())
+                                            .toInstant().toEpochMilli()
+                                        val recentListens = listens.asSequence()
+                                            .filter { it.startedAt >= recentCutoff }
+                                            .sortedByDescending { it.startedAt }
+                                            .take(12)
+                                            .toList()
+                                        if (recentListens.isEmpty()) {
+                                            item("stats-recent-empty") {
+                                                EmptyPanel("No recent plays", "Your latest device listens will appear here.")
+                                            }
+                                        } else {
+                                            item("stats-recent-heading") {
+                                                StatsSectionHeading("Recently played", "Latest listens on this device")
+                                            }
+                                            val recentSongs = recentListens.map { it.song }
+                                            itemsIndexed(
+                                                recentListens,
+                                                key = { _, entry -> "recent-${entry.startedAt}-${songIdentity(entry.song)}" },
+                                            ) { index, entry ->
+                                                StatsRankedTrack(
+                                                    rank = index + 1,
+                                                    song = entry.song,
+                                                    supporting = formatStatsTimestamp(entry.startedAt),
+                                                    onClick = { onPlayPlaylist("Recently played", recentSongs, index) },
+                                                )
                                             }
                                         }
                                     }
-                                }
-                                val rankedTracks = summary!!.songs
-                                    .sortedWith(compareByDescending<RankedSong> { it.plays }.thenByDescending { it.ms })
-                                    .take(12)
-                                if (rankedTracks.isNotEmpty()) {
-                                    item("stats-top-heading") {
-                                        StatsSectionHeading("Most played", "${summary!!.songs.size} tracks")
+                                    StatsView.MOST_PLAYED, StatsView.LAST_7_DAYS, StatsView.LAST_30_DAYS -> {
+                                        val rankedTracks = summary!!.songs
+                                            .sortedWith(compareByDescending<RankedSong> { it.plays }.thenByDescending { it.ms })
+                                            .take(12)
+                                        if (rankedTracks.isNotEmpty()) {
+                                            item("stats-top-heading") {
+                                                StatsSectionHeading(
+                                                    "Most played",
+                                                    "${summary!!.songs.size} tracks",
+                                                )
+                                            }
+                                            itemsIndexed(
+                                                rankedTracks,
+                                                key = { _, ranked -> "stat-${songIdentity(ranked.song)}" },
+                                            ) { index, ranked ->
+                                                StatsRankedTrack(
+                                                    rank = index + 1,
+                                                    song = ranked.song,
+                                                    supporting = "${ranked.plays} ${if (ranked.plays == 1) "play" else "plays"} · ${formatListeningTime(ranked.ms)}",
+                                                    onClick = { onPlayPlaylist("Most played", rankedTracks.map { it.song }, index) },
+                                                )
+                                            }
+                                        }
+                                        if (statsView == StatsView.MOST_PLAYED && summary!!.genres.isNotEmpty()) {
+                                            item("stats-genres-heading") {
+                                                StatsSectionHeading("Top genres", "From your listening")
+                                            }
+                                            items(
+                                                summary!!.genres.take(5),
+                                                key = { "genre-${it.title.lowercase()}" },
+                                            ) { genre ->
+                                                InfoPanel(
+                                                    genre.title,
+                                                    "${genre.plays} plays · ${formatListeningTime(genre.ms)}",
+                                                )
+                                            }
+                                        }
                                     }
-                                    itemsIndexed(
-                                        rankedTracks,
-                                        key = { _, ranked -> "stat-${songIdentity(ranked.song)}" },
-                                    ) { index, ranked ->
-                                        StatsRankedTrack(
-                                            rank = index + 1,
-                                            song = ranked.song,
-                                            supporting = "${ranked.plays} ${if (ranked.plays == 1) "play" else "plays"} · ${formatListeningTime(ranked.ms)}",
-                                            onClick = { onPlayPlaylist("Most played", listOf(ranked.song), 0) },
-                                        )
+                                    StatsView.TOP_ARTISTS -> {
+                                        item("stats-artists-heading") {
+                                            StatsSectionHeading("Top artists", "Your most-played")
+                                        }
+                                        items(
+                                            summary!!.artists.take(12),
+                                            key = { "artist-${it.title.lowercase()}" },
+                                        ) { artist ->
+                                            StatsEntityRow(
+                                                title = artist.title,
+                                                subtitle = "${artist.plays} plays · ${formatListeningTime(artist.ms)}",
+                                                artworkUrl = artist.artworkUrl,
+                                            )
+                                        }
                                     }
-                                }
-                                if (summary!!.artists.isNotEmpty()) {
-                                    item("stats-artists-heading") {
-                                        StatsSectionHeading("Top artists", "Your most-played")
-                                    }
-                                    items(
-                                        summary!!.artists.take(5),
-                                        key = { "artist-${it.title.lowercase()}" },
-                                    ) { artist ->
-                                        StatsEntityRow(
-                                            title = artist.title,
-                                            subtitle = "${artist.plays} plays · ${formatListeningTime(artist.ms)}",
-                                            artworkUrl = artist.artworkUrl,
-                                        )
-                                    }
-                                }
-                                if (summary!!.albums.isNotEmpty()) {
-                                    item("stats-albums-heading") {
-                                        StatsSectionHeading("Top albums", "By listening time")
-                                    }
-                                    items(
-                                        summary!!.albums.take(5),
-                                        key = { "album-${it.title}-${it.subtitle.orEmpty()}" },
-                                    ) { album ->
-                                        StatsEntityRow(
-                                            title = album.title,
-                                            subtitle = listOfNotNull(album.subtitle, "${album.plays} plays").joinToString(" · "),
-                                            artworkUrl = album.artworkUrl,
-                                        )
-                                    }
-                                }
-                                if (summary!!.genres.isNotEmpty()) {
-                                    item("stats-genres-heading") {
-                                        StatsSectionHeading("Top genres", "From your listening")
-                                    }
-                                    items(
-                                        summary!!.genres.take(5),
-                                        key = { "genre-${it.title.lowercase()}" },
-                                    ) { genre ->
-                                        InfoPanel(
-                                            genre.title,
-                                            "${genre.plays} plays · ${formatListeningTime(genre.ms)}",
-                                        )
+                                    StatsView.TOP_ALBUMS -> {
+                                        item("stats-albums-heading") {
+                                            StatsSectionHeading("Top albums", "By listening time")
+                                        }
+                                        items(
+                                            summary!!.albums.take(12),
+                                            key = { "album-${it.title}-${it.subtitle.orEmpty()}" },
+                                        ) { album ->
+                                            StatsEntityRow(
+                                                title = album.title,
+                                                subtitle = listOfNotNull(album.subtitle, "${album.plays} plays").joinToString(" · "),
+                                                artworkUrl = album.artworkUrl,
+                                            )
+                                        }
                                     }
                                 }
                             }
-                        }
-                        item("stats-device-note") {
-                            Text(
-                                "Private by design · These insights are calculated from listening data stored on this device.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
                         }
                     }
 
@@ -1166,51 +1201,39 @@ private fun HourlyActivityChart(hours: List<Long>, reduceMotion: Boolean) {
 @Composable
 private fun StatsOverviewCard(
     summary: ReplaySummary,
-    topTracks: List<Song>,
     reduceMotion: Boolean,
 ) {
-    val shape = RoundedCornerShape(28.dp)
     val listeningTimeStyle = if (formatListeningTime(summary.totalMs).length > 7) {
-        MaterialTheme.typography.headlineMedium
+        MaterialTheme.typography.titleLarge
     } else {
-        MaterialTheme.typography.displaySmall
+        MaterialTheme.typography.headlineSmall
     }
-    Column(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(shape)
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.62f))
+            .clip(RoundedCornerShape(24.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f))
             .border(
                 width = 1.dp,
-                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.26f),
-                shape = shape,
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.24f),
+                shape = RoundedCornerShape(24.dp),
             )
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp),
+            .padding(14.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        Column(
+            modifier = Modifier.weight(0.95f),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
-                        .padding(horizontal = 10.dp, vertical = 6.dp),
-                ) {
-                    Text(
-                        "LISTENING TIME",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.05.sp,
-                    )
-                }
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(
+                    "LISTENING TIME",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.65.sp,
+                )
                 AnimatedValueText(
                     value = summary.totalMs / 60_000L,
                     reduceMotion = reduceMotion,
@@ -1218,87 +1241,119 @@ private fun StatsOverviewCard(
                     color = MaterialTheme.colorScheme.onSurface,
                     formatter = { formatListeningTime(it * 60_000L) },
                 )
-                Text(
-                    summary.label,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
             }
-            ArtworkMosaic(
-                songs = topTracks.take(4),
-                modifier = Modifier
-                    .size(96.dp)
-                    .clip(RoundedCornerShape(20.dp))
-                    .border(
-                        width = 1.dp,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f),
-                        shape = RoundedCornerShape(20.dp),
-                    ),
+            Box(
+                Modifier.fillMaxWidth().height(1.dp)
+                    .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.22f)),
             )
+            StatsMetricLine("PLAYS", summary.totalPlays.toLong(), reduceMotion)
+            StatsMetricLine("TRACKS", summary.distinctSongs.toLong(), reduceMotion)
+            StatsMetricLine("ARTISTS", summary.distinctArtists.toLong(), reduceMotion)
         }
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(1.dp)
-                .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.24f)),
-        )
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        Column(
+            modifier = Modifier.weight(1.05f),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            StatsMetricTile(
-                value = summary.totalPlays.toLong(),
-                label = "PLAYS",
-                reduceMotion = reduceMotion,
-                modifier = Modifier.weight(1f),
+            Text(
+                "ACTIVITY",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.65.sp,
             )
-            StatsMetricTile(
-                value = summary.distinctSongs.toLong(),
-                label = "TRACKS",
-                reduceMotion = reduceMotion,
-                modifier = Modifier.weight(1f),
-            )
-            StatsMetricTile(
-                value = summary.distinctArtists.toLong(),
-                label = "ARTISTS",
-                reduceMotion = reduceMotion,
-                modifier = Modifier.weight(1f),
-            )
+            HourlyActivityMiniChart(summary.hourOfDay, reduceMotion)
         }
     }
 }
 
 @Composable
-private fun StatsMetricTile(
-    value: Long,
+private fun StatsMetricLine(
     label: String,
+    value: Long,
     reduceMotion: Boolean,
-    modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(17.dp))
-            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.46f))
-            .padding(horizontal = 10.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(5.dp),
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        AnimatedValueText(
-            value = value,
-            reduceMotion = reduceMotion,
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
         Text(
             label,
+            modifier = Modifier.weight(1f),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontWeight = FontWeight.SemiBold,
-            letterSpacing = 0.55.sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+            letterSpacing = 0.35.sp,
         )
+        AnimatedValueText(
+            value = value,
+            reduceMotion = reduceMotion,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+    }
+}
+
+@Composable
+private fun HourlyActivityMiniChart(
+    hours: List<Long>,
+    reduceMotion: Boolean,
+) {
+    val peak = hours.maxOrNull()?.takeIf { it > 0L } ?: 0L
+    val description = hours.withIndex()
+        .filter { it.value > 0L }
+        .joinToString { (hour, value) -> "%02d:00 %s".format(hour, formatListeningTime(value)) }
+    var visible by remember(hours) { mutableStateOf(false) }
+    LaunchedEffect(hours, reduceMotion) {
+        visible = false
+        if (reduceMotion) {
+            visible = true
+        } else {
+            delay(35)
+            visible = true
+        }
+    }
+    val progress by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (visible) 1f else 0f,
+        animationSpec = if (reduceMotion) snap() else tween(480, easing = FastOutSlowInEasing),
+        label = "compact-hourly-activity",
+    )
+    Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().height(112.dp).semantics {
+                contentDescription = if (description.isBlank()) "No hourly listening activity recorded"
+                else "Hourly listening activity: $description"
+            },
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            hours.forEachIndexed { hour, value ->
+                val base = if (peak == 0L) 0.035f else (value.toFloat() / peak.toFloat()).coerceAtLeast(0.035f)
+                val height = if (peak == 0L) base else (base * progress).coerceAtLeast(0.035f)
+                Box(
+                    modifier = Modifier.weight(1f)
+                        .fillMaxHeight(height)
+                        .clip(RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp))
+                        .background(
+                            MaterialTheme.colorScheme.primary.copy(
+                                alpha = if (value > 0L) 0.42f + (value.toFloat() / peak.toFloat()) * 0.58f else 0.18f,
+                            ),
+                        ),
+                )
+            }
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            listOf("00", "06", "12", "18", "23").forEach { hour ->
+                Text(
+                    hour,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
     }
 }
 
@@ -1766,6 +1821,17 @@ private fun ArtworkTile(song: Song, modifier: Modifier = Modifier) {
         }
     }
 }
+
+private fun formatStatsTimestamp(timestamp: Long): String = runCatching {
+    java.time.Instant.ofEpochMilli(timestamp)
+        .atZone(java.time.ZoneId.systemDefault())
+        .format(
+            java.time.format.DateTimeFormatter.ofPattern(
+                "EEE, d MMM · HH:mm",
+                java.util.Locale.getDefault(),
+            ),
+        )
+}.getOrDefault("Played recently")
 
 private fun formatStatsDay(day: String): String = runCatching {
     java.time.LocalDate.parse(day).format(
