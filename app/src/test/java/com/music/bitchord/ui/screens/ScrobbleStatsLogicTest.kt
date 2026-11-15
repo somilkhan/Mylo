@@ -113,6 +113,35 @@ class ScrobbleStatsLogicTest {
     }
 
     @Test
+    fun syncedHistoryUsesLeadArtistForCollaborationsAndRanksAlbums() {
+        val first = com.music.bitchord.data.model.Song(
+            videoId = "abcdefghijk",
+            title = "First",
+            artist = "Artist A, Artist B",
+            thumbnailUrl = "https://example.com/album.jpg",
+            albumName = "Shared album",
+        )
+        val second = com.music.bitchord.data.model.Song(
+            videoId = "lmnopqrstuv",
+            title = "Second",
+            artist = "Artist A feat. Guest",
+            thumbnailUrl = null,
+            albumName = "Shared album",
+        )
+
+        val summary = buildSyncedHistorySummary(listOf(first, second))
+
+        assertEquals(1, summary.distinctArtists)
+        assertEquals("Artist A", summary.topArtists.single().name)
+        assertEquals(2, summary.topArtists.single().plays)
+        assertEquals(1, summary.distinctAlbums)
+        assertEquals("Shared album", summary.topAlbums.single().name)
+        assertEquals("Artist A", summary.topAlbums.single().artist)
+        assertEquals(2, summary.topAlbums.single().plays)
+        assertEquals("https://example.com/album.jpg", summary.topAlbums.single().artworkUrl)
+    }
+
+    @Test
     fun syncedHistoryHandlesEmptyAndMissingAlbumMetadata() {
         val empty = buildSyncedHistorySummary(emptyList())
         assertEquals(0, empty.totalPlays)
