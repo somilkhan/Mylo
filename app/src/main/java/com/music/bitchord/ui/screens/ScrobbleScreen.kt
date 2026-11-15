@@ -209,9 +209,16 @@ fun ScrobbleScreen(
             loadingSyncedStats = false
         }
     }
-    LaunchedEffect(syncedHistory.isNotEmpty(), syncingYouTubeHistory) {
-        if ((syncedHistory.isNotEmpty() || syncingYouTubeHistory) && !statsSourceManuallySelected) {
-            statsSource = ScrobbleStatsSource.YOUTUBE_MUSIC
+    LaunchedEffect(syncedHistory.isNotEmpty(), syncingYouTubeHistory, statsSourceManuallySelected) {
+        if (!statsSourceManuallySelected) {
+            // Follow the available source automatically in both directions.
+            // If a previous account sync is cleared or disabled, don't leave
+            // Stats stranded on an empty YouTube Music source.
+            statsSource = if (syncedHistory.isNotEmpty() || syncingYouTubeHistory) {
+                ScrobbleStatsSource.YOUTUBE_MUSIC
+            } else {
+                ScrobbleStatsSource.DEVICE
+            }
         }
     }
     var statsMenuExpanded by remember { mutableStateOf(false) }
