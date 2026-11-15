@@ -37,6 +37,7 @@ class ScrobbleMixLogicTest {
 
         val result = buildRadioMix(
             radio = listOf(seed, radioOne, radioEdit, incomplete),
+            similar = listOf(similar),
             favourites = listOf(favourite, duplicate),
             recent = listOf(recent),
             discovery = listOf(discovery),
