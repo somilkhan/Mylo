@@ -177,6 +177,7 @@ fun ScrobbleScreen(
     onViewPlaylists: () -> Unit,
     workScope: kotlinx.coroutines.CoroutineScope,
     syncedHistory: List<Song> = emptyList(),
+    syncingYouTubeHistory: Boolean = false,
     modifier: Modifier = Modifier,
     reduceMotion: Boolean = false,
 ) {
@@ -1016,7 +1017,7 @@ fun ScrobbleScreen(
                                     )
                                 } else {
                                     Text(
-                                        "ALL SYNCED HISTORY",
+                                        if (syncingYouTubeHistory) "UPDATING HISTORY" else "ALL SYNCED HISTORY",
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         fontWeight = FontWeight.SemiBold,
@@ -1033,6 +1034,11 @@ fun ScrobbleScreen(
                             }
                         }
                         when {
+                            statsSource == ScrobbleStatsSource.YOUTUBE_MUSIC && syncedStats.totalPlays == 0 && syncingYouTubeHistory -> {
+                                item("stats-youtube-syncing") {
+                                    LoadingLine("Syncing YouTube Music listening history")
+                                }
+                            }
                             statsSource == ScrobbleStatsSource.YOUTUBE_MUSIC && syncedStats.totalPlays == 0 -> {
                                 item("stats-youtube-empty") {
                                     EmptyPanel(
