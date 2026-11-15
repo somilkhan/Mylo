@@ -124,7 +124,7 @@ internal fun buildYouTubeFirstMix(
         }
         if (lastFmIndex < lastFmTracks.size && result.size < limit) {
             val track = lastFmTracks[lastFmIndex++]
-            if (seen.add(recommendationIdentity(track))) result += track
+            if (seenVideoIds.add(track.videoId) && seenNames.add(recommendationIdentity(track))) result += track
         }
     }
     return result
