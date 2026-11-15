@@ -239,12 +239,25 @@ fun ScrobbleScreen(
         val apiKey = AppSettings.lastfmApiKey.value
         val secret = AppSettings.lastfmSecret.value
         if (apiKey.isNotBlank() && secret.isNotBlank()) {
-            LastFM.configure(
-                endpoint = AppSettings.lastfmEndpoint.value.ifBlank { LastFM.DEFAULT_API_ENDPOINT },
-                apiKey = apiKey,
-                secret = secret,
-                sessionKey = AppSettings.lastfmSessionKey.value.takeIf(String::isNotBlank) ?: LastFM.sessionKey,
-            )
+            val sessionKey = AppSettings.lastfmSessionKey.value.takeIf(String::isNotBlank) ?: LastFM.sessionKey
+            val endpoint = AppSettings.lastfmEndpoint.value.ifBlank { LastFM.DEFAULT_API_ENDPOINT }
+            runCatching {
+                LastFM.configure(
+                    endpoint = endpoint,
+                    apiKey = apiKey,
+                    secret = secret,
+                    sessionKey = sessionKey,
+                )
+            }.onFailure {
+                // A stale custom endpoint must not take down Scrobble; retain
+                // the public Last.fm default for discovery if the saved URL is invalid.
+                LastFM.configure(
+                    endpoint = LastFM.DEFAULT_API_ENDPOINT,
+                    apiKey = apiKey,
+                    secret = secret,
+                    sessionKey = sessionKey,
+                )
+            }
         }
     }
 
