@@ -18,6 +18,10 @@ internal fun songIdentity(song: Song): String =
         ?: song.videoId.takeIf(String::isNotBlank)?.let { "video:$it" }
         ?: "${song.title.lowercase()}|${song.artist.lowercase()}"
 
+/** Same normalized title+artist identity used by LastWave GeneratedTrack.key. */
+internal fun recommendationIdentity(song: Song): String =
+    "${song.title.trim().replace(Regex("\\s+"), " ").lowercase()}|${song.artist.trim().replace(Regex("\\s+"), " ").lowercase()}"
+
 /**
  * Rediscover only counts completed plays from ListeningStats, not raw history
  * rows: a two-second skip is recorded in ListeningHistory but is not a play.
@@ -67,7 +71,7 @@ internal fun buildTagMix(
         }
     }
     .filter(::isYouTubeCatalogTrack)
-    .distinctBy(::songIdentity)
+    .distinctBy(::recommendationIdentity)
     .take(limit.coerceAtLeast(0))
     .toList()
 
@@ -81,7 +85,7 @@ internal fun buildLibraryMix(
     limit: Int = 25,
 ): List<Song> = (library.likedSongs + library.librarySongs).asSequence()
     .filter(::isYouTubeCatalogTrack)
-    .distinctBy(::songIdentity)
+    .distinctBy(::recommendationIdentity)
     .take(limit.coerceAtLeast(0))
     .toList()
 
@@ -97,8 +101,10 @@ internal fun buildYouTubeFirstMix(
 ): List<Song> {
     if (limit <= 0) return emptyList()
     val seen = mutableSetOf<String>()
-    val youtubeTracks = youtube.distinctBy(::songIdentity)
-    val lastFmTracks = lastFm.distinctBy(::songIdentity)
+    val youtubeTracks = youtube.filter { it.title.isNotBlank() && it.artist.isNotBlank() && it.videoId.isNotBlank() }
+        .distinctBy(::recommendationIdentity)
+    val lastFmTracks = lastFm.filter { it.title.isNotBlank() && it.artist.isNotBlank() && it.videoId.isNotBlank() }
+        .distinctBy(::recommendationIdentity)
     val result = ArrayList<Song>(minOf(limit, youtubeTracks.size + lastFmTracks.size))
     var youtubeIndex = 0
     var lastFmIndex = 0
@@ -106,7 +112,7 @@ internal fun buildYouTubeFirstMix(
         repeat(2) {
             if (youtubeIndex < youtubeTracks.size && result.size < limit) {
                 val track = youtubeTracks[youtubeIndex++]
-                if (seen.add(songIdentity(track))) result += track
+                if (seen.add(recommendationIdentity(track))) result += track
             }
         }
         if (lastFmIndex < lastFmTracks.size && result.size < limit) {
@@ -131,7 +137,7 @@ internal fun buildPrecheckedMix(
     val valid = candidates.filter {
         it.title.isNotBlank() && it.artist.isNotBlank() && it.videoId.isNotBlank()
     }.filter { song ->
-        val nameKey = "${song.title.trim().replace(Regex("\\s+"), " ").lowercase()}|${song.artist.trim().replace(Regex("\\s+"), " ").lowercase()}"
+        val nameKey = recommendationIdentity(song)
         // Match LastWave GeneratedTrack.sameSongAs: exact catalogue ID or
         // normalized title+artist identity, whichever catches the duplicate.
         // Like LastWave's distinctSongs(), a duplicate video ID is
