@@ -32,7 +32,7 @@ internal object ScrobbleRecommendationEngine {
     )
 
     private const val TASTE_PROFILE_TTL_MILLIS = 60L * 60 * 1000
-    private const val SOURCE_TIMEOUT_MILLIS = 5_000L
+    private const val SOURCE_TIMEOUT_MILLIS = 4_000L
     private data class CachedTasteTags(val username: String, val loadedAtMillis: Long, val tags: List<String>)
     private val tasteProfileMutex = Mutex()
     private var cachedTasteTags: CachedTasteTags? = null
