@@ -106,9 +106,11 @@ import com.music.bitchord.data.stats.ReplayPeriod
 import com.music.bitchord.data.stats.ReplaySummary
 import com.music.bitchord.data.stats.RankedSong
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.delay
 import kotlin.math.roundToLong
 
@@ -137,6 +139,8 @@ private enum class StatsView(val label: String, val period: ReplayPeriod) {
     TOP_ARTISTS("Top Artists", ReplayPeriod.ALL_TIME),
     TOP_ALBUMS("Top Albums", ReplayPeriod.ALL_TIME),
 }
+
+private const val SCROBBLE_GENERATION_TIMEOUT_MS = 60_000L
 
 internal const val SCROBBLE_TAB_STATS = 0
 internal const val SCROBBLE_TAB_GENERATE = 1
@@ -317,13 +321,20 @@ fun ScrobbleScreen(
         mixSaved = false
         generatedMix = emptyList()
         try {
-            val generated = when (mixMode) {
+            val generated = withTimeout(SCROBBLE_GENERATION_TIMEOUT_MS) {
+                when (mixMode) {
                 ScrobbleMixMode.FAVOURITES -> topTracks.take(mixTrackCount)
                 ScrobbleMixMode.RECENT -> recentTracks.take(mixTrackCount)
                 ScrobbleMixMode.TASTE_MIX -> {
                     val excluded = (syncedHistory.map { it.videoId } + listens.map { it.song.videoId }).filter(String::isNotBlank).toSet()
                     val fresh = recommendations.ifEmpty {
-                        runCatching { YtMusicRepository.quickPicks(excluded).getOrThrow() }.getOrDefault(emptyList())
+                        try {
+                            YtMusicRepository.quickPicks(excluded).getOrThrow()
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                            emptyList()
+                        }
                     }
                     (topTracks.take(12) + recentTracks.take(12) + fresh.filter { it.videoId.isNotBlank() && it.videoId !in excluded })
                         .distinctBy(::songIdentity).shuffled().take(mixTrackCount)
@@ -371,6 +382,7 @@ fun ScrobbleScreen(
                         .filter { it.videoId.isNotBlank() && it.videoId != seed.videoId }
                         .distinctBy(::songIdentity).take(mixTrackCount)
                 }
+                }
             }
             if (generated.isEmpty()) throw IllegalStateException("No tracks were available for this mix. Try another mode or refresh your listening data.")
             generatedMix = generated
@@ -386,6 +398,8 @@ fun ScrobbleScreen(
                 ScrobbleMixMode.LIBRARY -> "Your library mix"
                 ScrobbleMixMode.REDISCOVER -> "Rediscover"
             }
+        } catch (_: TimeoutCancellationException) {
+            generationError = "Playlist generation timed out. Check your connection and try again."
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
@@ -405,12 +419,15 @@ fun ScrobbleScreen(
         try {
             val excluded = (syncedHistory.map { it.videoId } + listens.map { it.song.videoId } + topTracks.map { it.videoId })
                 .filter(String::isNotBlank).toSet()
-            val result = YtMusicRepository.quickPicks(excluded)
-            result.exceptionOrNull()?.let { throw it }
-            recommendations = result.getOrNull().orEmpty()
+            val result = withTimeout(SCROBBLE_GENERATION_TIMEOUT_MS) {
+                YtMusicRepository.quickPicks(excluded).getOrThrow()
+            }
+            recommendations = result
                  .filter { it.videoId.isNotBlank() && it.videoId !in excluded }
                 .distinctBy(::songIdentity)
             recommendationsFailed = false
+        } catch (_: TimeoutCancellationException) {
+            recommendationsFailed = true
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {
