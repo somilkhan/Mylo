@@ -67,6 +67,35 @@ internal fun buildRediscoverMix(
 
 
 /**
+ * Discovery is deliberately different from Never Heard: it uses whatever
+ * discovery feed is available, but still rejects previously heard tracks and
+ * alternate catalogue uploads by title/artist, not only by video ID.
+ */
+internal fun buildDiscoverMix(
+    candidates: List<Song>,
+    heardVideoIds: Set<String>,
+    heardSongs: List<Song> = emptyList(),
+    limit: Int = 25,
+): List<Song> {
+    if (limit <= 0) return emptyList()
+    val heardByArtist = heardSongs
+        .filter { it.title.isNotBlank() && it.artist.isNotBlank() }
+        .groupBy { it.artist.trim().replace(Regex("\\s+"), " ").lowercase() }
+    val fresh = candidates.filter { candidate ->
+        if (!isYouTubeCatalogTrack(candidate) || candidate.videoId in heardVideoIds) {
+            false
+        } else {
+            val artistKey = candidate.artist.trim().replace(Regex("\\s+"), " ").lowercase()
+            heardByArtist[artistKey].orEmpty().none { heard ->
+                recommendationIdentity(candidate) == recommendationIdentity(heard) ||
+                    isSameSongOrEdit(candidate, heard)
+            }
+        }
+    }
+    return distinctRecommendationSongs(fresh).take(limit)
+}
+
+/**
  * Tag generation uses Mylo's real YouTube Music song search. Browse cards are
  * deliberately ignored: this generator must return playable tracks only.
  */
