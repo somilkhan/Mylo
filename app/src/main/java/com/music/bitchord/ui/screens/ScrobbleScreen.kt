@@ -208,7 +208,38 @@ fun ScrobbleScreen(
     var playlistQuery by remember { mutableStateOf("") }
     var playlistSortMode by remember { mutableStateOf(ScrobblePlaylistSortMode.RECENT) }
     var pendingExport by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var coverEditorPlaylist by remember { mutableStateOf<String?>(null) }
+    var coverPickerPlaylist by remember { mutableStateOf<String?>(null) }
+    var generatingSimilarPlaylist by remember { mutableStateOf<String?>(null) }
     val exportScope = rememberCoroutineScope()
+    fun releaseCoverPermission(uri: String?) {
+        if (!uri.isNullOrBlank()) {
+            runCatching {
+                context.contentResolver.releasePersistableUriPermission(
+                    android.net.Uri.parse(uri),
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                )
+            }
+        }
+    }
+    val coverPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        val title = coverPickerPlaylist
+        coverPickerPlaylist = null
+        if (uri != null && title != null) {
+            val permissionGranted = runCatching {
+                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }.isSuccess
+            if (!permissionGranted) {
+                Toast.makeText(context, "Couldn't keep access to that image. Choose another one.", Toast.LENGTH_LONG).show()
+            } else if (ScrobblePlaylistStore.playlists.any { it.title == title }) {
+                val previous = ScrobblePlaylistStore.setCover(title, uri.toString())
+                if (previous != uri.toString()) releaseCoverPermission(previous)
+                Toast.makeText(context, "Playlist cover updated", Toast.LENGTH_SHORT).show()
+            } else {
+                releaseCoverPermission(uri.toString())
+            }
+        }
+    }
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val destination = result.data?.data
         val payload = pendingExport
@@ -362,6 +393,85 @@ fun ScrobbleScreen(
                     .onFailure { Toast.makeText(context, "Couldn't share this playlist", Toast.LENGTH_SHORT).show() }
             }.onFailure {
                 Toast.makeText(context, "Couldn't prepare this playlist for sharing", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+    val generateSimilarPlaylist: (SavedScrobblePlaylist) -> Unit = { playlist ->
+        val seeds = playlist.songs.filter(::isYouTubeCatalogTrack).distinctBy(::songIdentity).take(3)
+        if (generatingSimilarPlaylist != null) {
+            Toast.makeText(context, "Another similar mix is already being built", Toast.LENGTH_SHORT).show()
+        } else if (seeds.isEmpty()) {
+            Toast.makeText(context, "This playlist has no playable YouTube Music seed tracks", Toast.LENGTH_SHORT).show()
+        } else {
+            exportScope.launch {
+                generatingSimilarPlaylist = playlist.title
+                try {
+                    val generated = withTimeout(SCROBBLE_GENERATION_TIMEOUT_MS) {
+                        val excluded = playlist.songs.mapTo(mutableSetOf(), ::songIdentity)
+                        val radioTracks = coroutineScope {
+                            seeds.map { seed ->
+                                async {
+                                    try {
+                                        YtMusicRepository.radio(seed.videoId).getOrThrow()
+                                            .filter { isYouTubeCatalogTrack(it) && songIdentity(it) !in excluded }
+                                    } catch (cancelled: CancellationException) {
+                                        throw cancelled
+                                    } catch (_: Exception) {
+                                        emptyList()
+                                    }
+                                }
+                            }.awaitAll().flatten()
+                        }.distinctBy(::songIdentity)
+                        val lastFmArtists = if (lastFmDiscoveryAvailable) {
+                            coroutineScope {
+                                seeds.map { it.artist }.distinct().take(2).map { artist ->
+                                    async {
+                                        try {
+                                            LastFM.getSimilarArtists(artist, limit = 4).getOrThrow()
+                                        } catch (cancelled: CancellationException) {
+                                            throw cancelled
+                                        } catch (_: Exception) {
+                                            emptyList()
+                                        }
+                                    }
+                                }.awaitAll().flatten().distinct().take(6)
+                            }
+                        } else {
+                            emptyList()
+                        }
+                        val lastFmTracks = coroutineScope {
+                            lastFmArtists.map { artist ->
+                                async {
+                                    try {
+                                        buildTagMix(
+                                            YtMusicRepository.search("$artist songs", SearchFilter.SONGS).getOrThrow(),
+                                            limit = 4,
+                                        ).filter { songIdentity(it) !in excluded }
+                                    } catch (cancelled: CancellationException) {
+                                        throw cancelled
+                                    } catch (_: Exception) {
+                                        emptyList()
+                                    }
+                                }
+                            }.awaitAll().flatten()
+                        }
+                        buildBalancedSourceMix(radioTracks, lastFmTracks, limit = 35)
+                    }
+                    when {
+                        generated.isEmpty() -> Toast.makeText(context, "No similar tracks were found. Try another playlist.", Toast.LENGTH_LONG).show()
+                        !ScrobblePlaylistStore.save("\${playlist.title} Mix", "Inspired by \${playlist.title}", generated) ->
+                            Toast.makeText(context, "You have 20 saved mixes. Remove one before saving another.", Toast.LENGTH_LONG).show()
+                        else -> Toast.makeText(context, "Created a new mix inspired by \${playlist.title}", Toast.LENGTH_SHORT).show()
+                    }
+                } catch (_: TimeoutCancellationException) {
+                    Toast.makeText(context, "Similar mix generation timed out. Check your connection and try again.", Toast.LENGTH_LONG).show()
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    Toast.makeText(context, error.message ?: "Couldn't generate a similar mix", Toast.LENGTH_LONG).show()
+                } finally {
+                    generatingSimilarPlaylist = null
+                }
             }
         }
     }
@@ -624,13 +734,63 @@ fun ScrobbleScreen(
                 text = { Text("‘$title’ will be removed from this device. Your listening history will stay untouched.") },
                 confirmButton = {
                     TextButton(onClick = {
-                        ScrobblePlaylistStore.remove(title)
+                        releaseCoverPermission(ScrobblePlaylistStore.remove(title))
                         if (openedPlaylist == title) openedPlaylist = null
+                        if (coverEditorPlaylist == title) coverEditorPlaylist = null
                         pendingRemovePlaylist = null
                     }) { Text("Remove") }
                 },
                 dismissButton = { TextButton(onClick = { pendingRemovePlaylist = null }) { Text("Cancel") } },
             )
+        }
+        coverEditorPlaylist?.let { title ->
+            savedPlaylists.firstOrNull { it.title == title }?.let { playlist ->
+                androidx.compose.material3.AlertDialog(
+                    onDismissRequest = { coverEditorPlaylist = null },
+                    title = { Text("Playlist cover") },
+                    text = {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            PlaylistArtwork(playlist.songs, playlist.coverUri, Modifier.size(144.dp))
+                            Text(
+                                if (playlist.coverUri.isNullOrBlank()) "Using the playlist's automatic artwork."
+                                else "Your selected image is saved with this playlist on this device.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center,
+                            )
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                coverPickerPlaylist = title
+                                coverEditorPlaylist = null
+                                runCatching { coverPicker.launch(arrayOf("image/*")) }.onFailure {
+                                    coverPickerPlaylist = null
+                                    Toast.makeText(context, "Couldn't open the image picker", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                        ) { Text(if (playlist.coverUri.isNullOrBlank()) "Choose image" else "Change image") }
+                    },
+                    dismissButton = {
+                        Row {
+                            if (!playlist.coverUri.isNullOrBlank()) {
+                                TextButton(
+                                    onClick = {
+                                        releaseCoverPermission(ScrobblePlaylistStore.setCover(title, null))
+                                        coverEditorPlaylist = null
+                                    },
+                                ) { Text("Use automatic") }
+                            }
+                            TextButton(onClick = { coverEditorPlaylist = null }) { Text("Done") }
+                        }
+                    },
+                )
+            }
         }
         SharedTransitionLayout(modifier = Modifier.fillMaxSize()) {
         AnimatedContent(
@@ -1292,7 +1452,7 @@ fun ScrobbleScreen(
                                     elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                                 ) {
                                     Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                                        ArtworkMosaic(selected.songs, Modifier.fillMaxWidth().height(188.dp))
+                                        PlaylistArtwork(selected.songs, selected.coverUri, Modifier.fillMaxWidth().height(188.dp))
                                         Text(selected.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                                         Text(selected.reason, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                         Text("${selected.songs.size} tracks · Saved on this device", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
@@ -1391,6 +1551,7 @@ fun ScrobbleScreen(
                                                 ) {
                                                     ArtworkMosaic(
                                                         playlist.songs,
+                                                        playlist.coverUri,
                                                         Modifier.size(96.dp)
                                                             .then(if (reduceMotion) Modifier else Modifier.sharedElement(
                                                                 sharedContentState = sharedArtworkState,
@@ -1409,6 +1570,24 @@ fun ScrobbleScreen(
                                                     IconButton(onClick = { menuExpanded = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "More playlist actions") }
                                                     DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
                                                         DropdownMenuItem(text = { Text("Open") }, onClick = { menuExpanded = false; openedPlaylist = playlist.title })
+                                                        DropdownMenuItem(
+                                                            text = { Text(if (generatingSimilarPlaylist == playlist.title) "Generating similar…" else "Generate similar") },
+                                                            enabled = generatingSimilarPlaylist == null && playlist.songs.any(::isYouTubeCatalogTrack),
+                                                            onClick = { menuExpanded = false; generateSimilarPlaylist(playlist) },
+                                                        )
+                                                        DropdownMenuItem(
+                                                            text = { Text("Change cover") },
+                                                            onClick = { menuExpanded = false; coverEditorPlaylist = playlist.title },
+                                                        )
+                                                        if (!playlist.coverUri.isNullOrBlank()) {
+                                                            DropdownMenuItem(
+                                                                text = { Text("Use automatic cover") },
+                                                                onClick = {
+                                                                    menuExpanded = false
+                                                                    releaseCoverPermission(ScrobblePlaylistStore.setCover(playlist.title, null))
+                                                                },
+                                                            )
+                                                        }
                                                         DropdownMenuItem(text = { Text("Rename") }, onClick = {
                                                             menuExpanded = false
                                                             renamePlaylistDraft = playlist.title
