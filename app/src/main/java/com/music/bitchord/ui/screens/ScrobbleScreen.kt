@@ -885,6 +885,7 @@ fun ScrobbleScreen(
                                                             ))
                                                             .clip(RoundedCornerShape(18.dp)),
                                                     )
+                                                    Spacer(Modifier.width(13.dp))
                                                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                                         Text(playlist.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                                         Text("${playlist.songs.size} tracks", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
