@@ -849,6 +849,25 @@ fun ScrobbleScreen(
                             item("generate-seed") {
                                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                     Text(if (mixMode == ScrobbleMixMode.RADIO) "Choose a starting track" else "Choose an artist", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                                    val seeds = (recentTracks + topTracks).filter(::isYouTubeCatalogTrack).distinctBy(::songIdentity).take(12)
+                                    selectedSeed?.takeIf(::isYouTubeCatalogTrack)?.let { seed ->
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f))
+                                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                        ) {
+                                            Column(Modifier.weight(1f)) {
+                                                Text("Selected seed", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                                                Text("${seed.title} · ${seed.artist}", style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                            }
+                                            TextButton(onClick = {
+                                                selectedSeed = null
+                                                generatedMix = emptyList()
+                                                generationError = null
+                                            }) { Text("Clear") }
+                                        }
+                                    }
                                     OutlinedTextField(
                                         value = seedSearchQuery,
                                         onValueChange = {
@@ -878,7 +897,7 @@ fun ScrobbleScreen(
                                     seedSearchError?.let { message ->
                                         Text(message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                                     }
-                                    seedSearchResults.forEach { song ->
+                                    seedSearchResults.filterNot { result -> seeds.any { songIdentity(it) == songIdentity(result) } }.forEach { song ->
                                         val seedSelected = selectedSeed?.videoId == song.videoId
                                         Row(
                                             Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
@@ -903,7 +922,6 @@ fun ScrobbleScreen(
                                             if (seedSelected) Text("Selected", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                                         }
                                     }
-                                    val seeds = (recentTracks + topTracks).filter(::isYouTubeCatalogTrack).distinctBy(::songIdentity).take(12)
                                     if (seeds.isEmpty() && seedSearchResults.isEmpty()) {
                                         if (mixMode == ScrobbleMixMode.RADIO) {
                                             EmptyPanel("No radio seed yet", "Search YouTube Music above to choose a track, even if your listening history is empty.")
