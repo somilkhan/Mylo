@@ -411,16 +411,23 @@ fun ScrobbleScreen(
                                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.82f)),
                                             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                                         ) {
-                                            Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                                Text("LISTENING TIME", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.SemiBold)
-                                                AnimatedValueText(
-                                                    value = summary!!.totalMs / 60_000L,
-                                                    reduceMotion = reduceMotion,
-                                                    style = MaterialTheme.typography.displaySmall,
-                                                    color = MaterialTheme.colorScheme.onSurface,
-                                                    formatter = { formatListeningTime(it * 60_000L) },
-                                                )
-                                                Text("Listening captured on this device", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            Row(
+                                                Modifier.fillMaxWidth().padding(20.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                            ) {
+                                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                    Text("YOUR LISTENING JOURNAL", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, letterSpacing = 1.3.sp)
+                                                    AnimatedValueText(
+                                                        value = summary!!.totalMs / 60_000L,
+                                                        reduceMotion = reduceMotion,
+                                                        style = MaterialTheme.typography.displaySmall,
+                                                        color = MaterialTheme.colorScheme.onSurface,
+                                                        formatter = { formatListeningTime(it * 60_000L) },
+                                                    )
+                                                    Text("${summary!!.totalPlays} plays · ${summary!!.distinctSongs} tracks", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                }
+                                                ArtworkMosaic(topTracks.take(4), Modifier.size(104.dp))
                                             }
                                         }
                                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -490,11 +497,15 @@ fun ScrobbleScreen(
 
                     SCROBBLE_TAB_GENERATE -> {
                         item("generate-heading") {
-                            PageHeading("Make a mix", "Choose what you want to hear. Mylo builds the queue from your listening and YouTube Music.")
+                            PageHeading("The mix studio", "A soundtrack shaped around your listening. Choose a direction, then let Mylo do the rest.")
                         }
                         item("generate-modes") {
                             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                Text("Choose your listening mood", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text("Choose your sound", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                                    Spacer(Modifier.weight(1f))
+                                    Text("8 MODES", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = 1.sp)
+                                }
                                 ScrobbleMixMode.entries.chunked(2).forEach { rowModes ->
                                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                         rowModes.forEach { mode ->
@@ -520,8 +531,29 @@ fun ScrobbleScreen(
                                                         mixSaved = false
                                                     }
                                                     .padding(horizontal = 13.dp, vertical = 14.dp),
-                                                verticalArrangement = Arrangement.spacedBy(6.dp),
+                                                verticalArrangement = Arrangement.spacedBy(9.dp),
                                             ) {
+                                                Box(
+                                                    Modifier.size(34.dp).clip(RoundedCornerShape(11.dp))
+                                                        .background(if (selectedMode) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f) else MaterialTheme.colorScheme.surfaceVariant),
+                                                    contentAlignment = Alignment.Center,
+                                                ) {
+                                                    Icon(
+                                                        imageVector = when (mode) {
+                                                            ScrobbleMixMode.FAVOURITES -> Icons.Rounded.History
+                                                            ScrobbleMixMode.RECENT -> Icons.Rounded.Refresh
+                                                            ScrobbleMixMode.TASTE_MIX -> Icons.Rounded.GraphicEq
+                                                            ScrobbleMixMode.RADIO -> Icons.Rounded.PlayArrow
+                                                            ScrobbleMixMode.ARTIST_MIX -> Icons.Rounded.Explore
+                                                            ScrobbleMixMode.NEVER_HEARD -> Icons.Rounded.Search
+                                                            ScrobbleMixMode.DISCOVER -> Icons.Rounded.Explore
+                                                            ScrobbleMixMode.REDISCOVER -> Icons.Rounded.History
+                                                        },
+                                                        contentDescription = null,
+                                                        tint = if (selectedMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                        modifier = Modifier.size(19.dp),
+                                                    )
+                                                }
                                                 Row(
                                                     modifier = Modifier.fillMaxWidth(),
                                                     verticalAlignment = Alignment.CenterVertically,
@@ -640,7 +672,21 @@ fun ScrobbleScreen(
                         }
                         if (generatedMix.isNotEmpty()) {
                             item("generated-result-heading") {
-                                PageHeading(generatedTitle, "${generatedMix.size} tracks ready", eyebrow = false)
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(26.dp),
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                                ) {
+                                    Row(Modifier.fillMaxWidth().padding(18.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                                        ArtworkMosaic(generatedMix, Modifier.size(112.dp))
+                                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                                            Text("YOUR NEW MIX", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
+                                            Text(generatedTitle, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                            Text("${generatedMix.size} tracks · ${mixMode.description}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                                        }
+                                    }
+                                }
                             }
                             itemsIndexed(generatedMix, key = { _, song -> "generated-${songIdentity(song)}" }) { index, song ->
                                 TrackRow(song, onClick = { onPlayPlaylist(generatedTitle, generatedMix, index) })
@@ -759,7 +805,7 @@ fun ScrobbleScreen(
                                 }
                                 .let { matches -> if (playlistSortNewest) matches else matches.sortedBy { it.title.lowercase() } }
                             item("playlists-heading") {
-                                PageHeading("Your library", "${savedPlaylists.size} saved mixes · Stored on this device")
+                                PageHeading("Your collections", "${savedPlaylists.size} saved mixes · Made by you, kept on this device")
                             }
                             if (savedPlaylists.isNotEmpty()) {
                                 item("playlists-search") {
@@ -823,7 +869,7 @@ fun ScrobbleScreen(
                                                         model = playlist.songs.firstOrNull()?.thumbnailUrl,
                                                         contentDescription = null,
                                                         contentScale = ContentScale.Crop,
-                                                        modifier = Modifier.size(76.dp)
+                                                        modifier = Modifier.size(96.dp)
                                                             .then(if (reduceMotion) Modifier else Modifier.sharedElement(
                                                                 sharedContentState = sharedArtworkState,
                                                                 animatedVisibilityScope = pageVisibilityScope,
@@ -1063,15 +1109,16 @@ private fun LoadingLine(label: String) {
 @Composable
 private fun TrackRow(song: Song, supporting: String = "", onClick: () -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
-            .clickable(role = Role.Button, onClick = onClick).padding(vertical = 7.dp),
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.26f))
+            .clickable(role = Role.Button, onClick = onClick).padding(horizontal = 10.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         AsyncImage(
             model = song.thumbnailUrl,
             contentDescription = null,
             contentScale = ContentScale.Crop,
-            modifier = Modifier.size(48.dp).clip(RoundedCornerShape(10.dp)),
+            modifier = Modifier.size(52.dp).clip(RoundedCornerShape(12.dp)),
         )
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -1152,6 +1199,37 @@ private fun AnimatedValueText(
 
 private fun playlistSharedElementKey(songs: List<Song>): String =
     "scrobble-playlist-art-${songs.joinToString(separator = "|") { songIdentity(it) }}"
+
+@Composable
+private fun ArtworkMosaic(songs: List<Song>, modifier: Modifier = Modifier) {
+    val shape = RoundedCornerShape(18.dp)
+    val covers = songs.take(4)
+    if (covers.isEmpty()) {
+        Box(
+            modifier.clip(shape).background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(Icons.Rounded.GraphicEq, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp))
+        }
+    } else {
+        Row(modifier.clip(shape), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+            val left = covers.take(2)
+            Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                left.forEach { song ->
+                    AsyncImage(model = song.thumbnailUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.weight(1f).fillMaxWidth())
+                }
+                if (left.size == 1) Spacer(Modifier.weight(1f))
+            }
+            val right = covers.drop(2).take(2)
+            Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                right.forEach { song ->
+                    AsyncImage(model = song.thumbnailUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.weight(1f).fillMaxWidth())
+                }
+                if (right.size < 2) Spacer(Modifier.weight((2 - right.size).toFloat()))
+            }
+        }
+    }
+}
 
 private fun formatListeningTime(totalMs: Long): String {
     val totalMinutes = totalMs / 60_000
