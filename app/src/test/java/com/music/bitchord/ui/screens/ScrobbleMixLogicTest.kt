@@ -298,6 +298,22 @@ class ScrobbleMixLogicTest {
     }
 
     @Test
+    fun artistCapDeduplicatesAlternateUploadsBeforeApplyingDiversity() {
+        val original = Song("original001", "Night Drive", "Artist A", null)
+        val alternate = Song("alternate01", "Night Drive - Official Audio", "Artist A", null)
+        val other = Song("othertrack01", "Morning Light", "Artist B", null)
+
+        assertEquals(
+            listOf(original, other),
+            buildArtistCappedMix(
+                candidates = listOf(original, alternate, other),
+                seedArtist = "Artist A",
+                targetSize = 10,
+            ),
+        )
+    }
+
+    @Test
     fun similarArtistMixExcludesSeedArtistAndBalancesOtherArtists() {
         val seedOne = Song("seedtrk0001", "Seed song", "Seed Artist", null)
         val seedTwo = Song("seedtrk0002", "Another seed song", "Seed Artist feat. Guest", null)
