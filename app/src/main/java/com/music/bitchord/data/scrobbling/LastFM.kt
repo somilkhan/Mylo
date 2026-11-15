@@ -153,6 +153,21 @@ internal fun parseLastFmTopArtists(response: String, limit: Int = 30): List<Last
     }.distinctBy { it.name.lowercase(Locale.ROOT) }.take(limit)
 }
 
+internal fun parseLastFmTopTags(response: String, limit: Int = 30): List<LastFM.RankedTag> {
+    if (limit <= 0) return emptyList()
+    val root = runCatching { Json.parseToJsonElement(response) as? JsonObject }.getOrNull() ?: return emptyList()
+    val rows = root["toptags"] as? JsonObject ?: return emptyList()
+    return parseLastFmObjects(rows["tag"]).mapNotNull { tag ->
+        val name = tag.textValue("name")
+        if (name.isBlank()) null else LastFM.RankedTag(
+            name = name,
+            count = tag.textValue("count").toLongOrNull() ?: 0L,
+        )
+    }.distinctBy { it.name.trim().lowercase(Locale.ROOT) }
+        .sortedWith(compareByDescending<LastFM.RankedTag> { it.count }.thenBy { it.name.lowercase(Locale.ROOT) })
+        .take(limit)
+}
+
 internal fun parseLastFmTopAlbums(response: String, limit: Int = 20): List<LastFM.RankedAlbum> {
     if (limit <= 0) return emptyList()
     val root = runCatching { Json.parseToJsonElement(response) as? JsonObject }.getOrNull() ?: return emptyList()
@@ -355,6 +370,7 @@ object LastFM {
     data class RankedTrack(val name: String, val artist: String, val playCount: Long, val artworkUrl: String?)
     data class RankedArtist(val name: String, val playCount: Long, val artworkUrl: String?)
     data class RankedAlbum(val name: String, val artist: String, val playCount: Long, val artworkUrl: String?)
+    data class RankedTag(val name: String, val count: Long)
 
     private val supportedStatsPeriods = setOf("overall", "7day", "1month", "3month", "6month", "12month")
 
@@ -378,6 +394,19 @@ object LastFM {
                 extra = mapOf("user" to user, "period" to period, "limit" to limit.coerceIn(1, 100).toString()),
             )
             parseLastFmTopTracks(response, limit)
+        }
+
+    /** User taste tags power LastWave's primary and neighbouring genre sources. */
+    suspend fun getTopTags(username: String, limit: Int = 30): Result<List<RankedTag>> =
+        discoveryResult {
+            require(isInitialized()) { "Last.fm API credentials are not configured" }
+            val user = username.trim()
+            require(user.isNotBlank()) { "Connect a Last.fm username to load listening tags" }
+            val response = postAndRead(
+                "user.gettoptags",
+                extra = mapOf("user" to user, "limit" to limit.coerceIn(1, 100).toString()),
+            )
+            parseLastFmTopTags(response, limit)
         }
 
     suspend fun getTopArtists(username: String, period: String = "overall", limit: Int = 30): Result<List<RankedArtist>> =
@@ -458,14 +487,18 @@ object LastFM {
         }
 
     /** Public Last.fm tag chart; results are later resolved to playable YouTube Music tracks. */
-    suspend fun getTagTopTracks(tag: String, limit: Int = 12): Result<List<DiscoveryTrack>> =
+    suspend fun getTagTopTracks(tag: String, limit: Int = 12, page: Int = 1): Result<List<DiscoveryTrack>> =
         discoveryResult {
             require(isInitialized()) { "Last.fm API credentials are not configured for this build" }
             val cleanTag = tag.trim()
             require(cleanTag.isNotBlank()) { "Enter a genre or tag first" }
             val response = postAndRead(
                 method = "tag.gettoptracks",
-                extra = mapOf("tag" to cleanTag, "limit" to limit.coerceIn(1, 50).toString()),
+                extra = mapOf(
+                    "tag" to cleanTag,
+                    "limit" to limit.coerceIn(1, 50).toString(),
+                    "page" to page.coerceAtLeast(1).toString(),
+                ),
             )
             parseLastFmTagTracks(response, limit)
         }
