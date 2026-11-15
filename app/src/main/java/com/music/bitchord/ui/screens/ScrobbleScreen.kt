@@ -151,6 +151,15 @@ private enum class StatsView(val label: String, val period: ReplayPeriod) {
 
 private enum class ScrobbleStatsSource { DEVICE, YOUTUBE_MUSIC, LAST_FM }
 
+private fun ScrobbleTopPeriod.lastFmValue(): String = when (this) {
+    ScrobbleTopPeriod.ALL_TIME -> "overall"
+    ScrobbleTopPeriod.LAST_12_MONTHS -> "12month"
+    ScrobbleTopPeriod.LAST_6_MONTHS -> "6month"
+    ScrobbleTopPeriod.LAST_3_MONTHS -> "3month"
+    ScrobbleTopPeriod.LAST_30_DAYS -> "1month"
+    ScrobbleTopPeriod.LAST_7_DAYS -> "7day"
+}
+
 
 private enum class ScrobbleTopPeriod(val label: String, val period: ReplayPeriod) {
     ALL_TIME("All time", ReplayPeriod.ALL_TIME),
@@ -232,6 +241,7 @@ fun ScrobbleScreen(
     var lastFmTopTracks by remember { mutableStateOf<List<LastFM.RankedTrack>>(emptyList()) }
     var lastFmTopArtists by remember { mutableStateOf<List<LastFM.RankedArtist>>(emptyList()) }
     var lastFmTopAlbums by remember { mutableStateOf<List<LastFM.RankedAlbum>>(emptyList()) }
+    var lastFmStatsPeriod by remember { mutableStateOf(ScrobbleTopPeriod.ALL_TIME) }
     var loadingLastFmStats by remember { mutableStateOf(false) }
     var lastFmStatsFailed by remember { mutableStateOf(false) }
     var generationTopPeriod by remember { mutableStateOf(ScrobbleTopPeriod.ALL_TIME) }
@@ -376,7 +386,7 @@ fun ScrobbleScreen(
         lastFmDiscoveryAvailable = apiKey.isNotBlank() && secret.isNotBlank() && LastFM.isInitialized()
     }
 
-    LaunchedEffect(statsSource, lastFmUsername, lastFmDiscoveryAvailable) {
+    LaunchedEffect(statsSource, lastFmUsername, lastFmDiscoveryAvailable, lastFmStatsPeriod) {
         if (statsSource != ScrobbleStatsSource.LAST_FM) return@LaunchedEffect
         if (!lastFmDiscoveryAvailable || lastFmUsername.isBlank()) {
             lastFmProfile = null
@@ -393,9 +403,9 @@ fun ScrobbleScreen(
             val username = lastFmUsername.trim()
             val (profile, charts) = coroutineScope {
                 val profileCall = async { LastFM.getUserStats(username).getOrThrow() }
-                val tracksCall = async { LastFM.getTopTracks(username, period = "overall", limit = 12).getOrThrow() }
-                val artistsCall = async { LastFM.getTopArtists(username, period = "overall", limit = 12).getOrThrow() }
-                val albumsCall = async { LastFM.getTopAlbums(username, period = "overall", limit = 12).getOrThrow() }
+                val tracksCall = async { LastFM.getTopTracks(username, period = lastFmStatsPeriod.lastFmValue(), limit = 12).getOrThrow() }
+                val artistsCall = async { LastFM.getTopArtists(username, period = lastFmStatsPeriod.lastFmValue(), limit = 12).getOrThrow() }
+                val albumsCall = async { LastFM.getTopAlbums(username, period = lastFmStatsPeriod.lastFmValue(), limit = 12).getOrThrow() }
                 profileCall.await() to Triple(tracksCall.await(), artistsCall.await(), albumsCall.await())
             }
             lastFmProfile = profile
@@ -1335,6 +1345,20 @@ fun ScrobbleScreen(
                                 }
                             }
                             statsSource == ScrobbleStatsSource.LAST_FM && lastFmProfile != null -> {
+                                item("stats-lastfm-period") {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    ) {
+                                        ScrobbleTopPeriod.values().forEach { period ->
+                                            FilterChip(
+                                                selected = lastFmStatsPeriod == period,
+                                                onClick = { lastFmStatsPeriod = period },
+                                                label = { Text(period.label) },
+                                            )
+                                        }
+                                    }
+                                }
                                 item("stats-lastfm-overview") {
                                     InfoPanel(
                                         "Last.fm profile",
@@ -1345,19 +1369,19 @@ fun ScrobbleScreen(
                                     )
                                 }
                                 if (lastFmTopTracks.isNotEmpty()) {
-                                    item("stats-lastfm-tracks-heading") { StatsSectionHeading("Top tracks", "All-time Last.fm chart") }
+                                    item("stats-lastfm-tracks-heading") { StatsSectionHeading("Top tracks", "${lastFmStatsPeriod.label} Last.fm chart") }
                                     items(lastFmTopTracks, key = { "lastfm-track-" + it.artist.lowercase() + "-" + it.name.lowercase() }) { track ->
                                         StatsEntityRow(track.name, track.artist + " · " + track.playCount + " plays", track.artworkUrl)
                                     }
                                 }
                                 if (lastFmTopArtists.isNotEmpty()) {
-                                    item("stats-lastfm-artists-heading") { StatsSectionHeading("Top artists", "All-time Last.fm chart") }
+                                    item("stats-lastfm-artists-heading") { StatsSectionHeading("Top artists", "${lastFmStatsPeriod.label} Last.fm chart") }
                                     items(lastFmTopArtists, key = { "lastfm-artist-" + it.name.lowercase() }) { artist ->
                                         StatsEntityRow(artist.name, artist.playCount.toString() + " plays", artist.artworkUrl)
                                     }
                                 }
                                 if (lastFmTopAlbums.isNotEmpty()) {
-                                    item("stats-lastfm-albums-heading") { StatsSectionHeading("Top albums", "All-time Last.fm chart") }
+                                    item("stats-lastfm-albums-heading") { StatsSectionHeading("Top albums", "${lastFmStatsPeriod.label} Last.fm chart") }
                                     items(lastFmTopAlbums, key = { "lastfm-album-" + it.artist.lowercase() + "-" + it.name.lowercase() }) { album ->
                                         StatsEntityRow(album.name, album.artist + " · " + album.playCount + " plays", album.artworkUrl)
                                     }
