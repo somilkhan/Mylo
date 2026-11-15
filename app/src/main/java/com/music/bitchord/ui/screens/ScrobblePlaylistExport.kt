@@ -1,7 +1,5 @@
 package com.music.bitchord.ui.screens
 
-import com.music.bitchord.data.model.Song
-
 internal enum class ScrobblePlaylistExportFormat(
     val extension: String,
     val mimeType: String,
@@ -68,7 +66,7 @@ internal fun scrobblePlaylistExportFilename(
 
 private fun csvEscape(value: String): String {
     val escaped = value.replace("\"", "\"\"")
-    return if (value.any { it == ',' || it == '"' || it == '\\r' || it == '\\n' }) {
+    return if (value.any { it == ',' || it == '"' || it == '\r' || it == '\n' }) {
         "\"$escaped\""
     } else {
         escaped
@@ -76,7 +74,7 @@ private fun csvEscape(value: String): String {
 }
 
 private fun m3uSafe(value: String): String =
-    value.replace('\\r', ' ').replace('\\n', ' ').trim()
+    value.replace('\r', ' ').replace('\n', ' ').trim()
 
 private fun parseDurationSeconds(value: String?): Int? {
     val parts = value?.trim()?.split(':') ?: return null
