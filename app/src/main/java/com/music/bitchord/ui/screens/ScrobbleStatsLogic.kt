@@ -41,6 +41,13 @@ internal data class SyncedHistoryArtist(
     val plays: Int,
 )
 
+internal data class SyncedHistoryAlbum(
+    val name: String,
+    val artist: String,
+    val plays: Int,
+    val artworkUrl: String?,
+)
+
 internal data class SyncedHistorySummary(
     val totalPlays: Int,
     val distinctTracks: Int,
@@ -48,6 +55,7 @@ internal data class SyncedHistorySummary(
     val distinctAlbums: Int,
     val topTracks: List<SyncedHistoryTrack>,
     val topArtists: List<SyncedHistoryArtist>,
+    val topAlbums: List<SyncedHistoryAlbum>,
 )
 
 /** Repeated rows are separate plays in YouTube Music history; keep their count. */
@@ -56,7 +64,7 @@ internal fun buildSyncedHistorySummary(
 ): SyncedHistorySummary {
     val tracks = LinkedHashMap<String, Pair<com.music.bitchord.data.model.Song, Int>>()
     val artists = LinkedHashMap<String, Pair<String, Int>>()
-    val albums = HashSet<String>()
+    val albums = LinkedHashMap<String, SyncedHistoryAlbum>()
 
     history.forEach { song ->
         val trackKey = song.videoId.takeIf(String::isNotBlank)
@@ -64,13 +72,23 @@ internal fun buildSyncedHistorySummary(
         val existingTrack = tracks[trackKey]
         tracks[trackKey] = (existingTrack?.first ?: song) to ((existingTrack?.second ?: 0) + 1)
 
-        song.artist.trim().takeIf(String::isNotBlank)?.let { artist ->
+        val primaryArtist = com.music.bitchord.data.stats.ListeningStats.primaryArtist(song.artist)
+            ?.trim()?.takeIf(String::isNotBlank)
+        primaryArtist?.let { artist ->
             val artistKey = artist.lowercase()
             val existingArtist = artists[artistKey]
             artists[artistKey] = (existingArtist?.first ?: artist) to ((existingArtist?.second ?: 0) + 1)
         }
         song.albumName?.trim()?.takeIf(String::isNotBlank)?.let { album ->
-            albums += "${song.artist.trim().lowercase()}|${album.lowercase()}"
+            val artist = primaryArtist ?: song.artist.trim()
+            val albumKey = "${artist.lowercase()}|${album.lowercase()}"
+            val existingAlbum = albums[albumKey]
+            albums[albumKey] = SyncedHistoryAlbum(
+                name = existingAlbum?.name ?: album,
+                artist = existingAlbum?.artist ?: artist,
+                plays = (existingAlbum?.plays ?: 0) + 1,
+                artworkUrl = existingAlbum?.artworkUrl ?: song.thumbnailUrl,
+            )
         }
     }
 
@@ -80,6 +98,8 @@ internal fun buildSyncedHistorySummary(
     val topArtists = artists.values
         .map { (name, plays) -> SyncedHistoryArtist(name, plays) }
         .sortedWith(compareByDescending<SyncedHistoryArtist> { it.plays }.thenBy { it.name.lowercase() })
+    val topAlbums = albums.values
+        .sortedWith(compareByDescending<SyncedHistoryAlbum> { it.plays }.thenBy { it.name.lowercase() })
 
     return SyncedHistorySummary(
         totalPlays = history.size,
@@ -88,5 +108,6 @@ internal fun buildSyncedHistorySummary(
         distinctAlbums = albums.size,
         topTracks = topTracks,
         topArtists = topArtists,
+        topAlbums = topAlbums,
     )
 }
