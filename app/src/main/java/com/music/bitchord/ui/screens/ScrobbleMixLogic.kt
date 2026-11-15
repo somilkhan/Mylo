@@ -136,6 +136,10 @@ internal fun buildDiscoverMix(
     topArtistNames: Set<String> = emptySet(),
     recentArtistNames: Set<String> = emptySet(),
     artistAffinity: Map<String, Double> = emptyMap(),
+    sourceWeights: Map<String, Int> = emptyMap(),
+    sourceCounts: Map<String, Int> = emptyMap(),
+    sourceTags: Map<String, Set<String>> = emptyMap(),
+    primaryGenreIdentities: Set<String> = emptySet(),
     limit: Int = 25,
 ): List<Song> {
     if (limit <= 0) return emptyList()
@@ -155,55 +159,93 @@ internal fun buildDiscoverMix(
     })
     if (fresh.size < 2) return fresh.take(limit)
 
-    // LastWave RecommendationEngine.recoScore + selectFinal, adapted to Mylo's
-    // Song contract. Last.fm listeners/playcount/match and per-source genre
-    // tags do not exist on Song, so those unavailable signals are not fabricated.
+    // LastWave RecommendationEngine.recoScore/selectFinal, adapted to Song.
+    // Last.fm listeners/playcount/match metadata is not part of Mylo's Song model.
     val top = topArtistNames.mapTo(mutableSetOf(), ::recommendationArtistKey)
     val recent = recentArtistNames.mapTo(mutableSetOf(), ::recommendationArtistKey)
+    val genreCap = maxOf(2, kotlin.math.ceil(limit * 0.35).toInt())
     val scored = fresh.mapIndexed { index, song ->
+        val key = recommendationIdentity(song)
         val artist = recommendationArtistKey(song.artist)
+        val tags = sourceTags[key].orEmpty()
+        val weight = sourceWeights[key] ?: 4
         val known = artist in top || artist in recent
-        val score = 50.0 +
+        val base = when {
+            weight >= 4 -> 50.0
+            weight >= 3 -> 38.0
+            weight >= 2 -> 26.0
+            else -> 12.0
+        }
+        val score = base +
             (artistAffinity[artist] ?: 0.0).coerceIn(0.0, 1.0) * 30.0 +
             (if (artist in top) 16.0 else 0.0) +
             (if (artist in recent) 8.0 else 0.0) +
             (if (!known) 3.0 else 0.0) +
-            6.0 // all candidates surviving the strict heard filter are fresh
+            (if ("yt-feed" in tags) 8.0 else 0.0) +
+            (if ("yt-liked" in tags) 6.0 else 0.0) +
+            (if ("yt-recent" in tags) 4.0 else 0.0) +
+            (if (key in primaryGenreIdentities) 4.0 else 0.0) +
+            (when (sourceCounts[key] ?: 1) { in 3..Int.MAX_VALUE -> 20.0; 2 -> 10.0; else -> 0.0 }) +
+            6.0 // all candidates surviving strict heard filtering are fresh
         Triple(song, score, index)
     }.sortedWith(compareByDescending<Triple<Song, Double, Int>> { it.second }.thenBy { it.third })
 
-    fun select(artistCap: Int, albumCap: Int): List<Song> {
+    fun attempt(artistCap: Int, albumCapOn: Boolean, genreCapOn: Boolean): List<Song> {
         val artistCounts = mutableMapOf<String, Int>()
         val albumCounts = mutableMapOf<String, Int>()
-        return scored.map { it.first }.filter { song ->
+        val genreCounts = mutableMapOf<String, Int>()
+        val picked = mutableListOf<Song>()
+        for ((song, _, _) in scored) {
+            val key = recommendationIdentity(song)
             val artist = recommendationArtistKey(song.artist)
             val album = song.albumName?.trim()?.lowercase().orEmpty()
-            if ((artistCounts[artist] ?: 0) >= artistCap) return@filter false
-            if (album.isNotBlank() && (albumCounts[album] ?: 0) >= albumCap) return@filter false
+            val genreTag = sourceTags[key].orEmpty().firstOrNull { it.startsWith("tag:") }
+            if ((artistCounts[artist] ?: 0) >= artistCap) continue
+            if (albumCapOn && album.isNotBlank() && (albumCounts[album] ?: 0) >= 2) continue
+            if (genreCapOn && genreTag != null && (genreCounts[genreTag] ?: 0) >= genreCap) continue
             artistCounts[artist] = (artistCounts[artist] ?: 0) + 1
             if (album.isNotBlank()) albumCounts[album] = (albumCounts[album] ?: 0) + 1
-            true
-        }.take(limit)
+            if (genreTag != null) genreCounts[genreTag] = (genreCounts[genreTag] ?: 0) + 1
+            picked += song
+            if (picked.size >= limit) break
+        }
+        return picked
     }
 
-    // LastWave progressively relaxes diversity only when the fresh pool cannot fill.
-    var selected = select(artistCap = 2, albumCap = 2)
-    if (selected.size < limit) selected = select(artistCap = 3, albumCap = 2)
-    if (selected.size < limit) selected = select(artistCap = 3, albumCap = Int.MAX_VALUE)
-    if (selected.size < limit) selected = select(artistCap = Int.MAX_VALUE, albumCap = Int.MAX_VALUE)
+    // LastWave relaxes diversity only as much as needed to fill the queue.
+    var selected = attempt(2, albumCapOn = true, genreCapOn = true)
+    if (selected.size < limit) selected = attempt(3, albumCapOn = true, genreCapOn = true)
+    if (selected.size < limit) selected = attempt(3, albumCapOn = true, genreCapOn = false)
+    if (selected.size < limit) selected = attempt(3, albumCapOn = false, genreCapOn = false)
+    if (selected.size < limit) selected = attempt(Int.MAX_VALUE, albumCapOn = false, genreCapOn = false)
 
-    // Keep the strongest recommendation first and the runner-up as the closer,
-    // as LastWave's playlist flow does; leave the middle diversity order intact.
-    if (selected.size >= 3) {
-        val scoreById = scored.associate { songScore -> songScore.first.videoId to songScore.second }
-        val opener = selected.maxByOrNull { scoreById[it.videoId] ?: 0.0 } ?: return selected
-        val closer = selected.asSequence().filter { it.videoId != opener.videoId }
-            .maxByOrNull { scoreById[it.videoId] ?: 0.0 } ?: return selected
-        selected = listOf(opener) + selected.filter { it.videoId != opener.videoId && it.videoId != closer.videoId } + closer
+    // Round-robin genre buckets to avoid adjacent tracks from one tag.
+    val buckets = LinkedHashMap<String, ArrayDeque<Song>>()
+    selected.forEach { song ->
+        val label = sourceTags[recommendationIdentity(song)].orEmpty()
+            .firstOrNull { it.startsWith("tag:") } ?: "other"
+        buckets.getOrPut(label) { ArrayDeque() }.addLast(song)
     }
-    return selected
+    val interleaved = mutableListOf<Song>()
+    var previous: String? = null
+    while (interleaved.size < selected.size) {
+        val label = buckets.keys.firstOrNull { it != previous && !buckets[it].isNullOrEmpty() }
+            ?: buckets.keys.firstOrNull { !buckets[it].isNullOrEmpty() }
+            ?: break
+        interleaved += buckets.getValue(label).removeFirst()
+        previous = label
+    }
+
+    // LastWave places the strongest recommendation first and runner-up last.
+    if (interleaved.size >= 3) {
+        val scoreById = scored.associate { it.first.videoId to it.second }
+        val opener = interleaved.maxByOrNull { scoreById[it.videoId] ?: 0.0 } ?: return interleaved
+        val closer = interleaved.asSequence().filter { it.videoId != opener.videoId }
+            .maxByOrNull { scoreById[it.videoId] ?: 0.0 } ?: return interleaved
+        return listOf(opener) + interleaved.filter { it.videoId != opener.videoId && it.videoId != closer.videoId } + closer
+    }
+    return interleaved
 }
-
 /**
  * Tag generation uses Mylo's real YouTube Music song search. Browse cards are
  * deliberately ignored: this generator must return playable tracks only.
