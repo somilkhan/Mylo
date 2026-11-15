@@ -104,6 +104,7 @@ class LastFmDiscoveryTest {
             assertTrue(LastFM.getSimilarArtists("Artist").isFailure)
             assertTrue(LastFM.getSimilarTracks("Track", "Artist").isFailure)
             assertTrue(LastFM.getTagTopTracks("rock").isFailure)
+            assertTrue(LastFM.getArtistTopTracks("Artist").isFailure)
         } finally {
             LastFM.configure(
                 endpoint = previous.endpoint,
