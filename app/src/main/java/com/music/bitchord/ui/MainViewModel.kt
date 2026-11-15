@@ -600,6 +600,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val historyIsLocal: StateFlow<Boolean> = _historyIsLocal.asStateFlow()
     private val _historySections = MutableStateFlow<List<InnertubeParser.HistorySection>>(emptyList())
     val historySections: StateFlow<List<InnertubeParser.HistorySection>> = _historySections.asStateFlow()
+    // Account-synced YouTube Music history is independent of the History tab's
+    // local/remote selection. Statistics and Generate must not depend on which
+    // source the user last opened in History.
+    private val _accountSyncedHistory = MutableStateFlow<List<Song>>(emptyList())
+    val accountSyncedHistory: StateFlow<List<Song>> = _accountSyncedHistory.asStateFlow()
     private val _historyContinuation = MutableStateFlow<String?>(null)
     val historyContinuation: StateFlow<String?> = _historyContinuation.asStateFlow()
     private val _historyLoadingMore = MutableStateFlow(false)
@@ -1905,6 +1910,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     LikeState.replaceSeededLiked(snapshot.library.likedSongs.mapTo(HashSet()) { it.videoId })
                     _library.value = if (snapshot.library.isEmpty) UiState.Error(text(R.string.library_empty))
                         else UiState.Success(snapshot.library)
+                    _accountSyncedHistory.value = snapshot.historySections.flatMap { it.songs }
                     if (!_historyIsLocal.value) publishCachedHistory(snapshot.historySections)
                 }
                 _accountSyncResult.value = outcome.result
@@ -2045,6 +2051,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val cached = withContext(Dispatchers.IO) { accountSnapshotStore.read(identity) }
             if (identity != listenerKey()) return@launch
+            _accountSyncedHistory.value = cached?.historySections?.flatMap { it.songs }.orEmpty()
             // A completed account sync already followed every history continuation and
             // persisted the full remote feed. Do not replace that complete snapshot with the
             // first page returned by historyPage(): doing so made older weeks/months disappear
@@ -3719,6 +3726,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         ownershipInFlight.clear()
         _songMenu.value = null
         _library.value = UiState.Loading
+        _accountSyncedHistory.value = emptyList()
         _historyContinuation.value = null
         _historyLoadingMore.value = false
         _historyLoadMoreFailed.value = false
@@ -3733,6 +3741,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             _library.value = cached.library
             _history.value = cached.history
             _historySections.value = cached.historySections
+            _accountSyncedHistory.value = cached.historySections.flatMap { it.songs }
             _playlists.value = cached.playlists
             _playlistOwned.value = cached.owned
         }
