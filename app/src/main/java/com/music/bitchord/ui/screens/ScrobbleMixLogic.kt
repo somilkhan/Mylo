@@ -33,6 +33,10 @@ internal fun distinctRecommendationSongs(candidates: List<Song>): List<Song> {
     }
 }
 
+private fun recommendationArtistKey(artist: String): String =
+    (com.music.bitchord.data.stats.ListeningStats.primaryArtist(artist) ?: artist)
+        .trim().replace(Regex("\\s+"), " ").lowercase()
+
 /**
  * Rediscover only counts completed plays from ListeningStats, not raw history
  * rows: a two-second skip is recorded in ListeningHistory but is not a play.
@@ -80,12 +84,12 @@ internal fun buildDiscoverMix(
     if (limit <= 0) return emptyList()
     val heardByArtist = heardSongs
         .filter { it.title.isNotBlank() && it.artist.isNotBlank() }
-        .groupBy { it.artist.trim().replace(Regex("\\s+"), " ").lowercase() }
+        .groupBy { recommendationArtistKey(it.artist) }
     val fresh = candidates.filter { candidate ->
         if (!isYouTubeCatalogTrack(candidate) || candidate.videoId in heardVideoIds) {
             false
         } else {
-            val artistKey = candidate.artist.trim().replace(Regex("\\s+"), " ").lowercase()
+            val artistKey = recommendationArtistKey(candidate.artist)
             heardByArtist[artistKey].orEmpty().none { heard ->
                 recommendationIdentity(candidate) == recommendationIdentity(heard) ||
                     isSameSongOrEdit(candidate, heard)
@@ -382,13 +386,13 @@ internal fun buildNeverHeardMix(
     // new upload as a new song.
     val heardByArtist = heardSongs
         .filter { it.title.isNotBlank() && it.artist.isNotBlank() }
-        .groupBy { it.artist.trim().replace(Regex("\\s+"), " ").lowercase() }
+        .groupBy { recommendationArtistKey(it.artist) }
 
     val unheard = candidates.filter { candidate ->
         if (!isYouTubeCatalogTrack(candidate) || candidate.videoId in heardVideoIds) {
             false
         } else {
-            val artistKey = candidate.artist.trim().replace(Regex("\\s+"), " ").lowercase()
+            val artistKey = recommendationArtistKey(candidate.artist)
             heardByArtist[artistKey].orEmpty().none { heard ->
                 recommendationIdentity(candidate) == recommendationIdentity(heard) ||
                     isSameSongOrEdit(candidate, heard)
