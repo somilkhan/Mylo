@@ -1,6 +1,8 @@
 package com.music.bitchord.data.scrobbling
 
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LastFmDiscoveryTest {
@@ -56,6 +58,29 @@ class LastFmDiscoveryTest {
             ),
             parseLastFmTagTracks(response, limit = 10),
         )
+    }
+
+    @Test
+    fun discoveryEndpointsFailClearlyWithoutApiCredentials() = runBlocking {
+        val previous = LastFM.currentConfig()
+        try {
+            LastFM.configure(
+                endpoint = LastFM.DEFAULT_API_ENDPOINT,
+                apiKey = "",
+                secret = "",
+                sessionKey = null,
+            )
+
+            assertTrue(LastFM.getSimilarArtists("Artist").isFailure)
+            assertTrue(LastFM.getTagTopTracks("rock").isFailure)
+        } finally {
+            LastFM.configure(
+                endpoint = previous.endpoint,
+                apiKey = previous.apiKey,
+                secret = previous.secret,
+                sessionKey = previous.sessionKey,
+            )
+        }
     }
 
     @Test
