@@ -971,11 +971,18 @@ fun ScrobbleScreen(
                 val youtubePicks = YtMusicRepository.quickPicks(excluded).getOrThrow()
                 if (lastFmDiscoveryAvailable) {
                     ScrobbleRecommendationEngine.discover(
-                        seedTracks = favouriteTracks + recentTracks,
+                        seedTracks = recentTracks.take(3) + favouriteTracks.take(5),
                         seedArtists = favouriteTracks.map {
                             ListeningStats.primaryArtist(it.artist) ?: it.artist
                         },
                         lastFmUsername = lastFmUsername,
+                        artistAffinity = run {
+                            val counts = generationTopRankedTracks.groupBy {
+                                ListeningStats.primaryArtist(it.song.artist)?.lowercase() ?: it.song.artist.lowercase()
+                            }.mapValues { (_, rows) -> rows.sumOf { it.plays }.toDouble() }
+                            val max = counts.values.maxOrNull() ?: 0.0
+                            if (max <= 0.0) emptyMap() else counts.mapValues { (_, value) -> value / max }
+                        },
                         youtubeCandidates = youtubePicks,
                         heardVideoIds = excluded,
                         heardSongs = syncedHistory + listens.map { it.song } + generationTopTracks,
