@@ -77,6 +77,7 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.IosShare
+import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlayArrow
@@ -1196,7 +1197,7 @@ private fun BitChordApp(
         listOf(
             BottomTab("Stats", Icons.Rounded.History),
             BottomTab("Generate", Icons.Rounded.PlayArrow),
-            BottomTab("Playlists", Icons.Rounded.MoreHoriz),
+            BottomTab("Playlists", Icons.Rounded.LibraryMusic),
         )
     }
 
