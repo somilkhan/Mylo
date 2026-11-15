@@ -383,123 +383,123 @@ fun ScrobbleScreen(
         try {
             val generated = withTimeout(SCROBBLE_GENERATION_TIMEOUT_MS) {
                 when (mixMode) {
-                ScrobbleMixMode.FAVOURITES -> topTracks.take(mixTrackCount)
-                ScrobbleMixMode.RECENT -> recentTracks.take(mixTrackCount)
-                ScrobbleMixMode.TASTE_MIX -> {
-                    val excluded = (syncedHistory.map { it.videoId } + listens.map { it.song.videoId }).filter(String::isNotBlank).toSet()
-                    val fresh = recommendations.ifEmpty {
-                        try {
-                            YtMusicRepository.quickPicks(excluded).getOrThrow()
-                        } catch (cancelled: CancellationException) {
-                            throw cancelled
-                        } catch (_: Exception) {
-                            emptyList()
+                    ScrobbleMixMode.FAVOURITES -> topTracks.take(mixTrackCount)
+                    ScrobbleMixMode.RECENT -> recentTracks.take(mixTrackCount)
+                    ScrobbleMixMode.TASTE_MIX -> {
+                        val excluded = (syncedHistory.map { it.videoId } + listens.map { it.song.videoId }).filter(String::isNotBlank).toSet()
+                        val fresh = recommendations.ifEmpty {
+                            try {
+                                YtMusicRepository.quickPicks(excluded).getOrThrow()
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (_: Exception) {
+                                emptyList()
+                            }
                         }
+                        buildTasteMix(
+                            favourites = topTracks.take(12),
+                            recent = recentTracks.take(12),
+                            fresh = fresh.filter { it.videoId.isNotBlank() && it.videoId !in excluded }.take(25),
+                            limit = mixTrackCount,
+                        )
                     }
-                    buildTasteMix(
-                        favourites = topTracks.take(12),
-                        recent = recentTracks.take(12),
-                        fresh = fresh.filter { it.videoId.isNotBlank() && it.videoId !in excluded }.take(25),
-                        limit = mixTrackCount,
-                    )
-                }
-                ScrobbleMixMode.TAG -> {
-                    val youtubeTracks = buildTagMix(
-                        YtMusicRepository.search("${tagQuery.trim()} music", SearchFilter.SONGS).getOrThrow(),
-                        limit = mixTrackCount * 2,
-                    )
-                    val lastFmTracks = if (LastFM.isInitialized()) {
-                        val tagTracks = try {
-                            LastFM.getTagTopTracks(tagQuery, limit = minOf(8, mixTrackCount)).getOrThrow()
-                        } catch (cancelled: CancellationException) {
-                            throw cancelled
-                        } catch (_: Exception) {
+                    ScrobbleMixMode.TAG -> {
+                        val youtubeTracks = buildTagMix(
+                            YtMusicRepository.search("${tagQuery.trim()} music", SearchFilter.SONGS).getOrThrow(),
+                            limit = mixTrackCount * 2,
+                        )
+                        val lastFmTracks = if (LastFM.isInitialized()) {
+                            val tagTracks = try {
+                                LastFM.getTagTopTracks(tagQuery, limit = minOf(8, mixTrackCount)).getOrThrow()
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (_: Exception) {
+                                emptyList()
+                            }
+                            coroutineScope {
+                                tagTracks.map { candidate ->
+                                    async {
+                                        try {
+                                            buildTagMix(
+                                                YtMusicRepository.search(
+                                                    "${candidate.name} ${candidate.artist}",
+                                                    SearchFilter.SONGS,
+                                                ).getOrThrow(),
+                                                limit = 1,
+                                            ).firstOrNull()
+                                        } catch (cancelled: CancellationException) {
+                                            throw cancelled
+                                        } catch (_: Exception) {
+                                            null
+                                        }
+                                    }
+                                }.awaitAll().filterNotNull()
+                            }
+                        } else {
                             emptyList()
                         }
+                        buildBalancedSourceMix(youtubeTracks, lastFmTracks, mixTrackCount)
+                    }
+                    ScrobbleMixMode.LIBRARY -> buildLibraryMix(
+                        YtMusicRepository.library().getOrThrow(),
+                        mixTrackCount,
+                    )
+                    ScrobbleMixMode.REDISCOVER -> rediscoverTracks.take(mixTrackCount)
+                    ScrobbleMixMode.NEVER_HEARD -> {
+                        val heard = (syncedHistory.map { it.videoId } + listens.map { it.song.videoId } +
+                            topTracks.map { it.videoId } + recentTracks.map { it.videoId })
+                            .filter(String::isNotBlank).toSet()
+                        buildNeverHeardMix(
+                            YtMusicRepository.quickPicks(heard).getOrThrow(),
+                            heard,
+                            mixTrackCount,
+                        )
+                    }
+                    ScrobbleMixMode.DISCOVER -> {
+                        val excluded = (syncedHistory.map { it.videoId } + listens.map { it.song.videoId } + topTracks.map { it.videoId })
+                            .filter(String::isNotBlank).toSet()
+                        (recommendations.ifEmpty { YtMusicRepository.quickPicks(excluded).getOrThrow() })
+                            .filter { it.videoId.isNotBlank() && it.videoId !in excluded }
+                            .distinctBy(::songIdentity).take(mixTrackCount)
+                    }
+                    ScrobbleMixMode.RADIO -> {
+                        val seed = selectedSeed?.takeIf(::isYouTubeCatalogTrack)
+                            ?: throw IllegalStateException("Choose a YouTube Music track for Song radio")
+                        YtMusicRepository.radio(seed.videoId).getOrThrow()
+                            .filter { it.videoId.isNotBlank() && it.videoId != seed.videoId }
+                            .distinctBy(::songIdentity).take(mixTrackCount)
+                    }
+                    ScrobbleMixMode.ARTIST_MIX -> {
+                        val seed = selectedSeed?.takeIf(::isYouTubeCatalogTrack)
+                            ?: throw IllegalStateException("Choose a track by the artist you want to explore")
+                        val artistBrowseId = seed.artistId
+                            ?: YtMusicRepository.findArtistPageId(seed.artist).getOrThrow()
+                            ?: throw IllegalStateException("Couldn't find an exact artist match for ${seed.artist}")
+                        YtMusicRepository.artistPage(artistBrowseId).getOrThrow().songs
+                            .filter { it.videoId.isNotBlank() && it.videoId != seed.videoId }
+                            .distinctBy(::songIdentity).take(mixTrackCount)
+                    }
+                    ScrobbleMixMode.SIMILAR_ARTISTS -> {
+                        val seed = selectedSeed?.takeIf(::isYouTubeCatalogTrack)
+                            ?: throw IllegalStateException("Choose a YouTube Music track to find similar artists")
+                        val similarArtists = LastFM.getSimilarArtists(seed.artist, limit = 8).getOrThrow()
                         coroutineScope {
-                            tagTracks.map { candidate ->
+                            similarArtists.map { artist ->
                                 async {
                                     try {
                                         buildTagMix(
-                                            YtMusicRepository.search(
-                                                "${candidate.name} ${candidate.artist}",
-                                                SearchFilter.SONGS,
-                                            ).getOrThrow(),
-                                            limit = 1,
-                                        ).firstOrNull()
+                                            YtMusicRepository.search("$artist songs", SearchFilter.SONGS).getOrThrow(),
+                                            limit = 3,
+                                        ).filterNot { it.artist.equals(seed.artist, ignoreCase = true) }
                                     } catch (cancelled: CancellationException) {
                                         throw cancelled
                                     } catch (_: Exception) {
-                                        null
+                                        emptyList()
                                     }
                                 }
-                            }.awaitAll().filterNotNull()
-                        }
-                    } else {
-                        emptyList()
+                            }.awaitAll().flatten()
+                        }.distinctBy(::songIdentity).take(mixTrackCount)
                     }
-                    buildBalancedSourceMix(youtubeTracks, lastFmTracks, mixTrackCount)
-                }
-                ScrobbleMixMode.LIBRARY -> buildLibraryMix(
-                    YtMusicRepository.library().getOrThrow(),
-                    mixTrackCount,
-                )
-                ScrobbleMixMode.REDISCOVER -> rediscoverTracks.take(mixTrackCount)
-                ScrobbleMixMode.NEVER_HEARD -> {
-                    val heard = (syncedHistory.map { it.videoId } + listens.map { it.song.videoId } +
-                        topTracks.map { it.videoId } + recentTracks.map { it.videoId })
-                        .filter(String::isNotBlank).toSet()
-                    buildNeverHeardMix(
-                        YtMusicRepository.quickPicks(heard).getOrThrow(),
-                        heard,
-                        mixTrackCount,
-                    )
-                }
-                ScrobbleMixMode.DISCOVER -> {
-                    val excluded = (syncedHistory.map { it.videoId } + listens.map { it.song.videoId } + topTracks.map { it.videoId })
-                        .filter(String::isNotBlank).toSet()
-                    (recommendations.ifEmpty { YtMusicRepository.quickPicks(excluded).getOrThrow() })
-                        .filter { it.videoId.isNotBlank() && it.videoId !in excluded }
-                        .distinctBy(::songIdentity).take(mixTrackCount)
-                }
-                ScrobbleMixMode.RADIO -> {
-                    val seed = selectedSeed?.takeIf(::isYouTubeCatalogTrack)
-                        ?: throw IllegalStateException("Choose a YouTube Music track for Song radio")
-                    YtMusicRepository.radio(seed.videoId).getOrThrow()
-                        .filter { it.videoId.isNotBlank() && it.videoId != seed.videoId }
-                        .distinctBy(::songIdentity).take(mixTrackCount)
-                }
-                ScrobbleMixMode.ARTIST_MIX -> {
-                    val seed = selectedSeed?.takeIf(::isYouTubeCatalogTrack)
-                        ?: throw IllegalStateException("Choose a track by the artist you want to explore")
-                    val artistBrowseId = seed.artistId
-                        ?: YtMusicRepository.findArtistPageId(seed.artist).getOrThrow()
-                        ?: throw IllegalStateException("Couldn't find an exact artist match for ${seed.artist}")
-                    YtMusicRepository.artistPage(artistBrowseId).getOrThrow().songs
-                        .filter { it.videoId.isNotBlank() && it.videoId != seed.videoId }
-                        .distinctBy(::songIdentity).take(mixTrackCount)
-                }
-                ScrobbleMixMode.SIMILAR_ARTISTS -> {
-                    val seed = selectedSeed?.takeIf(::isYouTubeCatalogTrack)
-                        ?: throw IllegalStateException("Choose a YouTube Music track to find similar artists")
-                    val similarArtists = LastFM.getSimilarArtists(seed.artist, limit = 8).getOrThrow()
-                    coroutineScope {
-                        similarArtists.map { artist ->
-                            async {
-                                try {
-                                    buildTagMix(
-                                        YtMusicRepository.search("$artist songs", SearchFilter.SONGS).getOrThrow(),
-                                        limit = 3,
-                                    ).filterNot { it.artist.equals(seed.artist, ignoreCase = true) }
-                                } catch (cancelled: CancellationException) {
-                                    throw cancelled
-                                } catch (_: Exception) {
-                                    emptyList()
-                                }
-                            }
-                        }.awaitAll().flatten()
-                    }.distinctBy(::songIdentity).take(mixTrackCount)
-                }
                 }
             }
             if (generated.isEmpty()) throw IllegalStateException("No tracks were available for this mix. Try another mode or refresh your listening data.")
