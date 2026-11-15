@@ -129,6 +129,36 @@ class ScrobbleMixLogicTest {
     }
 
     @Test
+    fun tasteMixUsesWeightedSourcesAndDeduplicatesByTrackIdentity() {
+        val favouriteOne = Song("favourite001", "Favourite one", "Artist", null)
+        val favouriteTwo = Song("favourite002", "Favourite two", "Artist", null)
+        val favouriteThree = Song("favourite003", "Favourite three", "Artist", null)
+        val recentOne = Song("recent00001", "Recent one", "Artist", null)
+        val recentTwo = Song("recent00002", "Recent two", "Artist", null)
+        val freshOne = Song("fresh000001", "Fresh one", "Artist", null)
+
+        val result = buildTasteMix(
+            favourites = listOf(favouriteOne, favouriteTwo, favouriteThree),
+            recent = listOf(favouriteTwo.copy(title = "Duplicate"), recentOne, recentTwo),
+            fresh = listOf(recentOne, freshOne),
+            limit = 5,
+        )
+
+        assertEquals(
+            listOf(favouriteOne, favouriteTwo, recentOne, recentTwo, freshOne),
+            result,
+        )
+    }
+
+    @Test
+    fun tasteMixHandlesEmptySourcesAndZeroLimit() {
+        val favourite = Song("favourite001", "Favourite", "Artist", null)
+
+        assertEquals(listOf(favourite), buildTasteMix(listOf(favourite), emptyList(), emptyList()))
+        assertEquals(emptyList<Song>(), buildTasteMix(listOf(favourite), emptyList(), emptyList(), limit = 0))
+    }
+
+    @Test
     fun neverHeardExcludesKnownTracksAndDuplicatesAndHonoursLimit() {
         val heard = Song("knowntrack01", "Already heard", "Artist", null)
         val fresh = Song("freshtrack01", "New track", "Artist", null)
