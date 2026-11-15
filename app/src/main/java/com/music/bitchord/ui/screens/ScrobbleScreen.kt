@@ -184,7 +184,13 @@ fun ScrobbleScreen(
     val historyRevision by ListeningHistory.revision.collectAsStateWithLifecycle()
     var statsView by remember { mutableStateOf(StatsView.RECENT) }
     var statsSource by remember { mutableStateOf(ScrobbleStatsSource.DEVICE) }
+    var statsSourceManuallySelected by remember { mutableStateOf(false) }
     val syncedStats = remember(syncedHistory) { buildSyncedHistorySummary(syncedHistory) }
+    LaunchedEffect(syncedHistory.isNotEmpty()) {
+        if (syncedHistory.isNotEmpty() && !statsSourceManuallySelected) {
+            statsSource = ScrobbleStatsSource.YOUTUBE_MUSIC
+        }
+    }
     var statsMenuExpanded by remember { mutableStateOf(false) }
     var summary by remember { mutableStateOf<ReplaySummary?>(null) }
     var allTimeSummary by remember { mutableStateOf<ReplaySummary?>(null) }
@@ -891,12 +897,18 @@ fun ScrobbleScreen(
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     FilterChip(
                                         selected = statsSource == ScrobbleStatsSource.DEVICE,
-                                        onClick = { statsSource = ScrobbleStatsSource.DEVICE },
+                                        onClick = {
+                                            statsSourceManuallySelected = true
+                                            statsSource = ScrobbleStatsSource.DEVICE
+                                        },
                                         label = { Text("Mylo") },
                                     )
                                     FilterChip(
                                         selected = statsSource == ScrobbleStatsSource.YOUTUBE_MUSIC,
-                                        onClick = { statsSource = ScrobbleStatsSource.YOUTUBE_MUSIC },
+                                        onClick = {
+                                            statsSourceManuallySelected = true
+                                            statsSource = ScrobbleStatsSource.YOUTUBE_MUSIC
+                                        },
                                         label = { Text("YouTube Music") },
                                     )
                                 }
