@@ -191,6 +191,37 @@ internal fun isSameSongOrEdit(candidate: Song, seed: Song): Boolean {
 }
 
 /**
+ * Builds a radio queue from YouTube's seed-specific radio first, then fills
+ * short responses from personal favourites, recent listens and discovery.
+ * The seed itself and alternate uploads/remixes are excluded from every pool.
+ */
+internal fun buildRadioMix(
+    radio: List<Song>,
+    favourites: List<Song>,
+    recent: List<Song>,
+    discovery: List<Song>,
+    seed: Song,
+    limit: Int,
+): List<Song> {
+    if (limit <= 0) return emptyList()
+    val seen = mutableSetOf<String>()
+    val result = ArrayList<Song>(limit)
+    listOf(radio, favourites, recent, discovery).forEach { pool ->
+        pool.forEach { candidate ->
+            if (result.size < limit &&
+                candidate.videoId.isNotBlank() &&
+                candidate.videoId != seed.videoId &&
+                !isSameSongOrEdit(candidate, seed) &&
+                seen.add(songIdentity(candidate))
+            ) {
+                result += candidate
+            }
+        }
+    }
+    return result
+}
+
+/**
  * Port of LastWave GenerateRepository.applyArtistCap: cap the seed artist at
  * one and other artists at two, relax to two/three only when that would leave
  * the requested mix short, then preserve the full deduplicated pool as a final
