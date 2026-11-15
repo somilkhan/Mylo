@@ -104,6 +104,7 @@ class LastFmDiscoveryTest {
             assertTrue(LastFM.getSimilarArtists("Artist").isFailure)
             assertTrue(LastFM.getSimilarTracks("Track", "Artist").isFailure)
             assertTrue(LastFM.getTagTopTracks("rock").isFailure)
+            assertTrue(LastFM.getTopTags("user").isFailure)
             assertTrue(LastFM.getArtistTopTracks("Artist").isFailure)
         } finally {
             LastFM.configure(
@@ -154,6 +155,20 @@ class LastFmDiscoveryTest {
         assertEquals(1, albums.size)
         assertEquals("Artist A", albums.single().artist)
         assertEquals(8L, albums.single().playCount)
+    }
+
+    @Test
+    fun parsesTopTagsByCountAndHandlesSingleTagObject() {
+        val tags = parseLastFmTopTags(
+            """{"toptags":{"tag":[{"name":"indie rock","count":"12"},{"name":"dream pop","count":"30"},{"name":"INDIE ROCK","count":"4"},{"name":"","count":"99"}]}}""",
+        )
+        assertEquals(listOf("dream pop", "indie rock"), tags.map { it.name })
+        assertEquals(30L, tags.first().count)
+        assertEquals(
+            listOf(LastFM.RankedTag("metal", 7L)),
+            parseLastFmTopTags("""{"toptags":{"tag":{"name":"metal","count":"7"}}}"""),
+        )
+        assertEquals(emptyList<LastFM.RankedTag>(), parseLastFmTopTags("""{"toptags":{}}"""))
     }
 
     @Test
