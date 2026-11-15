@@ -83,6 +83,7 @@ import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Sort
 import androidx.compose.material.icons.rounded.Upgrade
 import com.music.bitchord.data.listentogether.ServerConnectionState
+import com.music.bitchord.data.LibrarySyncCategory
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -2782,6 +2783,8 @@ private fun BitChordApp(
                             onViewPlaylists = { scrobbleSection = SCROBBLE_TAB_PLAYLISTS },
                             workScope = scope,
                             syncedHistory = accountSyncedHistory,
+                            syncingYouTubeHistory = accountSyncing &&
+                                LibrarySyncCategory.LISTENING_HISTORY in accountSyncCategoriesInProgress,
                             reduceMotion = reducePlayerMotion,
                         )
                     } else if (key == "history") {
