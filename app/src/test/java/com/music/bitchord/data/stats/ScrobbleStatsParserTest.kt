@@ -21,26 +21,10 @@ class ScrobbleStatsParserTest {
         )
         val tag = Json.parseToJsonElement("""{"name":"post-punk","count":"12"}""")
 
-        val parsedTrack = ScrobbleStatsRepository.run {
-            val method = javaClass.getDeclaredMethod("parseTrack", kotlinx.serialization.json.JsonElement::class.java)
-            method.isAccessible = true
-            method.invoke(this, track) as ScrobbleChartEntry
-        }
-        val parsedArtist = ScrobbleStatsRepository.run {
-            val method = javaClass.getDeclaredMethod("parseArtist", kotlinx.serialization.json.JsonElement::class.java)
-            method.isAccessible = true
-            method.invoke(this, artist) as ScrobbleChartEntry
-        }
-        val parsedAlbum = ScrobbleStatsRepository.run {
-            val method = javaClass.getDeclaredMethod("parseAlbum", kotlinx.serialization.json.JsonElement::class.java)
-            method.isAccessible = true
-            method.invoke(this, album) as ScrobbleChartEntry
-        }
-        val parsedTag = ScrobbleStatsRepository.run {
-            val method = javaClass.getDeclaredMethod("parseTag", kotlinx.serialization.json.JsonElement::class.java)
-            method.isAccessible = true
-            method.invoke(this, tag) as ScrobbleChartEntry
-        }
+        val parsedTrack = ScrobbleStatsRepository.parseTrack(track)!!
+        val parsedArtist = ScrobbleStatsRepository.parseArtist(artist)!!
+        val parsedAlbum = ScrobbleStatsRepository.parseAlbum(album)!!
+        val parsedTag = ScrobbleStatsRepository.parseTag(tag)!!
 
         assertEquals("New Order", parsedTrack.artist)
         assertEquals("Power, Corruption & Lies", parsedTrack.album)
@@ -57,13 +41,8 @@ class ScrobbleStatsParserTest {
         val malformed = Json.parseToJsonElement("""{"artist":"No title"}""")
         val noImage = Json.parseToJsonElement("""{"name":"Unknown","playcount":"3"}""")
 
-        val parsed = ScrobbleStatsRepository.run {
-            val method = javaClass.getDeclaredMethod("parseArtist", kotlinx.serialization.json.JsonElement::class.java)
-            method.isAccessible = true
-            method.invoke(this, noImage) as ScrobbleChartEntry
-        }
-
-        assertNull(parsed.artworkUrl)
+        assertNull(ScrobbleStatsRepository.parseArtist(malformed))
+        assertNull(ScrobbleStatsRepository.parseArtist(noImage)?.artworkUrl)
         assertTrue(ScrobbleStatsRepository.supportedPeriods.contains("7day"))
     }
 }

@@ -12,7 +12,6 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonObject
 
 /** Last.fm chart row, kept separate from Song because it is not playable yet. */
 data class ScrobbleChartEntry(
@@ -106,7 +105,7 @@ object ScrobbleStatsRepository {
         else -> emptyList()
     }
 
-    private fun parseTrack(element: JsonElement): ScrobbleChartEntry? {
+    internal fun parseTrack(element: JsonElement): ScrobbleChartEntry? {
         val obj = element as? JsonObject ?: return null
         val name = obj.stringAt("name")?.takeIf(String::isNotBlank) ?: return null
         val artist = obj.objectAt("artist")?.stringAt("name") ?: obj.stringAt("artist")
@@ -121,7 +120,7 @@ object ScrobbleStatsRepository {
         )
     }
 
-    private fun parseArtist(element: JsonElement): ScrobbleChartEntry? {
+    internal fun parseArtist(element: JsonElement): ScrobbleChartEntry? {
         val obj = element as? JsonObject ?: return null
         val name = obj.stringAt("name")?.takeIf(String::isNotBlank) ?: return null
         return ScrobbleChartEntry(
@@ -132,7 +131,7 @@ object ScrobbleStatsRepository {
         )
     }
 
-    private fun parseAlbum(element: JsonElement): ScrobbleChartEntry? {
+    internal fun parseAlbum(element: JsonElement): ScrobbleChartEntry? {
         val obj = element as? JsonObject ?: return null
         val name = obj.stringAt("name")?.takeIf(String::isNotBlank) ?: return null
         return ScrobbleChartEntry(
@@ -143,7 +142,7 @@ object ScrobbleStatsRepository {
         )
     }
 
-    private fun parseTag(element: JsonElement): ScrobbleChartEntry? {
+    internal fun parseTag(element: JsonElement): ScrobbleChartEntry? {
         val obj = element as? JsonObject ?: return null
         val name = obj.stringAt("name")?.takeIf(String::isNotBlank) ?: return null
         return ScrobbleChartEntry(name = name, playCount = obj.longAt("count") ?: 0L)
