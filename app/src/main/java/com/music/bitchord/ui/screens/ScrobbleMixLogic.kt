@@ -318,7 +318,7 @@ internal fun buildArtistCappedMix(
     targetSize: Int,
 ): List<Song> {
     if (targetSize <= 0) return emptyList()
-    val distinctSongs = candidates.distinctBy(::songIdentity)
+    val distinctSongs = distinctRecommendationSongs(candidates)
     val seedKey = recommendationArtistKey(seedArtist)
     fun applyArtistCap(maxSeedArtist: Int, maxOtherArtist: Int): List<Song> {
         val counts = mutableMapOf<String, Int>()
