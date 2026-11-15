@@ -96,6 +96,7 @@ internal object ScrobbleGeneratorRepository {
                 seeds = seeds,
                 heardSongs = heard,
                 total = target,
+                freshOnly = mode == ScrobbleGenerateMode.NEVER_HEARD,
                 onProgress = onProgress,
             )
         }
