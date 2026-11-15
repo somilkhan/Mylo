@@ -689,9 +689,6 @@ fun ScrobbleScreen(
                                     }
                                 }
                             }
-                            itemsIndexed(generatedMix, key = { _, song -> "generated-${songIdentity(song)}" }) { index, song ->
-                                TrackRow(song, onClick = { onPlayPlaylist(generatedTitle, generatedMix, index) })
-                            }
                             item("generated-actions") {
                                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                                     Button(onClick = { onPlayPlaylist(generatedTitle, generatedMix, 0) }, modifier = Modifier.weight(1f)) {
@@ -759,6 +756,9 @@ fun ScrobbleScreen(
                                 }
                             }
                         }
+                            itemsIndexed(generatedMix, key = { _, song -> "generated-${songIdentity(song)}" }) { index, song ->
+                                TrackRow(song, onClick = { onPlayPlaylist(generatedTitle, generatedMix, index) })
+                            }
                         item("generate-discovery-refresh") {
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 OutlinedButton(onClick = { recommendationRequest++ }, enabled = !loadingRecommendations && !generatingMix, modifier = Modifier.weight(1f)) {
@@ -786,11 +786,23 @@ fun ScrobbleScreen(
                                 }
                             }
                             item("playlist-detail-heading") {
-                                PageHeading(selected.title, selected.reason, eyebrow = false)
-                                Button(onClick = { onPlayPlaylist(selected.title, selected.songs, 0) }, modifier = Modifier.fillMaxWidth()) {
-                                    Icon(Icons.Rounded.PlayArrow, null)
-                                    Spacer(Modifier.width(8.dp))
-                                    Text("Play all · ${selected.songs.size} tracks")
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(26.dp),
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                                ) {
+                                    Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                                        ArtworkMosaic(selected.songs, Modifier.fillMaxWidth().height(188.dp))
+                                        Text(selected.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                                        Text(selected.reason, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text("${selected.songs.size} tracks · Saved on this device", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                                        Button(onClick = { onPlayPlaylist(selected.title, selected.songs, 0) }, modifier = Modifier.fillMaxWidth()) {
+                                            Icon(Icons.Rounded.PlayArrow, null)
+                                            Spacer(Modifier.width(8.dp))
+                                            Text("Play all · ${selected.songs.size} tracks")
+                                        }
+                                    }
                                 }
                             }
                             items(selected.songs.size, key = { index -> "saved-${selected.title}-${songIdentity(selected.songs[index])}-$index" }) { index ->
