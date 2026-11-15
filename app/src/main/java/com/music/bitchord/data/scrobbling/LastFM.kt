@@ -440,6 +440,23 @@ object LastFM {
         parseLastFmSimilarTracks(response, limit)
     }
 
+    /** Artist chart used by LastWave's similar-artist discovery pipeline. */
+    suspend fun getArtistTopTracks(artist: String, limit: Int = 10, page: Int = 1): Result<List<RankedTrack>> =
+        discoveryResult {
+            require(isInitialized()) { "Last.fm API credentials are not configured for this build" }
+            val cleanArtist = artist.trim()
+            require(cleanArtist.isNotBlank()) { "Choose an artist first" }
+            val response = postAndRead(
+                method = "artist.gettoptracks",
+                extra = mapOf(
+                    "artist" to cleanArtist,
+                    "limit" to limit.coerceIn(1, 100).toString(),
+                    "page" to page.coerceAtLeast(1).toString(),
+                ),
+            )
+            parseLastFmTopTracks(response, limit)
+        }
+
     /** Public Last.fm tag chart; results are later resolved to playable YouTube Music tracks. */
     suspend fun getTagTopTracks(tag: String, limit: Int = 12): Result<List<DiscoveryTrack>> =
         discoveryResult {
