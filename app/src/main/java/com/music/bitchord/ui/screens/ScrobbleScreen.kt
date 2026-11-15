@@ -92,6 +92,7 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.music.bitchord.data.ListeningHistory
 import com.music.bitchord.data.YtMusicRepository
+import com.music.bitchord.data.model.SearchFilter
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.stats.ListeningStats
 import com.music.bitchord.data.stats.ReplayPeriod
@@ -111,8 +112,12 @@ private enum class ScrobbleMixMode(val title: String, val description: String) {
     ARTIST_MIX("Artist mix", "Explore more tracks from an artist you already enjoy"),
     NEVER_HEARD("Never heard", "Find catalogue picks missing from your listening history"),
     DISCOVER("Discover", "Fresh YouTube Music picks outside your listening history"),
+    TAG("By genre", "Build a mix from a genre or tag"),
+    LIBRARY("Your library", "Tracks saved to your YouTube Music library"),
     REDISCOVER("Rediscover", "Tracks played 3+ times on this device and quiet for 60 days"),
 }
+
+private val SCROBBLE_GENRE_TAGS = listOf("pop", "rock", "hip-hop", "electronic", "jazz", "lofi", "metal", "indie", "classical", "r&b", "ambient", "punk")
 
 internal const val SCROBBLE_TAB_STATS = 0
 internal const val SCROBBLE_TAB_GENERATE = 1
@@ -148,6 +153,7 @@ fun ScrobbleScreen(
     var recommendationRequest by remember { mutableIntStateOf(0) }
     var mixMode by remember { mutableStateOf(ScrobbleMixMode.FAVOURITES) }
     var selectedSeed by remember { mutableStateOf<Song?>(null) }
+    var tagQuery by remember { mutableStateOf("") }
     var mixTrackCount by remember { mutableIntStateOf(20) }
     var generationRequest by remember { mutableIntStateOf(0) }
     var generatingMix by remember { mutableStateOf(false) }
@@ -253,6 +259,14 @@ fun ScrobbleScreen(
                     (topTracks.take(12) + recentTracks.take(12) + fresh.filter { it.videoId.isNotBlank() && it.videoId !in excluded })
                         .distinctBy(::songIdentity).shuffled().take(mixTrackCount)
                 }
+                ScrobbleMixMode.TAG -> buildTagMix(
+                    YtMusicRepository.search("${tagQuery.trim()} music", SearchFilter.SONGS).getOrThrow(),
+                    mixTrackCount,
+                )
+                ScrobbleMixMode.LIBRARY -> buildLibraryMix(
+                    YtMusicRepository.library().getOrThrow(),
+                    mixTrackCount,
+                )
                 ScrobbleMixMode.REDISCOVER -> rediscoverTracks.take(mixTrackCount)
                 ScrobbleMixMode.NEVER_HEARD -> {
                     val heard = (syncedHistory.map { it.videoId } + listens.map { it.song.videoId } +
@@ -299,6 +313,8 @@ fun ScrobbleScreen(
                 ScrobbleMixMode.ARTIST_MIX -> "More by ${selectedSeed?.artist.orEmpty()}"
                 ScrobbleMixMode.NEVER_HEARD -> "New to you"
                 ScrobbleMixMode.DISCOVER -> "Discover"
+                ScrobbleMixMode.TAG -> "${tagQuery.trim().replaceFirstChar { it.uppercase() }} mix"
+                ScrobbleMixMode.LIBRARY -> "Your library mix"
                 ScrobbleMixMode.REDISCOVER -> "Rediscover"
             }
         } catch (cancelled: CancellationException) {
@@ -561,7 +577,7 @@ fun ScrobbleScreen(
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     Text("Choose your sound", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                                     Spacer(Modifier.weight(1f))
-                                    Text("8 MODES", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = 1.sp)
+                                    Text("${ScrobbleMixMode.entries.size} MODES", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = 1.sp)
                                 }
                                 ScrobbleMixMode.entries.chunked(2).forEach { rowModes ->
                                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -604,6 +620,8 @@ fun ScrobbleScreen(
                                                             ScrobbleMixMode.ARTIST_MIX -> Icons.Rounded.Explore
                                                             ScrobbleMixMode.NEVER_HEARD -> Icons.Rounded.Search
                                                             ScrobbleMixMode.DISCOVER -> Icons.Rounded.Explore
+                                                            ScrobbleMixMode.TAG -> Icons.Rounded.Search
+                                                            ScrobbleMixMode.LIBRARY -> Icons.Rounded.GraphicEq
                                                             ScrobbleMixMode.REDISCOVER -> Icons.Rounded.History
                                                         },
                                                         contentDescription = null,
@@ -696,6 +714,59 @@ fun ScrobbleScreen(
                                 }
                             }
                         }
+                        if (mixMode == ScrobbleMixMode.TAG) {
+                            item("generate-tag-options") {
+                                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    Text("Choose a genre or tag", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                                    OutlinedTextField(
+                                        value = tagQuery,
+                                        onValueChange = {
+                                            tagQuery = it
+                                            generatedMix = emptyList()
+                                            generationError = null
+                                            mixSaved = false
+                                        },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        singleLine = true,
+                                        enabled = !generatingMix,
+                                        label = { Text("Genre or tag") },
+                                        placeholder = { Text("e.g. Punjabi, indie pop, synthwave") },
+                                        shape = RoundedCornerShape(16.dp),
+                                    )
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    ) {
+                                        SCROBBLE_GENRE_TAGS.forEach { tag ->
+                                            FilterChip(
+                                                selected = tagQuery.equals(tag, ignoreCase = true),
+                                                onClick = {
+                                                    tagQuery = tag
+                                                    generatedMix = emptyList()
+                                                    generationError = null
+                                                    mixSaved = false
+                                                },
+                                                enabled = !generatingMix,
+                                                label = { Text(tag) },
+                                            )
+                                        }
+                                    }
+                                    Text(
+                                        "Searches YouTube Music for real tracks matching this tag.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        }
+                        if (mixMode == ScrobbleMixMode.LIBRARY) {
+                            item("generate-library-info") {
+                                InfoPanel(
+                                    "Your YouTube Music library",
+                                    "Builds from Liked Music and tracks saved to your library. You need a signed-in YouTube Music account; your local listening history is not changed.",
+                                )
+                            }
+                        }
                         if (mixMode == ScrobbleMixMode.REDISCOVER && loadingAllTimeStats) {
                             item("rediscover-loading") { LoadingLine("Checking your all-time play counts") }
                         }
@@ -715,6 +786,7 @@ fun ScrobbleScreen(
                                 enabled = !generatingMix && !loadingHistory &&
                                     (mixMode !in setOf(ScrobbleMixMode.TASTE_MIX, ScrobbleMixMode.DISCOVER) || !loadingRecommendations) &&
                                     (mixMode !in setOf(ScrobbleMixMode.FAVOURITES, ScrobbleMixMode.TASTE_MIX) || !loadingStats) &&
+                                    (mixMode != ScrobbleMixMode.TAG || tagQuery.isNotBlank()) &&
                                     (mixMode != ScrobbleMixMode.REDISCOVER || !loadingAllTimeStats) &&
                                     (mixMode != ScrobbleMixMode.REDISCOVER || !allTimeStatsFailed) &&
                                     (mixMode !in setOf(ScrobbleMixMode.REDISCOVER, ScrobbleMixMode.NEVER_HEARD) || !historyFailed) &&
