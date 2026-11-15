@@ -422,13 +422,13 @@ fun ScrobbleScreen(
                                                     AnimatedValueText(
                                                         value = summary!!.totalMs / 60_000L,
                                                         reduceMotion = reduceMotion,
-                                                        style = MaterialTheme.typography.displaySmall,
+                                                        style = MaterialTheme.typography.headlineMedium,
                                                         color = MaterialTheme.colorScheme.onSurface,
                                                         formatter = { formatListeningTime(it * 60_000L) },
                                                     )
                                                     Text("${summary!!.totalPlays} plays · ${summary!!.distinctSongs} tracks", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                                 }
-                                                ArtworkMosaic(topTracks.take(4), Modifier.size(104.dp))
+                                                ArtworkMosaic(topTracks.take(4), Modifier.size(88.dp))
                                             }
                                         }
                                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
