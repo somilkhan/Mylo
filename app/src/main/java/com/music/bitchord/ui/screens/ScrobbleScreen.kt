@@ -1293,21 +1293,39 @@ private fun StatsRankedTrack(
     supporting: String,
     onClick: () -> Unit,
 ) {
+    val isTopTrack = rank == 1
+    val rowShape = RoundedCornerShape(18.dp)
     Row(
-        modifier = Modifier.fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(rowShape)
+            .background(
+                if (isTopTrack) MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.24f),
+            )
             .clickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = 4.dp, vertical = 7.dp),
+            .padding(horizontal = 10.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(
-            rank.toString().padStart(2, '0'),
-            modifier = Modifier.width(25.dp),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontWeight = FontWeight.Bold,
-        )
+        Box(
+            modifier = Modifier
+                .size(28.dp)
+                .clip(CircleShape)
+                .background(
+                    if (isTopTrack) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                    else MaterialTheme.colorScheme.surface.copy(alpha = 0.55f),
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                rank.toString().padStart(2, '0'),
+                style = MaterialTheme.typography.labelSmall,
+                color = if (isTopTrack) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.Bold,
+            )
+        }
         ArtworkMosaic(
             songs = listOf(song),
             modifier = Modifier.size(50.dp),
@@ -1331,12 +1349,24 @@ private fun StatsRankedTrack(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        Icon(
-            Icons.Rounded.PlayArrow,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(22.dp),
-        )
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .clip(CircleShape)
+                .background(
+                    if (isTopTrack) MaterialTheme.colorScheme.primary.copy(alpha = 0.13f)
+                    else MaterialTheme.colorScheme.surface.copy(alpha = 0.55f),
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Rounded.PlayArrow,
+                contentDescription = null,
+                tint = if (isTopTrack) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(22.dp),
+            )
+        }
     }
 }
 
