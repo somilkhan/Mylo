@@ -67,7 +67,7 @@ class LastFmDiscoveryTest {
             {
               "similartracks": {
                 "track": [
-                  {"name":"Track One","artist":{"name":"Artist One"}},
+                  {"name":"Track One","artist":{"name":"Artist One"},"listeners":"1000","playcount":"6000","match":"0.75","album":{"title":"Album One"}},
                   {"name":"Track Two","artist":"Artist Two"},
                   {"name":"Track One","artist":{"name":"artist one"}},
                   {"name":"Missing artist","artist":{}},
@@ -79,7 +79,7 @@ class LastFmDiscoveryTest {
 
         assertEquals(
             listOf(
-                LastFM.DiscoveryTrack("Track One", "Artist One"),
+                LastFM.DiscoveryTrack("Track One", "Artist One", 1_000L, 6_000L, 0.75, "Album One"),
                 LastFM.DiscoveryTrack("Track Two", "Artist Two"),
             ),
             parseLastFmSimilarTracks(response, limit = 10),
@@ -138,10 +138,13 @@ class LastFmDiscoveryTest {
     @Test
     fun parsesLastFmTopChartsForArrayAndSingleObjectPayloads() {
         val tracks = parseLastFmTopTracks(
-            """{"toptracks":{"track":[{"name":"Track A","playcount":"12","artist":{"name":"Artist A"}},{"name":"Track B","playcount":"4","artist":"Artist B"}]}}""",
+            """{"toptracks":{"track":[{"name":"Track A","playcount":"12","listeners":"3","match":"0.9","album":{"title":"Album A"},"artist":{"name":"Artist A"}},{"name":"Track B","playcount":"4","artist":"Artist B"}]}}""",
         )
         assertEquals(listOf("Track A", "Track B"), tracks.map { it.name })
         assertEquals(12L, tracks.first().playCount)
+        assertEquals(3L, tracks.first().listeners)
+        assertEquals(0.9, tracks.first().match!!, 0.0)
+        assertEquals("Album A", tracks.first().album)
 
         val artists = parseLastFmTopArtists(
             """{"topartists":{"artist":{"name":"Artist A","playcount":"20","image":[{"#text":"https://img/a.jpg","size":"extralarge"}]}}}""",
