@@ -2281,10 +2281,7 @@ fun ScrobbleScreen(
                                 }
                                 .let { matches -> when (playlistSortMode) {
                                     ScrobblePlaylistSortMode.RECENT -> matches
-                                    ScrobblePlaylistSortMode.PINNED -> matches.sortedWith(
-                                        compareByDescending<SavedScrobblePlaylist> { it.pinned }
-                                            .thenByDescending { savedPlaylists.indexOf(it) },
-                                    )
+                                    ScrobblePlaylistSortMode.PINNED -> matches.sortedByDescending { it.pinned }
                                     ScrobblePlaylistSortMode.OLDEST -> matches.reversed()
                                     ScrobblePlaylistSortMode.NAME -> matches.sortedBy { it.title.lowercase() }
                                     ScrobblePlaylistSortMode.TRACK_COUNT -> matches.sortedWith(
