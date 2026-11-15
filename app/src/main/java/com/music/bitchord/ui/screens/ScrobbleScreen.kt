@@ -413,9 +413,10 @@ fun ScrobbleScreen(
             loadingGenerationTopTracks = false
         }
     }
-    val recentTracks = (syncedHistory + listens.sortedByDescending { it.startedAt }.map { it.song })
-        .asSequence()
-        .filter { it.videoId.isNotBlank() || !it.localUri.isNullOrBlank() || !it.localPath.isNullOrBlank() }
+    val recentTracks = sequence {
+        yieldAll(syncedHistory)
+        yieldAll(listens.sortedByDescending { it.startedAt }.map { it.song })
+    }.filter { it.videoId.isNotBlank() || !it.localUri.isNullOrBlank() || !it.localPath.isNullOrBlank() }
         .distinctBy(::songIdentity)
         .take(25)
         .toList()
@@ -423,11 +424,14 @@ fun ScrobbleScreen(
     val rediscoverTracks = buildRediscoverMix(listens, allTimePlayCounts, System.currentTimeMillis())
     val savedPlaylists = ScrobblePlaylistStore.playlists.toList()
     val addableHistoryTracks = remember(syncedHistory, listens, allTimeSummary) {
-        (syncedHistory + listens.sortedByDescending { it.startedAt }.map { it.song } +
-            allTimeSummary?.songs.orEmpty().map { it.song })
-            .filter { it.videoId.isNotBlank() || !it.localUri.isNullOrBlank() || !it.localPath.isNullOrBlank() }
+        sequence {
+            yieldAll(syncedHistory)
+            yieldAll(listens.sortedByDescending { it.startedAt }.map { it.song })
+            yieldAll(allTimeSummary?.songs.orEmpty().map { it.song })
+        }.filter { it.videoId.isNotBlank() || !it.localUri.isNullOrBlank() || !it.localPath.isNullOrBlank() }
             .distinctBy(::songIdentity)
             .take(40)
+            .toList()
     }
     val savePlaylistExport: (SavedScrobblePlaylist, ScrobblePlaylistExportFormat) -> Unit = { playlist, format ->
         val filename = scrobblePlaylistExportFilename(playlist.title, format)
