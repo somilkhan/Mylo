@@ -174,19 +174,19 @@ class ScrobbleMixLogicTest {
     }
 
     @Test
-    fun balancedSourceMixAlternatesAndDeduplicatesAcrossSources() {
+    fun youtubeFirstMixUsesTwoToOnePriorityAndDeduplicatesAcrossSources() {
         val ytOne = Song("youtube0001", "YouTube one", "Artist", null)
         val shared = Song("shared00001", "Shared", "Artist", null)
         val ytTwo = Song("youtube0002", "YouTube two", "Artist", null)
         val lastFmOne = Song("lastfm00001", "Last.fm one", "Artist", null)
 
         assertEquals(
-            // Shared identities keep the primary row; secondary-only picks
-            // alternate into the mix without replacing primary metadata.
-            listOf(ytOne, lastFmOne, shared, ytTwo),
-            buildBalancedSourceMix(
-                primary = listOf(ytOne, shared, ytTwo),
-                secondary = listOf(shared.copy(title = "Duplicate"), lastFmOne),
+            // LastWave's youtubeFirstBlend keeps YouTube first in a 2:1 ratio;
+            // duplicate Last.fm rows never replace the YouTube metadata.
+            listOf(ytOne, shared, ytTwo, lastFmOne),
+            buildYouTubeFirstMix(
+                youtube = listOf(ytOne, shared, ytTwo),
+                lastFm = listOf(shared.copy(title = "Duplicate"), lastFmOne),
                 limit = 10,
             ),
         )

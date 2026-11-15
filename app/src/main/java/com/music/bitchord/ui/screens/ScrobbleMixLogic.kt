@@ -90,26 +90,28 @@ internal fun buildLibraryMix(
  * The primary source owns overlapping identities so its canonical metadata
  * is never replaced by a duplicate row from the secondary source.
  */
-internal fun buildBalancedSourceMix(
-    primary: List<Song>,
-    secondary: List<Song>,
+internal fun buildYouTubeFirstMix(
+    youtube: List<Song>,
+    lastFm: List<Song>,
     limit: Int,
 ): List<Song> {
     if (limit <= 0) return emptyList()
-    val primaryTracks = primary.distinctBy(::songIdentity)
-    val primaryIdentities = primaryTracks.mapTo(mutableSetOf(), ::songIdentity)
-    val secondaryTracks = secondary.distinctBy(::songIdentity)
-        .filterNot { songIdentity(it) in primaryIdentities }
-
-    val result = ArrayList<Song>(limit)
-    var primaryIndex = 0
-    var secondaryIndex = 0
-    while (result.size < limit && (primaryIndex < primaryTracks.size || secondaryIndex < secondaryTracks.size)) {
-        if (primaryIndex < primaryTracks.size && result.size < limit) {
-            result += primaryTracks[primaryIndex++]
+    val seen = mutableSetOf<String>()
+    val youtubeTracks = youtube.distinctBy(::songIdentity)
+    val lastFmTracks = lastFm.distinctBy(::songIdentity)
+    val result = ArrayList<Song>(minOf(limit, youtubeTracks.size + lastFmTracks.size))
+    var youtubeIndex = 0
+    var lastFmIndex = 0
+    while (result.size < limit && (youtubeIndex < youtubeTracks.size || lastFmIndex < lastFmTracks.size)) {
+        repeat(2) {
+            if (youtubeIndex < youtubeTracks.size && result.size < limit) {
+                val track = youtubeTracks[youtubeIndex++]
+                if (seen.add(songIdentity(track))) result += track
+            }
         }
-        if (secondaryIndex < secondaryTracks.size && result.size < limit) {
-            result += secondaryTracks[secondaryIndex++]
+        if (lastFmIndex < lastFmTracks.size && result.size < limit) {
+            val track = lastFmTracks[lastFmIndex++]
+            if (seen.add(songIdentity(track))) result += track
         }
     }
     return result

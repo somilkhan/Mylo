@@ -598,7 +598,7 @@ fun ScrobbleScreen(
                                 }
                             }.awaitAll().flatten()
                         }
-                        buildBalancedSourceMix(radioTracks, lastFmTracks, limit = 35)
+                        buildYouTubeFirstMix(radioTracks, lastFmTracks, limit = 35)
                     }
                     when {
                         generated.isEmpty() -> Toast.makeText(context, "No similar tracks were found. Try another playlist.", Toast.LENGTH_LONG).show()
@@ -716,7 +716,7 @@ fun ScrobbleScreen(
                         } else {
                             emptyList()
                         }
-                        buildBalancedSourceMix(youtubeTracks, lastFmTracks, mixTrackCount)
+                        buildYouTubeFirstMix(youtubeTracks, lastFmTracks, mixTrackCount)
                     }
                     ScrobbleMixMode.LIBRARY -> buildLibraryMix(
                         YtMusicRepository.library().getOrThrow(),
