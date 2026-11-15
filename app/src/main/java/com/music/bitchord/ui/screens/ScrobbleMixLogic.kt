@@ -197,6 +197,7 @@ internal fun isSameSongOrEdit(candidate: Song, seed: Song): Boolean {
  */
 internal fun buildRadioMix(
     radio: List<Song>,
+    similar: List<Song>,
     favourites: List<Song>,
     recent: List<Song>,
     discovery: List<Song>,
@@ -206,7 +207,7 @@ internal fun buildRadioMix(
     if (limit <= 0) return emptyList()
     val seen = mutableSetOf<String>()
     val result = ArrayList<Song>(limit)
-    listOf(radio, favourites, recent, discovery).forEach { pool ->
+    listOf(radio, similar, favourites, recent, discovery).forEach { pool ->
         pool.forEach { candidate ->
             if (result.size < limit &&
                 candidate.title.isNotBlank() &&
