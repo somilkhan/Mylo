@@ -318,7 +318,17 @@ internal fun buildArtistCappedMix(
     targetSize: Int,
 ): List<Song> {
     if (targetSize <= 0) return emptyList()
-    val distinctSongs = distinctRecommendationSongs(candidates)
+    val distinctSongs = buildList {
+        candidates.filter(::isYouTubeCatalogTrack).forEach { candidate ->
+            val duplicate = any { existing ->
+                existing.videoId == candidate.videoId ||
+                    (recommendationArtistKey(existing.artist) == recommendationArtistKey(candidate.artist) &&
+                        (recommendationIdentity(existing) == recommendationIdentity(candidate) ||
+                            isSameSongOrEdit(candidate, existing)))
+            }
+            if (!duplicate) add(candidate)
+        }
+    }
     val seedKey = recommendationArtistKey(seedArtist)
     fun applyArtistCap(maxSeedArtist: Int, maxOtherArtist: Int): List<Song> {
         val counts = mutableMapOf<String, Int>()
