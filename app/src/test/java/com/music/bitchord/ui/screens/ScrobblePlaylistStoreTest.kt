@@ -109,4 +109,43 @@ class ScrobblePlaylistStoreTest {
             ScrobblePlaylistStore.playlists.clear()
         }
     }
+
+    @Test
+    fun customCoverUriRoundTripsAndLegacyRecordsDefaultToAutomaticCover() {
+        val song = Song("abcdefghijk", "Track", "Artist", null)
+        val playlist = SavedScrobblePlaylist(
+            title = "Covered mix",
+            reason = "Inspired by favourites",
+            songs = listOf(song),
+            coverUri = "content://media/external/images/media/42",
+        )
+
+        val restored = ScrobblePlaylistCodec.decodeOrNull(
+            ScrobblePlaylistCodec.encode(listOf(playlist)),
+        ).orEmpty().single()
+
+        assertEquals(playlist.coverUri, restored.coverUri)
+        assertEquals(song, restored.songs.single())
+
+        val legacy = """{"version":1,"playlists":[{"title":"Legacy","reason":"Old mix","songs":[{"videoId":"abcdefghijk","title":"Track","artist":"Artist"}]}]}"""
+        val legacyPlaylist = ScrobblePlaylistCodec.decodeOrNull(legacy).orEmpty().single()
+        assertNull(legacyPlaylist.coverUri)
+    }
+
+    @Test
+    fun changingCoverPreservesPlaylistSnapshotAndReturnsPreviousUri() {
+        val song = Song("abcdefghijk", "Track", "Artist", null)
+        ScrobblePlaylistStore.playlists.clear()
+        try {
+            ScrobblePlaylistStore.save("Covered", "Original", listOf(song))
+            assertNull(ScrobblePlaylistStore.setCover("Covered", "content://cover/one"))
+            assertEquals("content://cover/one", ScrobblePlaylistStore.setCover("Covered", "content://cover/two"))
+            assertEquals("content://cover/two", ScrobblePlaylistStore.playlists.single().coverUri)
+            assertEquals(listOf(song), ScrobblePlaylistStore.playlists.single().songs)
+            assertEquals("content://cover/two", ScrobblePlaylistStore.remove("Covered"))
+        } finally {
+            ScrobblePlaylistStore.playlists.clear()
+        }
+    }
+
 }
