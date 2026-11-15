@@ -126,9 +126,16 @@ internal fun buildPrecheckedMix(
     limit: Int = 25,
 ): List<Song> {
     if (limit <= 0) return emptyList()
+    val seenVideoIds = mutableSetOf<String>()
+    val seenNames = mutableSetOf<String>()
     val valid = candidates.filter {
         it.title.isNotBlank() && it.artist.isNotBlank() && it.videoId.isNotBlank()
-    }.distinctBy(::songIdentity)
+    }.filter { song ->
+        val nameKey = "${song.title.trim().replace(Regex("\\s+"), " ").lowercase()}|${song.artist.trim().replace(Regex("\\s+"), " ").lowercase()}"
+        // Match LastWave GeneratedTrack.sameSongAs: exact catalogue ID or
+        // normalized title+artist identity, whichever catches the duplicate.
+        seenVideoIds.add(song.videoId) && seenNames.add(nameKey)
+    }
     val artistCounts = mutableMapOf<String, Int>()
     return valid.filter { song ->
         val key = song.artist.trim().lowercase()
