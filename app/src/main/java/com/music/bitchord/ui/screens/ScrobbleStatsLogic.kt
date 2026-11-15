@@ -79,7 +79,7 @@ internal fun buildCombinedFavouriteTracks(
         if (key !in songs) songs[key] = it.song
     }
     synced.forEach {
-        val key = songIdentity(it.song)
+        val key = recommendationIdentity(it.song)
         if (key !in songs) songs[key] = it.song
     }
 
