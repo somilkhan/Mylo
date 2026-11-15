@@ -71,8 +71,15 @@ internal fun buildCombinedFavouriteTracks(
     limit: Int = 25,
 ): List<com.music.bitchord.data.model.Song> {
     if (limit <= 0) return emptyList()
-    val localByKey = local.associateBy { recommendationIdentity(it.song) }
-    val syncedByKey = synced.associateBy { recommendationIdentity(it.song) }
+    val localByKey = local.groupBy { recommendationIdentity(it.song) }.mapValues { (_, rows) ->
+        val first = rows.first()
+        first.copy(
+            ms = rows.sumOf { it.ms },
+            plays = rows.sumOf { it.plays },
+        )
+    }
+    val syncedByKey = synced.groupBy { recommendationIdentity(it.song) }
+        .mapValues { (_, rows) -> rows.sumOf { it.plays } }
     val songs = LinkedHashMap<String, com.music.bitchord.data.model.Song>()
     local.forEach {
         val key = recommendationIdentity(it.song)
@@ -86,7 +93,7 @@ internal fun buildCombinedFavouriteTracks(
     return songs.entries
         .sortedWith(
             compareByDescending<Map.Entry<String, com.music.bitchord.data.model.Song>> {
-                maxOf(localByKey[it.key]?.plays ?: 0, syncedByKey[it.key]?.plays ?: 0)
+                maxOf(localByKey[it.key]?.plays ?: 0, syncedByKey[it.key] ?: 0)
             }.thenByDescending { localByKey[it.key]?.ms ?: 0L }
                 .thenBy { it.value.title.lowercase() },
         )
