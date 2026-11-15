@@ -28,7 +28,7 @@ class ScrobbleMixLogicTest {
         val seed = Song("seedtrack01", "Deep Swim", "Seed Artist", null)
         val radioOne = Song("radio000001", "Ocean Lights", "Other Artist", null)
         val alternateUpload = Song("alternate001", "Ocean Lights - Official Audio", "Other Artist", null)
-        val similar = Song("similar00001", "Similar Track", "Similar Artist", null)
+        val similar = Song("similar0001", "Similar Track", "Similar Artist", null)
         val radioEdit = Song("radio000002", "Deep Swim (VIP Remix)", "Remixer", null)
         val favourite = Song("favourite01", "Favourite", "Seed Artist", null)
         val recent = Song("recent00001", "Recent", "Recent Artist", null)
