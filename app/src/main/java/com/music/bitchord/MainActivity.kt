@@ -318,7 +318,7 @@ import com.music.bitchord.ui.screens.LibraryGridPage
 import com.music.bitchord.ui.screens.LibraryScreen
 import com.music.bitchord.ui.screens.MoodGenrePlaylistsScreen
 import com.music.bitchord.ui.screens.SearchScreen
-import com.music.bitchord.ui.screens.scrobble.ScrobbleStatsScreen
+import com.music.bitchord.ui.screens.scrobble.ScrobbleHubScreen
 import com.music.bitchord.data.settings.SongSort
 import com.music.bitchord.ui.onboarding.OnboardingScreen
 import com.music.bitchord.ui.replay.ReplayScreen
@@ -2741,8 +2741,11 @@ private fun BitChordApp(
                         detailListStates.getOrPut(key) { LazyListState() }
                     }
                     if (key == "scrobble") {
-                        ScrobbleStatsScreen(
+                        ScrobbleHubScreen(
                             modifier = Modifier.padding(bottom = if (player.song != null) 180.dp else 120.dp),
+                            onPlay = { songs, index ->
+                                playFrom(songs, index, QueueSource("Scrobble", PlaybackSourceType.HISTORY))
+                            },
                         )
                     } else if (key == "history") {
                         HistoryScreen(
