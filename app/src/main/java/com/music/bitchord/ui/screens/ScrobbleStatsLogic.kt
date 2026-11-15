@@ -59,6 +59,34 @@ internal data class SyncedHistorySummary(
 )
 
 /** Repeated rows are separate plays in YouTube Music history; keep their count. */
+/**
+ * Combines device playback aggregates with account history without double-counting
+ * a track present in both sources. The larger source count is used for ranking;
+ * local listening time breaks ties and local-only tracks remain eligible.
+ */
+internal fun buildCombinedFavouriteTracks(
+    local: List<com.music.bitchord.data.stats.RankedSong>,
+    synced: List<SyncedHistoryTrack>,
+    limit: Int = 25,
+): List<com.music.bitchord.data.model.Song> {
+    if (limit <= 0) return emptyList()
+    val localByKey = local.associateBy { songIdentity(it.song) }
+    val syncedByKey = synced.associateBy { songIdentity(it.song) }
+    val songs = LinkedHashMap<String, com.music.bitchord.data.model.Song>()
+    local.forEach { songs.putIfAbsent(songIdentity(it.song), it.song) }
+    synced.forEach { songs.putIfAbsent(songIdentity(it.song), it.song) }
+
+    return songs.entries
+        .sortedWith(
+            compareByDescending<Map.Entry<String, com.music.bitchord.data.model.Song>> {
+                maxOf(localByKey[it.key]?.plays ?: 0, syncedByKey[it.key]?.plays ?: 0)
+            }.thenByDescending { localByKey[it.key]?.ms ?: 0L }
+                .thenBy { it.value.title.lowercase() },
+        )
+        .take(limit)
+        .map { it.value }
+}
+
 internal fun buildSyncedHistorySummary(
     history: List<com.music.bitchord.data.model.Song>,
 ): SyncedHistorySummary {
