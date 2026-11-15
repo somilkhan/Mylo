@@ -1055,31 +1055,30 @@ private fun SectionHeading(title: String) {
 
 @Composable
 private fun MetricCard(value: Long, label: String, reduceMotion: Boolean, modifier: Modifier = Modifier) {
-    val shape = RoundedCornerShape(18.dp)
     Card(
-        modifier = modifier.border(
-            width = 1.dp,
-            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.28f),
-            shape = shape,
-        ),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f)),
-        shape = shape,
+        modifier = modifier,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.48f)),
+        shape = RoundedCornerShape(22.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Column(
-            Modifier.fillMaxWidth().padding(horizontal = 15.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 15.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            Text(
+                label.uppercase(),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 0.8.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
             AnimatedValueText(
                 value = value,
                 reduceMotion = reduceMotion,
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.onSurface,
-            )
-            Text(
-                label,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
@@ -1087,9 +1086,20 @@ private fun MetricCard(value: Long, label: String, reduceMotion: Boolean, modifi
 
 @Composable
 private fun InfoPanel(title: String, value: String) {
-    Column(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
-        Text(value, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.24f))
+            .padding(horizontal = 14.dp, vertical = 13.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Text(value, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Box(
+            Modifier.size(8.dp).clip(RoundedCornerShape(50)).background(MaterialTheme.colorScheme.primary.copy(alpha = 0.72f))
+        )
     }
 }
 
