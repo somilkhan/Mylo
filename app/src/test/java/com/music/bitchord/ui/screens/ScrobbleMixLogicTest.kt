@@ -4,9 +4,25 @@ import com.music.bitchord.data.ListeningHistory
 import com.music.bitchord.data.model.SearchResult
 import com.music.bitchord.data.model.Song
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ScrobbleMixLogicTest {
+    @Test
+    fun seedVersionMatchingRejectsAlternateUploadsButKeepsUnrelatedTracks() {
+        val seed = Song("seedtrack01", "Deep Swim", "Original Artist", null)
+        val vip = Song("viptrack0001", "Deep Swim (VIP Remix)", "Another Artist", null)
+        val officialAudio = Song("audio000001", "Deep Swim - Official Audio", "Original Artist", null)
+        val unrelated = Song("unrelated01", "Deep Swimmer", "Different Artist", null)
+        val differentSong = Song("different001", "Ocean Lights", "Original Artist", null)
+
+        assertTrue(isSameSongOrEdit(vip, seed))
+        assertTrue(isSameSongOrEdit(officialAudio, seed))
+        assertFalse(isSameSongOrEdit(unrelated, seed))
+        assertFalse(isSameSongOrEdit(differentSong, seed))
+    }
+
     @Test
     fun artistCapLimitsSeedAndOtherArtistsThenRelaxesOnlyWhenPoolIsShort() {
         val candidates = listOf(

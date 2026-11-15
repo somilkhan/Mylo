@@ -152,6 +152,43 @@ internal fun buildTasteMix(
 }
 
 /**
+ * Port of LastWave GenerateRepository.isSameSongOrEdit. A distinct YouTube ID
+ * is not enough to make a different recommendation: radio can return the seed
+ * again as an official video, lyric upload, remix or cover.
+ */
+internal fun isSameSongOrEdit(candidate: Song, seed: Song): Boolean {
+    fun cleanTitle(title: String): String = title.lowercase()
+        .replace(Regex("""\\s*[({\\[][^)\\]]*[)}\\]]"""), " ")
+        .replace(
+            Regex("""(?i)\\b(official\\s+video|official\\s+audio|lyrics?|remix|mix|edit|bootleg|flip|vip|slowed|reverb|sped\\s+up|speed\\s+up|cover|version|live|acoustic|instrumental|feat\\.?|ft\\.?)\\b.*"""),
+            " ",
+        )
+        .replace(Regex("[^a-z0-9]"), "")
+        .trim()
+
+    val cleanSeed = cleanTitle(seed.title)
+    val cleanCandidate = cleanTitle(candidate.title)
+    if (cleanCandidate.isBlank() || cleanSeed.isBlank()) return false
+    if (cleanCandidate == cleanSeed) return true
+
+    val lowerCandidate = candidate.title.lowercase()
+    val lowerSeed = seed.title.lowercase().trim()
+    if (lowerSeed.length >= 3 && lowerCandidate.contains(lowerSeed)) {
+        val editIndicators = listOf(
+            "remix", "edit", "mix", "cover", "version", "flip", "bootleg",
+            "vip", "slowed", "reverb", "sped", "speed", "acoustic", "instrumental",
+            "tribute", "karaoke", "live", "rework", "dub", "mashup", "rendition",
+        )
+        if (editIndicators.any(lowerCandidate::contains)) return true
+        val lowerArtist = seed.artist.lowercase().trim()
+        if (lowerArtist.length >= 3 && lowerCandidate.contains(lowerArtist)) return true
+    }
+    if (cleanSeed.length >= 10 && cleanCandidate.contains(cleanSeed)) return true
+    if (cleanCandidate.length >= 10 && cleanSeed.contains(cleanCandidate)) return true
+    return false
+}
+
+/**
  * Port of LastWave GenerateRepository.applyArtistCap: cap the seed artist at
  * one and other artists at two, relax to two/three only when that would leave
  * the requested mix short, then preserve the full deduplicated pool as a final

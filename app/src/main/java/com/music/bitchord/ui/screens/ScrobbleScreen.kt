@@ -744,7 +744,7 @@ fun ScrobbleScreen(
                         val seed = selectedSeed?.takeIf(::isYouTubeCatalogTrack)
                             ?: throw IllegalStateException("Choose a YouTube Music track for Song radio")
                         YtMusicRepository.radio(seed.videoId).getOrThrow()
-                            .filter { it.videoId.isNotBlank() && it.videoId != seed.videoId }
+                            .filter { it.videoId.isNotBlank() && it.videoId != seed.videoId && !isSameSongOrEdit(it, seed) }
                             .distinctBy(::songIdentity).take(mixTrackCount)
                     }
                     ScrobbleMixMode.ARTIST_MIX -> {
@@ -755,7 +755,10 @@ fun ScrobbleScreen(
                             ?: throw IllegalStateException("Couldn't find an exact artist match for ${seed.artist}")
                         buildArtistCappedMix(
                             candidates = YtMusicRepository.artistPage(artistBrowseId).getOrThrow().songs
-                                .filter { it.videoId.isNotBlank() && it.videoId != seed.videoId },
+                                .filter {
+                                    it.videoId.isNotBlank() && it.videoId != seed.videoId &&
+                                        !isSameSongOrEdit(it, seed)
+                                },
                             seedArtist = seed.artist,
                             targetSize = mixTrackCount,
                         )
