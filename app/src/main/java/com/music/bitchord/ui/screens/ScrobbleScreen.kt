@@ -996,17 +996,12 @@ fun ScrobbleScreen(
             val result = withTimeout(SCROBBLE_GENERATION_TIMEOUT_MS) {
                 val youtubePicks = YtMusicRepository.quickPicks(excluded).getOrThrow()
                 if (lastFmDiscoveryAvailable) {
-                    val tags = if (lastFmUsername.isNotBlank()) {
-                        LastFM.getTopTags(lastFmUsername, limit = 12).getOrElse { emptyList() }.map { it.name }
-                    } else {
-                        emptyList()
-                    }
                     ScrobbleRecommendationEngine.discover(
                         seedTracks = favouriteTracks + recentTracks,
                         seedArtists = favouriteTracks.map {
                             ListeningStats.primaryArtist(it.artist) ?: it.artist
                         },
-                        topTags = tags,
+                        lastFmUsername = lastFmUsername,
                         youtubeCandidates = youtubePicks,
                         heardVideoIds = excluded,
                         heardSongs = syncedHistory + listens.map { it.song } + generationTopTracks,
