@@ -34,6 +34,26 @@ class ScrobblePlaylistExportTest {
     }
 
     @Test
+    fun csvNeutralizesSpreadsheetFormulaCellsIncludingLeadingWhitespace() {
+        val playlist = SavedScrobblePlaylist(
+            title = "Formula safety",
+            reason = "Test",
+            songs = listOf(
+                Song("abcdefghijk", "=HYPERLINK(\\\"https://evil.example\\\")", "  +SUM(1,2)", null),
+                Song("lmnopqrstuv", "-2+3", "@command", null),
+                Song("zyxwvutsrqp", "Ordinary title", "Ordinary artist", null),
+            ),
+        )
+
+        val csv = exportScrobblePlaylist(playlist, ScrobblePlaylistExportFormat.CSV)
+
+        assertTrue(csv.contains("'=HYPERLINK"))
+        assertTrue(csv.contains("\"'  +SUM(1,2)\""))
+        assertTrue(csv.contains("'-2+3,'@command"))
+        assertTrue(csv.contains("Ordinary title,Ordinary artist"))
+    }
+
+    @Test
     fun m3uUsesPlayableYoutubeAndLocalLocationsAndSkipsUnresolvableRows() {
         val playlist = SavedScrobblePlaylist(
             title = "Mix\nOne",
