@@ -122,8 +122,8 @@ private fun ScrobbleGeneratorScreen(
                 ScrobbleGenerateMode.SIMILAR_ARTISTS,
                 ScrobbleGenerateMode.TAG,
             )
-            modes.chunked(3).forEach { group ->
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            modes.chunked(2).forEach { group ->
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     group.forEach { option ->
                         FilterChip(
                             selected = mode == option.name,
@@ -349,30 +349,34 @@ private fun ScrobblePlaylistsScreen(
                             }
                         },
                     ) { Text("Save cover") }
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Button(
-                            onClick = { onPlay(playlist.tracks, 0) },
-                            enabled = playlist.tracks.isNotEmpty(),
-                        ) { Text("Play") }
-                        TextButton(onClick = {
-                            renameText = playlist.title
-                            renameTarget = playlist
-                        }) { Text("Rename") }
-                        TextButton(onClick = {
-                            scope.launch {
-                                try {
-                                    ScrobblePlaylistStore.setPinned(playlist.id, !playlist.pinned)
-                                } catch (failure: Exception) { message = failure.message }
-                            }
-                        }) { Text(if (playlist.pinned) "Unpin" else "Pin") }
-                        TextButton(onClick = {
-                            scope.launch {
-                                try {
-                                    ScrobblePlaylistStore.delete(playlist.id)
-                                    message = "Playlist deleted"
-                                } catch (failure: Exception) { message = failure.message }
-                            }
-                        }) { Text("Delete") }
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Button(
+                                onClick = { onPlay(playlist.tracks, 0) },
+                                enabled = playlist.tracks.isNotEmpty(),
+                            ) { Text("Play") }
+                            TextButton(onClick = {
+                                renameText = playlist.title
+                                renameTarget = playlist
+                            }) { Text("Rename") }
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            TextButton(onClick = {
+                                scope.launch {
+                                    try {
+                                        ScrobblePlaylistStore.setPinned(playlist.id, !playlist.pinned)
+                                    } catch (failure: Exception) { message = failure.message }
+                                }
+                            }) { Text(if (playlist.pinned) "Unpin" else "Pin") }
+                            TextButton(onClick = {
+                                scope.launch {
+                                    try {
+                                        ScrobblePlaylistStore.delete(playlist.id)
+                                        message = "Playlist deleted"
+                                    } catch (failure: Exception) { message = failure.message }
+                                }
+                            }) { Text("Delete") }
+                        }
                     }
                     playlist.tracks.take(5).forEachIndexed { index, song ->
                         Row(
