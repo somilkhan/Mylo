@@ -90,6 +90,119 @@ internal object ScrobbleRecommendationEngine {
         }
     }
 
+    internal suspend fun resolveChartEntries(
+        entries: List<ScrobbleChartEntry>,
+        limit: Int,
+    ): List<Song> {
+        val sources = entries.map { SourcedTrack(it, "lastfm-chart", 1) }
+        return resolvePlayable(mergeSources(sources).take(limit.coerceAtLeast(0)), {}).map { it.first }
+    }
+
+    internal suspend fun generateSimilarTracks(
+        seed: Song,
+        profile: ScrobbleStatsSnapshot?,
+        heardSongs: List<Song>,
+        total: Int,
+    ): List<Song> {
+        val sourced = fetchTrackSource(
+            "track.getsimilar",
+            mapOf("track" to seed.title, "artist" to seed.artist),
+            "similartracks",
+            "track",
+            "similar-track",
+            3,
+        )
+        val radio = safeRadio(seed)
+        return selectResolved(sourced, profile, listOf(seed), heardSongs, total, radio)
+    }
+
+    internal suspend fun generateSimilarArtists(
+        artist: String,
+        profile: ScrobbleStatsSnapshot?,
+        heardSongs: List<Song>,
+        total: Int,
+    ): List<Song> {
+        val names = fetchSimilarArtists(artist).take(3)
+        val sourced = parallel(names) { name ->
+            fetchTrackSource(
+                "artist.gettoptracks",
+                mapOf("artist" to name),
+                "toptracks",
+                "track",
+                "similar-artist-top-tracks",
+                2,
+            )
+        }.flatten()
+        return selectResolved(sourced, profile, emptyList(), heardSongs, total, emptyList())
+    }
+
+    internal suspend fun generateTagTracks(
+        tag: String,
+        profile: ScrobbleStatsSnapshot?,
+        heardSongs: List<Song>,
+        total: Int,
+    ): List<Song> {
+        val sourced = fetchTrackSource(
+            "tag.gettoptracks",
+            mapOf("tag" to tag),
+            "tracks",
+            "track",
+            "user-tag",
+            3,
+            genreTag = tag,
+            primaryGenre = true,
+        )
+        return selectResolved(sourced, profile, emptyList(), heardSongs, total, emptyList())
+    }
+
+    private suspend fun selectResolved(
+        sourced: List<SourcedTrack>,
+        profile: ScrobbleStatsSnapshot?,
+        seeds: List<Song>,
+        heardSongs: List<Song>,
+        total: Int,
+        radio: List<Song>,
+    ): List<Song> {
+        val resolved = resolvePlayable(mergeSources(sourced).take(MAX_LASTFM_RESOLVE), {})
+        val familiarKeys = ScrobblePlaylistStore.playlists.value
+            .flatMap { playlist -> playlist.tracks.map { it.scrobbleIdentityKey } }.toSet()
+        val remote = resolved.map { (song, candidate) ->
+            val fresh = isScrobbleFreshCandidate(song, heardSongs, profile?.tracks.orEmpty())
+            val familiar = song.scrobbleIdentityKey in familiarKeys
+            ScrobbleRecommendationCandidate(
+                song = song,
+                tags = candidate.tags,
+                fresh = fresh,
+                familiar = familiar,
+                score = score(song, candidate, profile, seeds, fresh, familiar),
+            )
+        }
+        val local = radio.map { song ->
+            val fresh = isScrobbleFreshCandidate(song, heardSongs, profile?.tracks.orEmpty())
+            val familiar = song.scrobbleIdentityKey in familiarKeys
+            ScrobbleRecommendationCandidate(
+                song = song,
+                tags = setOf("source:youtube-radio"),
+                fresh = fresh,
+                familiar = familiar,
+                score = scoreLocal(song, profile, seeds, fresh, familiar),
+            )
+        }
+        val selected = ScrobbleRecommendationSelection.select(remote + local, total)
+        val selectedKeys = selected.mapTo(HashSet()) { it.scrobbleIdentityKey }
+        return (selected + radio.filter { it.scrobbleIdentityKey !in selectedKeys })
+            .distinctScrobbleSongs()
+            .take(total)
+    }
+
+    private suspend fun safeRadio(seed: Song): List<Song> = try {
+        YtMusicRepository.radio(seed.videoId).getOrDefault(emptyList())
+    } catch (cancellation: CancellationException) {
+        throw cancellation
+    } catch (_: Exception) {
+        emptyList()
+    }
+
     private suspend fun fetchSources(profile: ScrobbleStatsSnapshot, seeds: List<Song>): List<SourcedTrack> =
         coroutineScope {
             // 1. Similar tracks.
