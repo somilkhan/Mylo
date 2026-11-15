@@ -117,11 +117,12 @@ class ScrobbleStatsLogicTest {
     @Test
     fun combinedFavouritesDeduplicateAcrossSourcesAndKeepLocalOnlyTracks() {
         val shared = com.music.bitchord.data.model.Song("abcdefghijk", "Shared", "Artist A", null)
+        val localShared = com.music.bitchord.data.model.Song("content://media/shared", "Shared", "Artist A", null)
         val localOnly = com.music.bitchord.data.model.Song("lmnopqrstuv", "Local only", "Artist B", null)
         val remoteOnly = com.music.bitchord.data.model.Song("zyxwvutsrqp", "Remote only", "Artist C", null)
         val result = buildCombinedFavouriteTracks(
             local = listOf(
-                RankedSong(shared, ms = 900_000L, plays = 4),
+                RankedSong(localShared, ms = 900_000L, plays = 4),
                 RankedSong(localOnly, ms = 600_000L, plays = 5),
             ),
             synced = listOf(
@@ -130,8 +131,8 @@ class ScrobbleStatsLogicTest {
             ),
         )
 
-        assertEquals(listOf(shared, localOnly, remoteOnly), result.take(3))
-        assertEquals(3, result.distinctBy(::songIdentity).size)
+        assertEquals(listOf(localShared, localOnly, remoteOnly), result.take(3))
+        assertEquals(3, result.distinctBy(::recommendationIdentity).size)
         assertTrue(buildCombinedFavouriteTracks(emptyList(), emptyList()).isEmpty())
         assertTrue(buildCombinedFavouriteTracks(emptyList(), emptyList(), limit = 0).isEmpty())
     }
