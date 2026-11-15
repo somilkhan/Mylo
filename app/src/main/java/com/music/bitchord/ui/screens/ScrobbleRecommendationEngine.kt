@@ -228,6 +228,16 @@ internal object ScrobbleRecommendationEngine {
         val sourceCounts = sourceTags.mapValues { (_, tags) -> tags.size }
         val primaryGenres = resolvedPairs.filter { (_, rows) -> rows.any(SourceCandidate::primaryGenre) }
             .mapTo(mutableSetOf()) { recommendationIdentity(it.first) }
+        val trackSignals = resolvedPairs.groupBy { recommendationIdentity(it.first) }
+            .mapValues { (_, rows) ->
+                val metadata = rows.flatMap { pair -> pair.second.map { it.track } }
+                LastWaveTrackSignals(
+                    listeners = metadata.mapNotNull { it.listeners }.maxOrNull(),
+                    playCount = metadata.mapNotNull { it.playCount }.maxOrNull(),
+                    match = metadata.mapNotNull { it.match }.maxOrNull(),
+                    album = metadata.firstNotNullOfOrNull { it.album },
+                )
+            }
 
         // Strict exclusions are applied after all sources have been pooled;
         // neither an alternate upload nor a Last.fm fallback can re-add a heard song.
@@ -242,6 +252,7 @@ internal object ScrobbleRecommendationEngine {
             sourceCounts = sourceCounts,
             sourceTags = sourceTags,
             primaryGenreIdentities = primaryGenres,
+            trackSignals = trackSignals,
             limit = limit,
         )
     }
