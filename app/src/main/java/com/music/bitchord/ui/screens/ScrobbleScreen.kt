@@ -2031,7 +2031,7 @@ fun ScrobbleScreen(
                                             ) {
                                                 Row(
                                                     modifier = Modifier.weight(1f).clip(RoundedCornerShape(14.dp))
-                                                        .semantics { selected = playlist.title in selectedPlaylistTitles }
+                                                        .semantics { this.selected = playlist.title in selectedPlaylistTitles }
                                                         .clickable(role = if (playlistSelectionMode) Role.Checkbox else Role.Button) {
                                                             if (playlistSelectionMode) {
                                                                 selectedPlaylistTitles = if (playlist.title in selectedPlaylistTitles) {
