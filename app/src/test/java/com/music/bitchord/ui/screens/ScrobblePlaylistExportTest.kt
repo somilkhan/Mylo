@@ -39,7 +39,7 @@ class ScrobblePlaylistExportTest {
             title = "Formula safety",
             reason = "Test",
             songs = listOf(
-                Song("abcdefghijk", "=HYPERLINK(\\\"https://evil.example\\\")", "  +SUM(1,2)", null),
+                Song("abcdefghijk", "=HYPERLINK(https://evil.example)", "  +SUM(1,2)", null),
                 Song("lmnopqrstuv", "-2+3", "@command", null),
                 Song("zyxwvutsrqp", "Ordinary title", "Ordinary artist", null),
             ),
