@@ -96,6 +96,17 @@ class ScrobblePlaylistStoreTest {
     }
 
     @Test
+    fun olderPlaylistSnapshotsDecodeWithPinnedDefaultingToFalse() {
+        val legacy = """{"version":1,"playlists":[{"title":"Old mix","reason":"Saved before pinning","songs":[{"videoId":"abcdefghijk","title":"Track","artist":"Artist"}]}]}"""
+
+        val restored = ScrobblePlaylistCodec.decodeOrNull(legacy).orEmpty().single()
+
+        assertEquals("Old mix", restored.title)
+        assertEquals(false, restored.pinned)
+        assertEquals("abcdefghijk", restored.songs.single().videoId)
+    }
+
+    @Test
     fun pinnedStateRoundTripsAndCanBeToggledWithoutChangingTracks() {
         val song = Song("abcdefghijk", "Track", "Artist", null)
         val original = SavedScrobblePlaylist("Pinned mix", "Reason", listOf(song), pinned = true)
