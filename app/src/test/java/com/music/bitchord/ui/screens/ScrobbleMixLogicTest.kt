@@ -281,6 +281,24 @@ class ScrobbleMixLogicTest {
     }
 
     @Test
+    fun discoverPrefersHigherLastWaveSourceWeight() {
+        val low = Song("lowweight01", "Low weight", "Unknown Artist", null)
+        val high = Song("highweight01", "High weight", "Unknown Artist", null)
+
+        val result = buildDiscoverMix(
+            candidates = listOf(low, high),
+            heardVideoIds = emptySet(),
+            sourceWeights = mapOf(
+                recommendationIdentity(low) to 1,
+                recommendationIdentity(high) to 4,
+            ),
+            limit = 2,
+        )
+
+        assertEquals(listOf(high, low), result)
+    }
+
+    @Test
     fun discoverUsesLastWaveTasteAffinityAndArtistDiversityBeforeRelaxingCaps() {
         val topArtistA = Song("topartst001", "Top artist song", "Top Artist", null)
         val recentArtistA = Song("recentart01", "Recent artist song", "Recent Artist", null)
