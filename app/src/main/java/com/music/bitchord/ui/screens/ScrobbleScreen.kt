@@ -106,6 +106,7 @@ import com.music.bitchord.data.YtMusicRepository
 import com.music.bitchord.data.model.SearchFilter
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.stats.ListeningStats
+import com.music.bitchord.data.stats.RankedSong
 import com.music.bitchord.data.stats.ReplayPeriod
 import com.music.bitchord.data.stats.ReplaySummary
 import kotlinx.coroutines.CancellationException
