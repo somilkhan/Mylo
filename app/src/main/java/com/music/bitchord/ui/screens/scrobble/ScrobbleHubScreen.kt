@@ -333,7 +333,7 @@ private fun ScrobblePlaylistsScreen(
                             }
                         }) { Text("Delete") }
                     }
-                    playlist.tracks.take(3).forEachIndexed { index, song ->
+                    playlist.tracks.take(5).forEachIndexed { index, song ->
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -343,17 +343,34 @@ private fun ScrobblePlaylistsScreen(
                                 Text(song.artist, style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
+                            TextButton(
+                                enabled = index > 0,
+                                onClick = {
+                                    scope.launch {
+                                        try { ScrobblePlaylistStore.moveTrack(playlist.id, index, index - 1) }
+                                        catch (failure: Exception) { message = failure.message }
+                                    }
+                                },
+                            ) { Text("↑") }
+                            TextButton(
+                                enabled = index < playlist.tracks.lastIndex,
+                                onClick = {
+                                    scope.launch {
+                                        try { ScrobblePlaylistStore.moveTrack(playlist.id, index, index + 1) }
+                                        catch (failure: Exception) { message = failure.message }
+                                    }
+                                },
+                            ) { Text("↓") }
                             TextButton(onClick = {
                                 scope.launch {
-                                    try {
-                                        ScrobblePlaylistStore.removeTrack(playlist.id, song.videoId)
-                                    } catch (failure: Exception) { message = failure.message }
+                                    try { ScrobblePlaylistStore.removeTrack(playlist.id, song.videoId) }
+                                    catch (failure: Exception) { message = failure.message }
                                 }
                             }) { Text("Remove") }
                         }
                     }
-                    if (playlist.tracks.size > 3) {
-                        Text("+ ${playlist.tracks.size - 3} more tracks",
+                    if (playlist.tracks.size > 5) {
+                        Text("+ ${playlist.tracks.size - 5} more tracks",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
