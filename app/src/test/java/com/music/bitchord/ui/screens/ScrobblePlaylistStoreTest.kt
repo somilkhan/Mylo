@@ -64,6 +64,38 @@ class ScrobblePlaylistStoreTest {
     }
 
     @Test
+    fun renameTrimsTitleAndPreservesTheSavedSnapshot() {
+        val song = Song("abcdefghijk", "Track", "Artist", null)
+        ScrobblePlaylistStore.playlists.clear()
+        try {
+            ScrobblePlaylistStore.save("Old title", "Generated from favourites", listOf(song))
+
+            assertEquals(true, ScrobblePlaylistStore.rename("Old title", "  New title  "))
+            assertEquals("New title", ScrobblePlaylistStore.playlists.single().title)
+            assertEquals("Generated from favourites", ScrobblePlaylistStore.playlists.single().reason)
+            assertEquals(song, ScrobblePlaylistStore.playlists.single().songs.single())
+        } finally {
+            ScrobblePlaylistStore.playlists.clear()
+        }
+    }
+
+    @Test
+    fun renameRejectsBlankNamesAndCaseInsensitiveDuplicates() {
+        ScrobblePlaylistStore.playlists.clear()
+        try {
+            ScrobblePlaylistStore.save("First", "Reason", listOf(Song("abcdefghijk", "One", "Artist", null)))
+            ScrobblePlaylistStore.save("Second", "Reason", listOf(Song("lmnopqrstuv", "Two", "Artist", null)))
+
+            assertEquals(false, ScrobblePlaylistStore.rename("First", "   "))
+            assertEquals(false, ScrobblePlaylistStore.rename("First", "sEcOnD"))
+            assertEquals(false, ScrobblePlaylistStore.rename("Missing", "Renamed"))
+            assertEquals(listOf("Second", "First"), ScrobblePlaylistStore.playlists.map { it.title })
+        } finally {
+            ScrobblePlaylistStore.playlists.clear()
+        }
+    }
+
+    @Test
     fun identicalSavedSnapshotIsNotDuplicated() {
         val song = Song("abcdefghijk", "First", "Artist", null)
         ScrobblePlaylistStore.playlists.clear()
