@@ -129,6 +129,23 @@ class ScrobbleMixLogicTest {
     }
 
     @Test
+    fun balancedSourceMixAlternatesAndDeduplicatesAcrossSources() {
+        val ytOne = Song("youtube0001", "YouTube one", "Artist", null)
+        val shared = Song("shared00001", "Shared", "Artist", null)
+        val ytTwo = Song("youtube0002", "YouTube two", "Artist", null)
+        val lastFmOne = Song("lastfm00001", "Last.fm one", "Artist", null)
+
+        assertEquals(
+            listOf(ytOne, shared, ytTwo, lastFmOne),
+            buildBalancedSourceMix(
+                primary = listOf(ytOne, shared, ytTwo),
+                secondary = listOf(shared.copy(title = "Duplicate"), lastFmOne),
+                limit = 10,
+            ),
+        )
+    }
+
+    @Test
     fun tasteMixUsesWeightedSourcesAndDeduplicatesByTrackIdentity() {
         val favouriteOne = Song("favourite001", "Favourite one", "Artist", null)
         val favouriteTwo = Song("favourite002", "Favourite two", "Artist", null)
