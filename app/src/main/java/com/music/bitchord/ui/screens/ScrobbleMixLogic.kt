@@ -2,6 +2,8 @@ package com.music.bitchord.ui.screens
 
 import com.music.bitchord.data.ListeningHistory
 import com.music.bitchord.data.model.Song
+import com.music.bitchord.data.model.LibraryPage
+import com.music.bitchord.data.model.SearchResult
 
 /** YouTube's radio and artist catalogue endpoints require an 11-character video id. */
 private val YOUTUBE_VIDEO_ID = Regex("^[A-Za-z0-9_-]{11}$")
@@ -48,6 +50,40 @@ internal fun buildRediscoverMix(
         .map { it.song }
 }
 
+
+/**
+ * Tag generation uses Mylo's real YouTube Music song search. Browse cards are
+ * deliberately ignored: this generator must return playable tracks only.
+ */
+internal fun buildTagMix(
+    results: List<SearchResult>,
+    limit: Int = 25,
+): List<Song> = results.asSequence()
+    .mapNotNull { result ->
+        when (result) {
+            is SearchResult.TopTrack -> result.song
+            is SearchResult.Track -> result.song
+            is SearchResult.Browse -> null
+        }
+    }
+    .filter(::isYouTubeCatalogTrack)
+    .distinctBy(::songIdentity)
+    .take(limit.coerceAtLeast(0))
+    .toList()
+
+/**
+ * Library generation combines Liked Music and tracks added to the YouTube
+ * Music library, preserving the repository's source order and removing the
+ * overlap between those feeds.
+ */
+internal fun buildLibraryMix(
+    library: LibraryPage,
+    limit: Int = 25,
+): List<Song> = (library.likedSongs + library.librarySongs).asSequence()
+    .filter(::isYouTubeCatalogTrack)
+    .distinctBy(::songIdentity)
+    .take(limit.coerceAtLeast(0))
+    .toList()
 
 /** Only catalogue tracks absent from the supplied listening history qualify as new-to-you. */
 internal fun buildNeverHeardMix(
