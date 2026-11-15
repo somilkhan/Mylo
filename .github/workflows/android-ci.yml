@@ -8,20 +8,8 @@ on:
       - "docs/**"
   pull_request:
     branches: [main]
+  # Manual runs always build and publish debug APK artifacts for device testing.
   workflow_dispatch:
-    inputs:
-      build_apks:
-        description: "Build and upload Android/TV/Wear OS APKs for device testing"
-        required: true
-        type: boolean
-        default: false
-
-permissions:
-  contents: read
-
-concurrency:
-  group: android-ci-${{ github.ref }}
-  cancel-in-progress: true
 
 jobs:
   android:
@@ -56,18 +44,14 @@ jobs:
       - name: Report installed Android platforms
         run: sdkmanager --list | grep -E "platforms;android-|build-tools;" | head -30
 
-      - name: Build Android app, TV and Wear OS APKs (manual opt-in only)
+      - name: Build Android app, TV and Wear OS APKs (manual runs)
         id: build_apks
-        if: github.event_name == 'workflow_dispatch' && inputs.build_apks
+        if: github.event_name == 'workflow_dispatch'
         run: ./gradlew --no-daemon --stacktrace :app:assembleDevDebug :tv:assembleDevDebug :wearos:assembleDevDebug
 
-      - name: Run Android unit tests
-        id: test_android
-        run: ./gradlew --no-daemon --stacktrace :app:testDevDebugUnitTest
-
-      - name: Upload debug APKs (manual opt-in only)
+      - name: Upload debug APKs for device testing
         id: upload_apks
-        if: github.event_name == 'workflow_dispatch' && inputs.build_apks && steps.build_apks.outcome == 'success'
+        if: github.event_name == 'workflow_dispatch' && steps.build_apks.outcome == 'success'
         continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
@@ -77,18 +61,22 @@ jobs:
             tv/build/outputs/apk/dev/debug/*.apk
             wearos/build/outputs/apk/dev/debug/*.apk
           if-no-files-found: error
-          retention-days: 3
+          retention-days: 14
+
+      - name: Run Android unit tests
+        id: test_android
+        if: always()
+        run: ./gradlew --no-daemon --stacktrace :app:testDevDebugUnitTest
 
       - name: Report APK artifact upload failure
-        if: always() && github.event_name == 'workflow_dispatch' && inputs.build_apks && steps.build_apks.outcome == 'success' && steps.upload_apks.outcome == 'failure'
+        if: always() && github.event_name == 'workflow_dispatch' && steps.build_apks.outcome == 'success' && steps.upload_apks.outcome == 'failure'
         shell: bash
         run: |
-          echo "::warning::Android build succeeded, but GitHub could not store the APK artifacts. Check Actions artifact storage quota."
+          echo "::warning::Android build succeeded, but GitHub could not store the APK artifacts. Check the repository's GitHub Actions storage quota."
           {
             echo "### APK artifacts unavailable"
             echo "Android/TV/Wear OS APK builds succeeded, but artifact upload failed. Android unit-test outcome: ${{ steps.test_android.outcome }}. Check the repository's GitHub Actions storage quota."
           } >> "$GITHUB_STEP_SUMMARY"
-
   desktop:
     name: Desktop compile and tests
     runs-on: ubuntu-latest
