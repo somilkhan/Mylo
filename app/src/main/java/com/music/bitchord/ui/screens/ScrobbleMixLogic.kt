@@ -408,8 +408,11 @@ internal fun buildLocalTasteCandidates(
             val title = candidate.title.lowercase()
             if (junkTerms.any(title::contains)) continue
             val key = recommendationIdentity(candidate)
-            if (key in seen) continue
             val artistKey = recommendationArtistKey(candidate.artist)
+            if (key in seen || suggestions.any { existing ->
+                    recommendationArtistKey(existing.artist) == artistKey && isSameSongOrEdit(candidate, existing)
+                }
+            ) continue
             if ((artistCounts[artistKey] ?: 0) >= 3) continue
             val alreadyHeard = knownSongs[artistKey].orEmpty().any { heard ->
                 key == recommendationIdentity(heard) || isSameSongOrEdit(candidate, heard)
