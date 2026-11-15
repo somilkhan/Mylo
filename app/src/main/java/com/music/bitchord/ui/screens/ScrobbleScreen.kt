@@ -187,8 +187,8 @@ fun ScrobbleScreen(
     var statsSource by remember { mutableStateOf(ScrobbleStatsSource.DEVICE) }
     var statsSourceManuallySelected by remember { mutableStateOf(false) }
     val syncedStats = remember(syncedHistory) { buildSyncedHistorySummary(syncedHistory) }
-    LaunchedEffect(syncedHistory.isNotEmpty()) {
-        if (syncedHistory.isNotEmpty() && !statsSourceManuallySelected) {
+    LaunchedEffect(syncedHistory.isNotEmpty(), syncingYouTubeHistory) {
+        if ((syncedHistory.isNotEmpty() || syncingYouTubeHistory) && !statsSourceManuallySelected) {
             statsSource = ScrobbleStatsSource.YOUTUBE_MUSIC
         }
     }
