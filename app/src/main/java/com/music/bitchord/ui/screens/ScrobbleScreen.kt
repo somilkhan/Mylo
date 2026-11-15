@@ -1670,25 +1670,24 @@ private fun ArtworkMosaic(songs: List<Song>, modifier: Modifier = Modifier) {
 @Composable
 private fun ArtworkTile(song: Song, modifier: Modifier = Modifier) {
     val artwork = song.thumbnailUrl?.takeIf(String::isNotBlank)
-    if (artwork == null) {
-        Box(
-            modifier.background(MaterialTheme.colorScheme.surfaceVariant),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                Icons.Rounded.GraphicEq,
+    Box(
+        modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            Icons.Rounded.GraphicEq,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+            modifier = Modifier.size(22.dp),
+        )
+        if (artwork != null) {
+            AsyncImage(
+                model = artwork,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
-                modifier = Modifier.size(22.dp),
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
             )
         }
-    } else {
-        AsyncImage(
-            model = artwork,
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = modifier,
-        )
     }
 }
 
