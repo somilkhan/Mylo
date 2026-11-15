@@ -1,11 +1,13 @@
 package com.music.bitchord.ui.screens
 
 import android.app.Activity
+import android.content.ClipData
 import android.content.Intent
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.FileProvider
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
@@ -116,6 +118,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
+import java.io.File
 import kotlinx.coroutines.delay
 import kotlin.math.roundToLong
 
@@ -334,13 +337,33 @@ fun ScrobbleScreen(
     }
     val sharePlaylistExport: (SavedScrobblePlaylist, ScrobblePlaylistExportFormat) -> Unit = { playlist, format ->
         val filename = scrobblePlaylistExportFilename(playlist.title, format)
-        val intent = Intent(Intent.ACTION_SEND).apply {
-            type = format.mimeType
-            putExtra(Intent.EXTRA_SUBJECT, filename)
-            putExtra(Intent.EXTRA_TEXT, exportScrobblePlaylist(playlist, format))
+        val content = exportScrobblePlaylist(playlist, format)
+        exportScope.launch {
+            val shareUri = runCatching {
+                withContext(Dispatchers.IO) {
+                    val exportDirectory = File(context.cacheDir, "shared/scrobble-playlists/" + System.currentTimeMillis())
+                    if (!exportDirectory.mkdirs() && !exportDirectory.isDirectory) {
+                        error("Couldn't create the playlist export cache")
+                    }
+                    val exportFile = File(exportDirectory, filename)
+                    exportFile.writeText(content, Charsets.UTF_8)
+                    FileProvider.getUriForFile(context, context.packageName + ".fileprovider", exportFile)
+                }
+            }
+            shareUri.onSuccess { uri ->
+                val intent = Intent(Intent.ACTION_SEND).apply {
+                    type = format.mimeType
+                    putExtra(Intent.EXTRA_SUBJECT, filename)
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    clipData = ClipData.newUri(context.contentResolver, filename, uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                runCatching { context.startActivity(Intent.createChooser(intent, "Share playlist")) }
+                    .onFailure { Toast.makeText(context, "Couldn't share this playlist", Toast.LENGTH_SHORT).show() }
+            }.onFailure {
+                Toast.makeText(context, "Couldn't prepare this playlist for sharing", Toast.LENGTH_SHORT).show()
+            }
         }
-        runCatching { context.startActivity(Intent.createChooser(intent, "Share playlist")) }
-            .onFailure { Toast.makeText(context, "Couldn't share this playlist", Toast.LENGTH_SHORT).show() }
     }
     val savedPlaylistForGeneratedMix = savedPlaylists.firstOrNull { playlist ->
         playlist.songs.map(::songIdentity) == generatedMix.map(::songIdentity)
