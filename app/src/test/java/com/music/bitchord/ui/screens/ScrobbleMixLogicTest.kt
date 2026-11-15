@@ -27,6 +27,7 @@ class ScrobbleMixLogicTest {
     fun radioMixUsesSeedRadioFirstAndFillsShortResultsWithoutSeedEditsOrDuplicates() {
         val seed = Song("seedtrack01", "Deep Swim", "Seed Artist", null)
         val radioOne = Song("radio000001", "Ocean Lights", "Other Artist", null)
+        val similar = Song("similar00001", "Similar Track", "Similar Artist", null)
         val radioEdit = Song("radio000002", "Deep Swim (VIP Remix)", "Remixer", null)
         val favourite = Song("favourite01", "Favourite", "Seed Artist", null)
         val recent = Song("recent00001", "Recent", "Recent Artist", null)
@@ -40,10 +41,10 @@ class ScrobbleMixLogicTest {
             recent = listOf(recent),
             discovery = listOf(discovery),
             seed = seed,
-            limit = 4,
+            limit = 5,
         )
 
-        assertEquals(listOf(radioOne, favourite, recent, discovery), result)
+        assertEquals(listOf(radioOne, similar, favourite, recent, discovery), result)
     }
 
     @Test
@@ -51,8 +52,8 @@ class ScrobbleMixLogicTest {
         val seed = Song("seedtrack01", "Seed", "Artist", null)
         val onlyEdit = Song("edittrack001", "Seed (Live)", "Artist", null)
 
-        assertEquals(emptyList<Song>(), buildRadioMix(emptyList(), listOf(onlyEdit), emptyList(), emptyList(), seed, 10))
-        assertEquals(emptyList<Song>(), buildRadioMix(listOf(onlyEdit), emptyList(), emptyList(), emptyList(), seed, 0))
+        assertEquals(emptyList<Song>(), buildRadioMix(emptyList(), emptyList(), listOf(onlyEdit), emptyList(), emptyList(), seed, 10))
+        assertEquals(emptyList<Song>(), buildRadioMix(listOf(onlyEdit), emptyList(), emptyList(), emptyList(), emptyList(), seed, 0))
     }
 
     @Test
