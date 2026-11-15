@@ -18,19 +18,73 @@ internal fun songIdentity(song: Song): String =
         ?: song.videoId.takeIf(String::isNotBlank)?.let { "video:$it" }
         ?: "${song.title.lowercase()}|${song.artist.lowercase()}"
 
+/**
+ * LastWave GeneratedTrack.normalizeTrackText/key port. Keep upstream whitespace
+ * semantics while applying them to Mylo's Song model.
+ */
+private fun String.normalizeLastWaveTrackText(): String {
+    val trimmed = trim()
+    var needsWork = false
+    for (i in trimmed.indices) {
+        val c = trimmed[i]
+        if (c.isLastWaveRegexWhitespace() &&
+            (c != ' ' || (i + 1 < trimmed.length && trimmed[i + 1].isLastWaveRegexWhitespace()))
+        ) {
+            needsWork = true
+            break
+        }
+    }
+    if (!needsWork) return trimmed
+    val out = StringBuilder(trimmed.length)
+    var inRun = false
+    for (c in trimmed) {
+        if (c.isLastWaveRegexWhitespace()) {
+            if (!inRun) out.append(' ')
+            inRun = true
+        } else {
+            out.append(c)
+            inRun = false
+        }
+    }
+    return out.toString()
+}
+
+private fun Char.isLastWaveRegexWhitespace(): Boolean =
+    this == ' ' || this == '\t' || this == '\n' || this == '\u000B' ||
+        this == '\u000C' || this == '\r'
+
+/** Match String.equals(ignoreCase=true), including Turkish I and Greek sigma. */
+private fun String.lastWaveFoldCase(): String {
+    val out = CharArray(length)
+    for (i in indices) out[i] = Character.toLowerCase(Character.toUpperCase(this[i]))
+    return String(out)
+}
+
 /** Same normalized title+artist identity used by LastWave GeneratedTrack.key. */
 internal fun recommendationIdentity(song: Song): String =
-    "${song.title.trim().replace(Regex("\\s+"), " ").lowercase()}|${song.artist.trim().replace(Regex("\\s+"), " ").lowercase()}"
+    "\${song.title.normalizeLastWaveTrackText().lowercase()}|\${song.artist.normalizeLastWaveTrackText().lowercase()}"
 
-/** Deduplicate playable recommendation rows by video ID and normalized title+artist. */
+/** Direct port of LastWave GeneratedTrack.distinctSongs(), adapted to Song. */
 internal fun distinctRecommendationSongs(candidates: List<Song>): List<Song> {
-    val seenVideoIds = mutableSetOf<String>()
-    val seenNames = mutableSetOf<String>()
-    return candidates.filter {
+    if (candidates.size < 2) return candidates.filter {
         it.title.isNotBlank() && it.artist.isNotBlank() && it.videoId.isNotBlank()
-    }.filter { song ->
-        seenVideoIds.add(song.videoId) && seenNames.add(recommendationIdentity(song))
     }
+    val out = ArrayList<Song>(candidates.size)
+    val videoIds = HashSet<String>(candidates.size * 2)
+    val keys = HashSet<String>(candidates.size * 2)
+    val namePairs = HashSet<Pair<String, String>>(candidates.size * 2)
+    for (song in candidates) {
+        if (song.title.isBlank() || song.artist.isBlank() || song.videoId.isBlank()) continue
+        val key = recommendationIdentity(song)
+        val namePair = song.title.trim().lastWaveFoldCase() to song.artist.trim().lastWaveFoldCase()
+        if (song.videoId in videoIds) continue
+        if (key in keys || namePair in namePairs) continue
+        out += song
+        videoIds += song.videoId
+        keys += key
+        namePairs += namePair
+    }
+    return out
 }
 
 private fun recommendationArtistKey(artist: String): String =
