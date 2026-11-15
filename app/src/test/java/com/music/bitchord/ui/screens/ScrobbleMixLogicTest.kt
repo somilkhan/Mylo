@@ -290,10 +290,29 @@ class ScrobbleMixLogicTest {
         val result = buildNeverHeardMix(
             candidates = listOf(heard, fresh, duplicate, blankId),
             heardVideoIds = setOf(heard.videoId),
+            heardSongs = listOf(heard),
             limit = 1,
         )
 
         assertEquals(listOf(fresh), result)
+    }
+
+    @Test
+    fun neverHeardExcludesAlternateUploadsAndEditsOfPreviouslyHeardTracks() {
+        val heard = Song("heardtrack01", "Deep Swim", "Original Artist", null)
+        val alternateUpload = Song("alttrack0001", "Deep Swim - Official Audio", "Original Artist", null)
+        val remix = Song("remixtrack01", "Deep Swim (VIP Remix)", "Original Artist", null)
+        val unrelated = Song("freshtrack01", "Ocean Lights", "Original Artist", null)
+        val sameTitleOtherArtist = Song("freshtrack02", "Deep Swim", "Different Artist", null)
+
+        assertEquals(
+            listOf(unrelated, sameTitleOtherArtist),
+            buildNeverHeardMix(
+                candidates = listOf(alternateUpload, remix, unrelated, sameTitleOtherArtist),
+                heardVideoIds = emptySet(),
+                heardSongs = listOf(heard),
+            ),
+        )
     }
 
     @Test
