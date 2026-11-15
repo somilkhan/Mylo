@@ -2744,6 +2744,7 @@ private fun BitChordApp(
                         ScrobbleHubScreen(
                             modifier = Modifier,
                             onBack = { showScrobble = false },
+                            onConnectLastFm = { showScrobble = false; showAccountScrobbling = true },
                             onPlay = { songs, index ->
                                 playFrom(songs, index, QueueSource("Scrobble", PlaybackSourceType.HISTORY))
                             },
