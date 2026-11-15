@@ -355,17 +355,18 @@ internal fun buildSimilarArtistMix(
     limit: Int,
 ): List<Song> {
     if (limit <= 0) return emptyList()
-    val seedKey = com.music.bitchord.data.stats.ListeningStats.primaryArtist(seedArtist)
-        ?.trim()?.lowercase()
-        ?: seedArtist.trim().lowercase()
-    val candidates = (youtubeRadio + lastFmSimilar).filter { song ->
-        val primaryArtist = com.music.bitchord.data.stats.ListeningStats.primaryArtist(song.artist)
-            ?.trim()?.lowercase()
-            ?: song.artist.trim().lowercase()
-        primaryArtist != seedKey
-    }
+    val seedKey = recommendationArtistKey(seedArtist)
+    val youtubeCandidates = youtubeRadio.filter { recommendationArtistKey(it.artist) != seedKey }
+    val lastFmCandidates = lastFmSimilar.filter { recommendationArtistKey(it.artist) != seedKey }
+    // Preserve LastWave's YouTube-first 2:1 source blend, with enough headroom
+    // for the subsequent artist cap to fill the requested queue.
+    val blended = buildYouTubeFirstMix(
+        youtube = youtubeCandidates,
+        lastFm = lastFmCandidates,
+        limit = limit * 3,
+    )
     return buildArtistCappedMix(
-        candidates = candidates,
+        candidates = blended,
         seedArtist = seedArtist,
         targetSize = limit,
     )
