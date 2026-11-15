@@ -990,6 +990,9 @@ enum class ReplayPeriod(val chip: String) {
     THIS_WEEK("This week"),
     LAST_7_DAYS("Last 7 days"),
     LAST_30_DAYS("Last 30 days"),
+    LAST_3_MONTHS("Last 3 months"),
+    LAST_6_MONTHS("Last 6 months"),
+    LAST_12_MONTHS("Last 12 months"),
     THIS_MONTH("This month"),
     THIS_YEAR("This year"),
     ALL_TIME("All time"),
@@ -1000,6 +1003,9 @@ enum class ReplayPeriod(val chip: String) {
         THIS_WEEK -> today.with(java.time.DayOfWeek.MONDAY) to today
         LAST_7_DAYS -> today.minusDays(6) to today
         LAST_30_DAYS -> today.minusDays(29) to today
+        LAST_3_MONTHS -> today.minusMonths(3).plusDays(1) to today
+        LAST_6_MONTHS -> today.minusMonths(6).plusDays(1) to today
+        LAST_12_MONTHS -> today.minusMonths(12).plusDays(1) to today
         THIS_MONTH -> {
             val ym = YearMonth.from(today)
             ym.atDay(1) to ym.atEndOfMonth()
@@ -1009,7 +1015,7 @@ enum class ReplayPeriod(val chip: String) {
     }
 
     fun covers(month: YearMonth, today: LocalDate): Boolean = when (this) {
-        THIS_WEEK, LAST_7_DAYS, LAST_30_DAYS -> {
+        THIS_WEEK, LAST_7_DAYS, LAST_30_DAYS, LAST_3_MONTHS, LAST_6_MONTHS, LAST_12_MONTHS -> {
             val dateRange = range(today)!!
             val monthStart = month.atDay(1)
             val monthEnd = month.atEndOfMonth()
@@ -1021,12 +1027,16 @@ enum class ReplayPeriod(val chip: String) {
     }
 
     /** Bounded day ranges need exact filtering after their overlapping months are loaded. */
-    fun needsDayFilter(): Boolean = this == THIS_WEEK || this == LAST_7_DAYS || this == LAST_30_DAYS
+    fun needsDayFilter(): Boolean = this == THIS_WEEK || this == LAST_7_DAYS || this == LAST_30_DAYS ||
+        this == LAST_3_MONTHS || this == LAST_6_MONTHS || this == LAST_12_MONTHS
 
     fun label(today: LocalDate): String = when (this) {
         THIS_WEEK -> "This week"
         LAST_7_DAYS -> "Last 7 days"
         LAST_30_DAYS -> "Last 30 days"
+        LAST_3_MONTHS -> "Last 3 months"
+        LAST_6_MONTHS -> "Last 6 months"
+        LAST_12_MONTHS -> "Last 12 months"
         THIS_MONTH -> YearMonth.from(today).month.name.lowercase(Locale.ROOT)
             .replaceFirstChar { it.uppercase(Locale.ROOT) } + " ${today.year}"
         THIS_YEAR -> today.year.toString()
