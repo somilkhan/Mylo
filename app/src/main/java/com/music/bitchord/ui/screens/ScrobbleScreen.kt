@@ -459,9 +459,9 @@ fun ScrobbleScreen(
                     }
                     when {
                         generated.isEmpty() -> Toast.makeText(context, "No similar tracks were found. Try another playlist.", Toast.LENGTH_LONG).show()
-                        !ScrobblePlaylistStore.save("\${playlist.title} Mix", "Inspired by \${playlist.title}", generated) ->
+                        !ScrobblePlaylistStore.save("${playlist.title} Mix", "Inspired by ${playlist.title}", generated) ->
                             Toast.makeText(context, "You have 20 saved mixes. Remove one before saving another.", Toast.LENGTH_LONG).show()
-                        else -> Toast.makeText(context, "Created a new mix inspired by \${playlist.title}", Toast.LENGTH_SHORT).show()
+                        else -> Toast.makeText(context, "Created a new mix inspired by ${playlist.title}", Toast.LENGTH_SHORT).show()
                     }
                 } catch (_: TimeoutCancellationException) {
                     Toast.makeText(context, "Similar mix generation timed out. Check your connection and try again.", Toast.LENGTH_LONG).show()
