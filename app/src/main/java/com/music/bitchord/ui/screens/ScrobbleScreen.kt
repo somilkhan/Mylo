@@ -854,10 +854,10 @@ fun ScrobbleScreen(
                             playlistSortMode = ScrobblePlaylistSortMode.RECENT
                             openedPlaylist = title
                         } else {
-                            createPlaylistError = if (savedPlaylists.size >= 20) {
-                                "You can save up to 20 playlists on this device."
-                            } else {
-                                "Choose a name that isn't already in use."
+                            createPlaylistError = when {
+                                title.isBlank() -> "Enter a playlist name."
+                                savedPlaylists.size >= 20 -> "You can save up to 20 playlists on this device."
+                                else -> "A playlist with that name already exists."
                             }
                         }
                     }) { Text("Create") }
