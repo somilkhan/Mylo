@@ -85,7 +85,11 @@ internal fun buildLibraryMix(
     .take(limit.coerceAtLeast(0))
     .toList()
 
-/** Alternates two independent recommendation sources while preserving their order. */
+/**
+ * Alternates two recommendation sources while preserving their order.
+ * The primary source owns overlapping identities so its canonical metadata
+ * is never replaced by a duplicate row from the secondary source.
+ */
 internal fun buildBalancedSourceMix(
     primary: List<Song>,
     secondary: List<Song>,
@@ -93,27 +97,19 @@ internal fun buildBalancedSourceMix(
 ): List<Song> {
     if (limit <= 0) return emptyList()
     val primaryTracks = primary.distinctBy(::songIdentity)
+    val primaryIdentities = primaryTracks.mapTo(mutableSetOf(), ::songIdentity)
     val secondaryTracks = secondary.distinctBy(::songIdentity)
-    val seen = mutableSetOf<String>()
+        .filterNot { songIdentity(it) in primaryIdentities }
+
     val result = ArrayList<Song>(limit)
     var primaryIndex = 0
     var secondaryIndex = 0
     while (result.size < limit && (primaryIndex < primaryTracks.size || secondaryIndex < secondaryTracks.size)) {
-        // A duplicate does not consume this source's turn. Advance until this
-        // source contributes one new track or is exhausted, then alternate.
-        while (primaryIndex < primaryTracks.size && result.size < limit) {
-            val next = primaryTracks[primaryIndex++]
-            if (seen.add(songIdentity(next))) {
-                result += next
-                break
-            }
+        if (primaryIndex < primaryTracks.size && result.size < limit) {
+            result += primaryTracks[primaryIndex++]
         }
-        while (secondaryIndex < secondaryTracks.size && result.size < limit) {
-            val next = secondaryTracks[secondaryIndex++]
-            if (seen.add(songIdentity(next))) {
-                result += next
-                break
-            }
+        if (secondaryIndex < secondaryTracks.size && result.size < limit) {
+            result += secondaryTracks[secondaryIndex++]
         }
     }
     return result
