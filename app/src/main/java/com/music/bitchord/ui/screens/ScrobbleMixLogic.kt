@@ -32,13 +32,20 @@ internal fun buildRediscoverMix(
     return listens.groupBy { songIdentity(it.song) }
         .mapNotNull { (identity, events) ->
             val latest = events.maxByOrNull { it.startedAt } ?: return@mapNotNull null
-            latest.song.takeIf {
-                (allTimePlayCounts[identity] ?: 0) >= minimumPlays &&
-                    latest.startedAt <= cutoff
+            val completedPlays = allTimePlayCounts[identity] ?: 0
+            if (completedPlays < minimumPlays || latest.startedAt > cutoff) {
+                null
+            } else {
+                latest
             }
         }
-        .distinctBy(::songIdentity)
+        // Rediscover the tracks that have been absent the longest first.
+        // Group insertion order depends on the history file's storage order,
+        // which is not a meaningful ranking and can otherwise hide older picks.
+        .sortedBy { it.startedAt }
+        .distinctBy { songIdentity(it.song) }
         .take(limit.coerceAtLeast(0))
+        .map { it.song }
 }
 
 
