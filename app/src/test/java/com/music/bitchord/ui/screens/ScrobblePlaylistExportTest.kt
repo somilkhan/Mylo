@@ -40,6 +40,7 @@ class ScrobblePlaylistExportTest {
                 Song("abcdefghijk", "Video track", "Artist", null, durationText = "3:42"),
                 Song("", "Local track", "Local artist", null, localPath = "/storage/music/local.mp3"),
                 Song("not-a-video-id", "Unresolvable", "Artist", null),
+                Song("", "Content URI only", "Local artist", null, localUri = "content://media/external/audio/42"),
             ),
         )
 
@@ -49,6 +50,7 @@ class ScrobblePlaylistExportTest {
         assertTrue(m3u.contains("#EXTINF:222,Artist - Video track\nhttps://music.youtube.com/watch?v=abcdefghijk"))
         assertTrue(m3u.contains("#EXTINF:-1,Local artist - Local track\n/storage/music/local.mp3"))
         assertFalse(m3u.contains("Unresolvable"))
+        assertFalse(m3u.contains("Content URI only"))
     }
 
     @Test
