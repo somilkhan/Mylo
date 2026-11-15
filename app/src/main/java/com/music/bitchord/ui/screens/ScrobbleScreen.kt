@@ -99,6 +99,7 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.music.bitchord.data.ListeningHistory
 import com.music.bitchord.data.scrobbling.LastFM
+import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.data.YtMusicRepository
 import com.music.bitchord.data.model.SearchFilter
 import com.music.bitchord.data.model.Song
@@ -235,6 +236,16 @@ fun ScrobbleScreen(
 
     LaunchedEffect(context) {
         ScrobblePlaylistStore.init(context)
+        val apiKey = AppSettings.lastfmApiKey.value
+        val secret = AppSettings.lastfmSecret.value
+        if (apiKey.isNotBlank() && secret.isNotBlank()) {
+            LastFM.configure(
+                endpoint = AppSettings.lastfmEndpoint.value.ifBlank { LastFM.DEFAULT_API_ENDPOINT },
+                apiKey = apiKey,
+                secret = secret,
+                sessionKey = AppSettings.lastfmSessionKey.value.takeIf(String::isNotBlank) ?: LastFM.sessionKey,
+            )
+        }
     }
 
     LaunchedEffect(context, historyRevision) {
@@ -802,6 +813,14 @@ fun ScrobbleScreen(
                                 )
                             }
                         }
+                        if (mixMode == ScrobbleMixMode.SIMILAR_ARTISTS && !LastFM.isInitialized()) {
+                            item("generate-similar-artists-warning") {
+                                InfoPanel(
+                                    "Last.fm discovery unavailable",
+                                    "This build has no Last.fm API credentials configured. Song radio and Artist mix still work without Last.fm.",
+                                )
+                            }
+                        }
                         if (recommendationsFailed) {
                             item("generate-recommendations-warning") {
                                 InfoPanel(
@@ -1099,6 +1118,7 @@ fun ScrobbleScreen(
                                     (mixMode !in setOf(ScrobbleMixMode.TASTE_MIX, ScrobbleMixMode.DISCOVER) || !loadingRecommendations) &&
                                     (mixMode !in setOf(ScrobbleMixMode.FAVOURITES, ScrobbleMixMode.TASTE_MIX) || !loadingStats) &&
                                     (mixMode != ScrobbleMixMode.TAG || tagQuery.isNotBlank()) &&
+                                    (mixMode != ScrobbleMixMode.SIMILAR_ARTISTS || LastFM.isInitialized()) &&
                                     (mixMode != ScrobbleMixMode.REDISCOVER || !loadingAllTimeStats) &&
                                     (mixMode != ScrobbleMixMode.REDISCOVER || !allTimeStatsFailed) &&
                                     (mixMode !in setOf(ScrobbleMixMode.REDISCOVER, ScrobbleMixMode.NEVER_HEARD) || !historyFailed) &&
