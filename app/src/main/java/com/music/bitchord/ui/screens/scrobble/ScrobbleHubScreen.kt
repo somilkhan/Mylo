@@ -77,6 +77,7 @@ private fun ScrobbleGeneratorScreen(
     onPlay: (List<Song>, Int) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
+    val savedPlaylists by ScrobblePlaylistStore.playlists.collectAsState()
     var mode by rememberSaveable { mutableStateOf(ScrobbleGenerateMode.RECOMMENDATIONS.name) }
     var count by rememberSaveable { mutableStateOf(20f) }
     var artist by rememberSaveable { mutableStateOf("") }
@@ -235,6 +236,24 @@ private fun ScrobbleGeneratorScreen(
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text("Save to Playlists") }
                 savedMessage?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
+                if (savedPlaylists.isNotEmpty()) {
+                    Text("Add to an existing playlist", style = MaterialTheme.typography.labelMedium)
+                    savedPlaylists.forEach { playlist ->
+                        TextButton(
+                            onClick = {
+                                scope.launch {
+                                    try {
+                                        ScrobblePlaylistStore.addTracks(playlist.id, results)
+                                        savedMessage = "Added tracks to “${playlist.title}”"
+                                    } catch (failure: Exception) {
+                                        error = failure.message ?: "Couldn't update playlist"
+                                    }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text(playlist.title) }
+                    }
+                }
             }
             items(results, key = { it.videoId }) { song ->
                 Card(modifier = Modifier.fillMaxWidth().clickable { onPlay(results, results.indexOf(song)) }) {
@@ -308,6 +327,28 @@ private fun ScrobblePlaylistsScreen(
                     Text("${playlist.tracks.size} tracks · ${playlist.subtitle}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    var coverUri by remember(playlist.id) {
+                        mutableStateOf(playlist.customCoverUri.orEmpty())
+                    }
+                    OutlinedTextField(
+                        value = coverUri,
+                        onValueChange = { coverUri = it },
+                        label = { Text("Custom cover URI (optional)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                    )
+                    TextButton(
+                        onClick = {
+                            scope.launch {
+                                try {
+                                    ScrobblePlaylistStore.setCustomCover(
+                                        playlist.id, coverUri.trim().ifBlank { null },
+                                    )
+                                    message = "Cover updated"
+                                } catch (failure: Exception) { message = failure.message }
+                            }
+                        },
+                    ) { Text("Save cover") }
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         Button(
                             onClick = { onPlay(playlist.tracks, 0) },
