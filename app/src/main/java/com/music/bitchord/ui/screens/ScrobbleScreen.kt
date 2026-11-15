@@ -336,8 +336,12 @@ fun ScrobbleScreen(
                             emptyList()
                         }
                     }
-                    (topTracks.take(12) + recentTracks.take(12) + fresh.filter { it.videoId.isNotBlank() && it.videoId !in excluded })
-                        .distinctBy(::songIdentity).shuffled().take(mixTrackCount)
+                    buildTasteMix(
+                        favourites = topTracks.take(12),
+                        recent = recentTracks.take(12),
+                        fresh = fresh.filter { it.videoId.isNotBlank() && it.videoId !in excluded }.take(25),
+                        limit = mixTrackCount,
+                    )
                 }
                 ScrobbleMixMode.TAG -> buildTagMix(
                     YtMusicRepository.search("${tagQuery.trim()} music", SearchFilter.SONGS).getOrThrow(),
