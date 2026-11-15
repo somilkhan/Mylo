@@ -71,6 +71,17 @@ class ScrobbleMixLogicTest {
         assertEquals(emptyList<Song>(), buildNeverHeardMix(listOf(first), emptySet(), limit = 0))
     }
 
+    @Test
+    fun catalogueSeedRequiresAValidYoutubeVideoId() {
+        val youtube = Song("dQw4w9WgXcQ", "Video", "Artist", null)
+        val localContentUri = Song("content://media/external/audio/media/42", "Local", "Artist", null)
+        val localPath = Song("/storage/music/local.mp3", "Local path", "Artist", null)
+
+        assertEquals(true, isYouTubeCatalogTrack(youtube))
+        assertEquals(false, isYouTubeCatalogTrack(localContentUri))
+        assertEquals(false, isYouTubeCatalogTrack(localPath))
+    }
+
     private companion object {
         const val DAY = 24L * 60 * 60 * 1000
     }
