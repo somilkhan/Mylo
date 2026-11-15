@@ -47,6 +47,7 @@ import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Sort
 import androidx.compose.material3.Button
@@ -865,16 +866,14 @@ fun ScrobbleScreen(
                                                         .clickable(role = Role.Button) { openedPlaylist = playlist.title },
                                                     verticalAlignment = Alignment.CenterVertically,
                                                 ) {
-                                                    AsyncImage(
-                                                        model = playlist.songs.firstOrNull()?.thumbnailUrl,
-                                                        contentDescription = null,
-                                                        contentScale = ContentScale.Crop,
-                                                        modifier = Modifier.size(96.dp)
+                                                    ArtworkMosaic(
+                                                        playlist.songs,
+                                                        Modifier.size(96.dp)
                                                             .then(if (reduceMotion) Modifier else Modifier.sharedElement(
                                                                 sharedContentState = sharedArtworkState,
                                                                 animatedVisibilityScope = pageVisibilityScope,
                                                             ))
-                                                            .clip(RoundedCornerShape(14.dp)),
+                                                            .clip(RoundedCornerShape(18.dp)),
                                                     )
                                                     Spacer(Modifier.width(13.dp))
                                                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
