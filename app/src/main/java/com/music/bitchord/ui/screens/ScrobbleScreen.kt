@@ -2084,10 +2084,26 @@ fun ScrobbleScreen(
                             }
                         item("generate-discovery-refresh") {
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                OutlinedButton(onClick = { recommendationRequest++ }, enabled = !loadingRecommendations && !generatingMix, modifier = Modifier.weight(1f)) {
+                                OutlinedButton(
+                                    onClick = {
+                                        if (mixMode == ScrobbleMixMode.TASTE_MIX || mixMode == ScrobbleMixMode.DISCOVER) {
+                                            recommendationRequest++
+                                        } else {
+                                            generationRequest++
+                                        }
+                                    },
+                                    enabled = !loadingRecommendations && !generatingMix,
+                                    modifier = Modifier.weight(1f),
+                                ) {
                                     Icon(Icons.Rounded.Refresh, null)
                                     Spacer(Modifier.width(6.dp))
-                                    Text(if (loadingRecommendations) "Refreshing…" else "Refresh picks")
+                                    Text(
+                                        when {
+                                            loadingRecommendations -> "Refreshing…"
+                                            mixMode == ScrobbleMixMode.TASTE_MIX || mixMode == ScrobbleMixMode.DISCOVER -> "Refresh picks"
+                                            else -> "Refresh mix"
+                                        },
+                                    )
                                 }
                                 OutlinedButton(onClick = onBrowseMoods, enabled = !generatingMix, modifier = Modifier.weight(1f)) {
                                     Icon(Icons.Rounded.Explore, null)
