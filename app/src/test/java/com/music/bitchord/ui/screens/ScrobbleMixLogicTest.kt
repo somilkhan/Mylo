@@ -47,6 +47,29 @@ class ScrobbleMixLogicTest {
 
 
     @Test
+    fun rediscoverPrioritizesTheLongestQuietPeriodRegardlessOfHistoryOrder() {
+        val now = 100L * DAY
+        val moreRecentlyQuiet = Song("quietrecent1", "More recent", "Artist", null)
+        val longestQuiet = Song("quietlong001", "Longest quiet", "Artist", null)
+        // Deliberately put the more-recent candidate first, as a stored history
+        // file may be newest-first or oldest-first depending on its origin.
+        val listens = listOf(
+            ListeningHistory.Entry(moreRecentlyQuiet, now - 80 * DAY),
+            ListeningHistory.Entry(longestQuiet, now - 95 * DAY),
+            ListeningHistory.Entry(moreRecentlyQuiet, now - 70 * DAY),
+        )
+        val counts = mapOf(
+            songIdentity(moreRecentlyQuiet) to 3,
+            songIdentity(longestQuiet) to 3,
+        )
+
+        assertEquals(
+            listOf(longestQuiet, moreRecentlyQuiet),
+            buildRediscoverMix(listens, counts, now),
+        )
+    }
+
+    @Test
     fun neverHeardExcludesKnownTracksAndDuplicatesAndHonoursLimit() {
         val heard = Song("knowntrack01", "Already heard", "Artist", null)
         val fresh = Song("freshtrack01", "New track", "Artist", null)
