@@ -12,6 +12,11 @@
 </style></head>
 <body><div class="app" id="app"></div>
 <script>
+window.addEventListener("error",function(e){
+  document.body.innerHTML='<main style="font:16px system-ui;padding:24px;background:#111;color:#fff;min-height:100vh"><h2>Mylo prototype JavaScript error</h2><pre style="white-space:pre-wrap;color:#ff9b9b">'+String(e.message||"Unknown error")+'</pre><p>Send this error text to ChatGPT.</p></main>';
+});
+</script>
+<script>
 const tracks=[
 {id:1,t:"Sweet Disposition",a:"The Temper Trap",al:"Conditions",plays:84,dur:"3:54",mins:329,art:"https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=500",date:"Today · 16:42"},
 {id:2,t:"The Less I Know the Better",a:"Tame Impala",al:"Currents",plays:71,dur:"3:36",mins:256,art:"https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=500",date:"Today · 15:18"},
