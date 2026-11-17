@@ -13,7 +13,7 @@
 <body><div class="app" id="app"></div>
 <script>
 window.addEventListener("error",function(e){
-  document.body.innerHTML='<main style="font:16px system-ui;padding:24px;background:#111;color:#fff;min-height:100vh"><h2>Mylo prototype JavaScript error</h2><pre style="white-space:pre-wrap;color:#ff9b9b">'+String(e.message||"Unknown error")+'</pre><p>Send this error text to ChatGPT.</p></main>';
+  document.body.innerHTML='<main style="font:16px system-ui;padding:24px;background:#111;color:#fff;min-height:100vh"><h2>Mylo prototype JavaScript error</h2><pre style="white-space:pre-wrap;color:#ff9b9b">'+String(e.message||"Unknown error")+'\nLine: '+String(e.lineno||"?")+' · Column: '+String(e.colno||"?")+'\nFile: '+String(e.filename||"")+'</pre><p>Send this error text to ChatGPT.</p></main>';
 });
 </script>
 <script>
