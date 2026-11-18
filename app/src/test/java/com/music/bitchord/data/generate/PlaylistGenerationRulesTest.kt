@@ -105,6 +105,27 @@ class PlaylistGenerationRulesTest {
     }
 
     @Test
+    fun weightedBlendMaintainsArtistCapWhenThereIsEnoughDiversity() {
+        val tracks = listOf(
+            song("a1", "A1", "Artist A"),
+            song("a2", "A2", "Artist A"),
+            song("a3", "A3", "Artist A"),
+            song("b1", "B1", "Artist B"),
+            song("b2", "B2", "Artist B"),
+        )
+
+        val result = PlaylistGenerationRules.weightedBlend(
+            pools = listOf(tracks to 4),
+            limit = 4,
+            maxPerArtist = 2,
+        )
+
+        assertEquals(4, result.size)
+        assertEquals(2, result.count { it.artist == "Artist A" })
+        assertEquals(2, result.count { it.artist == "Artist B" })
+    }
+
+    @Test
     fun savedTracksAreDeprioritizedButNotDiscardedWhenPoolIsThin() {
         val saved = song("saved", "Saved")
         val fresh = song("fresh", "Fresh")

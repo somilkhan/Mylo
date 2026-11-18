@@ -96,28 +96,12 @@ class PlaylistGenerationRepository(context: Context) {
                 }
                 val artistNames = similarArtists.ifEmpty { listOf(artist) }
                 onProgress("Loading tracks from ${artistNames.size} artists…")
-                val artistPools = supervisorScope {
-                    artistNames.map { name ->
-                        async {
-                            try {
-                                val browseId = YtMusicRepository.findArtistPageId(name).getOrNull()
-                                    ?: return@async emptyList()
-                                YtMusicRepository.artistPage(browseId).getOrNull()?.songs.orEmpty()
-                            } catch (cancellation: CancellationException) {
-                                throw cancellation
-                            } catch (_: Exception) {
-                                emptyList()
-                            }
-                        }
-                    }.awaitAll()
-                }
-                val tracks = PlaylistGenerationRules.interleave(artistPools)
+                val tracks = PlaylistGenerationRules.interleave(artistPagePools(artistNames))
                 if (tracks.isNotEmpty()) tracks else {
                     // A failed Last.fm graph or unresolvable similar artists must not
                     // break the old exact-artist path.
-                    val browseId = YtMusicRepository.findArtistPageId(artist).getOrThrow()
-                        ?: throw IllegalStateException("Couldn't find that artist or similar artists")
-                    YtMusicRepository.artistPage(browseId).getOrThrow().songs
+                    val exact = artistPagePools(listOf(artist)).flatten()
+                    exact.ifEmpty { throw IllegalStateException("Couldn't find that artist or similar artists") }
                 }
             }
             PlaylistGenerationMode.TAG -> {
@@ -172,7 +156,7 @@ class PlaylistGenerationRepository(context: Context) {
                         (signals.likedSongs + signals.accountHistory + signals.lastFmSeeds + signals.recentSongs + signals.replaySongs) to 3,
                         remote.second to 1,
                     ),
-                    limit = target * 2,
+                    limit = target,
                     maxPerArtist = 3,
                 )
             }
@@ -202,7 +186,7 @@ class PlaylistGenerationRepository(context: Context) {
                         (discovery + remote.first) to 4,
                         remote.second to 1,
                     ),
-                    limit = target * 2,
+                    limit = target,
                     maxPerArtist = 2,
                 )
                 val heard = signals.lastFmSeeds + signals.replaySongs + signals.recentSongs +
@@ -272,9 +256,8 @@ class PlaylistGenerationRepository(context: Context) {
     }
 
     /**
-     * Creates a fresh mix inspired by a saved playlist. The source playlist is
-     * never modified or repeated; up to three distinct-artist seeds fan out to
-     * YouTube Music radio, with Quick Picks/Home used only when radio is thin.
+     * LastWave's playlist-taste regeneration, adapted to Mylo's Song and
+     * YouTube Music sources. The source playlist is never edited or repeated.
      */
     suspend fun generateSimilar(
         sourceSongs: List<Song>,
@@ -282,49 +265,94 @@ class PlaylistGenerationRepository(context: Context) {
         onProgress: (String) -> Unit = {},
     ): List<Song> {
         val target = count.coerceIn(MIN_TRACKS, MAX_TRACKS)
+        val minSize = minOf(MIN_SIMILAR_MIX_SIZE, target)
         val sourceTracks = PlaylistGenerationRules.deduplicate(sourceSongs)
         require(sourceTracks.isNotEmpty()) { "This playlist has no playable tracks to use as seeds." }
 
-        val seeds = (sourceTracks.distinctBy { it.artist.trim().lowercase(Locale.ROOT) } + sourceTracks)
-            .distinctBy { it.videoId }
-            .take(3)
-        onProgress("Building a mix from ${seeds.size} playlist seeds…")
-
-        val radioPools = supervisorScope {
-            seeds.map { seed ->
-                async {
-                    try {
-                        YtMusicRepository.radio(seed.videoId).getOrThrow()
-                    } catch (cancellation: CancellationException) {
-                        throw cancellation
-                    } catch (_: Exception) {
-                        emptyList()
-                    }
-                }
-            }.awaitAll()
-        }
-
         val sourceVideoIds = sourceSongs.mapTo(HashSet()) { it.videoId }
         val sourceTrackKeys = sourceSongs.mapTo(HashSet(), PlaylistGenerationRules::trackKey)
-        var candidates = PlaylistGenerationRules.excludeHeard(
-            candidates = PlaylistGenerationRules.deduplicate(PlaylistGenerationRules.interleave(radioPools)),
-            heardVideoIds = sourceVideoIds,
-            heardTrackKeys = sourceTrackKeys,
-        )
+        val sourceArtists = sourceTracks.map { it.artist.trim() }
+            .filter(String::isNotEmpty)
+            .distinctBy { it.lowercase(Locale.ROOT) }
+            .take(3)
+        val seedTracks = sourceTracks.filter { it.title.isNotBlank() && it.artist.isNotBlank() }.take(4)
+        onProgress("Finding artists and tracks related to this playlist…")
 
-        if (candidates.size < target) {
+        val similarArtistNames = if (LastFM.isInitialized()) {
+            supervisorScope {
+                sourceArtists.map { artist ->
+                    async {
+                        LastFM.getSimilarArtists(artist, limit = 12).getOrNull().orEmpty().take(2)
+                    }
+                }.awaitAll().flatten().distinctBy { it.lowercase(Locale.ROOT) }
+            }
+        } else {
+            emptyList()
+        }
+
+        onProgress("Building related-song radio and artist pools…")
+        val similarArtistTracks = PlaylistGenerationRules.interleave(artistPagePools(similarArtistNames))
+        val directArtistTracks = PlaylistGenerationRules.interleave(artistPagePools(sourceArtists))
+        val radioTracks = radioFromSeeds(seedTracks.take(3))
+        val basePools = listOf(
+            radioTracks to 4,
+            similarArtistTracks to 3,
+            directArtistTracks to 2,
+        )
+        fun curate(pools: List<Pair<List<Song>, Int>>): List<Song> =
+            PlaylistGenerationRules.weightedBlend(
+                pools = pools.map { (tracks, weight) ->
+                    PlaylistGenerationRules.excludeHeard(
+                        tracks,
+                        heardVideoIds = sourceVideoIds,
+                        heardTrackKeys = sourceTrackKeys,
+                    ) to weight
+                },
+                limit = target,
+                maxPerArtist = 3,
+            )
+
+        var candidates = curate(basePools)
+        var fallbackTracks = emptyList<Song>()
+        if (candidates.size < minSize) {
             onProgress("Widening the mix with YouTube Music recommendations…")
-            val fallback = supervisorScope {
+            val remote = supervisorScope {
                 val picks = async { YtMusicRepository.quickPicks().getOrNull().orEmpty() }
                 val home = async { homeSongs() }
                 picks.await() + home.await()
             }
-            candidates = PlaylistGenerationRules.deduplicate(candidates + fallback)
-            candidates = PlaylistGenerationRules.excludeHeard(
-                candidates = candidates,
-                heardVideoIds = sourceVideoIds,
-                heardTrackKeys = sourceTrackKeys,
-            )
+            fallbackTracks = remote
+            candidates = curate(basePools + (remote to 1))
+        }
+
+        if (candidates.size < minSize && LastFM.isInitialized()) {
+            onProgress("Exploring more similar artists…")
+            val extraNames = supervisorScope {
+                sourceArtists.take(2).map { artist ->
+                    async {
+                        LastFM.getSimilarArtists(artist, limit = 20).getOrNull().orEmpty().drop(2).take(3)
+                    }
+                }.awaitAll().flatten().distinctBy { it.lowercase(Locale.ROOT) }
+            }
+            val extraTracks = PlaylistGenerationRules.interleave(artistPagePools(extraNames))
+            candidates = curate(basePools + (extraTracks to 2) + (fallbackTracks to 1))
+        }
+
+        if (candidates.size < minSize) {
+            onProgress("Adding a wider mood and genre discovery pool…")
+            val moods = YtMusicRepository.moodAndGenres().getOrNull().orEmpty()
+                .flatMap { it.items }
+                .shuffled()
+                .take(3)
+            val moodTracks = supervisorScope {
+                moods.map { mood ->
+                    async {
+                        YtMusicRepository.moodGenreShelves(mood.browseId, mood.params).getOrNull().orEmpty()
+                            .flatMap { shelf -> shelf.items.mapNotNull(::shelfItemSong) }
+                    }
+                }.awaitAll().flatten()
+            }
+            candidates = curate(basePools + (moodTracks to 1) + (fallbackTracks to 1))
         }
 
         currentCoroutineContext().ensureActive()
@@ -335,8 +363,10 @@ class PlaylistGenerationRepository(context: Context) {
             savedTrackKeys = savedSongs.mapTo(HashSet(), PlaylistGenerationRules::trackKey),
             limit = target,
         )
-        if (result.size < MIN_TRACKS) {
-            throw IllegalStateException("Not enough new tracks found for this playlist. Try another source playlist.")
+        if (result.size < minSize) {
+            throw IllegalStateException(
+                "Not enough new tracks found to build a ${minSize}-track mix. Try another source playlist.",
+            )
         }
         return result
     }
@@ -409,6 +439,22 @@ class PlaylistGenerationRepository(context: Context) {
         }
     }
 
+    private suspend fun artistPagePools(artists: List<String>): List<List<Song>> = supervisorScope {
+        artists.distinctBy { it.trim().lowercase(Locale.ROOT) }.map { artist ->
+            async {
+                try {
+                    val browseId = YtMusicRepository.findArtistPageId(artist).getOrNull()
+                        ?: return@async emptyList()
+                    YtMusicRepository.artistPage(browseId).getOrNull()?.songs.orEmpty()
+                } catch (cancellation: CancellationException) {
+                    throw cancellation
+                } catch (_: Exception) {
+                    emptyList()
+                }
+            }
+        }.awaitAll()
+    }
+
     private suspend fun radioFromSeeds(seeds: List<Song>): List<Song> {
         val distinctSeeds = seeds.asSequence()
             .filter { it.videoId.isNotBlank() && !it.isVideo }
@@ -475,6 +521,7 @@ class PlaylistGenerationRepository(context: Context) {
 
     private companion object {
         const val MIN_TRACKS = 5
+        const val MIN_SIMILAR_MIX_SIZE = 20
         const val MAX_TRACKS = 35
     }
 }
