@@ -1369,3 +1369,34 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 - The workflow builds/tests but does not produce an installable APK by default. Device checks remain outstanding, especially large-playlist write latency, custom-cover URI persistence/release, and CSV/M3U save/share.
 - Current SharedPreferences JSON storage remains the existing persistence backend; this change makes its writes serialized and failure-aware, but it is not a Room/DataStore migration.
 - `main` remains untouched. Continue only on `Main-dev`.
+
+## 43. Approved final prototype constraints + CI failure follow-up (2026-11-19)
+
+### Source of truth
+- Read the user-uploaded `Mylo Final Prototype.md` in this session. It is the approved visual/interaction reference for the Scrobble shell. Do not replace it with LastWave's UI or infer a new design.
+- All Scrobble screens must use Mylo's own existing visual language: existing theme colors, typography, Material 3 surfaces, spacing, shapes, dialogs and navigation components. Adapt feature content to Mylo; do not introduce a second design system.
+
+### Prototype acceptance checklist
+- FAB is right-aligned directly above the mini-player, at the same measured position in Glass and Standard modes; visible only on Home.
+- Glass mode supports the approved scroll-fold behavior: the nav pill folds to the active tab and the mini-player/column compact as specified by the existing prototype.
+- Opening Scrobble uses the approved drop transition; the FAB morphs to Close. Closing restores the normal circular FAB state and normal navigation.
+- Scrobble tabs are Statistics, Generate and Playlists inside the existing navigation pill; the mini-player remains above it.
+- Statistics count-up and split-bar growth animations match the prototype. Generate's generated row animates into Playlists.
+- Selecting a normal app destination exits Scrobble mode and restores the normal tab set. Switching among the three Scrobble destinations must remain within Scrobble mode.
+- Reduce motion disables the animations while preserving the exact same end states and navigation behavior.
+- Verify both Glass/Standard and Reduce motion on/off combinations. No device-visual pass is claimed until checked on a device/emulator.
+
+### CI follow-up — run 1156 / ID 44386064413
+- Web tests/typecheck: **passed**.
+- Desktop compile/tests: **cancelled** during compile; desktop tests skipped. This is not a pass.
+- Android unit tests: **failed** — 1,136 tests completed, 1 failed, 1 skipped. Failure reported as `trackMoveUsesExpectedIdentityAndPreservesTheOtherOrder` at `LocalPlaylistCodecTest.kt:141`.
+- Inspected the exact tested commit `b2ec6ffa24be4d6f3decde439c81c1044f8ad74b`: its test expected a missing track identity to return the unchanged list, while `movePlaylistSong` correctly returns null when the expected videoId is absent. This is a stale test expectation, not evidence that a track was moved incorrectly.
+- The current `Main-dev` test file has since been updated to assert null for a missing identity (current fetched blob `1b4a9492bb5bac466e20af390ac7d39df0643f04`). However, that newer source has **not** yet been verified by a new CI run. Do not mark Android tests green until a run for the newer commit passes.
+- Run 1156 did not verify the Android APK build: the APK build step was skipped. No device test was performed.
+
+### Next actions
+1. Establish the exact current `Main-dev` head and the commit containing the corrected test expectation; trigger/obtain CI for that exact commit.
+2. Confirm Android unit tests pass; inspect desktop compile/tests separately because the previous job was cancelled.
+3. Continue the final prototype acceptance audit, especially FAB positioning in both nav modes, scroll-fold, normal-tab exit/reset, reduced-motion behavior, stats animations and Generate-to-Playlists animation.
+4. Do not add new playlist features while this verification gate is unresolved. Library integration remains deferred.
+5. Keep `main` untouched; work only on `Main-dev`.
