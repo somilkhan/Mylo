@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import com.music.bitchord.data.model.Song
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -65,7 +66,7 @@ object LocalPlaylistStore {
         title: String,
         songs: List<Song>,
         generationMode: String? = null,
-    ): LocalPlaylist = mutationMutex.withLock {
+    ): LocalPlaylist = mutate {
         val playlist = LocalPlaylist(
             id = "sp_local_" + UUID.randomUUID(),
             title = title,
@@ -79,7 +80,7 @@ object LocalPlaylistStore {
         playlist
     }
 
-    suspend fun deletePlaylist(id: String): Boolean = mutationMutex.withLock {
+    suspend fun deletePlaylist(id: String): Boolean = mutate {
         val current = _playlists.value
         val updated = current.filterNot { it.id == id || it.browseId == id || it.id == id.removePrefix("local:playlist:") }
         if (updated.size == current.size || !persist(updated)) return@withLock false
@@ -87,7 +88,7 @@ object LocalPlaylistStore {
         true
     }
 
-    suspend fun renamePlaylist(id: String, newTitle: String): Boolean = mutationMutex.withLock {
+    suspend fun renamePlaylist(id: String, newTitle: String): Boolean = mutate {
         val cleanId = id.removePrefix("local:playlist:").removePrefix("VL")
         val current = _playlists.value
         val index = current.indexOfFirst { it.id == cleanId || it.id == id || it.browseId == id }
@@ -101,7 +102,7 @@ object LocalPlaylistStore {
     }
 
     /** Replaces tracks without changing playlist identity or metadata. */
-    suspend fun updatePlaylistSongs(id: String, songs: List<Song>): Boolean = mutationMutex.withLock {
+    suspend fun updatePlaylistSongs(id: String, songs: List<Song>): Boolean = mutate {
         val cleanId = normalizeId(id)
         val current = _playlists.value
         val index = current.indexOfFirst { it.id == cleanId || it.browseId == id }
@@ -115,7 +116,7 @@ object LocalPlaylistStore {
     }
 
     /** Adds one catalogue track, rejecting invalid ids and duplicate YouTube identities. */
-    suspend fun addSongIfAbsent(id: String, song: Song): Boolean = mutationMutex.withLock {
+    suspend fun addSongIfAbsent(id: String, song: Song): Boolean = mutate {
         val cleanId = normalizeId(id)
         val current = _playlists.value
         val index = current.indexOfFirst { it.id == cleanId || it.browseId == id }
@@ -130,7 +131,7 @@ object LocalPlaylistStore {
         true
     }
 
-    suspend fun setPinned(id: String, pinned: Boolean): Boolean = mutationMutex.withLock {
+    suspend fun setPinned(id: String, pinned: Boolean): Boolean = mutate {
         val cleanId = normalizeId(id)
         val current = _playlists.value
         val index = current.indexOfFirst { it.id == cleanId || it.browseId == id }
@@ -143,7 +144,7 @@ object LocalPlaylistStore {
         true
     }
 
-    suspend fun setCustomCover(id: String, uri: String?): Boolean = mutationMutex.withLock {
+    suspend fun setCustomCover(id: String, uri: String?): Boolean = mutate {
         val cleanId = normalizeId(id)
         val current = _playlists.value
         val index = current.indexOfFirst { it.id == cleanId || it.browseId == id }
@@ -156,7 +157,7 @@ object LocalPlaylistStore {
         true
     }
 
-    suspend fun movePlaylist(id: String, destinationIndex: Int): Boolean = mutationMutex.withLock {
+    suspend fun movePlaylist(id: String, destinationIndex: Int): Boolean = mutate {
         val cleanId = normalizeId(id)
         val current = _playlists.value
         val from = current.indexOfFirst { it.id == cleanId || it.browseId == id }
@@ -171,7 +172,7 @@ object LocalPlaylistStore {
         true
     }
 
-    suspend fun moveSong(id: String, sourceIndex: Int, expectedVideoId: String, direction: Int): Boolean = mutationMutex.withLock {
+    suspend fun moveSong(id: String, sourceIndex: Int, expectedVideoId: String, direction: Int): Boolean = mutate {
         val cleanId = normalizeId(id)
         val current = _playlists.value
         val index = current.indexOfFirst { it.id == cleanId || it.browseId == id }
@@ -187,7 +188,7 @@ object LocalPlaylistStore {
         true
     }
 
-    suspend fun removeSong(id: String, sourceIndex: Int, expectedVideoId: String): Boolean = mutationMutex.withLock {
+    suspend fun removeSong(id: String, sourceIndex: Int, expectedVideoId: String): Boolean = mutate {
         val cleanId = normalizeId(id)
         val current = _playlists.value
         val index = current.indexOfFirst { it.id == cleanId || it.browseId == id }
@@ -209,6 +210,10 @@ object LocalPlaylistStore {
 
     private fun normalizeId(id: String): String =
         id.removePrefix("local:playlist:").removePrefix("VL")
+
+    private suspend fun <T> mutate(block: suspend () -> T): T = mutationMutex.withLock {
+        withContext(NonCancellable) { block() }
+    }
 
     private suspend fun persist(list: List<LocalPlaylist>): Boolean = withContext(Dispatchers.IO) {
         if (!this@LocalPlaylistStore::prefs.isInitialized) return@withContext false
