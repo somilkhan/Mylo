@@ -1672,3 +1672,48 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 - Implementation commit: `f269fe18eacbfb93f5f1992423a40a7257a7df05`.
 - Latest CI must be checked on the current branch head; no pass is claimed. Previous run #1178 / ID `44402595986` targeted earlier Last.fm taste-seed commit `ab4d133e2fa287963f7f3d6f4ea75cfaa8757446` and was pending when this implementation landed.
 - Continue only on `Main-dev`; `main` remains `11478fde56f1817cb777b296e60907359086f383`.
+
+
+## 60. Global Start Mix with this Song — LastWave flow port (2026-11-19)
+
+### LastWave flow traced
+- `ui/generate/MixLauncher.kt` defines a pending `MixSeed` StateFlow plus a replaying request flow. `startMix(trackName, artistName, videoId)` publishes the tapped track to the root navigation and Generator.
+- `GenerateViewModel.init` consumes the pending seed, selects Similar Tracks, fills the track/artist/video ID, sets a 28-track target, and starts generation immediately.
+- `GenerateRepository.fetchSimilarTracks` expands the seed through YouTube Music radio, branches from a related result when the first pool is thin, falls back to Last.fm `track.getsimilar`, excludes the seed and edits/remixes/covers, deduplicates by normalized title and progressively relaxes artist caps.
+- On success, LastWave persists the playlist, then `queueNextResult` causes `musicPlayer.replaceUpcoming` so the playing song remains current and the new mix takes over upcoming playback. A playlist navigation event follows the save.
+
+### Mylo implementation on Main-dev
+- Added **Start Mix with this Song** to the shared `SongActionsSheet`. It is available for online, playable audio songs with a nonblank video ID, title and artist; local files, videos and incomplete rows do not show it.
+- The action closes the song menu, opens Mylo's existing Scrobble Generate tab, and calls `ScrobbleGenerateViewModel.startMixWithSong`. No new navigation host, player owner or playlist store was introduced.
+- `PlaylistGenerationRepository` now expands the selected seed through Mylo YouTube Music radio, branches from a related result if the first pool is thin, then uses Last.fm similar-track discovery as a secondary fallback when configured. Last.fm names are only accepted after YouTube Music search returns an exact normalized title/artist identity; no guessed recording is saved.
+- Similar-track curation removes the seed and title variants, deduplicates normalized titles, applies LastWave's initial one-per-seed-artist / two-per-other-artist limits, then relaxes to two/three and finally the full unique pool only when needed to fill the requested count.
+- Radio fan-out now isolates individual failures while preserving coroutine cancellation. The seed validator is shared by UI and repository and rejects missing IDs, video items, local files and incomplete metadata.
+- A successful generation is saved through the existing `LocalPlaylistStore` first. Only then does the ViewModel publish a one-shot queue handoff. Mylo appends the generated songs after the existing user queue (before AutoPlay), preserving the current track and existing queued items. If no track is playing, the queue helper starts the generated mix rather than leaving a saved-but-unplayed queue.
+- The saved-playlist event uses replay to survive a collector starting after a fast generation; the activity deduplicates the playlist ID so recomposition/event replay cannot navigate twice. Queue handoff has its own pending state and is consumed once.
+- Generation already uses the cancellation token and `generateAndCommit` active-context guard. Cancellation before the durable save does not emit a playlist event or queue handoff. Save failures remain surfaced through the existing Generate error state.
+
+### Files changed
+- `app/src/main/java/com/music/bitchord/ui/components/SongActionsSheet.kt`
+- `app/src/main/java/com/music/bitchord/MainActivity.kt`
+- `app/src/main/java/com/music/bitchord/ui/scrobble/ScrobbleGenerateViewModel.kt`
+- `app/src/main/java/com/music/bitchord/data/generate/PlaylistGenerationRepository.kt`
+- `app/src/main/java/com/music/bitchord/data/scrobbling/LastFM.kt`
+- `app/src/main/res/values/strings.xml`
+- `app/src/test/java/com/music/bitchord/data/generate/PlaylistGenerationRulesTest.kt`
+- `app/src/test/java/com/music/bitchord/data/scrobbling/LastFMSimilarTracksParsingTest.kt`
+
+### Tests and verification
+- Added pure-rule tests for valid/invalid Start Mix seeds, source-seed exclusion, title/edit deduplication and progressive artist-cap relaxation.
+- Added Last.fm parser tests for array and single-object responses, incomplete rows and malformed payloads.
+- Corrected the pre-existing Kotlin compiler error in `weightedBlend`: the candidate loop now returns to its actual `candidateLoop` label rather than the unresolved `forEach` label.
+- Implementation commit: `4dee0d8ae65f2438ac0b9be603db5c86934c8dbf`.
+- Follow-up queue-idle behavior and this documentation update are recorded in the next commit.
+- CI #1179 / ID `44402919408` targeted `f269fe18eacbfb93f5f1992423a40a7257a7df05`, not the later code. Its Android job failed at the unresolved label above; web and desktop jobs passed. No CI run was returned for `4dee0d8` after the Git ref update, so this feature is **not CI-verified** yet. The Android workflow is configured for pushes to `Main-dev`, but the connector's Git-data ref update did not produce a discoverable run.
+- Local Gradle execution is unavailable in this session; the container cannot resolve GitHub to obtain the repository. No local build/test pass is claimed.
+- Device verification: not performed.
+- Branch integrity at this update: `Main-dev` is the only modified branch; `main` remains `11478fde56f1817cb777b296e60907359086f383` and `last-wave` remains `d0dd73755bfe640c515502751f440a32e57506d5`.
+
+### Remaining follow-up
+- Obtain a fresh Android CI run for the exact latest `Main-dev` head and fix any new compiler/test failures.
+- Verify on device: global action availability across list/player song surfaces, generation progress/error/cancel, playlist persistence after relaunch, current-track continuity, queue ordering, idle-player behavior and Listen Together queue limit.
+- Continue auditing the next unfinished LastWave behavior only after this implementation is compile/test verified.

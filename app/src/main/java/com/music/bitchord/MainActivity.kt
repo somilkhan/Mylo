@@ -1836,7 +1836,7 @@ private fun BitChordApp(
         scrobbleGenerateViewModel.pendingStartMixQueue.collect { playlist ->
             if (playlist != null) {
                 scrobbleGenerateViewModel.consumeStartMixQueue(playlist.id)
-                currentQueueSongs(playlist.songs, false, false)
+                currentQueueSongs(playlist.songs, false, true)
             }
         }
     }
