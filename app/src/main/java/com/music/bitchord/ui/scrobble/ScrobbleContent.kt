@@ -971,7 +971,13 @@ private fun PlaylistDetailContent(
                 )
                 if (addTrackLoading) LinearProgressIndicator(Modifier.fillMaxWidth())
                 addTrackError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                addTrackMessage?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
+                addTrackMessage?.let {
+                    Text(
+                        it,
+                        color = if (it.startsWith("Couldn't") || it.contains("no longer")) MaterialTheme.colorScheme.error
+                        else MaterialTheme.colorScheme.primary,
+                    )
+                }
                 if (!addTrackLoading && addTrackError == null && addTrackQuery.trim().length >= 2 && addTrackResults.isEmpty()) {
                     Text("No tracks found", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
