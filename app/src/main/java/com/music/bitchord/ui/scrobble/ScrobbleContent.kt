@@ -496,7 +496,7 @@ fun ScrobblePlaylistsContent(
                         index = index,
                         lastIndex = visible.lastIndex,
                         showReorder = sortMode == LocalPlaylistSortMode.CUSTOM && search.isBlank(),
-                        canGenerateSimilar = !generationState.isGenerating && playlist.songs.isNotEmpty(),
+                        canGenerateSimilar = !generationState.isGenerating && playlist.songs.any { it.videoId.isNotBlank() && !it.isVideo },
                         onGenerateSimilar = { viewModel.generateSimilar(playlist) },
                         onMoveUp = { LocalPlaylistStore.movePlaylist(playlist.id, index - 1) },
                         onMoveDown = { LocalPlaylistStore.movePlaylist(playlist.id, index + 1) },
@@ -800,7 +800,7 @@ private fun PlaylistDetailContent(
                 }
                 IconButton(
                     onClick = { viewModel.generateSimilar(playlist) },
-                    enabled = !generationState.isGenerating && playlist.songs.isNotEmpty(),
+                    enabled = !generationState.isGenerating && playlist.songs.any { it.videoId.isNotBlank() && !it.isVideo },
                 ) {
                     Icon(Icons.Rounded.Shuffle, contentDescription = "Generate similar playlist")
                 }
