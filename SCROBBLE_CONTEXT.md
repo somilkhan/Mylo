@@ -1558,3 +1558,28 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 - The earlier follow-up question was premature because it relied on section 51's open-question line without rechecking the current `last-wave` branch and the full context file. Do not repeat that question.
 - Continue using `last-wave` as the feature/behavior reference and `Main-dev` as the only implementation target. Keep `main` untouched. No branch creation and no wholesale merge of `last-wave`.
 - This update is documentation only; no application code or branch other than `Main-dev` was changed.
+
+## 53. LastWave track-concentration behavior ported into Mylo Statistics (2026-11-19)
+
+### Source traced
+- LastWave reference head: `d0dd73755bfe640c515502751f440a32e57506d5`.
+- `ListeningStatsScreen.kt` blob `ca369899fd476b53ae3960d28c8d2ab9ef4ca587` contains the Track concentration section and its three-way breakdown.
+- `ListeningStatsModels.kt` blob `d7f5bf16c54566f1bbd380e96971d2cc43e32e08` defines the concentration values: top track, next two tracks, and remaining tracks; duration labels; unique-track count; average plays per track.
+- `ListeningStatsViewModel.kt` blob `1425e7e14199feea2773f6450df3d5850a65d44c` computes the share against total listening duration. The original screen also shows the donut summary, breakdown rows and average/unique metrics.
+- Important source-quality finding: other LastWave Listening Stats calculations include synthetic/fallback values and approximations (e.g. fabricated 210-second play durations and inferred sessions). Those are **not** being copied into Mylo. Only the concentration behavior that can be computed exactly from Mylo's existing per-track duration aggregates is ported.
+
+### Mylo implementation on Main-dev
+- Added `app/src/main/java/com/music/bitchord/ui/scrobble/TrackConcentration.kt`: pure concentration calculation plus Mylo-native Material 3 card, animated three-segment bar, percentages, duration breakdown, average plays/track and unique track count.
+- Updated `app/src/main/java/com/music/bitchord/ui/scrobble/ScrobbleStatisticsContent.kt`: shows the concentration card above the existing Mylo Replay content when the Mylo Replay source is selected and real summary data exists. Last.fm remains separate and untouched.
+- Data source is only the current `ReplaySummary`: ranked per-track milliseconds and actual play counts. Segments are top 1, tracks 2–3, and all remaining tracks; percentages use `summary.totalMs` and are rounded to a total of exactly 100%. No synthetic values or guessed denominator.
+- Reduce Motion uses snap animations; otherwise the three segments animate in. Existing Replay information architecture and Library behavior are unchanged.
+- Added `app/src/test/java/com/music/bitchord/ui/scrobble/TrackConcentrationTest.kt` covering the 3-way split, single-track case, empty/zero input and negative-duration safety.
+
+### Commits and verification
+- Component: `9e2845bce13d07f2cae65d6a30100ae2a90eff6e`.
+- Statistics screen integration: `4f5e76263b59a14251480d2510e52040f8ee0209`.
+- Pure calculation/testability: `c04e902fb200f29cabf031cc277508aac9d1bac5`.
+- Focused tests: `48b731a10216acefb94eb2695f31dd739752174d`.
+- Android CI run `44398750532` targets exact HEAD `48b731a10216acefb94eb2695f31dd739752174d`; it was pending when this note was written. No test/build pass is claimed yet.
+- Branch integrity check: Main-dev HEAD `48b731a10216acefb94eb2695f31dd739752174d`; main remains `11478fde56f1817cb777b296e60907359086f383`. Only Main-dev was modified.
+- Remaining: verify CI, inspect any failures, run APK build if workflow supports it, and complete physical-device visual checks. Continue porting the rest of LastWave's source-backed Statistics behavior only where Mylo's stored aggregates can support it exactly; do not port fabricated session/time fallbacks.
