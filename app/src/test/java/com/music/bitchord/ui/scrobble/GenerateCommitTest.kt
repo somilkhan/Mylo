@@ -53,6 +53,13 @@ class GenerateCommitTest {
     }
 
     @Test
+    fun similarPlaylistTitleUsesSourceNameAndAvoidsDuplicates() {
+        assertEquals("Focus Mix", uniquePlaylistTitle("Focus Mix", emptyList()))
+        assertEquals("Focus Mix (2)", uniquePlaylistTitle("Focus Mix", listOf("focus mix")))
+        assertEquals("My Mix", uniquePlaylistTitle("   ", emptyList()))
+    }
+
+    @Test
     fun activeGenerationCommitsExactlyOnce() = runTest {
         var committed: String? = null
 
