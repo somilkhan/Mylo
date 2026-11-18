@@ -366,6 +366,7 @@ internal fun ScrobblePlaylistExportDialog(
             }.onSuccess { onMessage("CSV saved") }
                 .onFailure { onMessage(it.message ?: "Couldn't save CSV") }
         }
+        onDismiss()
     }
     val m3uSaveLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("audio/x-mpegurl"),
@@ -378,6 +379,7 @@ internal fun ScrobblePlaylistExportDialog(
             }.onSuccess { onMessage("M3U saved") }
                 .onFailure { onMessage(it.message ?: "Couldn't save M3U") }
         }
+        onDismiss()
     }
 
     fun share(csv: Boolean) {
@@ -407,11 +409,11 @@ internal fun ScrobblePlaylistExportDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("Choose a format for ${playlist.title}.")
-                TextButton(onClick = { csvSaveLauncher.launch(LocalPlaylistExport.fileName(playlist.title, "csv")); onDismiss() }) {
+                TextButton(onClick = { csvSaveLauncher.launch(LocalPlaylistExport.fileName(playlist.title, "csv")) }) {
                     Text("Save CSV")
                 }
                 TextButton(onClick = { share(true); onDismiss() }) { Text("Share CSV") }
-                TextButton(onClick = { m3uSaveLauncher.launch(LocalPlaylistExport.fileName(playlist.title, "m3u")); onDismiss() }) {
+                TextButton(onClick = { m3uSaveLauncher.launch(LocalPlaylistExport.fileName(playlist.title, "m3u")) }) {
                     Text("Save M3U")
                 }
                 TextButton(onClick = { share(false); onDismiss() }) { Text("Share M3U") }
