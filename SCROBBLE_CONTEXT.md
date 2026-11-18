@@ -1230,3 +1230,33 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 - No emulator or physical-device check has been performed.
 - Still pending from the approved playlist scope: custom cover selection/reset, CSV/M3U export/share, Generate Similar/regenerate and the remaining detail/list acceptance checks. Manual playlist creation and Library visibility ownership remain deferred until the Library decision is resumed.
 - `main` remains untouched; continue on `Main-dev` only.
+
+
+## 38. CSV/M3U export and share (2026-11-19)
+
+### Implemented on Main-dev
+- Added pure `LocalPlaylistExport` serializers to `data/spotify/LocalPlaylistStore.kt`, blob `2071c6554fbd584ef44829f3f44d826abf1c6147`:
+  - CSV contains title, artist, video ID, duration and YouTube Music URL. Every field is quoted and embedded quotes are doubled.
+  - M3U writes `#EXTM3U`, duration-bearing `#EXTINF` rows and YouTube Music URLs; blank IDs and video uploads are omitted.
+  - Export filenames strip path/reserved characters and constrain the title length.
+- Added tests to `LocalPlaylistCodecTest.kt`, blob `021973a65691fcf116ef8946045088d748ada96d`, covering CSV quoting, M3U duration/video filtering and safe filenames.
+- Added `ScrobblePlaylistExportDialog` in `ui/scrobble/ScrobbleStatisticsContent.kt`, blob `ffe4304f28ec2264354a8828dcdeb5658c1ba456`:
+  - Mylo Material 3 AlertDialog with Save CSV, Share CSV, Save M3U and Share M3U actions.
+  - Save uses Android's CreateDocument picker.
+  - Share writes a temporary export under `cache/shared/playlist_exports` and sends it through the already-declared `${applicationId}.fileprovider`; the existing `file_paths.xml` exposes the shared cache path, so no manifest/provider expansion was needed.
+- Connected the export action and status feedback to the playlist detail page in `ui/scrobble/ScrobbleContent.kt`, blob `ec42faf189808d170b7d0f22eeb6f05cc754c96c`.
+- Corrected the save-picker lifecycle: the dialog remains composed while CreateDocument is open, and dismisses only when the picker returns. This keeps the activity-result launcher registered. Fix commit: `37127376a1b4de0f68b823f3a9fff4ba59f6d0fc`.
+
+### Commits
+- Serializers: `e3c9dcaadaf467e50561b2b14544326845ff0757`.
+- Export tests: `2919c7b2df07d95d53b71293fc080077c51c6423`.
+- Export dialog: `09301e10f30b2046b301fe960cdbc0a11a035719`.
+- Detail-page connection: `beb77744bbf8a2e63098eb8ff55b745c496ffbe1`.
+- Picker lifecycle fix: `37127376a1b4de0f68b823f3a9fff4ba59f6d0fc`.
+
+### Verification and limits
+- Source review confirms the share authority matches the existing manifest provider (`${applicationId}.fileprovider`) and the shared cache path already permitted by `res/xml/file_paths.xml`.
+- No local Gradle build or unit-test execution was possible. The GitHub connector has not surfaced CI/workflow results for the current Main-dev commits; the export tests are added but not verified as passing.
+- No emulator/physical-device visual or share-target validation has been performed. The export dialog uses Mylo's existing Material 3 theme; visual alignment still needs device confirmation.
+- Custom cover editing, Generate Similar/regenerate and remaining list/detail acceptance checks are still pending. Manual playlist creation and Library ownership integration remain deferred.
+- `main` remains untouched.
