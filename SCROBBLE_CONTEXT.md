@@ -1137,3 +1137,35 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 ### Change boundary
 - This entry is documentation-only. No app source, tests, dependencies, branch structure, PR, or `main` was changed.
 - Continue on `Main-dev` only. Do not merge PR #8/#4 or modify `main` without explicit approval.
+
+
+## 35. Replay visual comparison and LastWave playlist behavior trace (2026-11-19)
+
+### Mylo screen comparison
+- `ui/scrobble/ScrobbleStatisticsContent.kt`, blob `2955a2e2f31ad2271f44ee6bf7adf9b996591623`, routes the Mylo Replay source directly through the existing `ReplayScreen`; it does not fork or restyle Replay. Last.fm is a separate source and is not mixed with local Replay metrics.
+- `ui/replay/ReplayScreen.kt`, blob `dfb8b5ec20bc3601cf38defbc9cddd7ba3d278cf`, uses Mylo's artwork-derived mesh background, theme-aware ink/contrast, `PAGE_GUTTER + 4.dp`, `displayLarge` page heading and the existing Replay period selector. Preserve this implementation for Statistics; do not create a second local-stats screen.
+- Generate and Playlists currently use `headlineLarge`, 20dp side gutters, Material 3 inputs/chips/buttons/dialogs and theme surface colors. Their broad material language is Mylo-native, but their individual hierarchy and spacing still need comparison with other Mylo pages before calling them pixel-aligned. Avoid replacing Mylo's monochrome/artwork-led visual language with LastWave's expressive surfaces, colors, icons or custom components.
+- Current source-level design check only; no screenshot comparison or device test. Pixel alignment remains unverified.
+
+### LastWave behavior source (not its UI)
+- The correct LastWave paths use package `com.lastwave.app`, not Mylo's `com.music.bitchord`:
+  - `ui/playlist/PlaylistScreen.kt`, blob `2bea1f6d4f9ccc9f08164b85a7a95a485d69fa56`.
+  - `ui/playlist/PlaylistDetailScreen.kt`, blob `54712d5106f9a244677c3679373609948ddf110b`.
+  - `ui/playlist/PlaylistViewModel.kt`, blob `0fe9109f3a0cce5cd3e23d90f6822e13e0678162`.
+  - `data/playlist/PlaylistRepository.kt`, blob `37bd36c5d269b494aafd8c536fc54eac50f3f5a5`.
+- LastWave's playlist screen confirms behavior for list sorting (newest, oldest, name, track count), custom playlist creation, search, pinning, custom cover selection/reset, export/share (CSV and M3U), regeneration, delete confirmation and a just-generated result banner.
+- LastWave's detail screen confirms track search/filter, custom sort vs drag reorder, lock/unlock reorder mode, track removal, and URI-backed cover editing. Its implementation has substantial lifecycle, drag/autoscroll, stable-key and concurrent-write protections; do not copy the large screen wholesale.
+- LastWave's repository supports track addition with duplicate protection and resolves incomplete tracks before saving. Mylo must adapt this around `Song.videoId`, current search/radio APIs and `LocalPlaylistStore`; do not port `GeneratedTrack`, Room, Hilt or LastWave playback infrastructure.
+- LastWave `DESIGN.md` is not Mylo's design authority. It was read only to confirm that the feature reference uses its own visual system; Mylo UI work must continue to use Mylo's own theme and shared components.
+
+### Clarified Mylo playlist import ownership
+- `ui/MainViewModel.kt`, blob `38998fc5925ee8c42886dc7ad23bf73f5b66b378`, method `createPlaylistWithVideoIds` (lines 1114–1168) confirms:
+  - When signed in, a Spotify import attempts to create a YouTube Music account playlist; on success it is a remote YT Music playlist.
+  - When signed out, or when remote playlist creation fails, the imported songs are saved to `LocalPlaylistStore` as a local fallback.
+  - This does not create a Spotify write-back/sync path. A local fallback is not linked to the Spotify original.
+- `MainActivity.kt` also maps every LocalPlaylistStore item into the Library On Device shelf. The previously recorded overlap between Library and Scrobble remains real and deliberately deferred.
+
+### Tests and implementation boundary
+- Current Mylo tests inspected: `LocalPlaylistCodecTest.kt` blob `97d20d039349953dd6712579b5c1f9af65a38a78` covers legacy metadata defaults, Song identity/metadata round-trip and empty lists; `PlaylistGenerationRulesTest.kt` blob `1730c6237530aeec9b8ce2143922b5112de129df` covers videoId dedupe, normalized heard identity, explicit exclusion semantics and freshness ordering.
+- No code or tests changed during this source trace. Do not infer the implementation of `YtMusicRepository` from its call sites; its source location/API cancellation contract still needs verification before adding search/add or multi-seed generation.
+- Next implementation slice after that verification: add the smallest Mylo-native playlist management batch (create/sort/reorder and safe edit operations first), with codec/store tests before UI wiring. Then add export and generation-similar flows as separate tested slices. Keep Library integration postponed and `main` untouched.
