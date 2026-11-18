@@ -4,6 +4,9 @@ import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.scaleIn
@@ -98,11 +101,17 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun ScrobbleGenerateContent(
     viewModel: ScrobbleGenerateViewModel,
     currentSong: Song?,
     contentPadding: PaddingValues,
+    highlightedPlaylistId: String?,
+    sharedHandoffFromGenerate: Boolean,
+    reduceMotion: Boolean,
+    sharedTransitionScope: SharedTransitionScope,
+    animatedVisibilityScope: AnimatedVisibilityScope,
     onOpenPlaylists: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -350,8 +359,20 @@ fun ScrobbleGenerateContent(
             Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
         }
         uiState.savedPlaylist?.let { playlist ->
+            val sharedBoundsModifier = if (
+                playlist.id == highlightedPlaylistId && sharedHandoffFromGenerate && !reduceMotion
+            ) {
+                with(sharedTransitionScope) {
+                    Modifier.sharedBounds(
+                        rememberSharedContentState(key = "scrobble-playlist-" + playlist.id),
+                        animatedVisibilityScope = animatedVisibilityScope,
+                    )
+                }
+            } else {
+                Modifier
+            }
             Column(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
+                Modifier.fillMaxWidth().then(sharedBoundsModifier).clip(RoundedCornerShape(16.dp))
                     .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.65f))
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -392,12 +413,16 @@ private fun ReplayPeriod.label(): String = when (this) {
     else -> name.lowercase().replace('_', ' ').replaceFirstChar(Char::uppercase)
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun ScrobblePlaylistsContent(
     viewModel: ScrobbleGenerateViewModel,
     contentPadding: PaddingValues,
     highlightedPlaylistId: String?,
+    sharedHandoffFromGenerate: Boolean,
     reduceMotion: Boolean,
+    sharedTransitionScope: SharedTransitionScope,
+    animatedVisibilityScope: AnimatedVisibilityScope,
     onPlaySongs: (List<Song>, Int) -> Unit,
 ) {
     val playlists by LocalPlaylistStore.playlists.collectAsStateWithLifecycle()
@@ -551,7 +576,10 @@ fun ScrobblePlaylistsContent(
                         canGenerateSimilar = !generationState.isGenerating && playlist.songs.any { it.videoId.isNotBlank() && !it.isVideo },
                         onGenerateSimilar = { viewModel.generateSimilar(playlist) },
                         animateHandoff = playlist.id == highlightedPlaylistId,
+                        sharedHandoffFromGenerate = sharedHandoffFromGenerate,
                         reduceMotion = reduceMotion,
+                        sharedTransitionScope = sharedTransitionScope,
+                        animatedVisibilityScope = animatedVisibilityScope,
                         onMoveUp = {
                             scope.launch {
                                 playlistActionError = if (LocalPlaylistStore.movePlaylist(playlist.id, index - 1)) null
@@ -655,6 +683,7 @@ fun ScrobblePlaylistsContent(
     }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun PlaylistRow(
     playlist: LocalPlaylist,
@@ -663,7 +692,10 @@ private fun PlaylistRow(
     showReorder: Boolean,
     canGenerateSimilar: Boolean,
     animateHandoff: Boolean,
+    sharedHandoffFromGenerate: Boolean,
     reduceMotion: Boolean,
+    sharedTransitionScope: SharedTransitionScope,
+    animatedVisibilityScope: AnimatedVisibilityScope,
     onGenerateSimilar: () -> Unit,
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
@@ -674,9 +706,19 @@ private fun PlaylistRow(
     onDelete: () -> Unit,
 ) {
     var menuExpanded by remember(playlist.id) { mutableStateOf(false) }
+    val sharedBoundsModifier = if (animateHandoff && sharedHandoffFromGenerate && !reduceMotion) {
+        with(sharedTransitionScope) {
+            Modifier.sharedBounds(
+                rememberSharedContentState(key = "scrobble-playlist-" + playlist.id),
+                animatedVisibilityScope = animatedVisibilityScope,
+            )
+        }
+    } else {
+        Modifier
+    }
     val rowContent: @Composable () -> Unit = {
             Row(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
+                Modifier.fillMaxWidth().then(sharedBoundsModifier).clip(RoundedCornerShape(16.dp))
                     .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f))
                     .padding(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -741,7 +783,7 @@ private fun PlaylistRow(
                 }
             }
     }
-    if (animateHandoff && !reduceMotion) {
+    if (animateHandoff && !reduceMotion && !sharedHandoffFromGenerate) {
         val handoffVisibility = remember(playlist.id) {
             MutableTransitionState(false).apply { targetState = true }
         }

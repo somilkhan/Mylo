@@ -1482,3 +1482,13 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 - No change to data, tab state, or playlist persistence when animations are disabled.
 - Full shared-bounds Generate-to-Playlists transition remains open; current row entrance is the safe fallback until the shared transition is implemented and device-checked. Split-bar categories/denominator remain unspecified and are not invented.
 - The preceding CI run #1163 caught the missing ReplayScreen remember import; this commit adds it and isolates animation recomposition. Fresh CI is required for this head.
+
+
+## 50. Generate-to-Playlists shared-bounds transition (2026-11-19)
+
+- Wrapped the existing screen AnimatedContent in Compose SharedTransitionLayout and matched the saved-playlist card on Generate to the new playlist row on Playlists with a stable playlist-id key and sharedBounds. This is a container transform because the source card and destination row have different content/layout.
+- The shared transition is enabled only for a save originating on Generate. Saves initiated from Playlists keep the existing row-arrival animation; no phantom source element is created.
+- The source id and origin are one-shot and cleared after the transition window or when Scrobble closes. The current selected tab is read through rememberUpdatedState so the origin is not captured stale by the long-lived event collector.
+- Reduce animation skips the shared-bounds transition and the fallback row entrance. Replay period-chip color transitions also snap when Reduce animation is enabled.
+- The transition uses the existing Mylo playlist card/row styling; no new design system or Library behavior was introduced.
+- Android/desktop/web CI must pass on the resulting head, and the shared transition still requires device visual verification. The Statistics split-bar definition remains unresolved and is not fabricated.

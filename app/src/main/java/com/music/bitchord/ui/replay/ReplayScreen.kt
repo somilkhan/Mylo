@@ -2,6 +2,7 @@ package com.music.bitchord.ui.replay
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -170,7 +171,7 @@ fun ReplayScreen(
             modifier = Modifier.fillMaxSize(),
             contentPadding = contentPadding,
         ) {
-            item("heading") { Heading(state, onPeriodChange, dark, heading) }
+            item("heading") { Heading(state, onPeriodChange, dark, heading, reduceMotion) }
 
             when {
                 state.loading && summary == null -> item("loading") {
@@ -263,7 +264,13 @@ fun ReplayScreen(
 // ── Heading ─────────────────────────────────────────────────────────────────
 
 @Composable
-private fun Heading(state: ReplayState, onPeriodChange: (ReplayPeriod) -> Unit, dark: Boolean, heading: String?) {
+private fun Heading(
+    state: ReplayState,
+    onPeriodChange: (ReplayPeriod) -> Unit,
+    dark: Boolean,
+    heading: String?,
+    reduceMotion: Boolean,
+) {
     val context = LocalContext.current
     val textColor = if (dark) Color.White else Color.Black
     Column(Modifier.padding(horizontal = PAGE_GUTTER + 4.dp)) {
@@ -280,7 +287,7 @@ private fun Heading(state: ReplayState, onPeriodChange: (ReplayPeriod) -> Unit, 
             color = textColor.copy(alpha = 0.6f),
         )
         Spacer(Modifier.height(14.dp))
-        PeriodPicker(state.period, onPeriodChange, dark)
+        PeriodPicker(state.period, onPeriodChange, dark, reduceMotion)
         Spacer(Modifier.height(18.dp))
     }
 }
@@ -294,7 +301,12 @@ private fun Heading(state: ReplayState, onPeriodChange: (ReplayPeriod) -> Unit, 
  * would make it a lie for the first thirty days of every month.
  */
 @Composable
-private fun PeriodPicker(selected: ReplayPeriod, onSelect: (ReplayPeriod) -> Unit, dark: Boolean) {
+private fun PeriodPicker(
+    selected: ReplayPeriod,
+    onSelect: (ReplayPeriod) -> Unit,
+    dark: Boolean,
+    reduceMotion: Boolean,
+) {
     val context = LocalContext.current
     val textColor = if (dark) Color.White else Color.Black
     Row(
@@ -308,7 +320,7 @@ private fun PeriodPicker(selected: ReplayPeriod, onSelect: (ReplayPeriod) -> Uni
             val active = period == selected
             val background by animateColorAsState(
                 if (active) textColor.copy(alpha = 0.92f) else Color.Transparent,
-                tween(160),
+                if (reduceMotion) snap() else tween(160),
                 label = "periodChip",
             )
             Text(

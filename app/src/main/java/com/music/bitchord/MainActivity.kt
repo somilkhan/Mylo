@@ -18,6 +18,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.MutableTransitionState
@@ -101,6 +103,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -477,7 +480,7 @@ class MainActivity : AppCompatActivity() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
 private fun BitChordApp(
     darkTheme: Boolean,
@@ -581,29 +584,36 @@ private fun BitChordApp(
     var showScrobble by rememberSaveable { mutableStateOf(false) }
     var selectedScrobbleTab by rememberSaveable { mutableIntStateOf(0) }
     var scrobbleHandoffPlaylistId by remember { mutableStateOf<String?>(null) }
+    var scrobbleHandoffFromGenerate by remember { mutableStateOf(false) }
+    val currentScrobbleTab by rememberUpdatedState(selectedScrobbleTab)
     val closeScrobble: () -> Unit = {
         scrobbleGenerateViewModel.cancelGeneration()
         scrobbleNavBarScroll.expand()
         showScrobble = false
         selectedScrobbleTab = 0
         scrobbleHandoffPlaylistId = null
+        scrobbleHandoffFromGenerate = false
     }
     // A successful save is the navigation event: keep the collector active only
     // while Scrobble is open, then move to Playlists after the store commit.
     LaunchedEffect(showScrobble, scrobbleGenerateViewModel) {
         if (showScrobble) {
             scrobbleGenerateViewModel.savedPlaylistEvents.collect { playlist ->
+                scrobbleHandoffFromGenerate = currentScrobbleTab == 1
                 scrobbleHandoffPlaylistId = playlist.id
                 selectedScrobbleTab = 2
             }
         }
     }
-    // Clear the target after its entrance motion so revisiting Playlists does
-    // not replay the animation for an older save.
+    // Clear the target after the shared/arrival motion so revisiting Playlists
+    // does not replay the animation for an older save.
     LaunchedEffect(scrobbleHandoffPlaylistId) {
         val playlistId = scrobbleHandoffPlaylistId ?: return@LaunchedEffect
         delay(1_600)
-        if (scrobbleHandoffPlaylistId == playlistId) scrobbleHandoffPlaylistId = null
+        if (scrobbleHandoffPlaylistId == playlistId) {
+            scrobbleHandoffPlaylistId = null
+            scrobbleHandoffFromGenerate = false
+        }
     }
     // Library cards use the same Replay page as every other entry point, but
     // category cards ask it to start at their matching ranked section.
@@ -2666,7 +2676,9 @@ private fun BitChordApp(
         // one child it always had and changes nothing.
         Row(Modifier.fillMaxSize()) {
             Box(Modifier.weight(1f).fillMaxHeight()) {
-                AnimatedContent(
+                SharedTransitionLayout(Modifier.fillMaxSize()) {
+                    val scrobbleSharedTransitionScope = this
+                    AnimatedContent(
                     targetState = when {
                         showSpotify && detail == null -> "spotify"
                         showDiscord -> "discord"
@@ -2765,6 +2777,7 @@ private fun BitChordApp(
                         ),
                     label = "content",
                 ) { key ->
+                    val scrobbleAnimatedVisibilityScope = this
                     // Every branch below reads `key` rather than the state that
                     // produced it. The two are the same thing only for the page
                     // being entered: the one on its way out is still composed,
@@ -2834,6 +2847,7 @@ private fun BitChordApp(
                         ReplayScreen(
                             state = replay,
                             holder = account?.name.orEmpty(),
+                            reduceMotion = reducePlayerMotion,
                             onPeriodChange = setReplayPeriod,
                             onOpenStory = { replayStory = it },
                             // A track tapped on a chart is one the user already
@@ -2890,13 +2904,21 @@ private fun BitChordApp(
                                 viewModel = scrobbleGenerateViewModel,
                                 currentSong = player.song,
                                 contentPadding = listPadding,
+                                highlightedPlaylistId = scrobbleHandoffPlaylistId,
+                                sharedHandoffFromGenerate = scrobbleHandoffFromGenerate,
+                                reduceMotion = reducePlayerMotion,
+                                sharedTransitionScope = scrobbleSharedTransitionScope,
+                                animatedVisibilityScope = scrobbleAnimatedVisibilityScope,
                                 onOpenPlaylists = { selectedScrobbleTab = 2 },
                             )
                             else -> ScrobblePlaylistsContent(
                                 viewModel = scrobbleGenerateViewModel,
                                 contentPadding = listPadding,
                                 highlightedPlaylistId = scrobbleHandoffPlaylistId,
+                                sharedHandoffFromGenerate = scrobbleHandoffFromGenerate,
                                 reduceMotion = reducePlayerMotion,
+                                sharedTransitionScope = scrobbleSharedTransitionScope,
+                                animatedVisibilityScope = scrobbleAnimatedVisibilityScope,
                                 onPlaySongs = { songs, index ->
                                     playFrom(
                                         songs,
@@ -3501,6 +3523,7 @@ private fun BitChordApp(
                             deviceItems = libraryDeviceItems(downloadedReleases) + localPlaylistItems,
                         )
                     }
+                }
                 }
 
                 // ---- Settings sub-screen overlays ----
