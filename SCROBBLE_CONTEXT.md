@@ -917,3 +917,14 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 - This is a focused JVM unit test for the pure visibility helper. It does **not** validate Compose layout, host integration, measured docking, navigation replacement, Back priority, or actual accessibility semantics.
 - Android CI must be checked against the exact test commit. No local Gradle execution is claimed.
 - Current next action: integrate the FAB and Scrobble host into MainActivity only after reconciling the PR #8 host patch with current overlay state and the complete ScrobbleScreen dependency graph. The PR patch requires new account-synced-history state and the full ScrobbleScreen implementation; do not paste the host diff alone because it will not compile.
+
+
+## 25. Prototype review and Glass navigation prerequisite (2026-11-18)
+
+- Reviewed the uploaded `Mylo Final Prototype.md` directly. Its explicit interaction requirements include: Glass/Standard switching, reduced-motion behavior, FAB above the player/navigation stack in both modes, Home-only FAB, Scrobble's three tabs inside the pill, Scrobble-specific scroll folding in Glass mode, normal tabs restored on close, and tapping a normal tab exits Scrobble. Its screen content is illustrative prototype copy, not production data.
+- Root `CLAUDE.md` and `AGENTS.md` remain absent on current `Main-dev`; do not claim they were read. Existing project instructions and this context log remain the available engineering guidance.
+- Current branch before this change: `Main-dev`, head `749270c32c49fe05b4bc425b471c410c2b304b04`; stable `main` remains `11478fde56f1817cb777b296e60907359086f383`.
+- Changed `app/src/main/java/com/music/bitchord/ui/components/GlassNavBar.kt` (blob `ba27410d2563008d741a0772ebf6a7f06e8426c4`) to accept optional `standaloneIndexOverride`. Default behavior remains the last tab as standalone; Scrobble host can pass `-1` so all three tabs remain inside the glass pill, matching the prototype.
+- Commit: `b189d169a755d2092faadd9b4621673c62c9a7be`.
+- This is a navigation-component prerequisite only; it is not yet wired or visually verified. No Gradle build/test was run in this GitHub-only step.
+- Next: inspect the actual Scrobble destination dependencies from the approved feature source, port/adapt only required pieces, then integrate MainActivity state and both nav modes together. Do not copy the old `ScrobbleScreen.kt` wholesale: the feature source of truth is LastWave, while Mylo's current recorder, settings, local playlist store and playback/queue APIs remain authoritative.
