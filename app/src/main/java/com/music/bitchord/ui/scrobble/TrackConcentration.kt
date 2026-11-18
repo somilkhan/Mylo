@@ -39,20 +39,24 @@ internal data class TrackConcentration(
     val averagePlaysPerTrack: String,
 )
 
-internal fun calculateTrackConcentration(summary: ReplaySummary): TrackConcentration? {
-    if (summary.isEmpty || summary.totalMs <= 0L) return null
-    val tracks = summary.songs.sortedByDescending { it.ms.coerceAtLeast(0L) }
-    if (tracks.isEmpty()) return null
+internal fun calculateTrackConcentration(summary: ReplaySummary): TrackConcentration? =
+    calculateTrackConcentration(summary.songs.map { it.ms }, summary.totalMs, summary.totalPlays)
 
-    val topMs = tracks.first().ms.coerceAtLeast(0L)
-    val nextMs = tracks.drop(1).take(2).sumOf { it.ms.coerceAtLeast(0L) }
-    val totalMs = summary.totalMs
-    val topPercent = ((topMs.toDouble() / totalMs) * 100.0).roundToInt().coerceIn(0, 100)
-    val nextPercent = ((nextMs.toDouble() / totalMs) * 100.0).roundToInt().coerceIn(0, 100 - topPercent)
+internal fun calculateTrackConcentration(
+    trackDurationsMs: List<Long>,
+    totalListeningMs: Long,
+    totalPlays: Int,
+): TrackConcentration? {
+    if (trackDurationsMs.isEmpty() || totalListeningMs <= 0L) return null
+    val tracks = trackDurationsMs.map { it.coerceAtLeast(0L) }.sortedDescending()
+    val topMs = tracks.first()
+    val nextMs = tracks.drop(1).take(2).sum()
+    val topPercent = ((topMs.toDouble() / totalListeningMs) * 100.0).roundToInt().coerceIn(0, 100)
+    val nextPercent = ((nextMs.toDouble() / totalListeningMs) * 100.0).roundToInt().coerceIn(0, 100 - topPercent)
     val othersPercent = (100 - topPercent - nextPercent).coerceAtLeast(0)
-    val otherMs = (totalMs - topMs - nextMs).coerceAtLeast(0L)
+    val otherMs = (totalListeningMs - topMs - nextMs).coerceAtLeast(0L)
     val count = tracks.size
-    val average = String.format(Locale.ROOT, "%.1f", summary.totalPlays.toFloat() / count)
+    val average = String.format(Locale.ROOT, "%.1f", totalPlays.coerceAtLeast(0).toFloat() / count)
 
     return TrackConcentration(
         topTrackPercent = topPercent,
@@ -62,7 +66,7 @@ internal fun calculateTrackConcentration(summary: ReplaySummary): TrackConcentra
         nextTwoMs = nextMs,
         otherTracksMs = otherMs,
         uniqueTracks = count,
-        totalPlays = summary.totalPlays,
+        totalPlays = totalPlays.coerceAtLeast(0),
         averagePlaysPerTrack = average,
     )
 }
