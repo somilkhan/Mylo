@@ -25,6 +25,8 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Sort
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.MoreVert
@@ -70,6 +72,8 @@ import com.music.bitchord.data.generate.PlaylistGenerationMode
 import com.music.bitchord.data.generate.PlaylistGenerationRequest
 import com.music.bitchord.data.spotify.LocalPlaylist
 import com.music.bitchord.data.spotify.LocalPlaylistStore
+import com.music.bitchord.data.spotify.LocalPlaylistSortMode
+import com.music.bitchord.data.spotify.sortLocalPlaylists
 import com.music.bitchord.data.stats.ReplayPeriod
 import kotlinx.coroutines.delay
 
@@ -361,6 +365,8 @@ fun ScrobblePlaylistsContent(
     val playlists by LocalPlaylistStore.playlists.collectAsStateWithLifecycle()
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
     var search by rememberSaveable { mutableStateOf("") }
+    var sortMode by rememberSaveable { mutableStateOf(LocalPlaylistSortMode.NEWEST) }
+    var sortMenuExpanded by remember { mutableStateOf(false) }
     var renameTarget by remember { mutableStateOf<LocalPlaylist?>(null) }
     var renameText by rememberSaveable { mutableStateOf("") }
     var renameError by remember { mutableStateOf<String?>(null) }
@@ -383,8 +389,7 @@ fun ScrobblePlaylistsContent(
             onDelete = { deleteTarget = selected },
         )
     } else {
-        val visible = playlists
-            .sortedWith(compareByDescending<LocalPlaylist> { it.isPinned }.thenByDescending { it.createdAtEpochMillis })
+        val visible = sortLocalPlaylists(playlists, sortMode)
             .filter { it.title.contains(search, ignoreCase = true) }
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -397,9 +402,38 @@ fun ScrobblePlaylistsContent(
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             item {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Playlists", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
-                    Text("Your generated and saved mixes", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Text("Playlists", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
+                        Text("Your generated and saved mixes", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Box {
+                        IconButton(onClick = { sortMenuExpanded = true }) {
+                            Icon(Icons.Rounded.Sort, contentDescription = "Sort playlists")
+                        }
+                        DropdownMenu(
+                            expanded = sortMenuExpanded,
+                            onDismissRequest = { sortMenuExpanded = false },
+                        ) {
+                            LocalPlaylistSortMode.entries.forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(option.label) },
+                                    leadingIcon = if (sortMode == option) {
+                                        { Icon(Icons.Rounded.Check, contentDescription = null) }
+                                    } else {
+                                        null
+                                    },
+                                    onClick = {
+                                        sortMode = option
+                                        sortMenuExpanded = false
+                                    },
+                                )
+                            }
+                        }
+                    }
                 }
             }
             if (playlists.isNotEmpty()) {
@@ -428,9 +462,13 @@ fun ScrobblePlaylistsContent(
                     }
                 }
             } else {
-                items(visible, key = { it.id }) { playlist ->
+                itemsIndexed(visible, key = { _, playlist -> playlist.id }) { index, playlist ->
                     PlaylistRow(
                         playlist = playlist,
+                        index = index,
+                        showReorder = sortMode == LocalPlaylistSortMode.CUSTOM && search.isBlank(),
+                        onMoveUp = { LocalPlaylistStore.movePlaylist(playlist.id, index - 1) },
+                        onMoveDown = { LocalPlaylistStore.movePlaylist(playlist.id, index + 1) },
                         onOpen = { selectedId = playlist.id },
                         onPlay = { onPlaySongs(playlist.songs, 0) },
                         onPin = { LocalPlaylistStore.setPinned(playlist.id, !playlist.isPinned) },
@@ -493,6 +531,10 @@ fun ScrobblePlaylistsContent(
 @Composable
 private fun PlaylistRow(
     playlist: LocalPlaylist,
+    index: Int,
+    showReorder: Boolean,
+    onMoveUp: () -> Unit,
+    onMoveDown: () -> Unit,
     onOpen: () -> Unit,
     onPlay: () -> Unit,
     onPin: () -> Unit,
@@ -532,6 +574,19 @@ private fun PlaylistRow(
                     leadingIcon = { Icon(Icons.Rounded.PushPin, contentDescription = null) },
                     onClick = { menuExpanded = false; onPin() },
                 )
+                if (showReorder) {
+                    DropdownMenuItem(
+                        text = { Text("Move up") },
+                        leadingIcon = { Icon(Icons.Rounded.ArrowUpward, contentDescription = null) },
+                        enabled = index > 0,
+                        onClick = { menuExpanded = false; onMoveUp() },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Move down") },
+                        leadingIcon = { Icon(Icons.Rounded.ArrowDownward, contentDescription = null) },
+                        onClick = { menuExpanded = false; onMoveDown() },
+                    )
+                }
                 DropdownMenuItem(
                     text = { Text("Rename") },
                     leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null) },
