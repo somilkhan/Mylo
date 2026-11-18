@@ -1035,3 +1035,12 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 - Exact-head CI must run after this commit. No local Gradle build or device/emulator run is claimed.
 - Physical-device checks remain: FAB measured docking with/without mini-player in Glass and Standard modes, scroll folding, IME/overlay suppression, Back priority inside playlist detail, search/seed selection, generation cancellation under network delay, and playlist persistence across process restart.
 - Do not merge PR #8 or change `main` without explicit approval.
+
+
+## 30. Scrobble motion and scroll isolation (2026-11-18)
+
+- Added a dedicated `scrobbleNavBarScroll` connection. Scrobble content dispatches scroll into it and GlassNavBar consumes it only while Scrobble is open; the normal Home navigation retains its previous fold state.
+- FAB folding follows the active Glass connection and is disabled in Standard mode. Opening/closing Scrobble expands only the Scrobble connection.
+- Scrobble page entry/exit now uses a short drop/return transition. The existing Reduce Animation setting snaps this transition and the FAB glyph/scale; the Glass bar's inline/expanded fade is also disabled when Reduce Animation is enabled.
+- Standard bottom-bar glyph tint now snaps with Reduce Animation instead of continuing a 200ms tint tween.
+- No Home content or normal tab order was changed. Exact-head CI for the previous host commit `442bb3f28834c19c3fc7f62d7e2cfe705ab18f25` passed run #1094 / `44359311548`.

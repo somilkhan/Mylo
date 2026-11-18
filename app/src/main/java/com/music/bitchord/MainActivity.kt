@@ -21,6 +21,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
@@ -511,6 +512,7 @@ private fun BitChordApp(
     // rather than inside the bar because the page's scroll is what drives it,
     // and the page is a sibling of the bar rather than a child.
     val navBarScroll = rememberFloatingTabBarScrollConnection()
+    val scrobbleNavBarScroll = rememberFloatingTabBarScrollConnection()
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     /**
      * Whether the player's sheet is up. The player is always a full-screen
@@ -578,7 +580,7 @@ private fun BitChordApp(
     var selectedScrobbleTab by rememberSaveable { mutableIntStateOf(0) }
     val closeScrobble: () -> Unit = {
         scrobbleGenerateViewModel.cancelGeneration()
-        navBarScroll.expand()
+        scrobbleNavBarScroll.expand()
         showScrobble = false
         selectedScrobbleTab = 0
     }
@@ -2698,10 +2700,19 @@ private fun BitChordApp(
                         val libraryTabKey = "$TAB_KEY$TAB_LIBRARY"
                         val libraryShowAllSwap = (initialState == "library_show_all" && targetState == libraryTabKey) ||
                             (targetState == "library_show_all" && initialState == libraryTabKey)
-                        if (tabSwap || libraryShowAllSwap) {
-                            EnterTransition.None togetherWith ExitTransition.None
-                        } else {
-                            fadeIn(tween(180)) togetherWith fadeOut(tween(180))
+                        val enteringScrobble = targetState.startsWith("scrobble-") && !initialState.startsWith("scrobble-")
+                        val leavingScrobble = initialState.startsWith("scrobble-") && !targetState.startsWith("scrobble-")
+                        when {
+                            tabSwap || libraryShowAllSwap -> EnterTransition.None togetherWith ExitTransition.None
+                            (enteringScrobble || leavingScrobble) && reducePlayerMotion ->
+                                EnterTransition.None togetherWith ExitTransition.None
+                            enteringScrobble ->
+                                (slideInVertically(tween(260)) { -it / 8 } + fadeIn(tween(180))) togetherWith
+                                    fadeOut(tween(140))
+                            leavingScrobble ->
+                                fadeIn(tween(160)) togetherWith
+                                    (slideOutVertically(tween(220)) { -it / 8 } + fadeOut(tween(180)))
+                            else -> fadeIn(tween(180)) togetherWith fadeOut(tween(180))
                         }
                     },
                     modifier = Modifier
@@ -2723,7 +2734,7 @@ private fun BitChordApp(
                                     // Every page's scroll passes through here, so
                                     // the glass bar collapses on all of them
                                     // without each one having to know about it.
-                                    .nestedScroll(navBarScroll)
+                                    .nestedScroll(if (showScrobble) scrobbleNavBarScroll else navBarScroll)
                             } else {
                                 Modifier
                             },
@@ -3682,7 +3693,7 @@ private fun BitChordApp(
                         // The page leads with its own large "Replay", so the bar
                         // stays out of the way until that has been scrolled off.
                         showReplay -> replayScrolled
-                        showScrobble -> navBarScroll.isInline
+                        showScrobble -> scrobbleNavBarScroll.isInline
                         detail != null -> detailScrolled
                         else -> scrolled || selectedTab == TAB_SEARCH
                     },
@@ -4088,7 +4099,7 @@ private fun BitChordApp(
                         tabs = displayedTabs,
                         selectedIndex = displayedSelectedIndex,
                         onTabSelected = displayedTabClick,
-                        scrollConnection = navBarScroll,
+                        scrollConnection = if (showScrobble) scrobbleNavBarScroll else navBarScroll,
                         standaloneIndexOverride = if (showScrobble) -1 else null,
                         song = player.song,
                         isPlaying = player.isPlaying,
@@ -4193,14 +4204,14 @@ private fun BitChordApp(
                         open = showScrobble,
                         onClick = {
                             if (showScrobble) closeScrobble() else {
-                                navBarScroll.expand()
+                                scrobbleNavBarScroll.expand()
                                 selectedScrobbleTab = 0
                                 showScrobble = true
                             }
                         },
                         surface = fabSurface,
                         reduceMotion = reducePlayerMotion,
-                        folded = navBarScroll.isInline,
+                        folded = glassActive && (if (showScrobble) scrobbleNavBarScroll.isInline else navBarScroll.isInline),
                         modifier = Modifier.padding(end = 8.dp),
                     )
                 }
