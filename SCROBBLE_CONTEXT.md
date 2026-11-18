@@ -997,3 +997,13 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 1. Wire the Generate ViewModel into the Scrobble Generate tab and ensure every dismissal path calls cancelGeneration().
 2. Build the Playlists tab on the now-initialized local store, including generated playlist open/play actions without changing queue semantics until the user taps Play.
 3. Integrate Statistics with local Replay as the primary source and keep Last.fm remote profile data explicitly separate.
+
+## 28. Generation review corrections and implementation commit (2026-11-18)
+
+- The engine/ViewModel/persistence batch was committed to Main-dev at 983cea23bf5f61167f960b2896d76946fe64722f; follow-up review commit 037777645d0c49b064c0e3bbd64a548f37944352 tightened cancellation and Never Heard behavior.
+- Never Heard no longer applies even a soft saved-playlist freshness bias by default. Saved-playlist, liked-song, and library-song exclusions are applied only when their explicit request flags are selected.
+- The title helper now uses Locale.ROOT for deterministic case-insensitive duplicate detection.
+- Corrected the active-generation commit test so the helper's return value is asserted independently from the side effect.
+- The exact-head CI run for 983cea23bf5f61167f960b2896d76946fe64722f was superseded by the follow-up commit. Check CI only against 037777645d0c49b064c0e3bbd64a548f37944352 before reporting validation.
+- Current feature code is committed, but the Scrobble Generate UI and FAB/nav host are still not integrated. Dismissal must call ScrobbleGenerateViewModel.cancelGeneration() when the screen host is wired.
+- No physical-device validation is claimed.
