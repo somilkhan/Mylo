@@ -1349,3 +1349,23 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 - The latest Main-dev UI source is `ScrobbleContent.kt` blob `f34212b4722f6308071b903888972f94a79f68fa`.
 - Android CI run #1133 / ID `44383699697` targets commit `6e3b6fb85f711a3491164e6860cb9096ea0f04d3`; it is still pending with zero jobs started at the latest poll. Earlier run #1132 / ID `44383676132` for `4e35ff13adfaaa5b357fc37dd2389eaddcd6c814` was cancelled by a later push. Do not treat either as a passing result; recheck run #1133 before proceeding.
 - `main` remains untouched.
+
+
+## 42. Local playlist persistence and mutation safety (2026-11-19)
+
+### Implemented
+- `LocalPlaylistStore.kt` blob `f797f9563919df54517eb283c790478dab1bfff6` now serializes mutations with a `Mutex`, writes JSON with `SharedPreferences.commit()` on `Dispatchers.IO`, and publishes the new StateFlow snapshot only after the write succeeds.
+- Mutations are non-cancellable after acquiring the store lock so a screen leaving mid-write cannot leave disk and in-memory state divergent. Cancellation while waiting for the lock still prevents the operation from starting.
+- Save failures throw to the caller; rename/delete/pin/cover/reorder/add/remove return failure without optimistic state changes. Scrobble surfaces those failures instead of claiming success.
+- Local playlist load/JSON decode failures are exposed through `loadError`; the Scrobble list shows the error and a Retry action instead of a misleading empty state.
+- Added atomic `moveSong` / `removeSong` operations keyed by the expected `videoId` and current index, avoiding stale whole-list snapshots when users move/remove tracks quickly. Pure helper tests were added to `LocalPlaylistCodecTest.kt`, blob `1be05233c24356fb8eb0bc4857052b44bf5c73be`.
+- `GenerateCommit.kt` blob `e005cb014aa5c7645e772364acfb79d15e2bb9c6` now accepts a suspending commit callback so generated playlist persistence can run on IO.
+- Spotify local fallback now catches persistence failures and reports them through the existing queue notice; see `MainViewModel.kt` blob `27d6619b0608f756c2697544ead9273a82478aae` and `MainActivity.kt` blob `bbb0039708eb4a4c06f54dd1756ce033c5c9cca3`.
+- Scrobble list/detail mutations now launch through Compose coroutine scopes; cover URI grant cleanup and deletion cleanup are protected so cancellation cannot release a URI after a successful persisted cover update. UI blob `92480551fac2ceaab4aee428ecd9e77822189cd0`.
+- Corrected CSV field quoting to use explicit quote concatenation; the export test remains the regression guard.
+
+### Verification
+- Android CI run #1156 / ID `44386064413` targets Main-dev commit `b2ec6ffa24be4d6f3decde439c81c1044f8ad74b`. At the latest poll, Web tests/typecheck, Desktop compile/tests and Android unit tests were all in progress. No passing result is claimed yet.
+- The workflow builds/tests but does not produce an installable APK by default. Device checks remain outstanding, especially large-playlist write latency, custom-cover URI persistence/release, and CSV/M3U save/share.
+- Current SharedPreferences JSON storage remains the existing persistence backend; this change makes its writes serialized and failure-aware, but it is not a Room/DataStore migration.
+- `main` remains untouched. Continue only on `Main-dev`.
