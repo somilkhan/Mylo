@@ -108,6 +108,7 @@ fun ReplayScreen(
     modifier: Modifier = Modifier,
     listState: LazyListState = rememberLazyListState(),
     landingPage: ReplayStoryPage = ReplayStoryPage.INTRO,
+    heading: String? = null,
 ) {
     val context = LocalContext.current
     val summary = state.summary
@@ -163,7 +164,7 @@ fun ReplayScreen(
             modifier = Modifier.fillMaxSize(),
             contentPadding = contentPadding,
         ) {
-            item("heading") { Heading(state, onPeriodChange, dark) }
+            item("heading") { Heading(state, onPeriodChange, dark, heading) }
 
             when {
                 state.loading && summary == null -> item("loading") {
@@ -254,13 +255,13 @@ fun ReplayScreen(
 // ── Heading ─────────────────────────────────────────────────────────────────
 
 @Composable
-private fun Heading(state: ReplayState, onPeriodChange: (ReplayPeriod) -> Unit, dark: Boolean) {
+private fun Heading(state: ReplayState, onPeriodChange: (ReplayPeriod) -> Unit, dark: Boolean, heading: String?) {
     val context = LocalContext.current
     val textColor = if (dark) Color.White else Color.Black
     Column(Modifier.padding(horizontal = PAGE_GUTTER + 4.dp)) {
         Spacer(Modifier.height(48.dp))
         Text(
-            text = stringResource(R.string.replay),
+            text = heading ?: stringResource(R.string.replay),
             style = MaterialTheme.typography.displayLarge,
             fontWeight = FontWeight.W800,
             color = textColor,

@@ -1007,3 +1007,31 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 - The exact-head CI run for 983cea23bf5f61167f960b2896d76946fe64722f was superseded by the follow-up commit. Check CI only against 037777645d0c49b064c0e3bbd64a548f37944352 before reporting validation.
 - Current feature code is committed, but the Scrobble Generate UI and FAB/nav host are still not integrated. Dismissal must call ScrobbleGenerateViewModel.cancelGeneration() when the screen host is wired.
 - No physical-device validation is claimed.
+
+## 29. Scrobble host and first functional tabs (2026-11-18)
+
+### Branch / source checks
+- Implementation branch before this commit: `Main-dev`, HEAD `0b436c15625b646e2125ed2368eca215e0d4eb79`; stable `main` remains `11478fde56f1817cb777b296e60907359086f383`.
+- Rechecked root `CLAUDE.md` and `AGENTS.md`; both are still absent on Main-dev (404). The complete project contract cannot be verified from those missing files.
+- PR #8 remains draft/open, head `5bf065da305e6bb663960f9e09d30572dcdc0f32`; both exact-head CI runs #35 / `43748195854` and #1053 / `43747641686` passed. This validates the PR8 branch only, not Main-dev.
+- Main-dev's generator code commit `037777645d0c49b064c0e3bbd64a548f37944352` passed exact-head Android CI run #1091 / `44350542384`.
+
+### Code added / wired
+- Added `ui/scrobble/ScrobbleContent.kt`:
+  - Generate UI selects all nine implemented generation modes, seed track search for Similar Tracks, optional current-track seed for Mix, Replay period for Top, playlist size, and explicit Never Heard exclusions.
+  - Shows progress, cancellation, errors, and the saved-playlist result.
+  - Playlists UI reads the existing `LocalPlaylistStore`; supports search, pinned-first display, detail, play, shuffle, pin/unpin, rename, delete, track reorder and track removal.
+  - Playback actions call MainActivity's existing `playFrom`/QueueCoordinator route. Generation itself still performs no queue mutation.
+- Integrated the Scrobble surface in MainActivity:
+  - Home-only FAB, suppressed by competing overlays, full player and IME; it uses the current Glass/Standard material, folds with the existing nav scroll state, and becomes the close glyph while open.
+  - Three Scrobble tabs replace the normal four-tab bar only while Scrobble is open; normal Home/Explore/Library/Search tabs remain unchanged and the prior selected normal tab is retained.
+  - Glass mode keeps all three Scrobble tabs inside the pill via `standaloneIndexOverride = -1`; mini-player remains in the existing nav stack.
+  - Back, FAB close and normal-tab exit cancel active generation before dismissing the Scrobble host.
+- Reused the existing local Replay data as the Statistics tab, with an optional heading override so the page reads “Statistics” while the Library Replay keeps its original title.
+- Starting a new generation clears the prior success result so a stale saved-playlist card cannot be mistaken for the new request.
+
+### Remaining / validation
+- This commit introduces the first working host and functional Generate/Playlists pages; it is not a complete port of every PR8 playlist affordance. Playlist-level manual reorder, export/cover actions, Last.fm remote statistics (separately labelled from local Replay), and richer Stats source switching remain.
+- Exact-head CI must run after this commit. No local Gradle build or device/emulator run is claimed.
+- Physical-device checks remain: FAB measured docking with/without mini-player in Glass and Standard modes, scroll folding, IME/overlay suppression, Back priority inside playlist detail, search/seed selection, generation cancellation under network delay, and playlist persistence across process restart.
+- Do not merge PR #8 or change `main` without explicit approval.

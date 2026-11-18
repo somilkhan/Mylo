@@ -46,7 +46,7 @@ class ScrobbleGenerateViewModel(application: Application) : AndroidViewModel(app
     fun generate(request: PlaylistGenerationRequest) {
         if (generationJob?.isActive == true) return
         val token = ++generationToken
-        _uiState.update { it.copy(isGenerating = true, progress = "Preparing your playlist…", error = null) }
+        _uiState.update { it.copy(isGenerating = true, progress = "Preparing your playlist…", error = null, savedPlaylist = null) }
 
         generationJob = viewModelScope.launch {
             try {
