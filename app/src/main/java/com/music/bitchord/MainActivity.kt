@@ -2869,6 +2869,7 @@ private fun BitChordApp(
                                 onOpenPlaylists = { selectedScrobbleTab = 2 },
                             )
                             else -> ScrobblePlaylistsContent(
+                                viewModel = scrobbleGenerateViewModel,
                                 contentPadding = listPadding,
                                 onPlaySongs = { songs, index ->
                                     playFrom(
