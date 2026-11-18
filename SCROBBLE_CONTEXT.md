@@ -1065,3 +1065,37 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 - Exact-head CI for rollback commit `1dcd8a8621663ee55af39fa15f34f5925b2a5121`: run #1104 / `44373228203` was observed in progress; Web tests/typecheck passed, Android SDK setup and Desktop compile were still running. Do not report the overall run as passed until all jobs finish.
 - No local build, device test, or emulator test was run. Physical-device validation remains outstanding.
 - Next: finish exact-head CI inspection; then resume the outstanding Phase 5 regression/review checklist from section 20 and the remaining Playlists acceptance items from sections 10, 13, 19 and 29. Before any additional app-code change, confirm the exact remaining gap against the current Main-dev source and the approved scope.
+
+## 33. Post-rollback playlist gap re-audit (2026-11-19)
+
+### Exact refs
+- `Main-dev`: `b2a5900ebab2805e5c490a4b055d3ee8c18c898d` (documentation-only commit after rollback); its app source tree is identical to checkpoint `23d7afd235c075f083500ad0420ee38378c94545`.
+- `main`: `11478fde56f1817cb777b296e60907359086f383`, unchanged.
+- `last-wave`: `d0dd73755bfe640c515502751f440a32e57506d5`.
+- `scrobble-ui`: `5bf065da305e6bb663960f9e09d30572dcdc0f32`.
+- No PR was merged or retargeted. The current implementation target remains `Main-dev`.
+
+### Current Mylo playlist implementation rechecked
+- `app/src/main/java/com/music/bitchord/data/spotify/LocalPlaylistStore.kt` currently provides UUID-backed IDs, optional `createdAtEpochMillis` / `generationMode` / `isPinned`, save/delete/rename/get, update songs, pin, and a `movePlaylist` operation. Existing SharedPreferences JSON persistence and codec remain the source of truth; no Room migration is justified.
+- `app/src/main/java/com/music/bitchord/ui/scrobble/ScrobbleContent.kt` currently provides playlist search, pinned/newest ordering, open/detail, play/shuffle, pin, rename, delete, track move-up/down and remove.
+- Confirmed gaps in the current Scrobble playlist UI: manual custom-playlist creation, list sort choices (oldest/name/track count), playlist-level reorder UI, custom cover selection/reset, CSV/M3U export/share, Generate Similar/regenerate, and track search/add.
+- The current Scrobble list reads the complete `LocalPlaylistStore.playlists` flow without a Scrobble ownership filter. This needs an explicit ownership decision/test so Library/import fallback playlists are not accidentally presented as generated Scrobble playlists. Preserve those existing playlists in Library.
+- `movePlaylist` exists in the store but is not exposed by this screen. Track reordering/removal are already present in detail, but the UI does not surface persistence failures. `persist()` currently catches serialization/write exceptions and uses SharedPreferences `apply()`; do not promise durable-write acknowledgement or display success without checking the actual store contract.
+
+### LastWave feature reference rechecked
+- Current `last-wave` `PlaylistViewModel.kt` covers custom creation, rename, cover, pin, track removal/reorder, delete, CSV/M3U save/share and regenerate.
+- `PlaylistScreen.kt` exposes create, sort (newest/oldest/name/track count), export, cover, pin and delete actions.
+- `PlaylistDetailScreen.kt` exposes track search/sort/reorder, cover selection/reset, regenerate, rename, export and delete.
+- `FileExportHelper.kt` contains pure CSV/M3U format builders plus Android save/share helpers. Only adapt the format and user-facing behavior; do not import LastWave's Room/DI/storage layer or its remote YouTube account playlist projections.
+- Mylo's export adapter must use `Song.videoId` as the playable identity; do not blindly copy LastWave `GeneratedTrack.url`. Local/non-YouTube tracks need an explicit skip/report policy. CSV escaping and filename sanitization need focused tests.
+- Cover selection must use Android document-picker URI grants safely. Replacing, resetting or deleting a cover requires lifecycle-aware permission cleanup; avoid releasing a URI grant still used by another playlist.
+
+### Verification / limits
+- This was a read-only source audit. No app code, build configuration, test or PR was changed in this pass.
+- Rollback exact-head CI run #1104 / `44373228203` was still in progress at the last poll: Web tests/typecheck passed; Android unit tests and Desktop compile were running. No overall pass is claimed.
+- No local Gradle build, emulator or physical-device check was performed.
+
+### Next audit slice
+1. Trace Mylo `Song` identity and YouTube Music search/radio APIs for track-add and Generate Similar; verify cancellation, timeout and stale-request behavior.
+2. Inspect all current `LocalPlaylistStore` callers (especially Library/import fallback and generated-save paths) before choosing a stable Scrobble ownership marker.
+3. Define the smallest playlist feature batch and regression tests against the acceptance matrix in section 19; then proceed under the already approved Phase 4 scope. Keep `main` untouched.
