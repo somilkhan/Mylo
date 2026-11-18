@@ -585,6 +585,7 @@ private fun BitChordApp(
     var selectedScrobbleTab by rememberSaveable { mutableIntStateOf(0) }
     var scrobbleHandoffPlaylistId by remember { mutableStateOf<String?>(null) }
     var scrobbleHandoffFromGenerate by remember { mutableStateOf(false) }
+    var handledScrobblePlaylistId by rememberSaveable { mutableStateOf<String?>(null) }
     val currentScrobbleTab by rememberUpdatedState(selectedScrobbleTab)
     val closeScrobble: () -> Unit = {
         scrobbleGenerateViewModel.cancelGeneration()
@@ -599,9 +600,12 @@ private fun BitChordApp(
     LaunchedEffect(showScrobble, scrobbleGenerateViewModel) {
         if (showScrobble) {
             scrobbleGenerateViewModel.savedPlaylistEvents.collect { playlist ->
-                scrobbleHandoffFromGenerate = currentScrobbleTab == 1
-                scrobbleHandoffPlaylistId = playlist.id
-                selectedScrobbleTab = 2
+                if (handledScrobblePlaylistId != playlist.id) {
+                    handledScrobblePlaylistId = playlist.id
+                    scrobbleHandoffFromGenerate = currentScrobbleTab == 1
+                    scrobbleHandoffPlaylistId = playlist.id
+                    selectedScrobbleTab = 2
+                }
             }
         }
     }
@@ -1770,17 +1774,15 @@ private fun BitChordApp(
      * shut, the current track carries on — so the count is said out loud, the
      * same way a batch download is.
      */
-    val queueSongs: (List<Song>, Boolean) -> Unit = { songs, next ->
+    val queueSongs: (List<Song>, Boolean, Boolean) -> Unit = { songs, next, startIfIdle ->
         if (songs.isNotEmpty()) {
             scope.launch {
                 if (refusedByHost()) return@launch
                 val c = controller
                 if (c == null || c.mediaItemCount == 0) {
-                    // Nothing to queue behind. "Add to queue" on a silent
-                    // player can only mean start here — and adding without
-                    // preparing would leave the list sitting in a player that
-                    // never gets round to it.
-                    play(songs, 0)
+                    // Normal queue actions can start from idle; Start Mix cannot
+                    // interrupt a silent player just because discovery finished.
+                    if (startIfIdle) play(songs, 0)
                 } else {
                     val toAdd = if (ListenTogether.state.value.inParty) {
                         val upcoming = (c.mediaItemCount - (c.currentMediaItemIndex + 1)).coerceAtLeast(0)
@@ -1823,8 +1825,21 @@ private fun BitChordApp(
             }
         }
     }
-    val addSongsToQueue: (List<Song>) -> Unit = { songs -> queueSongs(songs, false) }
-    val playSongsNext: (List<Song>) -> Unit = { songs -> queueSongs(songs, true) }
+    val addSongsToQueue: (List<Song>) -> Unit = { songs -> queueSongs(songs, false, true) }
+    val playSongsNext: (List<Song>) -> Unit = { songs -> queueSongs(songs, true, true) }
+
+    // Consume the one-shot queue handoff after the playlist has been persisted.
+    // It appends behind existing user-queued songs, before AutoPlay, and never
+    // starts playback when the player is idle.
+    val currentQueueSongs by rememberUpdatedState(queueSongs)
+    LaunchedEffect(scrobbleGenerateViewModel, controller) {
+        scrobbleGenerateViewModel.pendingStartMixQueue.collect { playlist ->
+            if (playlist != null) {
+                scrobbleGenerateViewModel.consumeStartMixQueue(playlist.id)
+                currentQueueSongs(playlist.songs, false, false)
+            }
+        }
+    }
 
     // ---- Links from outside the app ----
 
@@ -4580,6 +4595,12 @@ private fun BitChordApp(
                 onPlayNext = { playNext(song); songActions = null },
                 onAddToQueue = { addToQueue(song); songActions = null },
                 onStartRadio = { startRadio(song); songActions = null },
+                onStartMix = {
+                    songActions = null
+                    showScrobble = true
+                    selectedScrobbleTab = 1
+                    scrobbleGenerateViewModel.startMixWithSong(song)
+                },
                 // Stays open: the row it replaces itself with is the
                 // progress, and closing the sheet would hide the only
                 // answer to "did that work?".

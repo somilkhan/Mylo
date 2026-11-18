@@ -283,6 +283,23 @@ object LastFM {
         parseLastFmSimilarArtists(response)
     }
 
+    /** Public Last.fm similar-track graph used when YouTube radio is thin. */
+    suspend fun getSimilarTracks(
+        track: String,
+        artist: String,
+        limit: Int = 100,
+    ): Result<List<RankedTrack>> = statsResult {
+        val name = track.trim()
+        val by = artist.trim()
+        require(name.isNotEmpty()) { "Track name is missing" }
+        require(by.isNotEmpty()) { "Artist name is missing" }
+        val response = postAndRead(
+            "track.getsimilar",
+            extra = mapOf("track" to name, "artist" to by, "limit" to limit.coerceIn(1, 100).toString()),
+        )
+        parseLastFmSimilarTracks(response)
+    }
+
     suspend fun getTopTracks(
         username: String,
         period: String = "overall",
@@ -437,6 +454,14 @@ internal fun parseLastFmSimilarArtists(raw: String): List<String> = runCatching 
     rows.mapNotNull { it.text("name")?.trim()?.takeIf(String::isNotEmpty) }
         .distinctBy { it.lowercase(Locale.ROOT) }
 }.getOrDefault(emptyList())
+
+internal fun parseLastFmSimilarTracks(raw: String): List<LastFM.RankedTrack> =
+    parseLastFmChart(raw, "similartracks", "track").mapNotNull { row ->
+        val name = row.text("name")?.trim()?.takeIf(String::isNotEmpty) ?: return@mapNotNull null
+        val artist = row["artist"].artistName()?.trim().orEmpty()
+        if (artist.isEmpty()) return@mapNotNull null
+        LastFM.RankedTrack(name, artist, row.long("playcount"), row.artwork())
+    }
 
 internal fun parseLastFmTopTracks(raw: String): List<LastFM.RankedTrack> =
     parseLastFmChart(raw, "toptracks", "track").mapNotNull { row ->

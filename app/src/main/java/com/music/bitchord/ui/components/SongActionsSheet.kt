@@ -27,6 +27,7 @@ import androidx.compose.material.icons.automirrored.rounded.PlaylistPlay
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.automirrored.rounded.Undo
 import androidx.compose.material.icons.rounded.Album
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Bedtime
 import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.Check
@@ -194,6 +195,8 @@ fun SongActionsSheet(
      * held row itself above them.
      */
     presentation: SongActionsPresentation = SongActionsPresentation.Sheet,
+    /** Starts a generated mix from this playable song; null hides the action. */
+    onStartMix: (() -> Unit)? = null,
 ) {
     var pickingSleepTimer by remember { mutableStateOf(false) }
     val menu = presentation == SongActionsPresentation.Menu
@@ -296,6 +299,16 @@ fun SongActionsSheet(
 
         DownloadRow(song, palette, isOffline, onDownload)
         WebDavUploadRow(song, palette, isOffline, onUploadToWebDav)
+        if (onStartMix != null && !isOffline && song.videoId.isNotBlank() &&
+            !song.isVideo && song.title.isNotBlank() && song.artist.isNotBlank()
+        ) {
+            ActionRow(
+                icon = Icons.Rounded.AutoAwesome,
+                label = stringResource(R.string.start_mix_with_song),
+                accent = palette.accent,
+                onClick = onStartMix,
+            )
+        }
         ActionRow(
             icon = Icons.Rounded.Radio,
             label = stringResource(R.string.start_radio),

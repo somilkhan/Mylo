@@ -139,6 +139,33 @@ class PlaylistGenerationRulesTest {
         assertEquals(listOf(fresh, saved), result)
     }
 
+
+    @Test
+    fun startMixRequiresAPlayableOnlineSongWithCompleteIdentity() {
+        val valid = song("video-id", "Track", "Artist")
+        assertEquals(true, PlaylistGenerationRules.canStartMixWithSong(valid))
+        assertEquals(false, PlaylistGenerationRules.canStartMixWithSong(valid.copy(videoId = "")))
+        assertEquals(false, PlaylistGenerationRules.canStartMixWithSong(valid.copy(isVideo = true)))
+        assertEquals(false, PlaylistGenerationRules.canStartMixWithSong(valid.copy(localUri = "file:///music.mp3")))
+        assertEquals(false, PlaylistGenerationRules.canStartMixWithSong(valid.copy(title = " ")))
+        assertEquals(false, PlaylistGenerationRules.canStartMixWithSong(valid.copy(artist = "")))
+    }
+
+    @Test
+    fun similarTrackCurationRemovesSeedEditsAndDuplicateTitlesThenRelaxesArtistCaps() {
+        val seed = song("seed", "Deep Swim", "Seed Artist")
+        val candidates = listOf(
+            song("seed-copy", "Deep Swim (Official Video)", "Other Artist"),
+            song("a1", "First", "Seed Artist"),
+            song("a2", "Second", "Seed Artist"),
+            song("b1", "Unique", "Artist B"),
+            song("b2", "Unique (Live)", "Artist C"),
+            song("c1", "Third", "Artist C"),
+        )
+        val result = PlaylistGenerationRules.curateSimilarTracks(candidates, seed, 5)
+        assertEquals(listOf("a1", "a2", "b1", "c1"), result.map { it.videoId })
+    }
+
     private fun song(id: String, title: String, artist: String = "The Artist") =
         Song(videoId = id, title = title, artist = artist, thumbnailUrl = null)
 }

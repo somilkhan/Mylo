@@ -76,10 +76,10 @@ class PlaylistGenerationRepository(context: Context) {
             PlaylistGenerationMode.SIMILAR_TRACKS -> {
                 val seed = request.seedTrack
                     ?: throw IllegalArgumentException("Choose a track first")
-                require(seed.videoId.isNotBlank()) { "This track cannot start a YouTube Music radio" }
-                onProgress("Finding tracks related to ${seed.title}…")
-                YtMusicRepository.radio(seed.videoId).getOrThrow()
-                    .filterNot { it.videoId == seed.videoId }
+                require(PlaylistGenerationRules.canStartMixWithSong(seed)) {
+                    "This track cannot start a mix. Choose a playable YouTube Music song."
+                }
+                similarTrackCandidates(seed, target, onProgress)
             }
             PlaylistGenerationMode.SIMILAR_ARTISTS -> {
                 val artist = request.seedArtist.trim()
@@ -439,6 +439,79 @@ class PlaylistGenerationRepository(context: Context) {
         }
     }
 
+    /**
+     * LastWave's one-song radio flow: expand the tapped seed through YouTube
+     * Music radio, branch once from a related result when the first pool is
+     * thin, then use Last.fm similar tracks as a secondary source. Optional
+     * sources are isolated so one failed request cannot discard other results.
+     */
+    private suspend fun similarTrackCandidates(
+        seed: Song,
+        target: Int,
+        onProgress: (String) -> Unit,
+    ): List<Song> = supervisorScope {
+        onProgress("Finding tracks related to ${seed.title}…")
+        val primary = radioFromSeeds(listOf(seed))
+        val branchSeed = primary.firstOrNull { it.videoId != seed.videoId && !it.isVideo }
+        val branch = if (primary.size < 40 && branchSeed != null) {
+            onProgress("Expanding discovery from related tracks…")
+            radioFromSeeds(listOf(branchSeed))
+        } else {
+            emptyList()
+        }
+        val radioTracks = PlaylistGenerationRules.deduplicate(primary + branch)
+        val lastFmTracks = if (radioTracks.size < target && LastFM.isInitialized()) {
+            onProgress("Looking for more similar tracks…")
+            resolveLastFmSimilarTracks(seed, target)
+        } else {
+            emptyList()
+        }
+        val curated = PlaylistGenerationRules.curateSimilarTracks(
+            candidates = radioTracks + lastFmTracks,
+            seed = seed,
+            limit = target,
+        )
+        if (curated.isEmpty()) {
+            throw IllegalStateException("No similar tracks found for \"${seed.title}\". Try another song.")
+        }
+        curated
+    }
+
+    /** Resolve Last.fm names only when YouTube Music confirms the same title and artist. */
+    private suspend fun resolveLastFmSimilarTracks(seed: Song, target: Int): List<Song> {
+        val similar = LastFM.getSimilarTracks(
+            track = seed.title,
+            artist = seed.artist,
+            limit = minOf(100, target * 3),
+        ).getOrNull().orEmpty()
+        if (similar.isEmpty()) return emptyList()
+        return supervisorScope {
+            similar.map { track ->
+                async {
+                    try {
+                        val expected = PlaylistGenerationRules.trackKey(
+                            Song(videoId = "", title = track.name, artist = track.artist, thumbnailUrl = track.artworkUrl),
+                        )
+                        YtMusicRepository.search("${track.name} ${track.artist}", SearchFilter.SONGS)
+                            .getOrNull().orEmpty()
+                            .mapNotNull { result ->
+                                when (result) {
+                                    is SearchResult.TopTrack -> result.song
+                                    is SearchResult.Track -> result.song
+                                    is SearchResult.Browse -> null
+                                }
+                            }
+                            .firstOrNull { PlaylistGenerationRules.trackKey(it) == expected }
+                    } catch (cancellation: CancellationException) {
+                        throw cancellation
+                    } catch (_: Exception) {
+                        null
+                    }
+                }
+            }.awaitAll().filterNotNull()
+        }
+    }
+
     private suspend fun artistPagePools(artists: List<String>): List<List<Song>> = supervisorScope {
         artists.distinctBy { it.trim().lowercase(Locale.ROOT) }.map { artist ->
             async {
@@ -464,8 +537,14 @@ class PlaylistGenerationRepository(context: Context) {
         val pools = supervisorScope {
             distinctSeeds.map { seed ->
                 async {
-                    YtMusicRepository.radio(seed.videoId).getOrNull().orEmpty()
-                        .filterNot { it.videoId == seed.videoId }
+                    try {
+                        YtMusicRepository.radio(seed.videoId).getOrNull().orEmpty()
+                            .filterNot { it.videoId == seed.videoId }
+                    } catch (cancellation: CancellationException) {
+                        throw cancellation
+                    } catch (_: Exception) {
+                        emptyList()
+                    }
                 }
             }.awaitAll()
         }
@@ -576,7 +655,7 @@ internal object PlaylistGenerationRules {
             val key = trackKey(song)
             val artist = song.artist.trim().lowercase(Locale.ROOT)
                 .ifBlank { "unknown:${song.videoId}" }
-            if (artistCounts.getOrDefault(artist, 0) >= artistLimit) return@forEach
+            if (artistCounts.getOrDefault(artist, 0) >= artistLimit) return@candidateLoop
             if (pickedKeys.add(key)) {
                 picked += song
                 artistCounts[artist] = artistCounts.getOrDefault(artist, 0) + 1
@@ -613,6 +692,56 @@ internal object PlaylistGenerationRules {
         }
         return (fresh + saved).take(limit.coerceAtLeast(0))
     }
+
+    /** A one-song mix needs a playable, identifiable YouTube Music seed. */
+    fun canStartMixWithSong(song: Song): Boolean =
+        song.videoId.isNotBlank() &&
+            !song.isVideo &&
+            song.localUri == null &&
+            song.title.isNotBlank() &&
+            song.artist.isNotBlank()
+
+    /**
+     * Mirrors LastWave's similar-track curation: remove the seed and its edits,
+     * keep one result per normalized title, then relax artist limits only when
+     * the pool cannot otherwise reach the requested size.
+     */
+    fun curateSimilarTracks(candidates: List<Song>, seed: Song, limit: Int): List<Song> {
+        if (limit <= 0) return emptyList()
+        val seedTitle = cleanSimilarTitle(seed.title)
+        val distinctTitles = LinkedHashMap<String, Song>()
+        deduplicate(candidates).forEach { candidate ->
+            val title = cleanSimilarTitle(candidate.title)
+            if (title.isBlank() || title == seedTitle || trackKey(candidate) == trackKey(seed)) return@forEach
+            if (title !in distinctTitles) distinctTitles[title] = candidate
+        }
+        val unique = distinctTitles.values.toList()
+        fun withArtistCaps(seedArtistLimit: Int, otherArtistLimit: Int): List<Song> {
+            val counts = HashMap<String, Int>()
+            return unique.filter { song ->
+                val artist = normalize(song.artist).ifBlank { "unknown:${song.videoId}" }
+                val cap = if (artist == normalize(seed.artist)) seedArtistLimit else otherArtistLimit
+                val count = counts.getOrDefault(artist, 0)
+                if (count >= cap) false else {
+                    counts[artist] = count + 1
+                    true
+                }
+            }
+        }
+        val firstPass = withArtistCaps(seedArtistLimit = 1, otherArtistLimit = 2)
+        if (firstPass.size >= limit) return firstPass.take(limit)
+        val relaxed = withArtistCaps(seedArtistLimit = 2, otherArtistLimit = 3)
+        return (if (relaxed.size >= limit) relaxed else unique).take(limit)
+    }
+
+    private fun cleanSimilarTitle(value: String): String =
+        value.lowercase(Locale.ROOT)
+            .replace(Regex("""\s*[\(\[\{].*?[\)\]\}]"""), " ")
+            .replace(
+                Regex("""(?i)\b(official\s+video|official\s+audio|lyrics?|remix|mix|edit|bootleg|flip|vip|slowed|reverb|sped\s+up|speed\s+up|cover|version|live|acoustic|instrumental|feat\.?|ft\.?)\b.*$"""),
+                " ",
+            )
+            .filter(Char::isLetterOrDigit)
 
     fun trackKey(song: Song): String =
         "${normalize(song.title)}|${normalize(song.artist)}"

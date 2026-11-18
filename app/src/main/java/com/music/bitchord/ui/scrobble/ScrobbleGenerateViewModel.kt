@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import com.music.bitchord.data.generate.PlaylistGenerationRepository
 import com.music.bitchord.data.generate.PlaylistGenerationRequest
 import com.music.bitchord.data.generate.PlaylistGenerationMode
+import com.music.bitchord.data.generate.PlaylistGenerationRules
+import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.spotify.LocalPlaylist
 import com.music.bitchord.data.spotify.LocalPlaylistStore
 import kotlinx.coroutines.CancellationException
@@ -39,14 +41,46 @@ class ScrobbleGenerateViewModel(application: Application) : AndroidViewModel(app
     private val _uiState = MutableStateFlow(ScrobbleGenerateUiState())
     val uiState = _uiState.asStateFlow()
 
-    private val _savedPlaylistEvents = MutableSharedFlow<LocalPlaylist>(extraBufferCapacity = 1)
+    private val _savedPlaylistEvents = MutableSharedFlow<LocalPlaylist>(replay = 1, extraBufferCapacity = 1)
     val savedPlaylistEvents = _savedPlaylistEvents.asSharedFlow()
+
+    private val _pendingStartMixQueue = MutableStateFlow<LocalPlaylist?>(null)
+    val pendingStartMixQueue = _pendingStartMixQueue.asStateFlow()
 
     private var generationJob: Job? = null
     private var generationToken = 0L
+    private var queueMixOnSave = false
+
+    /** Starts a one-tap mix from any global song action without touching playback during discovery. */
+    fun startMixWithSong(song: Song) {
+        if (!PlaylistGenerationRules.canStartMixWithSong(song)) {
+            _uiState.update { it.copy(error = "This song cannot start a mix. Choose a playable track.") }
+            return
+        }
+        if (generationJob?.isActive == true) {
+            _uiState.update { it.copy(error = "A playlist is already being generated.") }
+            return
+        }
+        queueMixOnSave = true
+        generate(
+            PlaylistGenerationRequest(
+                mode = PlaylistGenerationMode.SIMILAR_TRACKS,
+                count = START_MIX_TRACK_COUNT,
+                seedTrack = song,
+            ),
+        )
+    }
+
+    fun consumeStartMixQueue(playlistId: String) {
+        if (_pendingStartMixQueue.value?.id == playlistId) {
+            _pendingStartMixQueue.value = null
+        }
+    }
 
     fun generate(request: PlaylistGenerationRequest) {
         if (generationJob?.isActive == true) return
+        val queueAfterSave = queueMixOnSave
+        queueMixOnSave = false
         val token = ++generationToken
         _uiState.update { it.copy(isGenerating = true, progress = "Preparing your playlist…", error = null, savedPlaylist = null) }
 
@@ -75,6 +109,7 @@ class ScrobbleGenerateViewModel(application: Application) : AndroidViewModel(app
                     },
                 )
                 if (generationToken == token) {
+                    if (queueAfterSave) _pendingStartMixQueue.value = playlist
                     _uiState.update { it.copy(savedPlaylist = playlist) }
                     _savedPlaylistEvents.tryEmit(playlist)
                 }
@@ -150,6 +185,7 @@ class ScrobbleGenerateViewModel(application: Application) : AndroidViewModel(app
 
     /** Cancels all in-flight generation before the Scrobble surface is dismissed. */
     fun cancelGeneration() {
+        queueMixOnSave = false
         generationToken++
         generationJob?.cancel()
         generationJob = null
@@ -167,6 +203,7 @@ class ScrobbleGenerateViewModel(application: Application) : AndroidViewModel(app
 
     private companion object {
         const val GENERATION_TIMEOUT_MS = 60_000L
+        const val START_MIX_TRACK_COUNT = 28
     }
 }
 
