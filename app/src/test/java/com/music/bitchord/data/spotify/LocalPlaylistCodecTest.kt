@@ -129,6 +129,34 @@ class LocalPlaylistCodecTest {
     }
 
     @Test
+    fun trackMoveUsesExpectedIdentityAndPreservesTheOtherOrder() {
+        val first = Song("first", "First", "Artist", null)
+        val second = Song("second", "Second", "Artist", null)
+        val third = Song("third", "Third", "Artist", null)
+
+        assertEquals(
+            listOf(second, first, third),
+            movePlaylistSong(listOf(first, second, third), 0, "first", 1),
+        )
+        assertEquals(
+            listOf(first, second, third),
+            movePlaylistSong(listOf(first, second, third), 0, "missing", 1),
+        )
+    }
+
+    @Test
+    fun trackRemovalRemovesOnlyTheRequestedSongSlot() {
+        val first = Song("first", "First", "Artist", null)
+        val second = Song("second", "Second", "Artist", null)
+
+        assertEquals(
+            listOf(second),
+            removePlaylistSong(listOf(first, second), 0, "first"),
+        )
+        assertNull(removePlaylistSong(listOf(first, second), 0, "missing"))
+    }
+
+    @Test
     fun appendsNewPlaylistSongsWithoutDuplicatesOrVideoUploads() {
         val existing = Song("existing", "Existing", "Artist", null)
         val next = Song("next", "Next", "Artist", null)
