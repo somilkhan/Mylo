@@ -1356,4 +1356,5 @@
     <string name="wear_os_done">Terminé</string>
     <string name="signed_by">Signé par %1$s</string>
     <string name="start_mix_with_song">Lancer un mix avec ce titre</string>
+    <string name="start_mix_with_song">Lancer un mix avec ce titre</string>
 </resources>
