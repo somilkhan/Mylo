@@ -1054,3 +1054,34 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 - Last.fm remote stats require a configured API client and a saved username. If unavailable, the page explains that the account must be connected in Settings; API failures have retry actions.
 - No changes to the existing Last.fm scrobble submission pipeline. The new methods are read-only.
 - Exact-head CI for the prior scroll/motion commit `712e0928ea09b316307db2ef5341a300f22059e9` is still being checked; this new statistics commit will need its own exact-head CI result. No physical-device validation is claimed.
+
+
+## 32. Playlist custom-cover implementation (2026-11-18)
+
+### Exact branch / verification state
+- Main-dev implementation commit: `d7b5439ab05203d2147f0308186aac153dff5cf9` (`feat(scrobble): add persistent custom playlist covers`).
+- Parent: `23d7afd235c075f083500ad0420ee38378c94545`.
+- Main-dev was rechecked at the implementation commit before this context update; `main` was not modified.
+- Exact-head Android CI run #1097 / run ID `44365743670` is in progress. Web unit tests and web typecheck have passed; Android SDK setup and desktop JDK setup are still running. Android unit tests and desktop compile/tests have not completed.
+- GitHub combined commit status currently has no posted status entries; use the exact Actions run above as the authoritative in-progress check.
+- No local Gradle build or physical-device validation was performed.
+
+### Code changed
+- `LocalPlaylist` now has optional `customCoverUri`; old JSON records decode it as null.
+- `LocalPlaylistCodec` reads/writes the optional URI; round-trip and legacy-default assertions were added to `LocalPlaylistCodecTest`.
+- `LocalPlaylistStore.setCustomCover` updates cover metadata without replacing playlist identity or songs.
+- Scrobble Playlists now opens Android's document picker for images, takes persistable read permission, displays the chosen cover in list/detail, and offers reset to automatic first-track artwork.
+- Only four files changed in the implementation commit: LocalPlaylistStore, LocalPlaylistCodec, ScrobbleContent and LocalPlaylistCodecTest.
+
+### Review / remaining risks
+- Existing playlist JSON remains backward compatible because the new field is optional.
+- Existing store persistence still uses SharedPreferences `apply()` and swallows serialization/write failures; this pre-existing persistence contract was not changed in this slice.
+- Persisted URI grants are not yet explicitly released when a cover is reset, replaced or its playlist is deleted; address this as part of the playlist lifecycle pass.
+- Codec tests were updated but are not yet confirmed passing; await exact-head CI.
+- No generated-playlist export, manual playlist creation, Generate Similar entry point, or playlist-level manual ordering was added in this slice.
+
+### Next
+1. Recheck and resolve exact-head CI run #1097.
+2. Continue the remaining LastWave playlist affordances by adapting them to Mylo's existing LocalPlaylistStore: export, custom/manual creation, Generate Similar, and playlist ordering. Preserve existing Library/detail/playback routes and do not introduce Room or remote playlist ownership.
+3. Add focused store/lifecycle tests, including URI permission cleanup and mutation failure behavior.
+4. Update this log after the next implementation commit. Keep `main` untouched.
