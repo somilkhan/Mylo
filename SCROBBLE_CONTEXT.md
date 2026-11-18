@@ -1634,3 +1634,15 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 - Android CI run #1174 / ID `44401745427` targets this exact commit and was pending when this note was written. No pass is claimed.
 - Hourly timeline period-integrity correction commit: `faa9d05daeba10604df27a2b55cbb1c8c416c719`; its CI run #1173 / ID `44401577805` was still in progress. The later #1174 run should be checked for full verification of all code at its head.
 - Continue only on `Main-dev`; `main` remains `11478fde56f1817cb777b296e60907359086f383`.
+
+
+## 57. Personalized weighted Mix port (2026-11-19)
+
+- Traced LastWave `GenerateRepository.fetchMix`: primary YouTube discovery/radio and home-feed sources, local listening/library seeds, source weights (4/3/2/1), highest-weight duplicate retention, and a three-per-artist diversity pass before fallback.
+- Mylo's old Mix only concatenated an optional seed radio, Quick Picks and Home shelves. It did not seed radio from local Replay/history or rank sources by trust/priority.
+- Updated Mylo Mix to seed up to six YouTube Music radio pools from the selected seed, actual Replay top tracks, local recent history, and (when signed in) account history/liked songs. It blends radio + Quick Picks at weight 4, local/account taste at weight 3, and Home shelves at weight 1.
+- Added pure `PlaylistGenerationRules.weightedBlend`: duplicate title/artist identities keep the highest source weight, candidates are ordered by weight, artist output is capped at three where possible, and the cap is relaxed only to fill a thin pool. Existing downstream explicit exclusions, saved-playlist freshness ordering and single playlist save remain in control.
+- Added unit coverage for weight precedence, cross-video duplicate identity, artist diversity and thin-pool fallback.
+- Implementation commit: `067e3f66d36e08d02fa77fd595d5ea0b937dbe97`; follow-up test/label cleanup and this documentation update are in the current commit.
+- Earlier CI #1174 / ID `44401745427` was pending for similar-artist commit `441aa6720ecaaca78ea599449d24f36d3d9d613f`; the latest combined code must be checked on its own CI head. No pass is claimed.
+- Continue only on `Main-dev`; `main` remains `11478fde56f1817cb777b296e60907359086f383`.

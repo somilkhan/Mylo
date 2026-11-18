@@ -419,8 +419,8 @@ internal object PlaylistGenerationRules {
         if (limit <= 0) return emptyList()
         val bestByTrack = LinkedHashMap<String, Pair<Song, Int>>()
         pools.forEach { (tracks, weight) ->
-            deduplicate(tracks).forEach { song ->
-                if (song.title.isBlank() || song.artist.isBlank()) return@forEach
+            deduplicate(tracks).forEach songLoop@{ song ->
+                if (song.title.isBlank() || song.artist.isBlank()) return@songLoop
                 val key = trackKey(song)
                 val current = bestByTrack[key]
                 if (current == null || weight > current.second) {
@@ -434,8 +434,8 @@ internal object PlaylistGenerationRules {
         val artistCounts = HashMap<String, Int>()
         val artistLimit = maxPerArtist.coerceAtLeast(1)
 
-        ordered.forEach { (song, _) ->
-            if (picked.size >= limit) return@forEach
+        ordered.forEach candidateLoop@{ (song, _) ->
+            if (picked.size >= limit) return@candidateLoop
             val key = trackKey(song)
             val artist = song.artist.trim().lowercase(Locale.ROOT)
                 .ifBlank { "unknown:${song.videoId}" }
@@ -448,8 +448,8 @@ internal object PlaylistGenerationRules {
 
         // A thin pool should still return the requested count when unique tracks exist.
         if (picked.size < limit) {
-            ordered.forEach { (song, _) ->
-                if (picked.size >= limit) return@forEach
+            ordered.forEach fillLoop@{ (song, _) ->
+                if (picked.size >= limit) return@fillLoop
                 if (pickedKeys.add(trackKey(song))) picked += song
             }
         }

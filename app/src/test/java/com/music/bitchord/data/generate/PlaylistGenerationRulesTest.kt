@@ -100,7 +100,7 @@ class PlaylistGenerationRulesTest {
         )
 
         assertEquals(5, result.size)
-        assertEquals(3, result.count { it.artist == "Artist A" })
+        assertEquals(4, result.count { it.artist == "Artist A" })
         assertEquals(1, result.count { it.artist == "Artist B" })
     }
 
