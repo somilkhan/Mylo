@@ -27,6 +27,7 @@ import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Sort
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.MoreVert
@@ -75,7 +76,10 @@ import com.music.bitchord.data.spotify.LocalPlaylistStore
 import com.music.bitchord.data.spotify.LocalPlaylistSortMode
 import com.music.bitchord.data.spotify.sortLocalPlaylists
 import com.music.bitchord.data.stats.ReplayPeriod
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 
 @Composable
 fun ScrobbleGenerateContent(
@@ -614,6 +618,47 @@ private fun PlaylistDetailContent(
     onRename: () -> Unit,
     onDelete: () -> Unit,
 ) {
+    var addTracksExpanded by remember(playlist.id) { mutableStateOf(false) }
+    var addTrackQuery by remember(playlist.id) { mutableStateOf("") }
+    var addTrackResults by remember(playlist.id) { mutableStateOf<List<Song>>(emptyList()) }
+    var addTrackLoading by remember(playlist.id) { mutableStateOf(false) }
+    var addTrackError by remember(playlist.id) { mutableStateOf<String?>(null) }
+    var addTrackMessage by remember(playlist.id) { mutableStateOf<String?>(null) }
+    val existingVideoIds = remember(playlist.songs) { playlist.songs.mapTo(hashSetOf()) { it.videoId } }
+
+    LaunchedEffect(playlist.id, addTracksExpanded, addTrackQuery) {
+        val query = addTrackQuery.trim()
+        if (!addTracksExpanded || query.length < 2) {
+            addTrackResults = emptyList()
+            addTrackError = null
+            addTrackLoading = false
+            return@LaunchedEffect
+        }
+        delay(300)
+        addTrackLoading = true
+        addTrackError = null
+        try {
+            val response = YtMusicRepository.search(query, SearchFilter.SONGS).getOrThrow()
+            currentCoroutineContext().ensureActive()
+            addTrackResults = response.mapNotNull { result ->
+                when (result) {
+                    is SearchResult.TopTrack -> result.song
+                    is SearchResult.Track -> result.song
+                    is SearchResult.Browse -> null
+                }
+            }.filter { it.videoId.isNotBlank() && !it.isVideo }
+                .distinctBy { it.videoId }
+                .take(8)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            addTrackResults = emptyList()
+            addTrackError = error.message ?: "Couldn't search YouTube Music"
+        } finally {
+            addTrackLoading = false
+        }
+    }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(
@@ -628,6 +673,16 @@ private fun PlaylistDetailContent(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = onBack) { Text("Back") }
                 Spacer(Modifier.weight(1f))
+                TextButton(
+                    onClick = {
+                        addTracksExpanded = !addTracksExpanded
+                        if (!addTracksExpanded) {
+                            addTrackQuery = ""
+                            addTrackResults = emptyList()
+                            addTrackMessage = null
+                        }
+                    },
+                ) { Text(if (addTracksExpanded) "Done" else "Add tracks") }
                 IconButton(onClick = onRename) { Icon(Icons.Rounded.Edit, contentDescription = "Rename playlist") }
                 IconButton(onClick = onDelete) { Icon(Icons.Rounded.DeleteOutline, contentDescription = "Delete playlist") }
             }
@@ -644,6 +699,66 @@ private fun PlaylistDetailContent(
                     Icon(Icons.Rounded.Shuffle, contentDescription = null)
                     Spacer(Modifier.width(6.dp))
                     Text("Shuffle")
+                }
+            }
+        }
+        if (addTracksExpanded) {
+            item(key = "add_tracks_search") {
+                OutlinedTextField(
+                    value = addTrackQuery,
+                    onValueChange = {
+                        addTrackQuery = it
+                        addTrackError = null
+                        addTrackMessage = null
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text("Search YouTube Music") },
+                    leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
+                )
+                if (addTrackLoading) LinearProgressIndicator(Modifier.fillMaxWidth())
+                addTrackError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                addTrackMessage?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
+                if (!addTrackLoading && addTrackError == null && addTrackQuery.trim().length >= 2 && addTrackResults.isEmpty()) {
+                    Text("No tracks found", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            items(addTrackResults, key = { "add-${it.videoId}" }) { song ->
+                Row(
+                    Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    AsyncImage(
+                        model = song.thumbnailUrl,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.size(44.dp).clip(RoundedCornerShape(8.dp)),
+                    )
+                    Column(
+                        Modifier.weight(1f).padding(horizontal = 10.dp),
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
+                        Text(song.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(
+                            song.artist,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    val alreadyAdded = song.videoId in existingVideoIds
+                    TextButton(
+                        enabled = !alreadyAdded,
+                        onClick = {
+                            val added = LocalPlaylistStore.addSongIfAbsent(playlist.id, song)
+                            addTrackMessage = when {
+                                added -> "Added ${song.title}"
+                                LocalPlaylistStore.getPlaylist(playlist.id) == null -> "Playlist no longer exists"
+                                else -> "Track already in this playlist"
+                            }
+                        },
+                    ) { Text(if (alreadyAdded) "Added" else "Add") }
                 }
             }
         }
