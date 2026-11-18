@@ -4,7 +4,11 @@ import android.content.Context
 import android.content.SharedPreferences
 import com.music.bitchord.data.model.Song
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import java.util.UUID
 
 data class LocalPlaylist(
@@ -27,6 +31,7 @@ object LocalPlaylistStore {
     private const val KEY_PLAYLISTS = "playlists_json"
 
     private lateinit var prefs: SharedPreferences
+    private val mutationMutex = Mutex()
 
     private val _playlists = MutableStateFlow<List<LocalPlaylist>>(emptyList())
     val playlists = _playlists.asStateFlow()
@@ -38,10 +43,10 @@ object LocalPlaylistStore {
         load()
     }
 
-    @Synchronized
-    fun reload() = load()
+    suspend fun reload() = mutationMutex.withLock {
+        withContext(Dispatchers.IO) { load() }
+    }
 
-    @Synchronized
     private fun load() {
         if (!this::prefs.isInitialized) {
             _loadError.value = "Local playlist storage is not initialized"
@@ -56,12 +61,11 @@ object LocalPlaylistStore {
         }
     }
 
-    @Synchronized
-    fun savePlaylist(
+    suspend fun savePlaylist(
         title: String,
         songs: List<Song>,
         generationMode: String? = null,
-    ): LocalPlaylist {
+    ): LocalPlaylist = mutationMutex.withLock {
         val playlist = LocalPlaylist(
             id = "sp_local_" + UUID.randomUUID(),
             title = title,
@@ -72,157 +76,143 @@ object LocalPlaylistStore {
         val updated = listOf(playlist) + _playlists.value
         check(persist(updated)) { "Couldn't save playlist to device storage." }
         _playlists.value = updated
-        return playlist
+        playlist
     }
 
-    @Synchronized
-    fun deletePlaylist(id: String): Boolean {
+    suspend fun deletePlaylist(id: String): Boolean = mutationMutex.withLock {
         val current = _playlists.value
         val updated = current.filterNot { it.id == id || it.browseId == id || it.id == id.removePrefix("local:playlist:") }
-        if (updated.size == current.size) return false
-        if (!persist(updated)) return false
+        if (updated.size == current.size || !persist(updated)) return@withLock false
         _playlists.value = updated
-        return true
+        true
     }
 
-    @Synchronized
-    fun renamePlaylist(id: String, newTitle: String): Boolean {
+    suspend fun renamePlaylist(id: String, newTitle: String): Boolean = mutationMutex.withLock {
         val cleanId = id.removePrefix("local:playlist:").removePrefix("VL")
         val current = _playlists.value
         val index = current.indexOfFirst { it.id == cleanId || it.id == id || it.browseId == id }
-        if (index < 0) return false
+        if (index < 0) return@withLock false
         val updated = current.toMutableList().apply {
             this[index] = this[index].copy(title = newTitle)
         }
-        if (!persist(updated)) return false
+        if (!persist(updated)) return@withLock false
         _playlists.value = updated
-        return true
+        true
     }
 
-    /**
-     * Replaces a playlist's tracks without changing its identity or generation metadata.
-     * Returns false when the playlist is missing or the persisted write fails.
-     */
-    @Synchronized
-    fun updatePlaylistSongs(id: String, songs: List<Song>): Boolean {
+    /** Replaces tracks without changing playlist identity or metadata. */
+    suspend fun updatePlaylistSongs(id: String, songs: List<Song>): Boolean = mutationMutex.withLock {
         val cleanId = normalizeId(id)
-        val index = _playlists.value.indexOfFirst { it.id == cleanId || it.browseId == id }
-        if (index < 0) return false
-        val updated = _playlists.value.toMutableList().apply {
+        val current = _playlists.value
+        val index = current.indexOfFirst { it.id == cleanId || it.browseId == id }
+        if (index < 0) return@withLock false
+        val updated = current.toMutableList().apply {
             this[index] = this[index].copy(songs = songs.toList())
         }
-        if (!persist(updated)) return false
+        if (!persist(updated)) return@withLock false
         _playlists.value = updated
-        return true
+        true
     }
 
-    /**
-     * Adds one catalogue track without duplicating its YouTube video identity.
-     * Returns false if the playlist is missing, the track is duplicate/invalid, or persistence fails.
-     */
-    @Synchronized
-    fun addSongIfAbsent(id: String, song: Song): Boolean {
+    /** Adds one catalogue track, rejecting invalid ids and duplicate YouTube identities. */
+    suspend fun addSongIfAbsent(id: String, song: Song): Boolean = mutationMutex.withLock {
         val cleanId = normalizeId(id)
-        val index = _playlists.value.indexOfFirst { it.id == cleanId || it.browseId == id }
-        if (index < 0) return false
-        val existing = _playlists.value[index]
-        val updatedSongs = appendUniquePlaylistSong(existing.songs, song) ?: return false
-        val updated = _playlists.value.toMutableList().apply {
+        val current = _playlists.value
+        val index = current.indexOfFirst { it.id == cleanId || it.browseId == id }
+        if (index < 0) return@withLock false
+        val existing = current[index]
+        val updatedSongs = appendUniquePlaylistSong(existing.songs, song) ?: return@withLock false
+        val updated = current.toMutableList().apply {
             this[index] = existing.copy(songs = updatedSongs)
         }
-        if (!persist(updated)) return false
+        if (!persist(updated)) return@withLock false
         _playlists.value = updated
-        return true
+        true
     }
 
-    /** Pin state is metadata only; existing playlist order is left untouched. */
-    @Synchronized
-    fun setPinned(id: String, pinned: Boolean): Boolean {
+    suspend fun setPinned(id: String, pinned: Boolean): Boolean = mutationMutex.withLock {
         val cleanId = normalizeId(id)
-        val index = _playlists.value.indexOfFirst { it.id == cleanId || it.browseId == id }
-        if (index < 0) return false
-        val updated = _playlists.value.toMutableList().apply {
+        val current = _playlists.value
+        val index = current.indexOfFirst { it.id == cleanId || it.browseId == id }
+        if (index < 0) return@withLock false
+        val updated = current.toMutableList().apply {
             this[index] = this[index].copy(isPinned = pinned)
         }
-        if (!persist(updated)) return false
+        if (!persist(updated)) return@withLock false
         _playlists.value = updated
-        return true
+        true
     }
 
-    /** Stores a user-selected artwork URI without changing playlist identity or tracks. */
-    @Synchronized
-    fun setCustomCover(id: String, uri: String?): Boolean {
+    suspend fun setCustomCover(id: String, uri: String?): Boolean = mutationMutex.withLock {
         val cleanId = normalizeId(id)
-        val index = _playlists.value.indexOfFirst { it.id == cleanId || it.browseId == id }
-        if (index < 0) return false
-        val updated = _playlists.value.toMutableList().apply {
+        val current = _playlists.value
+        val index = current.indexOfFirst { it.id == cleanId || it.browseId == id }
+        if (index < 0) return@withLock false
+        val updated = current.toMutableList().apply {
             this[index] = this[index].copy(customCoverUri = uri)
         }
-        if (!persist(updated)) return false
+        if (!persist(updated)) return@withLock false
         _playlists.value = updated
-        return true
+        true
     }
 
-    /** Moves a playlist within the current order, clamping the destination safely. */
-    @Synchronized
-    fun movePlaylist(id: String, destinationIndex: Int): Boolean {
+    suspend fun movePlaylist(id: String, destinationIndex: Int): Boolean = mutationMutex.withLock {
         val cleanId = normalizeId(id)
         val current = _playlists.value
         val from = current.indexOfFirst { it.id == cleanId || it.browseId == id }
-        if (from < 0 || current.isEmpty()) return false
+        if (from < 0 || current.isEmpty()) return@withLock false
         val to = destinationIndex.coerceIn(0, current.lastIndex)
-        if (from == to) return true
+        if (from == to) return@withLock true
         val updated = current.toMutableList()
         val moved = updated.removeAt(from)
         updated.add(to, moved)
-        if (!persist(updated)) return false
+        if (!persist(updated)) return@withLock false
         _playlists.value = updated
-        return true
+        true
     }
 
-    @Synchronized
-    fun moveSong(id: String, sourceIndex: Int, expectedVideoId: String, direction: Int): Boolean {
+    suspend fun moveSong(id: String, sourceIndex: Int, expectedVideoId: String, direction: Int): Boolean = mutationMutex.withLock {
         val cleanId = normalizeId(id)
-        val index = _playlists.value.indexOfFirst { it.id == cleanId || it.browseId == id }
-        if (index < 0) return false
-        val current = _playlists.value[index]
-        val songs = movePlaylistSong(current.songs, sourceIndex, expectedVideoId, direction) ?: return false
-        if (songs == current.songs) return true
-        val updated = _playlists.value.toMutableList().apply {
-            this[index] = current.copy(songs = songs)
+        val current = _playlists.value
+        val index = current.indexOfFirst { it.id == cleanId || it.browseId == id }
+        if (index < 0) return@withLock false
+        val playlist = current[index]
+        val songs = movePlaylistSong(playlist.songs, sourceIndex, expectedVideoId, direction) ?: return@withLock false
+        if (songs == playlist.songs) return@withLock true
+        val updated = current.toMutableList().apply {
+            this[index] = playlist.copy(songs = songs)
         }
-        if (!persist(updated)) return false
+        if (!persist(updated)) return@withLock false
         _playlists.value = updated
-        return true
+        true
     }
 
-    @Synchronized
-    fun removeSong(id: String, sourceIndex: Int, expectedVideoId: String): Boolean {
+    suspend fun removeSong(id: String, sourceIndex: Int, expectedVideoId: String): Boolean = mutationMutex.withLock {
         val cleanId = normalizeId(id)
-        val index = _playlists.value.indexOfFirst { it.id == cleanId || it.browseId == id }
-        if (index < 0) return false
-        val current = _playlists.value[index]
-        val songs = removePlaylistSong(current.songs, sourceIndex, expectedVideoId) ?: return false
-        val updated = _playlists.value.toMutableList().apply {
-            this[index] = current.copy(songs = songs)
+        val current = _playlists.value
+        val index = current.indexOfFirst { it.id == cleanId || it.browseId == id }
+        if (index < 0) return@withLock false
+        val playlist = current[index]
+        val songs = removePlaylistSong(playlist.songs, sourceIndex, expectedVideoId) ?: return@withLock false
+        val updated = current.toMutableList().apply {
+            this[index] = playlist.copy(songs = songs)
         }
-        if (!persist(updated)) return false
+        if (!persist(updated)) return@withLock false
         _playlists.value = updated
-        return true
+        true
     }
 
     fun getPlaylist(id: String): LocalPlaylist? {
-        val cleanId = id.removePrefix("local:playlist:").removePrefix("VL")
+        val cleanId = normalizeId(id)
         return _playlists.value.firstOrNull { it.id == cleanId || it.id == id || it.browseId == id }
     }
 
     private fun normalizeId(id: String): String =
         id.removePrefix("local:playlist:").removePrefix("VL")
 
-    @Synchronized
-    private fun persist(list: List<LocalPlaylist>): Boolean {
-        if (!this::prefs.isInitialized) return false
-        return runCatching {
+    private suspend fun persist(list: List<LocalPlaylist>): Boolean = withContext(Dispatchers.IO) {
+        if (!this@LocalPlaylistStore::prefs.isInitialized) return@withContext false
+        runCatching {
             prefs.edit().putString(KEY_PLAYLISTS, LocalPlaylistCodec.encode(list)).commit()
         }.getOrDefault(false)
     }
