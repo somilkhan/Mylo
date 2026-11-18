@@ -466,6 +466,7 @@ fun ScrobblePlaylistsContent(
                     PlaylistRow(
                         playlist = playlist,
                         index = index,
+                        lastIndex = visible.lastIndex,
                         showReorder = sortMode == LocalPlaylistSortMode.CUSTOM && search.isBlank(),
                         onMoveUp = { LocalPlaylistStore.movePlaylist(playlist.id, index - 1) },
                         onMoveDown = { LocalPlaylistStore.movePlaylist(playlist.id, index + 1) },
@@ -532,6 +533,7 @@ fun ScrobblePlaylistsContent(
 private fun PlaylistRow(
     playlist: LocalPlaylist,
     index: Int,
+    lastIndex: Int,
     showReorder: Boolean,
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
@@ -584,6 +586,7 @@ private fun PlaylistRow(
                     DropdownMenuItem(
                         text = { Text("Move down") },
                         leadingIcon = { Icon(Icons.Rounded.ArrowDownward, contentDescription = null) },
+                        enabled = index < lastIndex,
                         onClick = { menuExpanded = false; onMoveDown() },
                     )
                 }
