@@ -67,6 +67,29 @@ class LastFMStatsParserTest {
     }
 
     @Test
+    fun parsesSimilarArtistsFromArrayAndDeduplicatesNames() {
+        val artists = parseLastFmSimilarArtists(
+            """{"similarartists":{"artist":[
+                {"name":"Artist A","match":"0.9"},
+                {"name":"artist a","match":"0.7"},
+                {"name":"Artist B","match":"0.5"}
+            ]}}""",
+        )
+
+        assertEquals(listOf("Artist A", "Artist B"), artists)
+    }
+
+    @Test
+    fun parsesSingleSimilarArtistAndRejectsMalformedPayloads() {
+        assertEquals(
+            listOf("Artist A"),
+            parseLastFmSimilarArtists("""{"similarartists":{"artist":{"name":"Artist A"}}}"""),
+        )
+        assertTrue(parseLastFmSimilarArtists("not-json").isEmpty())
+        assertTrue(parseLastFmSimilarArtists("""{"similarartists":{}}""").isEmpty())
+    }
+
+    @Test
     fun malformedOrMissingChartPayloadsReturnEmptyResults() {
         assertNull(parseLastFmUserStats("not-json"))
         assertTrue(parseLastFmTopTracks("""{"toptracks":{}}""").isEmpty())

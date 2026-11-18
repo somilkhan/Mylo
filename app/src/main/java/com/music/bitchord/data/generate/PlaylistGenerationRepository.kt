@@ -3,6 +3,7 @@ package com.music.bitchord.data.generate
 import android.content.Context
 import com.music.bitchord.auth.SignedIn
 import com.music.bitchord.data.ListeningHistory
+import com.music.bitchord.data.scrobbling.LastFM
 import com.music.bitchord.data.YtMusicRepository
 import com.music.bitchord.data.innertube.InnertubeParser
 import com.music.bitchord.data.model.SearchFilter
@@ -82,10 +83,41 @@ class PlaylistGenerationRepository(context: Context) {
             PlaylistGenerationMode.SIMILAR_ARTISTS -> {
                 val artist = request.seedArtist.trim()
                 require(artist.isNotEmpty()) { "Enter an artist name" }
-                onProgress("Finding ${artist}'s music…")
-                val browseId = YtMusicRepository.findArtistPageId(artist).getOrThrow()
-                    ?: throw IllegalStateException("Couldn't find that exact artist")
-                YtMusicRepository.artistPage(browseId).getOrThrow().songs
+                onProgress("Finding artists similar to $artist…")
+
+                // LastWave's source is artist.getsimilar -> each similar artist's top tracks.
+                // Mylo resolves those names through its existing YouTube Music artist pages,
+                // so every returned row is already playable and retains Mylo's Song model.
+                val similarArtists = if (LastFM.isInitialized()) {
+                    LastFM.getSimilarArtists(artist, limit = 20).getOrNull().orEmpty().take(8)
+                } else {
+                    emptyList()
+                }
+                val artistNames = similarArtists.ifEmpty { listOf(artist) }
+                onProgress("Loading tracks from ${artistNames.size} artists…")
+                val artistPools = supervisorScope {
+                    artistNames.map { name ->
+                        async {
+                            try {
+                                val browseId = YtMusicRepository.findArtistPageId(name).getOrNull()
+                                    ?: return@async emptyList()
+                                YtMusicRepository.artistPage(browseId).getOrNull()?.songs.orEmpty()
+                            } catch (cancellation: CancellationException) {
+                                throw cancellation
+                            } catch (_: Exception) {
+                                emptyList()
+                            }
+                        }
+                    }.awaitAll()
+                }
+                val tracks = PlaylistGenerationRules.interleave(artistPools)
+                if (tracks.isNotEmpty()) tracks else {
+                    // A failed Last.fm graph or unresolvable similar artists must not
+                    // break the old exact-artist path.
+                    val browseId = YtMusicRepository.findArtistPageId(artist).getOrThrow()
+                        ?: throw IllegalStateException("Couldn't find that artist or similar artists")
+                    YtMusicRepository.artistPage(browseId).getOrThrow().songs
+                }
             }
             PlaylistGenerationMode.TAG -> {
                 val tag = request.tag.trim()

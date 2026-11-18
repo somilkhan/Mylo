@@ -269,6 +269,20 @@ object LastFM {
         parseLastFmUserStats(response) ?: error("Last.fm returned an invalid user profile")
     }
 
+    /** Similar-artist discovery uses the public Last.fm graph; no user session is required. */
+    suspend fun getSimilarArtists(
+        artist: String,
+        limit: Int = 20,
+    ): Result<List<String>> = statsResult {
+        val name = artist.trim()
+        require(name.isNotEmpty()) { "Artist name is missing" }
+        val response = postAndRead(
+            "artist.getsimilar",
+            extra = mapOf("artist" to name, "limit" to limit.coerceIn(1, 100).toString()),
+        )
+        parseLastFmSimilarArtists(response)
+    }
+
     suspend fun getTopTracks(
         username: String,
         period: String = "overall",
@@ -411,6 +425,18 @@ internal fun parseLastFmUserStats(raw: String): LastFM.UserStats? = runCatching 
         avatarUrl = user.artwork(),
     )
 }.getOrNull()
+
+internal fun parseLastFmSimilarArtists(raw: String): List<String> = runCatching {
+    val root = Json.parseToJsonElement(raw) as? JsonObject ?: return emptyList()
+    val chart = root["similarartists"] as? JsonObject ?: return emptyList()
+    val rows = when (val value = chart["artist"]) {
+        is JsonArray -> value.mapNotNull { it as? JsonObject }
+        is JsonObject -> listOf(value)
+        else -> emptyList()
+    }
+    rows.mapNotNull { it.text("name")?.trim()?.takeIf(String::isNotEmpty) }
+        .distinctBy { it.lowercase(Locale.ROOT) }
+}.getOrDefault(emptyList())
 
 internal fun parseLastFmTopTracks(raw: String): List<LastFM.RankedTrack> =
     parseLastFmChart(raw, "toptracks", "track").mapNotNull { row ->
