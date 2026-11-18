@@ -229,10 +229,7 @@ object LocalPlaylistStore {
 }
 
 
-/**
- * Appends a catalogue track to a local playlist, rejecting empty ids, video
- * uploads and duplicate YouTube identities while preserving existing order.
- */
+/** Moves one playlist row by its stable video identity without replacing a stale snapshot. */
 internal fun movePlaylistSong(
     songs: List<Song>,
     sourceIndex: Int,
@@ -250,6 +247,7 @@ internal fun movePlaylistSong(
     return songs.toMutableList().apply { add(to, removeAt(from)) }
 }
 
+/** Removes one playlist row by its stable video identity. */
 internal fun removePlaylistSong(
     songs: List<Song>,
     sourceIndex: Int,
@@ -264,6 +262,10 @@ internal fun removePlaylistSong(
     return songs.toMutableList().apply { removeAt(index) }
 }
 
+/**
+ * Appends a catalogue track to a local playlist, rejecting empty ids, video
+ * uploads and duplicate YouTube identities while preserving existing order.
+ */
 internal fun appendUniquePlaylistSong(existing: List<Song>, candidate: Song): List<Song>? {
     val videoId = candidate.videoId.trim()
     if (videoId.isEmpty() || candidate.isVideo || existing.any { it.videoId == videoId }) return null
