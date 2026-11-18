@@ -11,7 +11,11 @@ import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.spotify.LocalPlaylistStore
 import com.music.bitchord.data.stats.ListeningStats
 import com.music.bitchord.data.stats.ReplayPeriod
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
@@ -174,6 +178,76 @@ class PlaylistGenerationRepository(context: Context) {
         return result
     }
 
+    /**
+     * Creates a fresh mix inspired by a saved playlist. The source playlist is
+     * never modified or repeated; up to three distinct-artist seeds fan out to
+     * YouTube Music radio, with Quick Picks/Home used only when radio is thin.
+     */
+    suspend fun generateSimilar(
+        sourceSongs: List<Song>,
+        count: Int = 30,
+        onProgress: (String) -> Unit = {},
+    ): List<Song> {
+        val target = count.coerceIn(MIN_TRACKS, MAX_TRACKS)
+        val sourceTracks = PlaylistGenerationRules.deduplicate(sourceSongs)
+        require(sourceTracks.isNotEmpty()) { "This playlist has no playable tracks to use as seeds." }
+
+        val seeds = (sourceTracks.distinctBy { it.artist.trim().lowercase() } + sourceTracks)
+            .distinctBy { it.videoId }
+            .take(3)
+        onProgress("Building a mix from ${seeds.size} playlist seeds…")
+
+        val radioPools = supervisorScope {
+            seeds.map { seed ->
+                async {
+                    try {
+                        YtMusicRepository.radio(seed.videoId).getOrThrow()
+                    } catch (cancellation: CancellationException) {
+                        throw cancellation
+                    } catch (_: Exception) {
+                        emptyList()
+                    }
+                }
+            }.awaitAll()
+        }
+
+        val sourceVideoIds = sourceSongs.mapTo(HashSet()) { it.videoId }
+        val sourceTrackKeys = sourceSongs.mapTo(HashSet(), PlaylistGenerationRules::trackKey)
+        var candidates = PlaylistGenerationRules.excludeHeard(
+            candidates = PlaylistGenerationRules.deduplicate(PlaylistGenerationRules.interleave(radioPools)),
+            heardVideoIds = sourceVideoIds,
+            heardTrackKeys = sourceTrackKeys,
+        )
+
+        if (candidates.size < target) {
+            onProgress("Widening the mix with YouTube Music recommendations…")
+            val fallback = supervisorScope {
+                val picks = async { YtMusicRepository.quickPicks().getOrNull().orEmpty() }
+                val home = async { homeSongs() }
+                picks.await() + home.await()
+            }
+            candidates = PlaylistGenerationRules.deduplicate(candidates + fallback)
+            candidates = PlaylistGenerationRules.excludeHeard(
+                candidates = candidates,
+                heardVideoIds = sourceVideoIds,
+                heardTrackKeys = sourceTrackKeys,
+            )
+        }
+
+        currentCoroutineContext().ensureActive()
+        val savedSongs = LocalPlaylistStore.playlists.value.flatMap { it.songs }
+        val result = PlaylistGenerationRules.prioritizeFresh(
+            candidates = candidates,
+            savedVideoIds = savedSongs.mapTo(HashSet()) { it.videoId },
+            savedTrackKeys = savedSongs.mapTo(HashSet(), PlaylistGenerationRules::trackKey),
+            limit = target,
+        )
+        if (result.size < MIN_TRACKS) {
+            throw IllegalStateException("Not enough new tracks found for this playlist. Try another source playlist.")
+        }
+        return result
+    }
+
     private suspend fun neverHeardCandidates(onProgress: (String) -> Unit): List<Song> {
         onProgress("Checking your listening history…")
         val heard = heardTracks()
@@ -229,6 +303,15 @@ class PlaylistGenerationRepository(context: Context) {
 
 /** Pure candidate rules, kept separate so identity/exclusion behaviour is unit-testable. */
 internal object PlaylistGenerationRules {
+    fun interleave(pools: List<List<Song>>): List<Song> {
+        val longest = pools.maxOfOrNull { it.size } ?: return emptyList()
+        return buildList {
+            for (index in 0 until longest) {
+                pools.forEach { pool -> pool.getOrNull(index)?.let(::add) }
+            }
+        }
+    }
+
     fun deduplicate(candidates: List<Song>): List<Song> =
         candidates.asSequence()
             .filter { it.videoId.isNotBlank() && !it.isVideo }
