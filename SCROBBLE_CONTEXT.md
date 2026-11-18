@@ -1463,3 +1463,12 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 ### Verification
 - Source-level review only at this commit. Android, desktop and web CI plus device animation checks are still required; no pass is claimed.
 - main remains untouched; work only on Main-dev.
+
+
+## 48. Statistics count-up using Mylo Replay data (2026-11-19)
+
+- Added count-up motion to the real Mylo Replay totals shown in the Statistics surface: total plays and listening minutes. The displayed values are derived from ReplaySummary; no placeholder counts or external totals are introduced.
+- Animation runs only when ReplayScreen is hosted with the Statistics heading. Standalone Replay surfaces retain their existing values and behavior.
+- Reduce animation snaps both values directly to their real totals without changing the data or layout.
+- The split-bar remains unimplemented: current ReplaySummary has totals and ranked songs/artists/albums/genres, but no approved source/category definition or denominator for the bar. Do not infer one.
+- CI/device verification remains pending; no build or test pass is claimed. Continue only on Main-dev; main remains untouched.

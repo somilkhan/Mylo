@@ -76,6 +76,7 @@ private enum class LastFmStatsPeriod(val apiValue: String, val label: String) {
 @Composable
 fun ScrobbleStatisticsContent(
     replayState: ReplayState,
+    reduceMotion: Boolean = false,
     holder: String,
     onPeriodChange: (ReplayPeriod) -> Unit,
     onOpenStory: (ReplayStoryPage) -> Unit,
@@ -115,6 +116,7 @@ fun ScrobbleStatisticsContent(
             ScrobbleStatsSource.MYLO_REPLAY -> ReplayScreen(
                 state = replayState,
                 holder = holder,
+                reduceMotion = reduceMotion,
                 onPeriodChange = onPeriodChange,
                 onOpenStory = onOpenStory,
                 onPlaySong = onPlaySong,

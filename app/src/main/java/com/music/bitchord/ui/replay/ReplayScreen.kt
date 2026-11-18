@@ -1,6 +1,7 @@
 package com.music.bitchord.ui.replay
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -63,6 +64,8 @@ import com.music.bitchord.ui.icons.BitChordIcons
 import com.music.bitchord.ui.player.MeshGradientBackground
 import com.music.bitchord.ui.player.rememberArtworkColors
 import com.music.bitchord.ui.theme.AccentRed
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 
 /** Whether the Replay page is being shown in dark mode (vs light). */
 @Composable
@@ -109,9 +112,41 @@ fun ReplayScreen(
     listState: LazyListState = rememberLazyListState(),
     landingPage: ReplayStoryPage = ReplayStoryPage.INTRO,
     heading: String? = null,
+    reduceMotion: Boolean = false,
 ) {
     val context = LocalContext.current
     val summary = state.summary
+    val animateStatistics = heading == "Statistics"
+    val animatedPlays = remember { Animatable(0f) }
+    val animatedMinutes = remember { Animatable(0f) }
+    LaunchedEffect(
+        animateStatistics,
+        reduceMotion,
+        summary?.period,
+        summary?.totalPlays,
+        summary?.minutes,
+    ) {
+        val current = summary ?: return@LaunchedEffect
+        if (!animateStatistics || reduceMotion) {
+            animatedPlays.snapTo(current.totalPlays.toFloat())
+            animatedMinutes.snapTo(current.minutes.toFloat())
+        } else {
+            animatedPlays.snapTo(0f)
+            animatedMinutes.snapTo(0f)
+            coroutineScope {
+                launch { animatedPlays.animateTo(current.totalPlays.toFloat(), tween(900)) }
+                launch { animatedMinutes.animateTo(current.minutes.toFloat(), tween(900)) }
+            }
+        }
+    }
+    val displayedSummary = if (animateStatistics && !reduceMotion) {
+        summary?.copy(
+            totalPlays = animatedPlays.value.toInt(),
+            totalMs = animatedMinutes.value.toLong() * 60_000L,
+        )
+    } else {
+        summary
+    }
     val leadArtwork = summary?.songs?.firstOrNull()?.song?.thumbnailUrl
     val palette = rememberArtworkColors(leadArtwork)
     val topSongs = stringResource(R.string.top_songs)
@@ -176,7 +211,7 @@ fun ReplayScreen(
                 else -> {
                     item("cards") {
                         ReplayCardRow(
-                            cards = summary.cards(context),
+                            cards = displayedSummary!!.cards(context),
                             holder = holder,
                             memberSince = state.memberSince,
                             onCardClick = onOpenStory,

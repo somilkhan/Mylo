@@ -2861,6 +2861,7 @@ private fun BitChordApp(
                         when (scrobbleTab) {
                             0 -> ScrobbleStatisticsContent(
                                 replayState = replay,
+                                reduceMotion = reducePlayerMotion,
                                 holder = account?.name.orEmpty(),
                                 onPeriodChange = setReplayPeriod,
                                 onOpenStory = { replayStory = it },
