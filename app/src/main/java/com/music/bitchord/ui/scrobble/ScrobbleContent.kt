@@ -676,7 +676,7 @@ private fun PlaylistDetailContent(
     var addTrackLoading by remember(playlist.id) { mutableStateOf(false) }
     var addTrackError by remember(playlist.id) { mutableStateOf<String?>(null) }
     var addTrackMessage by remember(playlist.id) { mutableStateOf<String?>(null) }
-    var coverMenuExpanded by remember(playlist.id) { mutableStateOf(false) }
+    var detailMenuExpanded by remember(playlist.id) { mutableStateOf(false) }
     var coverMessage by remember(playlist.id) { mutableStateOf<String?>(null) }
     var exportDialogVisible by remember(playlist.id) { mutableStateOf(false) }
     var exportMessage by remember(playlist.id) { mutableStateOf<String?>(null) }
@@ -767,19 +767,29 @@ private fun PlaylistDetailContent(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = onBack) { Text("Back") }
                 Spacer(Modifier.weight(1f))
+                TextButton(
+                    onClick = {
+                        addTracksExpanded = !addTracksExpanded
+                        if (!addTracksExpanded) {
+                            addTrackQuery = ""
+                            addTrackResults = emptyList()
+                            addTrackMessage = null
+                        }
+                    },
+                ) { Text(if (addTracksExpanded) "Done" else "Add tracks") }
                 Box {
-                    IconButton(onClick = { coverMenuExpanded = true }) {
-                        Icon(Icons.Rounded.Image, contentDescription = "Playlist cover options")
+                    IconButton(onClick = { detailMenuExpanded = true }) {
+                        Icon(Icons.Rounded.MoreVert, contentDescription = "Playlist actions")
                     }
                     DropdownMenu(
-                        expanded = coverMenuExpanded,
-                        onDismissRequest = { coverMenuExpanded = false },
+                        expanded = detailMenuExpanded,
+                        onDismissRequest = { detailMenuExpanded = false },
                     ) {
                         DropdownMenuItem(
                             text = { Text("Change cover") },
                             leadingIcon = { Icon(Icons.Rounded.Image, contentDescription = null) },
                             onClick = {
-                                coverMenuExpanded = false
+                                detailMenuExpanded = false
                                 coverPicker.launch(arrayOf("image/*"))
                             },
                         )
@@ -788,7 +798,7 @@ private fun PlaylistDetailContent(
                                 text = { Text("Reset cover") },
                                 leadingIcon = { Icon(Icons.Rounded.DeleteOutline, contentDescription = null) },
                                 onClick = {
-                                    coverMenuExpanded = false
+                                    detailMenuExpanded = false
                                     val oldUri = playlist.customCoverUri
                                     if (LocalPlaylistStore.setCustomCover(playlist.id, null)) {
                                         oldUri?.let { savedUri ->
@@ -804,29 +814,35 @@ private fun PlaylistDetailContent(
                                 },
                             )
                         }
+                        DropdownMenuItem(
+                            text = { Text("Generate similar") },
+                            leadingIcon = { Icon(Icons.Rounded.Shuffle, contentDescription = null) },
+                            enabled = !generationState.isGenerating && playlist.songs.any { it.videoId.isNotBlank() && !it.isVideo },
+                            onClick = {
+                                detailMenuExpanded = false
+                                viewModel.generateSimilar(playlist)
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Export playlist") },
+                            leadingIcon = { Icon(Icons.Rounded.IosShare, contentDescription = null) },
+                            onClick = {
+                                detailMenuExpanded = false
+                                exportDialogVisible = true
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Rename") },
+                            leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null) },
+                            onClick = { detailMenuExpanded = false; onRename() },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Delete") },
+                            leadingIcon = { Icon(Icons.Rounded.DeleteOutline, contentDescription = null) },
+                            onClick = { detailMenuExpanded = false; onDelete() },
+                        )
                     }
                 }
-                IconButton(
-                    onClick = { viewModel.generateSimilar(playlist) },
-                    enabled = !generationState.isGenerating && playlist.songs.any { it.videoId.isNotBlank() && !it.isVideo },
-                ) {
-                    Icon(Icons.Rounded.Shuffle, contentDescription = "Generate similar playlist")
-                }
-                IconButton(onClick = { exportDialogVisible = true }) {
-                    Icon(Icons.Rounded.IosShare, contentDescription = "Export playlist")
-                }
-                TextButton(
-                    onClick = {
-                        addTracksExpanded = !addTracksExpanded
-                        if (!addTracksExpanded) {
-                            addTrackQuery = ""
-                            addTrackResults = emptyList()
-                            addTrackMessage = null
-                        }
-                    },
-                ) { Text(if (addTracksExpanded) "Done" else "Add tracks") }
-                IconButton(onClick = onRename) { Icon(Icons.Rounded.Edit, contentDescription = "Rename playlist") }
-                IconButton(onClick = onDelete) { Icon(Icons.Rounded.DeleteOutline, contentDescription = "Delete playlist") }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 AsyncImage(
