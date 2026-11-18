@@ -1504,3 +1504,24 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 - No physical-device/emulator verification was performed. Shared transition visual quality, Glass/Standard nav combinations, and Reduce Motion behavior remain device acceptance checks.
 - Statistics source remains Mylo's actual on-device ListeningStats aggregation (track/artist/album totals and day/time buckets). No split-bar categories or denominator are defined by the existing summary/prototype decisions, so no split-bar was fabricated.
 - Next: request a direct navigation-event regression test if the event flow is extracted into a testable state holder without unnecessary architecture; obtain the optional APK build; complete device checks. Ask the user to define the split-bar's intended categories and denominator before implementing it.
+
+
+## 52. Correction — re-read current LastWave branch before Statistics decisions (2026-11-19)
+
+### Fresh branch state
+- Re-read this entire 1,507-line context file from the current `Main-dev` head before continuing. This section corrects the stale assumption in section 51 that the split-bar question should be sent back to the user immediately.
+- Current `Main-dev` head at this update: `0348f5a7745fb0ae617c90ba70ce4e1bf3b0e642`.
+- Current `last-wave` head: `d0dd73755bfe640c515502751f440a32e57506d5` (not the older `e68d6f9` / `5da5446` refs recorded by earlier audit passes). Its latest commit is documentation-only: `docs: complete Scrobble audit interaction and failure matrix`.
+- The current `last-wave` branch still contains the feature reference implementation; inspect its live source at the current branch head rather than relying on old branch SHAs or asking the user to repeat decisions already available in code/context.
+
+### Current LastWave Statistics behavior inspected
+- `ui/home/HomeScreen.kt` blob `8460bf1a5fe545f25ce5ed4011804ed1e6f91386` chooses the honest headline label: local Room aggregates are **Plays**, while remote Last.fm data is **Scrobbles**. It renders the profile/overview statistics card and opens the detailed Listening Stats destination.
+- `ui/home/HomeScreenStats.kt` blob `f5ba02d075aa4b53d205b5d5514629a1d0206784` implements the overview card: animated headline count, then separate Tracks / Artists / Albums stat pills; compact scroll state retains the same values and navigation.
+- `ui/stats/ListeningStatsScreen.kt` blob `ca369899fd476b53ae3960d28c8d2ab9ef4ca587` implements detailed local listening analytics: range selection (month-to-date / year-to-date / all-time), Listening and Plays summary cards, timeline metric chips, and grouped day/month/year bar-chart progression.
+- These are two distinct Statistics surfaces: Last.fm/local profile overview and detailed local listening timeline. The current LastWave source does **not** contain a component explicitly named or implemented as the prototype's compact split bar. Do not conflate the timeline chart or three stat pills with that split bar.
+- The Mylo prototype/context decisions remain authoritative for Mylo's visual result. The split bar must be mapped against the actual available Mylo/LastWave data and the intended prototype meaning; do not invent a percentage denominator or combine local Plays with remote Scrobbles. First inspect all relevant source/state and existing UI data, then implement the closest faithful, truthful behavior without asking the user to re-state information already in the repo.
+
+### Process correction
+- The earlier follow-up question was premature because it relied on section 51's open-question line without rechecking the current `last-wave` branch and the full context file. Do not repeat that question.
+- Continue using `last-wave` as the feature/behavior reference and `Main-dev` as the only implementation target. Keep `main` untouched. No branch creation and no wholesale merge of `last-wave`.
+- This update is documentation only; no application code or branch other than `Main-dev` was changed.
