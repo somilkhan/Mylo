@@ -1677,10 +1677,10 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 ## 60. Global Start Mix with this Song — LastWave flow port (2026-11-19)
 
 ### LastWave flow traced
-- `ui/generate/MixLauncher.kt` defines a pending `MixSeed` StateFlow plus a replaying request flow. `startMix(trackName, artistName, videoId)` publishes the tapped track to the root navigation and Generator.
-- `GenerateViewModel.init` consumes the pending seed, selects Similar Tracks, fills the track/artist/video ID, sets a 28-track target, and starts generation immediately.
+- The actual global song-menu entry is `ui/common/TrackContextMenuSheet.kt`: the shared menu shows Start Mix for playable song targets. Its `StartMixMenuViewModel.startMix` calls `GenerateRepository.fetchSimilarTracks(track, artist, limit = 30, seedVideoId)`, converts the results to playable tracks and calls `MusicPlayer.replaceUpcoming`. It does not save a playlist itself.
 - `GenerateRepository.fetchSimilarTracks` expands the seed through YouTube Music radio, branches from a related result when the first pool is thin, falls back to Last.fm `track.getsimilar`, excludes the seed and edits/remixes/covers, deduplicates by normalized title and progressively relaxes artist caps.
-- On success, LastWave persists the playlist, then `queueNextResult` causes `musicPlayer.replaceUpcoming` so the playing song remains current and the new mix takes over upcoming playback. A playlist navigation event follows the save.
+- A separate generator-launch path also exists: `MixLauncher` publishes a pending `MixSeed`; `GenerateViewModel.init` consumes it, selects Similar Tracks, fills the seed fields, uses a 28-track target and starts generation. That route saves through the Generator's `PlaylistRepository`, then replaces upcoming playback. It is distinct from the shared context-menu action.
+- Mylo intentionally unifies the global action with its existing Generate and local-playlist architecture: generate the actual similar-track pool, persist it through `LocalPlaylistStore`, then queue it through Mylo's queue coordinator. This preserves Mylo's required saved-playlist lifecycle while retaining LastWave's seed discovery and current-track continuity.
 
 ### Mylo implementation on Main-dev
 - Added **Start Mix with this Song** to the shared `SongActionsSheet`. It is available for online, playable audio songs with a nonblank video ID, title and artist; local files, videos and incomplete rows do not show it.
