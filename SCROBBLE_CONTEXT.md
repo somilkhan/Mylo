@@ -37,12 +37,12 @@
 
 ## 1. Agreed scope and branch responsibilities
 
-- **Target:** `Main-dev` (the repository branch is case-sensitive; the earlier lowercase `main-dev` lookup returned 404). Latest audited head: `11478fde56f1817cb777b296e60907359086f383`.
+- **Target:** `Main-dev` (the repository branch is case-sensitive; the earlier lowercase `main-dev` lookup returned 404). Current ref snapshot at this documentation update: `c4230c3226c84f07774a6efd676a93c3fb8e8bc8` (refresh before work).
 - **FAB/navigation source:** `scrobble-ui`, audited head `5bf065da305e6bb663960f9e09d30572dcdc0f32`. Reuse only the Scrobble FAB, its visibility/placement/open-close behavior, and the static Statistics / Generate / Playlists navigation. Do not port its Scrobble destination screens or feature logic as the implementation source.
-- **Feature source:** `last-wave`, audited head `e68d6f9e488e9a0136998be6d23c731dbcfe8f9b`. Use as the source for Scrobble-related architecture, Statistics, Generate, Playlists and their supporting domain/data flows, then adapt to Mylo's existing architecture and UI.
+- **Feature source:** `last-wave`, current ref snapshot `d0dd73755bfe640c515502751f440a32e57506d5` (refresh before work). Use as the source for Scrobble-related architecture, Statistics, Generate, Playlists and their supporting domain/data flows, then adapt to Mylo's existing architecture and UI.
 - **Final integration target:** `Main-dev`. No work on `main`; no merge to `Main-dev` until audit, implementation, review and user approval.
-- Preserve Mylo's existing Home/main navigation except the specifically agreed FAB entry/exit integration. In Scrobble mode, replace the normal Home / Library / Search navigation with persistent Statistics / Generate / Playlists tabs. Tapping the FAB again or dismissing Scrobble restores the normal navigation.
-- User requires a complete, evidence-based audit and precise plan before implementation. No Gradle builds during planning. No code changes to app behavior, commits, PRs or merges without explicit authorization.
+- Preserve Mylo's existing Home/main navigation except the specifically agreed FAB entry/exit integration. In Scrobble mode, replace the full existing normal navigation (Home / Explore / Library / Search) with persistent Statistics / Generate / Playlists tabs; restore all four normal tabs on exit. Tapping the FAB again or dismissing Scrobble restores the normal navigation.
+- The original planning-only restriction is superseded by the user's current explicit instruction to continue implementation from `last-wave` on `Main-dev`, adapting to Mylo UI. Build/test only when appropriate and report evidence; never touch `main`.
 
 ## 2. Repository instructions inspected
 
@@ -1536,7 +1536,7 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 - CI run #1167 / ID `44395593096`, exact head `29faf8a5e6e6a4d56d1c5f0e8814ac00ec32e6ec`: Android unit tests **passed**; desktop compile **passed**; desktop unit tests **passed**; web tests **passed**; web typecheck **passed**. The optional Android/TV/Wear APK build was **skipped** because `build_apks` was not requested. This run verifies the shared-bounds implementation at that exact commit.
 - No physical-device/emulator verification was performed. Shared transition visual quality, Glass/Standard nav combinations, and Reduce Motion behavior remain device acceptance checks.
 - Statistics source remains Mylo's actual on-device ListeningStats aggregation (track/artist/album totals and day/time buckets). No split-bar categories or denominator are defined by the existing summary/prototype decisions, so no split-bar was fabricated.
-- Next: request a direct navigation-event regression test if the event flow is extracted into a testable state holder without unnecessary architecture; obtain the optional APK build; complete device checks. Ask the user to define the split-bar's intended categories and denominator before implementing it.
+- Historical next-step note superseded by Agent Rules (section 0): do not ask the user to define split-bar categories/denominator before tracing LastWave and Mylo source. Inspect the real component and data model; implement only source-backed, truthful behavior. Navigation regression coverage, optional APK build and physical-device checks remain verification tasks.
 
 
 ## 52. Correction — re-read current LastWave branch before Statistics decisions (2026-11-19)
