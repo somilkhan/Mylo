@@ -1658,3 +1658,17 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 - Implementation commit: `ab4d133e2fa287963f7f3d6f4ea75cfaa8757446`.
 - CI run #1177 / ID `44402436004` was pending on the earlier refactor commit `bc66572ae31cda7975c36835409e122e27538ad8`; it does not verify the Last.fm seed addition. Await CI on the latest combined head; no pass is claimed.
 - Continue only on `Main-dev`; `main` remains `11478fde56f1817cb777b296e60907359086f383`.
+
+
+## 59. Saved-playlist Similar regeneration port (2026-11-19)
+
+- Traced LastWave `GenerateRepository.fetchTasteMixForPlaylist`: three source-artist seeds, four source-track seeds, Last.fm similar artists/tracks and deep cuts, YouTube radio, optional tag discovery, source-track exclusion, progressive artist-cap relaxation, and a 20-track minimum (bounded by requested count).
+- Mylo's old `generateSimilar` used only three YouTube radio seeds, then Quick Picks/Home, and accepted as few as five tracks. It did not explore the source playlist's artist graph or widen discovery progressively.
+- Reworked Mylo regeneration to use up to three source artists and four source tracks; it combines YouTube radio, Last.fm similar-artist discovery resolved to playable YouTube Music artist pages, direct source-artist pages (with original tracks removed), Quick Picks/Home fallback, and Mylo mood/genre shelves as the final widening source.
+- Candidate pools are weighted and source playlist tracks are excluded by both video ID and normalized title/artist. Artist diversity starts at three per artist and relaxes only when required to fill the target. It now requires `min(20, requestedCount)` tracks, matching LastWave's minimum-size behavior without changing Mylo's playlist persistence/navigation flow.
+- Extracted `artistPagePools` so Similar Artists and Similar Playlist share the same safe artist-page resolution and per-artist failure handling.
+- Corrected Mix/Recommendations weighted curation to cap against the actual requested playlist size, not twice that size; this prevents the later save truncation from accidentally bypassing artist diversity.
+- Added a unit test proving the artist cap holds when enough distinct artists are available. Existing tests cover progressive thin-pool fallback.
+- Implementation commit: `f269fe18eacbfb93f5f1992423a40a7257a7df05`.
+- Latest CI must be checked on the current branch head; no pass is claimed. Previous run #1178 / ID `44402595986` targeted earlier Last.fm taste-seed commit `ab4d133e2fa287963f7f3d6f4ea75cfaa8757446` and was pending when this implementation landed.
+- Continue only on `Main-dev`; `main` remains `11478fde56f1817cb777b296e60907359086f383`.
