@@ -173,3 +173,58 @@ internal fun appendUniquePlaylistSong(existing: List<Song>, candidate: Song): Li
     if (videoId.isEmpty() || candidate.isVideo || existing.any { it.videoId == videoId }) return null
     return existing + candidate
 }
+
+
+/** CSV/M3U serializers for a local playlist; kept pure for unit testing. */
+internal object LocalPlaylistExport {
+    fun csv(playlist: LocalPlaylist): String = buildString {
+        appendLine(csvRow(listOf("title", "artist", "video_id", "duration", "video_url")))
+        playlist.songs.forEach { song ->
+            appendLine(
+                csvRow(
+                    listOf(
+                        song.title,
+                        song.artist,
+                        song.videoId,
+                        song.durationText.orEmpty(),
+                        "https://music.youtube.com/watch?v=${song.videoId}",
+                    ),
+                ),
+            )
+        }
+    }
+
+    fun m3u(playlist: LocalPlaylist): String = buildString {
+        appendLine("#EXTM3U")
+        playlist.songs.filter { it.videoId.isNotBlank() && !it.isVideo }.forEach { song ->
+            val duration = song.durationText?.split(':')?.map { it.toLongOrNull() }
+                ?.takeIf { values -> values.isNotEmpty() && values.all { it != null } }
+                ?.let { values ->
+                    when (values.size) {
+                        2 -> values[0]!! * 60 + values[1]!!
+                        3 -> values[0]!! * 3_600 + values[1]!! * 60 + values[2]!!
+                        else -> -1L
+                    }
+                } ?: -1L
+            val label = "${song.artist} - ${song.title}".replace('\r', ' ').replace('\n', ' ')
+            appendLine("#EXTINF:$duration,$label")
+            appendLine("https://music.youtube.com/watch?v=${song.videoId}")
+        }
+    }
+
+    fun fileName(title: String, extension: String): String {
+        val ext = when (extension.lowercase(java.util.Locale.ROOT).removePrefix(".")) {
+            "csv" -> "csv"
+            "m3u" -> "m3u"
+            else -> "txt"
+        }
+        val invalid = setOf('/', '\\', ':', '*', '?', '"', '<', '>', '|')
+        val safeTitle = title.map { if (it in invalid) '_' else it }
+            .joinToString("").trim().trim('.').take(80).ifBlank { "Playlist" }
+        return "$safeTitle.$ext"
+    }
+
+    private fun csvRow(values: List<String>): String = values.joinToString(",") { value ->
+        "\""${value.replace("\"", "\"\"")}\""
+    }
+}
