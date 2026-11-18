@@ -1,6 +1,10 @@
 package com.music.bitchord.ui.scrobble
 
+import android.content.Intent
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -29,6 +33,7 @@ import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.PhotoLibrary
 import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material3.AlertDialog
@@ -57,6 +62,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -359,6 +365,29 @@ fun ScrobblePlaylistsContent(
     onPlaySongs: (List<Song>, Int) -> Unit,
 ) {
     val playlists by LocalPlaylistStore.playlists.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    var coverPickerPlaylistId by rememberSaveable { mutableStateOf<String?>(null) }
+    val coverPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        val playlistId = coverPickerPlaylistId
+        if (uri != null && playlistId != null) {
+            try {
+                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                if (!LocalPlaylistStore.setCustomCover(playlistId, uri.toString())) {
+                    context.contentResolver.releasePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    Toast.makeText(context, "Playlist no longer exists", Toast.LENGTH_SHORT).show()
+                }
+            } catch (error: SecurityException) {
+                Toast.makeText(context, "Couldn't access that image", Toast.LENGTH_SHORT).show()
+            } catch (error: IllegalArgumentException) {
+                Toast.makeText(context, "Couldn't access that image", Toast.LENGTH_SHORT).show()
+            }
+        }
+        coverPickerPlaylistId = null
+    }
+    val openCoverPicker: (String) -> Unit = { playlistId ->
+        coverPickerPlaylistId = playlistId
+        coverPicker.launch(arrayOf("image/*"))
+    }
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
     var search by rememberSaveable { mutableStateOf("") }
     var renameTarget by remember { mutableStateOf<LocalPlaylist?>(null) }
@@ -381,6 +410,7 @@ fun ScrobblePlaylistsContent(
                 renameTarget = selected
             },
             onDelete = { deleteTarget = selected },
+            onChangeCover = { openCoverPicker(selected.id) },
         )
     } else {
         val visible = playlists
@@ -440,6 +470,8 @@ fun ScrobblePlaylistsContent(
                             renameTarget = playlist
                         },
                         onDelete = { deleteTarget = playlist },
+                        onChangeCover = { openCoverPicker(playlist.id) },
+                        onResetCover = { LocalPlaylistStore.setCustomCover(playlist.id, null) },
                     )
                 }
             }
@@ -498,6 +530,8 @@ private fun PlaylistRow(
     onPin: () -> Unit,
     onRename: () -> Unit,
     onDelete: () -> Unit,
+    onChangeCover: () -> Unit,
+    onResetCover: () -> Unit,
 ) {
     var menuExpanded by remember(playlist.id) { mutableStateOf(false) }
     Row(
@@ -507,7 +541,7 @@ private fun PlaylistRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         AsyncImage(
-            model = playlist.songs.firstOrNull()?.thumbnailUrl,
+            model = playlist.customCoverUri ?: playlist.songs.firstOrNull()?.thumbnailUrl,
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier.size(54.dp).clip(RoundedCornerShape(10.dp)).clickable(onClick = onOpen),
@@ -533,6 +567,17 @@ private fun PlaylistRow(
                     onClick = { menuExpanded = false; onPin() },
                 )
                 DropdownMenuItem(
+                    text = { Text("Change cover") },
+                    leadingIcon = { Icon(Icons.Rounded.PhotoLibrary, contentDescription = null) },
+                    onClick = { menuExpanded = false; onChangeCover() },
+                )
+                if (playlist.customCoverUri != null) {
+                    DropdownMenuItem(
+                        text = { Text("Reset cover") },
+                        onClick = { menuExpanded = false; onResetCover() },
+                    )
+                }
+                DropdownMenuItem(
                     text = { Text("Rename") },
                     leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null) },
                     onClick = { menuExpanded = false; onRename() },
@@ -555,6 +600,7 @@ private fun PlaylistDetailContent(
     onPlaySongs: (List<Song>, Int) -> Unit,
     onRename: () -> Unit,
     onDelete: () -> Unit,
+    onChangeCover: () -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -567,9 +613,19 @@ private fun PlaylistDetailContent(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         item {
+            val coverModel = playlist.customCoverUri ?: playlist.songs.firstOrNull()?.thumbnailUrl
+            if (coverModel != null) {
+                AsyncImage(
+                    model = coverModel,
+                    contentDescription = playlist.title + " cover",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxWidth().height(164.dp).clip(RoundedCornerShape(18.dp)),
+                )
+            }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = onBack) { Text("Back") }
                 Spacer(Modifier.weight(1f))
+                IconButton(onClick = onChangeCover) { Icon(Icons.Rounded.PhotoLibrary, contentDescription = "Change playlist cover") }
                 IconButton(onClick = onRename) { Icon(Icons.Rounded.Edit, contentDescription = "Rename playlist") }
                 IconButton(onClick = onDelete) { Icon(Icons.Rounded.DeleteOutline, contentDescription = "Delete playlist") }
             }
