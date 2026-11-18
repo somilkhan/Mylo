@@ -1260,3 +1260,32 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 - No emulator/physical-device visual or share-target validation has been performed. The export dialog uses Mylo's existing Material 3 theme; visual alignment still needs device confirmation.
 - Custom cover editing, Generate Similar/regenerate and remaining list/detail acceptance checks are still pending. Manual playlist creation and Library ownership integration remain deferred.
 - `main` remains untouched.
+
+
+## 39. Custom playlist cover selection and persistence (2026-11-19)
+
+### Implemented on Main-dev
+- Extended `LocalPlaylist` with nullable `customCoverUri` in `data/spotify/LocalPlaylistStore.kt`, blob `8695d20ab1b54955a63496dd135dc282a4483c2b`.
+- Added synchronized `LocalPlaylistStore.setCustomCover`; it updates only cover metadata and preserves playlist identity, tracks, pin and generation metadata.
+- Updated `LocalPlaylistCodec.kt`, blob `da3cc5402d8d5a6f3e1679b2919fca17b93dd9c4`, to encode/decode `customCoverUri`. Legacy JSON without this field safely defaults to null.
+- Updated `LocalPlaylistCodecTest.kt`, blob `46cd3657c81e5c3d56e6cf33c01a3167228eb231`, to assert the legacy null default and URI round-trip.
+- Updated `ui/scrobble/ScrobbleContent.kt`, blob `9498f3dbf3bd7cb3edccf5cd22e3929a616d1a11`:
+  - Playlist rows and detail artwork prefer the custom URI, falling back to the first track's thumbnail.
+  - Detail overflow offers Change cover and, when set, Reset cover.
+  - Uses Android OpenDocument for image selection and takes persistable read permission before saving the URI.
+  - On replacement/reset/delete, releases the previous persisted permission; on failed save, releases the newly acquired permission.
+- No broad storage permission or new provider path was added. The selected URI is stored as metadata in the existing playlist JSON.
+
+### Commits
+- Model/store: `e29b064eb8b6c044c59414ed1357dc760fbade44`.
+- Codec migration: `6ff2754d7dde2241ae1215c035d88e68d8aa3694`.
+- Tests: `26a96c5a01aa1d093918497a32e7322dedb374a8`.
+- UI: `76318377cec8ab051af58ec443031ef34d3c6ced`.
+- Context binding correction: `d8f70a995bc400bb2275463ade1b74dd2b4c29ff`.
+
+### Verification and limits
+- Reviewed all current direct `deletePlaylist` callers: the other MainActivity delete action is for remote YouTube Music account playlists, not LocalPlaylistStore. The Scrobble local delete confirmation releases the custom URI permission before deleting the local row.
+- No local Gradle build, unit-test execution, emulator test or physical-device test was possible. Tests are added but not yet verified as passing.
+- URI permission behavior and Coil loading of a persisted content URI still require device verification with an actual image provider.
+- Remaining approved work: Generate Similar/regenerate and final playlist/detail acceptance checks. Library ownership and manual playlist creation remain deferred.
+- `main` remains untouched; continue on `Main-dev` only.
