@@ -389,6 +389,7 @@ fun ScrobblePlaylistsContent(
     onPlaySongs: (List<Song>, Int) -> Unit,
 ) {
     val playlists by LocalPlaylistStore.playlists.collectAsStateWithLifecycle()
+    val storageError by LocalPlaylistStore.loadError.collectAsStateWithLifecycle()
     val generationState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -399,6 +400,8 @@ fun ScrobblePlaylistsContent(
     var renameText by rememberSaveable { mutableStateOf("") }
     var renameError by remember { mutableStateOf<String?>(null) }
     var deleteTarget by remember { mutableStateOf<LocalPlaylist?>(null) }
+    var deleteError by remember { mutableStateOf<String?>(null) }
+    var playlistActionError by remember { mutableStateOf<String?>(null) }
 
     val selected = playlists.firstOrNull { it.id == selectedId }
     BackHandler(enabled = selected != null) { selectedId = null }
@@ -466,6 +469,17 @@ fun ScrobblePlaylistsContent(
                     }
                 }
             }
+            storageError?.let { error ->
+                item(key = "playlist_storage_error") {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(error, color = MaterialTheme.colorScheme.error)
+                        TextButton(onClick = { LocalPlaylistStore.reload() }) { Text("Retry") }
+                    }
+                }
+            }
+            playlistActionError?.let { error ->
+                item(key = "playlist_action_error") { Text(error, color = MaterialTheme.colorScheme.error) }
+            }
             generationState.savedPlaylist?.takeIf { it.generationMode == "similar-playlist" }?.let { saved ->
                 item(key = "similar_playlist_saved") {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -497,7 +511,7 @@ fun ScrobblePlaylistsContent(
                     )
                 }
             }
-            if (visible.isEmpty()) {
+            if (visible.isEmpty() && storageError == null) {
                 item {
                     Column(
                         Modifier.fillMaxWidth().padding(vertical = 56.dp),
@@ -520,17 +534,29 @@ fun ScrobblePlaylistsContent(
                         showReorder = sortMode == LocalPlaylistSortMode.CUSTOM && search.isBlank(),
                         canGenerateSimilar = !generationState.isGenerating && playlist.songs.any { it.videoId.isNotBlank() && !it.isVideo },
                         onGenerateSimilar = { viewModel.generateSimilar(playlist) },
-                        onMoveUp = { LocalPlaylistStore.movePlaylist(playlist.id, index - 1) },
-                        onMoveDown = { LocalPlaylistStore.movePlaylist(playlist.id, index + 1) },
+                        onMoveUp = {
+                            playlistActionError = if (LocalPlaylistStore.movePlaylist(playlist.id, index - 1)) null
+                            else "Couldn't save playlist order. Try again."
+                        },
+                        onMoveDown = {
+                            playlistActionError = if (LocalPlaylistStore.movePlaylist(playlist.id, index + 1)) null
+                            else "Couldn't save playlist order. Try again."
+                        },
                         onOpen = { selectedId = playlist.id },
                         onPlay = { onPlaySongs(playlist.songs, 0) },
-                        onPin = { LocalPlaylistStore.setPinned(playlist.id, !playlist.isPinned) },
+                        onPin = {
+                            playlistActionError = if (LocalPlaylistStore.setPinned(playlist.id, !playlist.isPinned)) null
+                            else "Couldn't update playlist pin. Try again."
+                        },
                         onRename = {
                             renameText = playlist.title
                             renameError = null
                             renameTarget = playlist
                         },
-                        onDelete = { deleteTarget = playlist },
+                        onDelete = {
+                            deleteError = null
+                            deleteTarget = playlist
+                        },
                     )
                 }
             }
@@ -555,8 +581,11 @@ fun ScrobblePlaylistsContent(
                         clean.isBlank() -> renameError = "Enter a playlist name"
                         duplicate -> renameError = "A playlist with that name already exists"
                         else -> {
-                            LocalPlaylistStore.renamePlaylist(target.id, clean)
-                            renameTarget = null
+                            if (LocalPlaylistStore.renamePlaylist(target.id, clean)) {
+                                renameTarget = null
+                            } else {
+                                renameError = "Couldn't save playlist name. Try again."
+                            }
                         }
                     }
                 }) { Text("Save") }
@@ -566,25 +595,34 @@ fun ScrobblePlaylistsContent(
     }
     deleteTarget?.let { target ->
         AlertDialog(
-            onDismissRequest = { deleteTarget = null },
+            onDismissRequest = { deleteTarget = null; deleteError = null },
             title = { Text("Delete playlist?") },
-            text = { Text("${target.title} will be removed from this device. Listening history is not affected.") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("${target.title} will be removed from this device. Listening history is not affected.")
+                    deleteError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                }
+            },
             confirmButton = {
                 TextButton(onClick = {
-                    target.customCoverUri?.let { savedUri ->
-                        runCatching {
-                            context.contentResolver.releasePersistableUriPermission(
-                                Uri.parse(savedUri),
-                                Intent.FLAG_GRANT_READ_URI_PERMISSION,
-                            )
+                    if (LocalPlaylistStore.deletePlaylist(target.id)) {
+                        target.customCoverUri?.let { savedUri ->
+                            runCatching {
+                                context.contentResolver.releasePersistableUriPermission(
+                                    Uri.parse(savedUri),
+                                    Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                                )
+                            }
                         }
+                        if (selectedId == target.id) selectedId = null
+                        deleteTarget = null
+                        deleteError = null
+                    } else {
+                        deleteError = "Couldn't delete playlist. Check device storage and try again."
                     }
-                    LocalPlaylistStore.deletePlaylist(target.id)
-                    if (selectedId == target.id) selectedId = null
-                    deleteTarget = null
                 }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
             },
-            dismissButton = { TextButton(onClick = { deleteTarget = null }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { deleteTarget = null; deleteError = null }) { Text("Cancel") } },
         )
     }
 }
