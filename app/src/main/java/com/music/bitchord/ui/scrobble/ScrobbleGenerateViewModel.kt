@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
+import java.util.Locale
 
 data class ScrobbleGenerateUiState(
     val isGenerating: Boolean = false,
@@ -131,9 +132,9 @@ internal fun uniquePlaylistTitle(
         PlaylistGenerationMode.NEVER_HEARD -> "Never Heard"
         PlaylistGenerationMode.LIBRARY -> "My Library Mix"
     }.take(64).ifBlank { "My Mix" }
-    val existing = existingTitles.mapTo(HashSet()) { it.trim().lowercase() }
-    if (base.lowercase() !in existing) return base
+    val existing = existingTitles.mapTo(HashSet()) { it.trim().lowercase(Locale.ROOT) }
+    if (base.lowercase(Locale.ROOT) !in existing) return base
     var suffix = 2
-    while ("${base.take(58)} ($suffix)".lowercase() in existing) suffix++
+    while ("${base.take(58)} ($suffix)".lowercase(Locale.ROOT) in existing) suffix++
     return "${base.take(58)} ($suffix)"
 }

@@ -58,7 +58,10 @@ class GenerateCommitTest {
 
         val result = generateAndCommit(
             generate = { "generated tracks" },
-            commit = { committed = it },
+            commit = { value ->
+                committed = value
+                value
+            },
         )
 
         assertEquals("generated tracks", result)

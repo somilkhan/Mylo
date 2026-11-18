@@ -155,7 +155,13 @@ class PlaylistGenerationRepository(context: Context) {
         }
 
         currentCoroutineContext().ensureActive()
-        val savedSongs = LocalPlaylistStore.playlists.value.flatMap { it.songs }
+        // Never Heard must not silently bias against saved playlists. It only
+        // excludes them when the explicit excludeSavedPlaylists option is set.
+        val savedSongs = if (request.mode == PlaylistGenerationMode.NEVER_HEARD) {
+            emptyList()
+        } else {
+            LocalPlaylistStore.playlists.value.flatMap { it.songs }
+        }
         val result = PlaylistGenerationRules.prioritizeFresh(
             candidates = candidates,
             savedVideoIds = savedSongs.mapTo(HashSet()) { it.videoId },
