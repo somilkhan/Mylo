@@ -1169,3 +1169,32 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 - Current Mylo tests inspected: `LocalPlaylistCodecTest.kt` blob `97d20d039349953dd6712579b5c1f9af65a38a78` covers legacy metadata defaults, Song identity/metadata round-trip and empty lists; `PlaylistGenerationRulesTest.kt` blob `1730c6237530aeec9b8ce2143922b5112de129df` covers videoId dedupe, normalized heard identity, explicit exclusion semantics and freshness ordering.
 - No code or tests changed during this source trace. Do not infer the implementation of `YtMusicRepository` from its call sites; its source location/API cancellation contract still needs verification before adding search/add or multi-seed generation.
 - Next implementation slice after that verification: add the smallest Mylo-native playlist management batch (create/sort/reorder and safe edit operations first), with codec/store tests before UI wiring. Then add export and generation-similar flows as separate tested slices. Keep Library integration postponed and `main` untouched.
+
+
+## 36. Scrobble playlist sorting and manual order (2026-11-19)
+
+### Implemented on Main-dev
+- Added `data/spotify/LocalPlaylistSort.kt`, blob `4d14968025a430e67a2cddd76bb68dba59a80a99`:
+  - Automatic sort modes: Newest, Oldest, Name and Track count.
+  - Pinned playlists stay first in every automatic mode.
+  - Comparisons use `Locale.ROOT` for deterministic case-insensitive names and stable tie-breakers.
+  - Custom order returns the store's persisted order unchanged.
+- Updated `ui/scrobble/ScrobbleContent.kt`, blob `f07f22d1d19a4f22a6a872b40efb263ebe199ea4`:
+  - Added a compact sort menu using existing Material icons and MaterialTheme.
+  - Added Move up / Move down to each playlist's existing overflow menu only while Custom order is selected and the search field is blank. This ensures the visible index is the same as the LocalPlaylistStore index.
+  - Boundary actions are disabled at the first and last positions. Moves call the existing `LocalPlaylistStore.movePlaylist`; no new storage path or playlist identity was introduced.
+  - Existing default behavior remains Newest with pinned playlists first.
+- Added three sorting tests to `LocalPlaylistCodecTest.kt`, blob `424554b1646ca9ab800028efc6b44bb3e778ea85`: pinned-first newest/oldest, deterministic name/track-count ordering, and custom-order preservation.
+
+### Commits
+- Helper: `e0316cb6626c8afd48d1f7f8e2d7dc961d39f093`.
+- UI: `4e32a25fd653202ec49bb8b2cc80bd93828c7139`.
+- Boundary correction: `b1ba378a2f867aa09817fa5936aaaa59d68c8672`.
+- Tests: `cef2c240cdee0471280b82903c3a0faded10a9d0`.
+
+### Verification and limits
+- Source review confirms the Custom mode is the only mode that exposes manual moves, and it hides those controls while searching so a filtered index cannot corrupt the persisted full-list order.
+- No local Gradle build or unit-test execution was possible in this session. The GitHub connector returned no workflow runs or combined status entries for the test commit; therefore tests are **added but not yet verified as passing**.
+- No emulator or physical-device visual check was performed. The sort menu uses Mylo's existing Material 3 controls and monochrome theme; device-level visual alignment remains to be checked.
+- Library visibility/ownership, manual playlist creation, cover editing, export/share, Generate Similar, track search/add and other remaining playlist gaps are not part of this batch. The user's Library integration decision remains deferred.
+- `main` was not changed. Continue on `Main-dev` only.
