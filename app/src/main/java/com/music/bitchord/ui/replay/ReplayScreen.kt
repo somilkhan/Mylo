@@ -197,6 +197,17 @@ fun ReplayScreen(
                         }
                     }
 
+                    if (heading == "Statistics") {
+                        item("listening-rhythm") {
+                            ListeningRhythmCard(
+                                hourOfDay = summary.hourOfDay,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = PAGE_GUTTER),
+                            )
+                        }
+                    }
+
                     chart(
                         key = "songs",
                         title = topSongs,
