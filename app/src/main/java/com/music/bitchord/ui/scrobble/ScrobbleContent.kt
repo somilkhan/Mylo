@@ -626,7 +626,7 @@ fun ScrobblePlaylistsContent(
                     val clean = createText.trim()
                     when {
                         clean.isBlank() -> createError = "Enter a playlist name"
-                        playlists.any { it.title.equals(clean, ignoreCase = true) } ->
+                        LocalPlaylistStore.playlists.value.any { it.title.equals(clean, ignoreCase = true) } ->
                             createError = "A playlist with that name already exists"
                         else -> {
                             val created = LocalPlaylistStore.savePlaylist(title = clean, songs = emptyList())
@@ -832,7 +832,7 @@ private fun PlaylistDetailContent(
                     is SearchResult.Browse -> null
                 }
             }
-            .filter { it.videoId.isNotBlank() }
+             .filter { it.videoId.isNotBlank() && !it.isVideo }
             .distinctBy { it.videoId }
             .take(8)
         trackSearchLoading = false
@@ -888,7 +888,7 @@ private fun PlaylistDetailContent(
                 ) { Text(if (showTrackSearch) "Close search" else "Add tracks") }
                 OutlinedButton(
                     onClick = onGenerateSimilar,
-                    enabled = playlist.songs.isNotEmpty(),
+                    enabled = playlist.songs.any { it.videoId.isNotBlank() && !it.isVideo },
                     modifier = Modifier.weight(1f),
                 ) { Text("Generate Similar") }
             }
@@ -905,7 +905,11 @@ private fun PlaylistDetailContent(
                     )
                     if (trackSearchLoading) LinearProgressIndicator(Modifier.fillMaxWidth())
                     trackSearchResults.forEach { candidate ->
-                        val alreadyAdded = playlist.songs.any { it.videoId == candidate.videoId }
+                        val alreadyAdded = playlist.songs.any { existing ->
+                            existing.videoId == candidate.videoId ||
+                                (existing.title.equals(candidate.title, ignoreCase = true) &&
+                                    existing.artist.equals(candidate.artist, ignoreCase = true))
+                        }
                         Row(
                             Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
                                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
