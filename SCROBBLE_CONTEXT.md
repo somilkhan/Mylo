@@ -907,3 +907,13 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 - Verification: source reviewed against current Main-dev package/component conventions; no Gradle build or tests have run yet. GitHub Actions is expected to trigger for this Main-dev push; exact run must be checked.
 - Review note: do not claim the FAB feature complete from component addition alone. Host integration still must calculate overlay/player/IME visibility, measure the player+nav dock, preserve Glass/Standard layout, swap only the three Scrobble nav tabs, and give Back priority without breaking existing handlers.
 - Next: integrate the FAB and three-tab host into MainActivity using exact current blob, then add host-level tests and inspect the complete diff.
+
+
+## 24. FAB visibility regression test (2026-11-18)
+
+- Test commit: `5ad1a4519bfb3a79ba9001466d8f664993cebdb8`.
+- Added `app/src/test/java/com/music/bitchord/ui/components/ScrobbleFabTest.kt`.
+- Covers Home-only visibility and suppression for another tab, an overlay, the expanded player, and the IME/keyboard.
+- This is a focused JVM unit test for the pure visibility helper. It does **not** validate Compose layout, host integration, measured docking, navigation replacement, Back priority, or actual accessibility semantics.
+- Android CI must be checked against the exact test commit. No local Gradle execution is claimed.
+- Current next action: integrate the FAB and Scrobble host into MainActivity only after reconciling the PR #8 host patch with current overlay state and the complete ScrobbleScreen dependency graph. The PR patch requires new account-synced-history state and the full ScrobbleScreen implementation; do not paste the host diff alone because it will not compile.
