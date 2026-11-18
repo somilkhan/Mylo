@@ -896,3 +896,14 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 2. Build the Phase 1 patch by applying only approved FAB + nav host behavior, preserving the four normal tabs, existing overlays, player/keyboard suppression, Back priority, and both Glass/Standard modes.
 3. Add host-level tests; do not treat PR #8's isolated FAB test as sufficient.
 4. Then implement Statistics, Generate cancellation/semantics, and playlist persistence as separate coherent slices. Keep PR #8 destination business logic under audit against LastWave and Mylo's real stores; do not bulk-copy it.
+
+
+## 23. Phase 1 implementation — reusable FAB component (2026-11-18)
+
+- Implementation commit: `7198ad29b5e43fd877084cab59f120d745926851` (`feat(scrobble): add accessible floating entry component`).
+- Added `app/src/main/java/com/music/bitchord/ui/components/ScrobbleFab.kt`, adapted from the audited PR #8 component blob `c70fd7c0840da6a13bac59497f24053a7c17084d`.
+- Component provides a 62dp accessible touch target, GraphicEq/Close state glyph, reduced-motion snap behavior, spring scale/fade/lift, stable layout slot, and hidden-state removal from click/accessibility semantics. Host supplies its surface treatment.
+- The source component was copied as a self-contained Compose unit; it is not yet wired into MainActivity. No behavior change is visible in the app until host integration lands.
+- Verification: source reviewed against current Main-dev package/component conventions; no Gradle build or tests have run yet. GitHub Actions is expected to trigger for this Main-dev push; exact run must be checked.
+- Review note: do not claim the FAB feature complete from component addition alone. Host integration still must calculate overlay/player/IME visibility, measure the player+nav dock, preserve Glass/Standard layout, swap only the three Scrobble nav tabs, and give Back priority without breaking existing handlers.
+- Next: integrate the FAB and three-tab host into MainActivity using exact current blob, then add host-level tests and inspect the complete diff.
