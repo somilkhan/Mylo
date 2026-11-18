@@ -928,3 +928,30 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 - Commit: `b189d169a755d2092faadd9b4621673c62c9a7be`.
 - This is a navigation-component prerequisite only; it is not yet wired or visually verified. No Gradle build/test was run in this GitHub-only step.
 - Next: inspect the actual Scrobble destination dependencies from the approved feature source, port/adapt only required pieces, then integrate MainActivity state and both nav modes together. Do not copy the old `ScrobbleScreen.kt` wholesale: the feature source of truth is LastWave, while Mylo's current recorder, settings, local playlist store and playback/queue APIs remain authoritative.
+
+
+## 26. Implementation pass — local playlist foundation (2026-11-18)
+
+### Verified repository state
+- Active implementation branch: `Main-dev`, current code commit `c5b338ee57ea7d0625d801d79adbeaf5780d20cf`.
+- Stable `main` remains `11478fde56f1817cb777b296e60907359086f383`; no changes were made there.
+- The prior Glass-tab code commit `b189d169a755d2092faadd9b4621673c62c9a7be` has a successful Android CI run (#1084 / `44334566782`). The current playlist commit's Android CI run is pending (#1086 / `44347313833`); do not treat it as passed until it completes.
+- Root `CLAUDE.md` and `AGENTS.md` were rechecked on this branch and both return 404. The LastWave branch still contains the previously read engineering instructions, but those are not a substitute for missing Main-dev instructions.
+
+### Code changed
+- Updated `app/src/main/java/com/music/bitchord/data/spotify/LocalPlaylistStore.kt` (current blob `f18f9ebcfce4979f63f6f628db1e3ec0dab9841d`).
+- Added backward-compatible optional playlist metadata: `createdAtEpochMillis`, `generationMode`, and `isPinned`. Missing fields in existing JSON decode to legacy-safe defaults.
+- New playlist IDs use UUIDs rather than millisecond timestamps, avoiding same-millisecond ID collisions.
+- Added `updatePlaylistSongs`, `setPinned`, and `movePlaylist` operations; all preserve playlist identity and other metadata.
+- Serialized load/mutation/persist entry points with `@Synchronized` to prevent in-process read-modify-write races. Existing SharedPreferences JSON key and `apply()` persistence remain unchanged; this is not a cross-process transaction or durable-write acknowledgement.
+- A first edit contained a stale identifier in the new save expression; it was corrected immediately in the following commit before verification. Current source was fetched again and reviewed after the fix.
+
+### Verification / limitations
+- Current exact-head Android CI run is pending; no local Gradle build or test result is claimed.
+- No new unit test was added in this pass. Existing JUnit and org.json test dependencies are available; add focused persistence/metadata tests before calling this store work fully verified.
+- No UI actions are wired to the new playlist methods yet. This is a persistence foundation, not a completed Playlists screen.
+
+### Next
+- Continue the Mylo-native generator audit: identify the actual InnerTube search/radio APIs, listening-history identity, queue mutation entry points, and playlist-save caller.
+- Port generator orchestration with structured cancellation. Dismissing Scrobble must cancel generation before any save or queue mutation; never catch and convert `CancellationException` into fallback output.
+- Then integrate Statistics by reusing Mylo's actual local Replay data and keeping Last.fm remote profile metrics separate.
