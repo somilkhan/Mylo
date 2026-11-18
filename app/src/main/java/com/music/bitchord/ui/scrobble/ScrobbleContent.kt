@@ -60,6 +60,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -87,6 +88,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.launch
 
 @Composable
 fun ScrobbleGenerateContent(
@@ -392,6 +394,7 @@ fun ScrobblePlaylistsContent(
     val storageError by LocalPlaylistStore.loadError.collectAsStateWithLifecycle()
     val generationState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
     var search by rememberSaveable { mutableStateOf("") }
     var sortMode by rememberSaveable { mutableStateOf(LocalPlaylistSortMode.NEWEST) }
@@ -476,7 +479,7 @@ fun ScrobblePlaylistsContent(
                 item(key = "playlist_storage_error") {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(error, color = MaterialTheme.colorScheme.error)
-                        TextButton(onClick = { LocalPlaylistStore.reload() }) { Text("Retry") }
+                        TextButton(onClick = { scope.launch { LocalPlaylistStore.reload() } }) { Text("Retry") }
                     }
                 }
             }
@@ -538,18 +541,24 @@ fun ScrobblePlaylistsContent(
                         canGenerateSimilar = !generationState.isGenerating && playlist.songs.any { it.videoId.isNotBlank() && !it.isVideo },
                         onGenerateSimilar = { viewModel.generateSimilar(playlist) },
                         onMoveUp = {
-                            playlistActionError = if (LocalPlaylistStore.movePlaylist(playlist.id, index - 1)) null
-                            else "Couldn't save playlist order. Try again."
+                            scope.launch {
+                                playlistActionError = if (LocalPlaylistStore.movePlaylist(playlist.id, index - 1)) null
+                                else "Couldn't save playlist order. Try again."
+                            }
                         },
                         onMoveDown = {
-                            playlistActionError = if (LocalPlaylistStore.movePlaylist(playlist.id, index + 1)) null
-                            else "Couldn't save playlist order. Try again."
+                            scope.launch {
+                                playlistActionError = if (LocalPlaylistStore.movePlaylist(playlist.id, index + 1)) null
+                                else "Couldn't save playlist order. Try again."
+                            }
                         },
                         onOpen = { selectedId = playlist.id },
                         onPlay = { onPlaySongs(playlist.songs, 0) },
                         onPin = {
-                            playlistActionError = if (LocalPlaylistStore.setPinned(playlist.id, !playlist.isPinned)) null
-                            else "Couldn't update playlist pin. Try again."
+                            scope.launch {
+                                playlistActionError = if (LocalPlaylistStore.setPinned(playlist.id, !playlist.isPinned)) null
+                                else "Couldn't update playlist pin. Try again."
+                            }
                         },
                         onRename = {
                             renameText = playlist.title
@@ -583,7 +592,7 @@ fun ScrobblePlaylistsContent(
                     when {
                         clean.isBlank() -> renameError = "Enter a playlist name"
                         duplicate -> renameError = "A playlist with that name already exists"
-                        else -> {
+                        else -> scope.launch {
                             if (LocalPlaylistStore.renamePlaylist(target.id, clean)) {
                                 renameTarget = null
                             } else {
@@ -608,20 +617,22 @@ fun ScrobblePlaylistsContent(
             },
             confirmButton = {
                 TextButton(onClick = {
-                    if (LocalPlaylistStore.deletePlaylist(target.id)) {
-                        target.customCoverUri?.let { savedUri ->
-                            runCatching {
-                                context.contentResolver.releasePersistableUriPermission(
-                                    Uri.parse(savedUri),
-                                    Intent.FLAG_GRANT_READ_URI_PERMISSION,
-                                )
+                    scope.launch {
+                        if (LocalPlaylistStore.deletePlaylist(target.id)) {
+                            target.customCoverUri?.let { savedUri ->
+                                runCatching {
+                                    context.contentResolver.releasePersistableUriPermission(
+                                        Uri.parse(savedUri),
+                                        Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                                    )
+                                }
                             }
+                            if (selectedId == target.id) selectedId = null
+                            deleteTarget = null
+                            deleteError = null
+                        } else {
+                            deleteError = "Couldn't delete playlist. Check device storage and try again."
                         }
-                        if (selectedId == target.id) selectedId = null
-                        deleteTarget = null
-                        deleteError = null
-                    } else {
-                        deleteError = "Couldn't delete playlist. Check device storage and try again."
                     }
                 }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
             },
