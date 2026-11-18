@@ -748,45 +748,48 @@ private fun PlaylistDetailContent(
     var exportDialogVisible by remember(playlist.id) { mutableStateOf(false) }
     var exportMessage by remember(playlist.id) { mutableStateOf<String?>(null) }
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val existingVideoIds = remember(playlist.songs) { playlist.songs.mapTo(hashSetOf()) { it.videoId } }
     val coverPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             val newUri = uri.toString()
             val oldUri = playlist.customCoverUri
-            try {
-                if (newUri != oldUri) {
-                    context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                }
-                val saved = LocalPlaylistStore.setCustomCover(playlist.id, newUri)
-                if (saved) {
-                    if (oldUri != null && oldUri != newUri) {
-                        runCatching {
-                            context.contentResolver.releasePersistableUriPermission(
-                                Uri.parse(oldUri),
-                                Intent.FLAG_GRANT_READ_URI_PERMISSION,
-                            )
+            scope.launch {
+                try {
+                    if (newUri != oldUri) {
+                        context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    val saved = LocalPlaylistStore.setCustomCover(playlist.id, newUri)
+                    if (saved) {
+                        if (oldUri != null && oldUri != newUri) {
+                            runCatching {
+                                context.contentResolver.releasePersistableUriPermission(
+                                    Uri.parse(oldUri),
+                                    Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                                )
+                            }
+                        }
+                        coverMessage = "Cover updated"
+                    } else {
+                        if (newUri != oldUri) {
+                            runCatching {
+                                context.contentResolver.releasePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            }
+                        }
+                        coverMessage = if (LocalPlaylistStore.getPlaylist(playlist.id) == null) {
+                            "Playlist no longer exists"
+                        } else {
+                            "Couldn't save cover. Try again."
                         }
                     }
-                    coverMessage = "Cover updated"
-                } else {
+                } catch (error: Exception) {
                     if (newUri != oldUri) {
                         runCatching {
                             context.contentResolver.releasePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
                         }
                     }
-                    coverMessage = if (LocalPlaylistStore.getPlaylist(playlist.id) == null) {
-                        "Playlist no longer exists"
-                    } else {
-                        "Couldn't save cover. Try again."
-                    }
+                    coverMessage = error.message ?: "Couldn't update cover"
                 }
-            } catch (error: Exception) {
-                if (newUri != oldUri) {
-                    runCatching {
-                        context.contentResolver.releasePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    }
-                }
-                coverMessage = error.message ?: "Couldn't update cover"
             }
         }
     }
@@ -871,18 +874,20 @@ private fun PlaylistDetailContent(
                                 onClick = {
                                     detailMenuExpanded = false
                                     val oldUri = playlist.customCoverUri
-                                    if (LocalPlaylistStore.setCustomCover(playlist.id, null)) {
-                                        oldUri?.let { savedUri ->
-                                            runCatching {
-                                                context.contentResolver.releasePersistableUriPermission(
-                                                    Uri.parse(savedUri),
-                                                    Intent.FLAG_GRANT_READ_URI_PERMISSION,
-                                                )
+                                    scope.launch {
+                                        if (LocalPlaylistStore.setCustomCover(playlist.id, null)) {
+                                            oldUri?.let { savedUri ->
+                                                runCatching {
+                                                    context.contentResolver.releasePersistableUriPermission(
+                                                        Uri.parse(savedUri),
+                                                        Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                                                    )
+                                                }
                                             }
+                                            coverMessage = "Cover reset"
+                                        } else {
+                                            coverMessage = "Couldn't reset cover. Try again."
                                         }
-                                        coverMessage = "Cover reset"
-                                    } else {
-                                        coverMessage = "Couldn't reset cover. Try again."
                                     }
                                 },
                             )
@@ -1021,12 +1026,15 @@ private fun PlaylistDetailContent(
                     TextButton(
                         enabled = !alreadyAdded,
                         onClick = {
-                            val added = LocalPlaylistStore.addSongIfAbsent(playlist.id, song)
-                            addTrackMessage = when {
-                                added -> "Added ${song.title}"
-                                LocalPlaylistStore.getPlaylist(playlist.id) == null -> "Playlist no longer exists"
-                                LocalPlaylistStore.getPlaylist(playlist.id)?.songs?.any { it.videoId == song.videoId } == true -> "Track already in this playlist"
-                                else -> "Couldn't save track. Try again."
+                            scope.launch {
+                                val added = LocalPlaylistStore.addSongIfAbsent(playlist.id, song)
+                                val current = LocalPlaylistStore.getPlaylist(playlist.id)
+                                addTrackMessage = when {
+                                    added -> "Added ${song.title}"
+                                    current == null -> "Playlist no longer exists"
+                                    current.songs.any { it.videoId == song.videoId } -> "Track already in this playlist"
+                                    else -> "Couldn't save track. Try again."
+                                }
                             }
                         },
                     ) { Text(if (alreadyAdded) "Added" else "Add") }
@@ -1063,8 +1071,10 @@ private fun PlaylistDetailContent(
                                 enabled = index > 0,
                                 onClick = {
                                     trackMenuExpanded = false
-                                    trackActionMessage = if (LocalPlaylistStore.moveSong(playlist.id, index, song.videoId, -1)) null
-                                    else "Couldn't save track order. Try again."
+                                    scope.launch {
+                                        trackActionMessage = if (LocalPlaylistStore.moveSong(playlist.id, index, song.videoId, -1)) null
+                                        else "Couldn't save track order. Try again."
+                                    }
                                 },
                             )
                             DropdownMenuItem(
@@ -1073,8 +1083,10 @@ private fun PlaylistDetailContent(
                                 enabled = index < playlist.songs.lastIndex,
                                 onClick = {
                                     trackMenuExpanded = false
-                                    trackActionMessage = if (LocalPlaylistStore.moveSong(playlist.id, index, song.videoId, 1)) null
-                                    else "Couldn't save track order. Try again."
+                                    scope.launch {
+                                        trackActionMessage = if (LocalPlaylistStore.moveSong(playlist.id, index, song.videoId, 1)) null
+                                        else "Couldn't save track order. Try again."
+                                    }
                                 },
                             )
                             DropdownMenuItem(
@@ -1082,8 +1094,10 @@ private fun PlaylistDetailContent(
                                 leadingIcon = { Icon(Icons.Rounded.DeleteOutline, contentDescription = null) },
                                 onClick = {
                                     trackMenuExpanded = false
-                                    trackActionMessage = if (LocalPlaylistStore.removeSong(playlist.id, index, song.videoId)) null
-                                    else "Couldn't remove track. Try again."
+                                    scope.launch {
+                                        trackActionMessage = if (LocalPlaylistStore.removeSong(playlist.id, index, song.videoId)) null
+                                        else "Couldn't remove track. Try again."
+                                    }
                                 },
                             )
                         }
