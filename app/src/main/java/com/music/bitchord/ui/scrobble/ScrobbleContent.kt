@@ -730,6 +730,7 @@ private fun PlaylistDetailContent(
     var addTrackMessage by remember(playlist.id) { mutableStateOf<String?>(null) }
     var detailMenuExpanded by remember(playlist.id) { mutableStateOf(false) }
     var coverMessage by remember(playlist.id) { mutableStateOf<String?>(null) }
+    var trackActionMessage by remember(playlist.id) { mutableStateOf<String?>(null) }
     var exportDialogVisible by remember(playlist.id) { mutableStateOf(false) }
     var exportMessage by remember(playlist.id) { mutableStateOf<String?>(null) }
     val context = LocalContext.current
@@ -759,7 +760,11 @@ private fun PlaylistDetailContent(
                             context.contentResolver.releasePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
                         }
                     }
-                    coverMessage = "Playlist no longer exists"
+                    coverMessage = if (LocalPlaylistStore.getPlaylist(playlist.id) == null) {
+                        "Playlist no longer exists"
+                    } else {
+                        "Couldn't save cover. Try again."
+                    }
                 }
             } catch (error: Exception) {
                 if (newUri != oldUri) {
@@ -862,6 +867,8 @@ private fun PlaylistDetailContent(
                                             }
                                         }
                                         coverMessage = "Cover reset"
+                                    } else {
+                                        coverMessage = "Couldn't reset cover. Try again."
                                     }
                                 },
                             )
@@ -909,7 +916,8 @@ private fun PlaylistDetailContent(
                 ) {
                     Text(playlist.title, style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
                     Text("${playlist.songs.size} tracks", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    coverMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    coverMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = if (it.startsWith("Couldn't")) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant) }
+                    trackActionMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
                     generationState.savedPlaylist?.takeIf { it.generationMode == "similar-playlist" }?.let {
                         Text("Created ${it.title}. Go back to view it.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                     }
@@ -997,7 +1005,8 @@ private fun PlaylistDetailContent(
                             addTrackMessage = when {
                                 added -> "Added ${song.title}"
                                 LocalPlaylistStore.getPlaylist(playlist.id) == null -> "Playlist no longer exists"
-                                else -> "Track already in this playlist"
+                                LocalPlaylistStore.getPlaylist(playlist.id)?.songs?.any { it.videoId == song.videoId } == true -> "Track already in this playlist"
+                                else -> "Couldn't save track. Try again."
                             }
                         },
                     ) { Text(if (alreadyAdded) "Added" else "Add") }
@@ -1034,8 +1043,8 @@ private fun PlaylistDetailContent(
                                 enabled = index > 0,
                                 onClick = {
                                     trackMenuExpanded = false
-                                    val updated = playlist.songs.toMutableList().apply { add(index - 1, removeAt(index)) }
-                                    LocalPlaylistStore.updatePlaylistSongs(playlist.id, updated)
+                                    trackActionMessage = if (LocalPlaylistStore.moveSong(playlist.id, index, song.videoId, -1)) null
+                                    else "Couldn't save track order. Try again."
                                 },
                             )
                             DropdownMenuItem(
@@ -1044,8 +1053,8 @@ private fun PlaylistDetailContent(
                                 enabled = index < playlist.songs.lastIndex,
                                 onClick = {
                                     trackMenuExpanded = false
-                                    val updated = playlist.songs.toMutableList().apply { add(index + 1, removeAt(index)) }
-                                    LocalPlaylistStore.updatePlaylistSongs(playlist.id, updated)
+                                    trackActionMessage = if (LocalPlaylistStore.moveSong(playlist.id, index, song.videoId, 1)) null
+                                    else "Couldn't save track order. Try again."
                                 },
                             )
                             DropdownMenuItem(
@@ -1053,10 +1062,8 @@ private fun PlaylistDetailContent(
                                 leadingIcon = { Icon(Icons.Rounded.DeleteOutline, contentDescription = null) },
                                 onClick = {
                                     trackMenuExpanded = false
-                                    LocalPlaylistStore.updatePlaylistSongs(
-                                        playlist.id,
-                                        playlist.songs.filterIndexed { songIndex, _ -> songIndex != index },
-                                    )
+                                    trackActionMessage = if (LocalPlaylistStore.removeSong(playlist.id, index, song.videoId)) null
+                                    else "Couldn't remove track. Try again."
                                 },
                             )
                         }
