@@ -1123,53 +1123,53 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val name = title.trim().ifBlank { text(R.string.new_playlist) }
         viewModelScope.launch {
             if (authStore.isSignedIn) {
-                val initialBatch = videoIds.take(50)
-                YtMusicRepository.createPlaylist(
+                val createResult = YtMusicRepository.createPlaylist(
                     title = name,
                     privacy = privacy,
-                    videoIds = initialBatch,
-                ).fold(
-                    onSuccess = { playlistId ->
-                        if (videoIds.size > 50) {
-                            videoIds.drop(50).chunked(50).forEach { chunk ->
-                                YtMusicRepository.addToPlaylist(playlistId, chunk)
-                            }
-                        }
-                        setPlaylistOwned("VL$playlistId", true)
-                        libraryStale = true
-                        val created = UserPlaylist(
-                            playlistId = playlistId,
-                            title = name,
-                            subtitle = "${videoIds.size} songs",
-                            thumbnailUrl = null,
-                        )
-                        _playlists.value = listOf(created) +
-                            _playlists.value.filterNot { it.playlistId == created.playlistId }
-                        editPlaylistShelf { items ->
-                            listOf(
-                                ShelfItem(
-                                    title = created.title,
-                                    subtitle = created.subtitle,
-                                    thumbnailUrl = created.thumbnailUrl,
-                                    videoId = null,
-                                    browseId = created.browseId,
-                                ),
-                            ) + items.filterNot { it.browseId == created.browseId }
-                        }
-                        onResult?.invoke(created.browseId, created.title, false)
-                    },
-                    onFailure = {
-                        val local = try {
-                            com.music.bitchord.data.spotify.LocalPlaylistStore.savePlaylist(name, songs)
-                        } catch (cancelled: CancellationException) {
-                            throw cancelled
-                        } catch (error: Exception) {
-                            onError?.invoke(error.message ?: "Couldn't save playlist on this device.")
-                            return@launch
-                        }
-                        onResult?.invoke(local.browseId, local.title, true)
-                    },
+                    videoIds = videoIds.take(50),
                 )
+                val playlistId = createResult.getOrNull()
+                if (playlistId != null) {
+                    if (videoIds.size > 50) {
+                        videoIds.drop(50).chunked(50).forEach { chunk ->
+                            YtMusicRepository.addToPlaylist(playlistId, chunk)
+                        }
+                    }
+                    setPlaylistOwned("VL$playlistId", true)
+                    libraryStale = true
+                    val created = UserPlaylist(
+                        playlistId = playlistId,
+                        title = name,
+                        subtitle = "${videoIds.size} songs",
+                        thumbnailUrl = null,
+                    )
+                    _playlists.value = listOf(created) +
+                        _playlists.value.filterNot { it.playlistId == created.playlistId }
+                    editPlaylistShelf { items ->
+                        listOf(
+                            ShelfItem(
+                                title = created.title,
+                                subtitle = created.subtitle,
+                                thumbnailUrl = created.thumbnailUrl,
+                                videoId = null,
+                                browseId = created.browseId,
+                            ),
+                        ) + items.filterNot { it.browseId == created.browseId }
+                    }
+                    onResult?.invoke(created.browseId, created.title, false)
+                } else {
+                    val failure = createResult.exceptionOrNull()
+                    if (failure is CancellationException) throw failure
+                    val local = try {
+                        com.music.bitchord.data.spotify.LocalPlaylistStore.savePlaylist(name, songs)
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (error: Exception) {
+                        onError?.invoke(error.message ?: "Couldn't save playlist on this device.")
+                        return@launch
+                    }
+                    onResult?.invoke(local.browseId, local.title, true)
+                }
             } else {
                 val local = try {
                     com.music.bitchord.data.spotify.LocalPlaylistStore.savePlaylist(name, songs)
@@ -1181,8 +1181,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 onResult?.invoke(local.browseId, local.title, true)
             }
-        }
-    }
+        }    }
 
     /**
      * Drops [song] from the playlist page it is being read on, and takes the
