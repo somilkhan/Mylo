@@ -370,10 +370,12 @@ private fun ReplayPeriod.label(): String = when (this) {
 
 @Composable
 fun ScrobblePlaylistsContent(
+    viewModel: ScrobbleGenerateViewModel,
     contentPadding: PaddingValues,
     onPlaySongs: (List<Song>, Int) -> Unit,
 ) {
     val playlists by LocalPlaylistStore.playlists.collectAsStateWithLifecycle()
+    val generationState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
     var search by rememberSaveable { mutableStateOf("") }
@@ -393,6 +395,8 @@ fun ScrobblePlaylistsContent(
             contentPadding = contentPadding,
             onBack = { selectedId = null },
             onPlaySongs = onPlaySongs,
+            viewModel = viewModel,
+            generationState = generationState,
             onRename = {
                 renameText = selected.title
                 renameError = null
@@ -448,6 +452,18 @@ fun ScrobblePlaylistsContent(
                     }
                 }
             }
+            if (generationState.isGenerating) {
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        LinearProgressIndicator(Modifier.fillMaxWidth())
+                        Text(generationState.progress, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        TextButton(onClick = viewModel::cancelGeneration) { Text("Cancel") }
+                    }
+                }
+            }
+            generationState.error?.let { error ->
+                item { Text(error, color = MaterialTheme.colorScheme.error) }
+            }
             if (playlists.isNotEmpty()) {
                 item {
                     OutlinedTextField(
@@ -480,6 +496,8 @@ fun ScrobblePlaylistsContent(
                         index = index,
                         lastIndex = visible.lastIndex,
                         showReorder = sortMode == LocalPlaylistSortMode.CUSTOM && search.isBlank(),
+                        canGenerateSimilar = !generationState.isGenerating && playlist.songs.isNotEmpty(),
+                        onGenerateSimilar = { viewModel.generateSimilar(playlist) },
                         onMoveUp = { LocalPlaylistStore.movePlaylist(playlist.id, index - 1) },
                         onMoveDown = { LocalPlaylistStore.movePlaylist(playlist.id, index + 1) },
                         onOpen = { selectedId = playlist.id },
@@ -555,6 +573,8 @@ private fun PlaylistRow(
     index: Int,
     lastIndex: Int,
     showReorder: Boolean,
+    canGenerateSimilar: Boolean,
+    onGenerateSimilar: () -> Unit,
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
     onOpen: () -> Unit,
@@ -596,6 +616,12 @@ private fun PlaylistRow(
                     leadingIcon = { Icon(Icons.Rounded.PushPin, contentDescription = null) },
                     onClick = { menuExpanded = false; onPin() },
                 )
+                DropdownMenuItem(
+                    text = { Text("Generate similar") },
+                    leadingIcon = { Icon(Icons.Rounded.Shuffle, contentDescription = null) },
+                    enabled = canGenerateSimilar,
+                    onClick = { menuExpanded = false; onGenerateSimilar() },
+                )
                 if (showReorder) {
                     DropdownMenuItem(
                         text = { Text("Move up") },
@@ -629,6 +655,8 @@ private fun PlaylistRow(
 private fun PlaylistDetailContent(
     playlist: LocalPlaylist,
     contentPadding: PaddingValues,
+    viewModel: ScrobbleGenerateViewModel,
+    generationState: ScrobbleGenerateUiState,
     onBack: () -> Unit,
     onPlaySongs: (List<Song>, Int) -> Unit,
     onRename: () -> Unit,
@@ -770,6 +798,12 @@ private fun PlaylistDetailContent(
                         }
                     }
                 }
+                IconButton(
+                    onClick = { viewModel.generateSimilar(playlist) },
+                    enabled = !generationState.isGenerating && playlist.songs.isNotEmpty(),
+                ) {
+                    Icon(Icons.Rounded.Shuffle, contentDescription = "Generate similar playlist")
+                }
                 IconButton(onClick = { exportDialogVisible = true }) {
                     Icon(Icons.Rounded.IosShare, contentDescription = "Export playlist")
                 }
@@ -818,6 +852,18 @@ private fun PlaylistDetailContent(
                     Text("Shuffle")
                 }
             }
+        }
+        if (generationState.isGenerating) {
+            item(key = "similar_generation_progress") {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    LinearProgressIndicator(Modifier.fillMaxWidth())
+                    Text(generationState.progress, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    TextButton(onClick = viewModel::cancelGeneration) { Text("Cancel") }
+                }
+            }
+        }
+        generationState.error?.let { error ->
+            item(key = "similar_generation_error") { Text(error, color = MaterialTheme.colorScheme.error) }
         }
         if (addTracksExpanded) {
             item(key = "add_tracks_search") {
