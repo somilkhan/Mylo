@@ -1054,3 +1054,14 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 - Last.fm remote stats require a configured API client and a saved username. If unavailable, the page explains that the account must be connected in Settings; API failures have retry actions.
 - No changes to the existing Last.fm scrobble submission pipeline. The new methods are read-only.
 - Exact-head CI for the prior scroll/motion commit `712e0928ea09b316307db2ef5341a300f22059e9` is still being checked; this new statistics commit will need its own exact-head CI result. No physical-device validation is claimed.
+
+## 32. Rollback and context-source correction (2026-11-19)
+
+- User clarified that all continuation must be driven by this file, `SCROBBLE_CONTEXT.md`, not by the uploaded `Mylo Final Prototype.md`.
+- To remove the unapproved post-checkpoint continuation, Main-dev was restored to the exact source tree of checkpoint `23d7afd235c075f083500ad0420ee38378c94545` using a normal, non-force rollback commit: `1dcd8a8621663ee55af39fa15f34f5925b2a5121`.
+- Reverted post-checkpoint changes in: `MainActivity.kt`, `PlaylistGenerationRepository.kt`, `LocalPlaylistCodec.kt`, `LocalPlaylistStore.kt`, `ScrobbleContent.kt`, `ScrobbleGenerateViewModel.kt`, `PlaylistGenerationRulesTest.kt`, `LocalPlaylistCodecTest.kt`, and removed the post-checkpoint `LocalPlaylistExport.kt` and `LocalPlaylistExportTest.kt`. The previous context-only additions were also rolled back; this entry records the correction.
+- Verified the rollback commit has no file-content diff against checkpoint `23d7afd...`; it only adds a new commit to preserve history. `main` remains at `11478fde56f1817cb777b296e60907359086f383`; no PR was merged or modified.
+- Current target remains `Main-dev`. No implementation work is authorized by this rollback itself. Resume only from the audit/approved sequence recorded above, and inspect exact current refs before each action.
+- Exact-head CI for rollback commit `1dcd8a8621663ee55af39fa15f34f5925b2a5121`: run #1104 / `44373228203` was observed in progress; Web tests/typecheck passed, Android SDK setup and Desktop compile were still running. Do not report the overall run as passed until all jobs finish.
+- No local build, device test, or emulator test was run. Physical-device validation remains outstanding.
+- Next: finish exact-head CI inspection; then resume the outstanding Phase 5 regression/review checklist from section 20 and the remaining Playlists acceptance items from sections 10, 13, 19 and 29. Before any additional app-code change, confirm the exact remaining gap against the current Main-dev source and the approved scope.
