@@ -113,7 +113,15 @@ fun ScrobbleStatisticsContent(
             )
         }
         when (source) {
-            ScrobbleStatsSource.MYLO_REPLAY -> ReplayScreen(
+            ScrobbleStatsSource.MYLO_REPLAY -> Column(Modifier.weight(1f)) {
+                replayState.summary?.takeIf { !it.isEmpty }?.let { summary ->
+                    TrackConcentrationCard(
+                        summary = summary,
+                        reduceMotion = reduceMotion,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                ReplayScreen(
                 state = replayState,
                 holder = holder,
                 reduceMotion = reduceMotion,
@@ -127,7 +135,8 @@ fun ScrobbleStatisticsContent(
                 modifier = Modifier.weight(1f),
                 listState = replayListState,
                 heading = "Statistics",
-            )
+                )
+            }
             ScrobbleStatsSource.LAST_FM -> LastFmRemoteStatistics(
                 modifier = Modifier.weight(1f),
                 bottomPadding = contentPadding.calculateBottomPadding(),
