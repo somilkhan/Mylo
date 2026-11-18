@@ -4,6 +4,7 @@ import android.content.Context
 import com.music.bitchord.auth.SignedIn
 import com.music.bitchord.data.ListeningHistory
 import com.music.bitchord.data.scrobbling.LastFM
+import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.data.YtMusicRepository
 import com.music.bitchord.data.innertube.InnertubeParser
 import com.music.bitchord.data.model.SearchFilter
@@ -147,6 +148,7 @@ class PlaylistGenerationRepository(context: Context) {
                 val signals = loadTasteSignals()
                 val seeds = (
                     listOfNotNull(request.seedTrack) +
+                        signals.lastFmSeeds.take(4) +
                         signals.replaySongs.take(4) +
                         signals.recentSongs.take(4) +
                         signals.accountHistory.take(3) +
@@ -167,7 +169,7 @@ class PlaylistGenerationRepository(context: Context) {
                 PlaylistGenerationRules.weightedBlend(
                     pools = listOf(
                         (discovery + remote.first) to 4,
-                        (signals.likedSongs + signals.accountHistory + signals.recentSongs + signals.replaySongs) to 3,
+                        (signals.likedSongs + signals.accountHistory + signals.lastFmSeeds + signals.recentSongs + signals.replaySongs) to 3,
                         remote.second to 1,
                     ),
                     limit = target * 2,
@@ -178,7 +180,8 @@ class PlaylistGenerationRepository(context: Context) {
                 onProgress("Building recommendations from your listening…")
                 val signals = loadTasteSignals()
                 val seeds = (
-                    signals.replaySongs.take(6) +
+                    signals.lastFmSeeds.take(6) +
+                        signals.replaySongs.take(6) +
                         signals.recentSongs.take(6) +
                         signals.accountHistory.take(4) +
                         signals.likedSongs.take(4)
@@ -202,7 +205,7 @@ class PlaylistGenerationRepository(context: Context) {
                     limit = target * 2,
                     maxPerArtist = 2,
                 )
-                val heard = signals.replaySongs + signals.recentSongs +
+                val heard = signals.lastFmSeeds + signals.replaySongs + signals.recentSongs +
                     signals.accountHistory + signals.likedSongs
                 val fresh = PlaylistGenerationRules.excludeHeard(
                     candidates = candidates,
@@ -339,6 +342,7 @@ class PlaylistGenerationRepository(context: Context) {
     }
 
     private data class TasteSignals(
+        val lastFmSeeds: List<Song>,
         val replaySongs: List<Song>,
         val recentSongs: List<Song>,
         val accountHistory: List<Song>,
@@ -346,6 +350,7 @@ class PlaylistGenerationRepository(context: Context) {
     )
 
     private suspend fun loadTasteSignals(): TasteSignals {
+        val lastFmSeeds = resolveLastFmTasteSeeds()
         val replay = try {
             ListeningStats.summary(ReplayPeriod.ALL_TIME).songs.take(12).map { it.song }
         } catch (cancellation: CancellationException) {
@@ -369,7 +374,39 @@ class PlaylistGenerationRepository(context: Context) {
         } else {
             emptyList<Song>() to emptyList()
         }
-        return TasteSignals(replay, recent, history, liked)
+        return TasteSignals(lastFmSeeds, replay, recent, history, liked)
+    }
+
+    private suspend fun resolveLastFmTasteSeeds(): List<Song> {
+        val username = AppSettings.lastfmUsername.value.trim()
+        if (username.isEmpty() || !LastFM.isInitialized()) return emptyList()
+        val topTracks = LastFM.getTopTracks(username, period = "overall", limit = 20)
+            .getOrNull().orEmpty().take(6)
+        return supervisorScope {
+            topTracks.map { track ->
+                async {
+                    try {
+                        val expected = PlaylistGenerationRules.trackKey(
+                            Song(videoId = "", title = track.name, artist = track.artist, thumbnailUrl = track.artworkUrl),
+                        )
+                        YtMusicRepository.search("${track.name} ${track.artist}", SearchFilter.SONGS)
+                            .getOrNull().orEmpty()
+                            .mapNotNull { result ->
+                                when (result) {
+                                    is SearchResult.TopTrack -> result.song
+                                    is SearchResult.Track -> result.song
+                                    is SearchResult.Browse -> null
+                                }
+                            }
+                            .firstOrNull { PlaylistGenerationRules.trackKey(it) == expected }
+                    } catch (cancellation: CancellationException) {
+                        throw cancellation
+                    } catch (_: Exception) {
+                        null
+                    }
+                }
+            }.awaitAll().filterNotNull()
+        }
     }
 
     private suspend fun radioFromSeeds(seeds: List<Song>): List<Song> {
