@@ -346,6 +346,7 @@ import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
 import dev.chrisbanes.haze.materials.HazeMaterials
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collect
 import java.util.Locale
 
 /** A full first screen of a native YouTube Music radio before AutoPlay tops it up. */
@@ -579,11 +580,30 @@ private fun BitChordApp(
     var showReplay by rememberSaveable { mutableStateOf(false) }
     var showScrobble by rememberSaveable { mutableStateOf(false) }
     var selectedScrobbleTab by rememberSaveable { mutableIntStateOf(0) }
+    var scrobbleHandoffPlaylistId by remember { mutableStateOf<String?>(null) }
     val closeScrobble: () -> Unit = {
         scrobbleGenerateViewModel.cancelGeneration()
         scrobbleNavBarScroll.expand()
         showScrobble = false
         selectedScrobbleTab = 0
+        scrobbleHandoffPlaylistId = null
+    }
+    // A successful save is the navigation event: keep the collector active only
+    // while Scrobble is open, then move to Playlists after the store commit.
+    LaunchedEffect(showScrobble, scrobbleGenerateViewModel) {
+        if (showScrobble) {
+            scrobbleGenerateViewModel.savedPlaylistEvents.collect { playlist ->
+                scrobbleHandoffPlaylistId = playlist.id
+                selectedScrobbleTab = 2
+            }
+        }
+    }
+    // Clear the target after its entrance motion so revisiting Playlists does
+    // not replay the animation for an older save.
+    LaunchedEffect(scrobbleHandoffPlaylistId) {
+        val playlistId = scrobbleHandoffPlaylistId ?: return@LaunchedEffect
+        delay(1_600)
+        if (scrobbleHandoffPlaylistId == playlistId) scrobbleHandoffPlaylistId = null
     }
     // Library cards use the same Replay page as every other entry point, but
     // category cards ask it to start at their matching ranked section.
@@ -2871,6 +2891,8 @@ private fun BitChordApp(
                             else -> ScrobblePlaylistsContent(
                                 viewModel = scrobbleGenerateViewModel,
                                 contentPadding = listPadding,
+                                highlightedPlaylistId = scrobbleHandoffPlaylistId,
+                                reduceMotion = reducePlayerMotion,
                                 onPlaySongs = { songs, index ->
                                     playFrom(
                                         songs,

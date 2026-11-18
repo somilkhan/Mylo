@@ -3,6 +3,12 @@ package com.music.bitchord.ui.scrobble
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.core.tween
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -390,6 +396,8 @@ private fun ReplayPeriod.label(): String = when (this) {
 fun ScrobblePlaylistsContent(
     viewModel: ScrobbleGenerateViewModel,
     contentPadding: PaddingValues,
+    highlightedPlaylistId: String?,
+    reduceMotion: Boolean,
     onPlaySongs: (List<Song>, Int) -> Unit,
 ) {
     val playlists by LocalPlaylistStore.playlists.collectAsStateWithLifecycle()
@@ -542,6 +550,8 @@ fun ScrobblePlaylistsContent(
                         showReorder = sortMode == LocalPlaylistSortMode.CUSTOM && search.isBlank(),
                         canGenerateSimilar = !generationState.isGenerating && playlist.songs.any { it.videoId.isNotBlank() && !it.isVideo },
                         onGenerateSimilar = { viewModel.generateSimilar(playlist) },
+                        animateHandoff = playlist.id == highlightedPlaylistId,
+                        reduceMotion = reduceMotion,
                         onMoveUp = {
                             scope.launch {
                                 playlistActionError = if (LocalPlaylistStore.movePlaylist(playlist.id, index - 1)) null
@@ -652,6 +662,8 @@ private fun PlaylistRow(
     lastIndex: Int,
     showReorder: Boolean,
     canGenerateSimilar: Boolean,
+    animateHandoff: Boolean,
+    reduceMotion: Boolean,
     onGenerateSimilar: () -> Unit,
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
@@ -662,70 +674,87 @@ private fun PlaylistRow(
     onDelete: () -> Unit,
 ) {
     var menuExpanded by remember(playlist.id) { mutableStateOf(false) }
-    Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f))
-            .padding(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        AsyncImage(
-            model = playlist.customCoverUri ?: playlist.songs.firstOrNull()?.thumbnailUrl,
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.size(54.dp).clip(RoundedCornerShape(10.dp)).clickable(onClick = onOpen),
-        )
-        Column(
-            Modifier.weight(1f).clickable(onClick = onOpen).padding(horizontal = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(3.dp),
-        ) {
-            Text(playlist.title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text("${playlist.songs.size} tracks${if (playlist.isPinned) " · Pinned" else ""}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        IconButton(onClick = onPlay, enabled = playlist.songs.isNotEmpty()) {
-            Icon(Icons.Rounded.PlayArrow, contentDescription = "Play playlist")
-        }
-        Box {
-            IconButton(onClick = { menuExpanded = true }) {
-                Icon(Icons.Rounded.MoreVert, contentDescription = "Playlist actions")
-            }
-            DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                DropdownMenuItem(
-                    text = { Text(if (playlist.isPinned) "Unpin" else "Pin") },
-                    leadingIcon = { Icon(Icons.Rounded.PushPin, contentDescription = null) },
-                    onClick = { menuExpanded = false; onPin() },
+    val rowContent: @Composable () -> Unit = {
+            Row(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f))
+                    .padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                AsyncImage(
+                    model = playlist.customCoverUri ?: playlist.songs.firstOrNull()?.thumbnailUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.size(54.dp).clip(RoundedCornerShape(10.dp)).clickable(onClick = onOpen),
                 )
-                DropdownMenuItem(
-                    text = { Text("Generate similar") },
-                    leadingIcon = { Icon(Icons.Rounded.Shuffle, contentDescription = null) },
-                    enabled = canGenerateSimilar,
-                    onClick = { menuExpanded = false; onGenerateSimilar() },
-                )
-                if (showReorder) {
-                    DropdownMenuItem(
-                        text = { Text("Move up") },
-                        leadingIcon = { Icon(Icons.Rounded.ArrowUpward, contentDescription = null) },
-                        enabled = index > 0,
-                        onClick = { menuExpanded = false; onMoveUp() },
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Move down") },
-                        leadingIcon = { Icon(Icons.Rounded.ArrowDownward, contentDescription = null) },
-                        enabled = index < lastIndex,
-                        onClick = { menuExpanded = false; onMoveDown() },
-                    )
+                Column(
+                    Modifier.weight(1f).clickable(onClick = onOpen).padding(horizontal = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(3.dp),
+                ) {
+                    Text(playlist.title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("${playlist.songs.size} tracks${if (playlist.isPinned) " · Pinned" else ""}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                DropdownMenuItem(
-                    text = { Text("Rename") },
-                    leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null) },
-                    onClick = { menuExpanded = false; onRename() },
-                )
-                DropdownMenuItem(
-                    text = { Text("Delete") },
-                    leadingIcon = { Icon(Icons.Rounded.DeleteOutline, contentDescription = null) },
-                    onClick = { menuExpanded = false; onDelete() },
-                )
+                IconButton(onClick = onPlay, enabled = playlist.songs.isNotEmpty()) {
+                    Icon(Icons.Rounded.PlayArrow, contentDescription = "Play playlist")
+                }
+                Box {
+                    IconButton(onClick = { menuExpanded = true }) {
+                        Icon(Icons.Rounded.MoreVert, contentDescription = "Playlist actions")
+                    }
+                    DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                        DropdownMenuItem(
+                            text = { Text(if (playlist.isPinned) "Unpin" else "Pin") },
+                            leadingIcon = { Icon(Icons.Rounded.PushPin, contentDescription = null) },
+                            onClick = { menuExpanded = false; onPin() },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Generate similar") },
+                            leadingIcon = { Icon(Icons.Rounded.Shuffle, contentDescription = null) },
+                            enabled = canGenerateSimilar,
+                            onClick = { menuExpanded = false; onGenerateSimilar() },
+                        )
+                        if (showReorder) {
+                            DropdownMenuItem(
+                                text = { Text("Move up") },
+                                leadingIcon = { Icon(Icons.Rounded.ArrowUpward, contentDescription = null) },
+                                enabled = index > 0,
+                                onClick = { menuExpanded = false; onMoveUp() },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Move down") },
+                                leadingIcon = { Icon(Icons.Rounded.ArrowDownward, contentDescription = null) },
+                                enabled = index < lastIndex,
+                                onClick = { menuExpanded = false; onMoveDown() },
+                            )
+                        }
+                        DropdownMenuItem(
+                            text = { Text("Rename") },
+                            leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null) },
+                            onClick = { menuExpanded = false; onRename() },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Delete") },
+                            leadingIcon = { Icon(Icons.Rounded.DeleteOutline, contentDescription = null) },
+                            onClick = { menuExpanded = false; onDelete() },
+                        )
+                    }
+                }
             }
+    }
+    if (animateHandoff && !reduceMotion) {
+        val handoffVisibility = remember(playlist.id) {
+            MutableTransitionState(false).apply { targetState = true }
         }
+        AnimatedVisibility(
+            visibleState = handoffVisibility,
+            enter = fadeIn(tween(220)) +
+                slideInVertically(tween(380)) { fullHeight -> fullHeight / 2 } +
+                scaleIn(tween(380), initialScale = 0.92f),
+        ) {
+            rowContent()
+        }
+    } else {
+        rowContent()
     }
 }
 

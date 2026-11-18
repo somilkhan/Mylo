@@ -1445,3 +1445,21 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 - Current `ReplayScreen.kt` renders the existing Replay data (cards, ranked charts and listening-shape tiles). It is not itself a spec for the prototype's compact Statistics split-bar component; do not change Replay's information architecture just to approximate the mock.
 - The prototype's "Tab tap" means a normal app destination tap closes Scrobble; tapping among Statistics/Generate/Playlists stays inside Scrobble. The current MainActivity handler does this distinction.
 - Current next work must stay source-led: inspect the actual Scrobble Statistics state/data and generation-success event; implement only details defined by the prototype and backed by real data. Where the prototype is silent, preserve current Mylo behavior and record the open point rather than guessing.
+
+
+## 47. Generate-to-Playlists handoff implementation (2026-11-19)
+
+### Implemented on Main-dev
+- MainActivity collects the existing saved-playlist event only while Scrobble is open. A successful, persisted save switches directly to the Playlists tab and passes the new playlist id to the list surface.
+- The handoff id is cleared after the arrival-animation window and on Scrobble close, preventing an old playlist from replaying the animation on later visits.
+- The newly saved row uses a short fade, vertical-rise and scale entrance in the existing Material 3 row. The entrance is skipped when the app's Reduce animation setting is enabled; the saved playlist and destination state remain identical.
+- The existing manual View playlists action remains available. Generation failure or cancellation does not emit the save event and therefore does not navigate.
+
+### Scope boundary
+- This implements successful-save navigation and destination-row arrival motion. It is not yet a measured shared-element flight from the Generate row to the exact Playlists row; that remains an explicit visual acceptance item rather than being claimed complete.
+- Statistics count-up and split-bar work remains gated on verified data semantics. No categories, percentages or denominators are invented.
+- The uploaded prototype attachment is no longer an active source. Continue from the user's conversation-approved decisions, current Mylo implementation and this context record; do not reopen the removed attachment.
+
+### Verification
+- Source-level review only at this commit. Android, desktop and web CI plus device animation checks are still required; no pass is claimed.
+- main remains untouched; work only on Main-dev.
