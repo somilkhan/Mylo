@@ -139,6 +139,46 @@ class LocalPlaylistCodecTest {
         assertNull(appendUniquePlaylistSong(emptyList(), next.copy(isVideo = true)))
     }
 
+    @Test
+    fun csvExportQuotesFieldsAndEscapesEmbeddedQuotes() {
+        val playlist = LocalPlaylist(
+            id = "export",
+            title = "Export",
+            songs = listOf(Song("video-1", "Track, \"One\"", "Artist", null, "3:42")),
+        )
+
+        assertEquals(
+            "\"title\",\"artist\",\"video_id\",\"duration\",\"video_url\"\n" +
+                "\"Track, \"\"One\"\"\",\"Artist\",\"video-1\",\"3:42\",\"https://music.youtube.com/watch?v=video-1\"\n",
+            LocalPlaylistExport.csv(playlist),
+        )
+    }
+
+    @Test
+    fun m3uExportWritesDurationAndSkipsVideoUploads() {
+        val playlist = LocalPlaylist(
+            id = "export",
+            title = "Export",
+            songs = listOf(
+                Song("audio-1", "Track", "Artist", null, "3:42"),
+                Song("video-1", "Video", "Artist", null, isVideo = true),
+            ),
+        )
+
+        assertEquals(
+            "#EXTM3U\n" +
+                "#EXTINF:222,Artist - Track\n" +
+                "https://music.youtube.com/watch?v=audio-1\n",
+            LocalPlaylistExport.m3u(playlist),
+        )
+    }
+
+    @Test
+    fun exportFilenameRemovesPathAndReservedCharacters() {
+        assertEquals("_My_ Mix.csv", LocalPlaylistExport.fileName("../My: Mix", "csv"))
+        assertEquals("Playlist.txt", LocalPlaylistExport.fileName("...", "unknown"))
+    }
+
     private fun playlist(
         id: String,
         title: String,
