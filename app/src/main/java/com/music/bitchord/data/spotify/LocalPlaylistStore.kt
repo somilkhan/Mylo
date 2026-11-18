@@ -93,7 +93,7 @@ object LocalPlaylistStore {
             createdAtEpochMillis = System.currentTimeMillis(),
             generationMode = generationMode,
         )
-        val updated = listOf(playlist) + _playlists.value.filterNot { it.id == id }
+        val updated = listOf(playlist) + _playlists.value
         _playlists.value = updated
         persist(updated)
         return playlist
