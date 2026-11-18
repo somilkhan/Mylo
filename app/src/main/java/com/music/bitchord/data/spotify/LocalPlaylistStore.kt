@@ -226,9 +226,11 @@ object LocalPlaylistStore {
 
     private suspend fun persist(list: List<LocalPlaylist>): Boolean = withContext(Dispatchers.IO) {
         if (!this@LocalPlaylistStore::prefs.isInitialized) return@withContext false
-        runCatching {
+        val saved = runCatching {
             prefs.edit().putString(KEY_PLAYLISTS, LocalPlaylistCodec.encode(list)).commit()
         }.getOrDefault(false)
+        if (saved) _loadError.value = null
+        saved
     }
 }
 
