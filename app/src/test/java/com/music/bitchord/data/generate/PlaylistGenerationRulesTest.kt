@@ -47,6 +47,26 @@ class PlaylistGenerationRulesTest {
     }
 
     @Test
+    fun radioPoolsAreInterleavedSoOneSeedDoesNotDominateTheMix() {
+        val firstA = song("a1", "A1")
+        val secondA = song("a2", "A2")
+        val firstB = song("b1", "B1")
+        val firstC = song("c1", "C1")
+        val secondC = song("c2", "C2")
+
+        assertEquals(
+            listOf(firstA, firstB, firstC, secondA, secondC),
+            PlaylistGenerationRules.interleave(
+                listOf(
+                    listOf(firstA, secondA),
+                    listOf(firstB),
+                    listOf(firstC, secondC),
+                ),
+            ),
+        )
+    }
+
+    @Test
     fun savedTracksAreDeprioritizedButNotDiscardedWhenPoolIsThin() {
         val saved = song("saved", "Saved")
         val fresh = song("fresh", "Fresh")
