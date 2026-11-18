@@ -138,10 +138,7 @@ class LocalPlaylistCodecTest {
             listOf(second, first, third),
             movePlaylistSong(listOf(first, second, third), 0, "first", 1),
         )
-        assertEquals(
-            listOf(first, second, third),
-            movePlaylistSong(listOf(first, second, third), 0, "missing", 1),
-        )
+        assertNull(movePlaylistSong(listOf(first, second, third), 0, "missing", 1))
     }
 
     @Test
