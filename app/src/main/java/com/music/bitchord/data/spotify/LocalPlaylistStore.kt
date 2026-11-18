@@ -241,6 +241,6 @@ internal object LocalPlaylistExport {
     }
 
     private fun csvRow(values: List<String>): String = values.joinToString(",") { value ->
-        "\""${value.replace("\"", "\"\"")}\""
+        "\"\${value.replace("\"", "\"\"")}\""
     }
 }
