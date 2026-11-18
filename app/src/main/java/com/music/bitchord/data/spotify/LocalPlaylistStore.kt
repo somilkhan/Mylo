@@ -96,6 +96,25 @@ object LocalPlaylistStore {
         return true
     }
 
+    /**
+     * Adds one catalogue track without duplicating its YouTube video identity.
+     * Returns false if the playlist is missing or already contains the track.
+     */
+    @Synchronized
+    fun addSongIfAbsent(id: String, song: Song): Boolean {
+        val cleanId = normalizeId(id)
+        val index = _playlists.value.indexOfFirst { it.id == cleanId || it.browseId == id }
+        if (index < 0) return false
+        val existing = _playlists.value[index]
+        val updatedSongs = appendUniquePlaylistSong(existing.songs, song) ?: return false
+        val updated = _playlists.value.toMutableList().apply {
+            this[index] = existing.copy(songs = updatedSongs)
+        }
+        _playlists.value = updated
+        persist(updated)
+        return true
+    }
+
     /** Pin state is metadata only; existing playlist order is left untouched. */
     @Synchronized
     fun setPinned(id: String, pinned: Boolean): Boolean {
@@ -142,4 +161,15 @@ object LocalPlaylistStore {
             prefs.edit().putString(KEY_PLAYLISTS, LocalPlaylistCodec.encode(list)).apply()
         }
     }
+}
+
+
+/**
+ * Appends a catalogue track to a local playlist, rejecting empty ids, video
+ * uploads and duplicate YouTube identities while preserving existing order.
+ */
+internal fun appendUniquePlaylistSong(existing: List<Song>, candidate: Song): List<Song>? {
+    val videoId = candidate.videoId.trim()
+    if (videoId.isEmpty() || candidate.isVideo || existing.any { it.videoId == videoId }) return null
+    return existing + candidate
 }
