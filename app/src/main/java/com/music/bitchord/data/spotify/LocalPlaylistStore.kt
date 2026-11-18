@@ -30,6 +30,8 @@ object LocalPlaylistStore {
 
     private val _playlists = MutableStateFlow<List<LocalPlaylist>>(emptyList())
     val playlists = _playlists.asStateFlow()
+    private val _loadError = MutableStateFlow<String?>(null)
+    val loadError = _loadError.asStateFlow()
 
     fun init(context: Context) {
         prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
@@ -37,10 +39,21 @@ object LocalPlaylistStore {
     }
 
     @Synchronized
+    fun reload() = load()
+
+    @Synchronized
     private fun load() {
-        if (!this::prefs.isInitialized) return
-        val raw = prefs.getString(KEY_PLAYLISTS, null) ?: return
-        runCatching { _playlists.value = LocalPlaylistCodec.decode(raw) }
+        if (!this::prefs.isInitialized) {
+            _loadError.value = "Local playlist storage is not initialized"
+            return
+        }
+        try {
+            val raw = prefs.getString(KEY_PLAYLISTS, null)
+            _playlists.value = if (raw.isNullOrBlank()) emptyList() else LocalPlaylistCodec.decode(raw)
+            _loadError.value = null
+        } catch (error: Exception) {
+            _loadError.value = error.message ?: "Couldn't load local playlists"
+        }
     }
 
     @Synchronized
@@ -57,28 +70,33 @@ object LocalPlaylistStore {
             generationMode = generationMode,
         )
         val updated = listOf(playlist) + _playlists.value
+        check(persist(updated)) { "Couldn't save playlist to device storage." }
         _playlists.value = updated
-        persist(updated)
         return playlist
     }
 
     @Synchronized
-    fun deletePlaylist(id: String) {
-        val updated = _playlists.value.filterNot { it.id == id || it.browseId == id || it.id == id.removePrefix("local:playlist:") }
+    fun deletePlaylist(id: String): Boolean {
+        val current = _playlists.value
+        val updated = current.filterNot { it.id == id || it.browseId == id || it.id == id.removePrefix("local:playlist:") }
+        if (updated.size == current.size) return false
+        if (!persist(updated)) return false
         _playlists.value = updated
-        persist(updated)
+        return true
     }
 
     @Synchronized
-    fun renamePlaylist(id: String, newTitle: String) {
+    fun renamePlaylist(id: String, newTitle: String): Boolean {
         val cleanId = id.removePrefix("local:playlist:").removePrefix("VL")
-        val updated = _playlists.value.map {
-            if (it.id == cleanId || it.id == id || it.browseId == id) {
-                it.copy(title = newTitle)
-            } else it
+        val current = _playlists.value
+        val index = current.indexOfFirst { it.id == cleanId || it.id == id || it.browseId == id }
+        if (index < 0) return false
+        val updated = current.toMutableList().apply {
+            this[index] = this[index].copy(title = newTitle)
         }
+        if (!persist(updated)) return false
         _playlists.value = updated
-        persist(updated)
+        return true
     }
 
     /**
@@ -93,8 +111,8 @@ object LocalPlaylistStore {
         val updated = _playlists.value.toMutableList().apply {
             this[index] = this[index].copy(songs = songs.toList())
         }
+        if (!persist(updated)) return false
         _playlists.value = updated
-        persist(updated)
         return true
     }
 
@@ -112,8 +130,8 @@ object LocalPlaylistStore {
         val updated = _playlists.value.toMutableList().apply {
             this[index] = existing.copy(songs = updatedSongs)
         }
+        if (!persist(updated)) return false
         _playlists.value = updated
-        persist(updated)
         return true
     }
 
@@ -126,8 +144,8 @@ object LocalPlaylistStore {
         val updated = _playlists.value.toMutableList().apply {
             this[index] = this[index].copy(isPinned = pinned)
         }
+        if (!persist(updated)) return false
         _playlists.value = updated
-        persist(updated)
         return true
     }
 
@@ -140,8 +158,8 @@ object LocalPlaylistStore {
         val updated = _playlists.value.toMutableList().apply {
             this[index] = this[index].copy(customCoverUri = uri)
         }
+        if (!persist(updated)) return false
         _playlists.value = updated
-        persist(updated)
         return true
     }
 
@@ -157,8 +175,39 @@ object LocalPlaylistStore {
         val updated = current.toMutableList()
         val moved = updated.removeAt(from)
         updated.add(to, moved)
+        if (!persist(updated)) return false
         _playlists.value = updated
-        persist(updated)
+        return true
+    }
+
+    @Synchronized
+    fun moveSong(id: String, sourceIndex: Int, expectedVideoId: String, direction: Int): Boolean {
+        val cleanId = normalizeId(id)
+        val index = _playlists.value.indexOfFirst { it.id == cleanId || it.browseId == id }
+        if (index < 0) return false
+        val current = _playlists.value[index]
+        val songs = movePlaylistSong(current.songs, sourceIndex, expectedVideoId, direction) ?: return false
+        if (songs == current.songs) return true
+        val updated = _playlists.value.toMutableList().apply {
+            this[index] = current.copy(songs = songs)
+        }
+        if (!persist(updated)) return false
+        _playlists.value = updated
+        return true
+    }
+
+    @Synchronized
+    fun removeSong(id: String, sourceIndex: Int, expectedVideoId: String): Boolean {
+        val cleanId = normalizeId(id)
+        val index = _playlists.value.indexOfFirst { it.id == cleanId || it.browseId == id }
+        if (index < 0) return false
+        val current = _playlists.value[index]
+        val songs = removePlaylistSong(current.songs, sourceIndex, expectedVideoId) ?: return false
+        val updated = _playlists.value.toMutableList().apply {
+            this[index] = current.copy(songs = songs)
+        }
+        if (!persist(updated)) return false
+        _playlists.value = updated
         return true
     }
 
@@ -171,11 +220,11 @@ object LocalPlaylistStore {
         id.removePrefix("local:playlist:").removePrefix("VL")
 
     @Synchronized
-    private fun persist(list: List<LocalPlaylist>) {
-        if (!this::prefs.isInitialized) return
-        runCatching {
-            prefs.edit().putString(KEY_PLAYLISTS, LocalPlaylistCodec.encode(list)).apply()
-        }
+    private fun persist(list: List<LocalPlaylist>): Boolean {
+        if (!this::prefs.isInitialized) return false
+        return runCatching {
+            prefs.edit().putString(KEY_PLAYLISTS, LocalPlaylistCodec.encode(list)).commit()
+        }.getOrDefault(false)
     }
 }
 
@@ -184,6 +233,37 @@ object LocalPlaylistStore {
  * Appends a catalogue track to a local playlist, rejecting empty ids, video
  * uploads and duplicate YouTube identities while preserving existing order.
  */
+internal fun movePlaylistSong(
+    songs: List<Song>,
+    sourceIndex: Int,
+    expectedVideoId: String,
+    direction: Int,
+): List<Song>? {
+    val from = if (songs.getOrNull(sourceIndex)?.videoId == expectedVideoId) {
+        sourceIndex
+    } else {
+        songs.indexOfFirst { it.videoId == expectedVideoId }
+    }
+    if (from < 0) return null
+    val to = (from + direction).coerceIn(0, songs.lastIndex)
+    if (from == to) return songs
+    return songs.toMutableList().apply { add(to, removeAt(from)) }
+}
+
+internal fun removePlaylistSong(
+    songs: List<Song>,
+    sourceIndex: Int,
+    expectedVideoId: String,
+): List<Song>? {
+    val index = if (songs.getOrNull(sourceIndex)?.videoId == expectedVideoId) {
+        sourceIndex
+    } else {
+        songs.indexOfFirst { it.videoId == expectedVideoId }
+    }
+    if (index < 0) return null
+    return songs.toMutableList().apply { removeAt(index) }
+}
+
 internal fun appendUniquePlaylistSong(existing: List<Song>, candidate: Song): List<Song>? {
     val videoId = candidate.videoId.trim()
     if (videoId.isEmpty() || candidate.isVideo || existing.any { it.videoId == videoId }) return null
