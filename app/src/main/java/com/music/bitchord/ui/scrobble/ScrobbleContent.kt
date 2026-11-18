@@ -1,10 +1,13 @@
 package com.music.bitchord.ui.scrobble
 
+import android.content.ClipData
 import android.content.Intent
+import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.FileProvider
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -36,6 +39,7 @@ import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.PhotoLibrary
 import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.Shuffle
+import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
@@ -78,6 +82,9 @@ import com.music.bitchord.data.spotify.LocalPlaylist
 import com.music.bitchord.data.spotify.LocalPlaylistStore
 import com.music.bitchord.data.stats.ReplayPeriod
 import kotlinx.coroutines.delay
+import java.io.File
+import java.io.IOException
+import java.util.UUID
 
 @Composable
 fun ScrobbleGenerateContent(
@@ -367,14 +374,48 @@ fun ScrobblePlaylistsContent(
     val playlists by LocalPlaylistStore.playlists.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var coverPickerPlaylistId by rememberSaveable { mutableStateOf<String?>(null) }
+    var pendingExportContent by rememberSaveable { mutableStateOf<String?>(null) }
+    var pendingExportFilename by rememberSaveable { mutableStateOf<String?>(null) }
+    var exportTarget by remember { mutableStateOf<LocalPlaylist?>(null) }
+    val savePendingExport: (Uri?) -> Unit = { uri ->
+        val content = pendingExportContent
+        val filename = pendingExportFilename
+        if (uri != null && content != null && filename != null) {
+            runCatching {
+                context.contentResolver.openOutputStream(uri, "wt")?.use { output ->
+                    output.write(content.toByteArray(Charsets.UTF_8))
+                } ?: throw IOException("Couldn't open the selected document")
+            }.onSuccess {
+                Toast.makeText(context, "Saved " + filename, Toast.LENGTH_SHORT).show()
+            }.onFailure {
+                Toast.makeText(context, "Couldn't save playlist", Toast.LENGTH_SHORT).show()
+            }
+        }
+        pendingExportContent = null
+        pendingExportFilename = null
+    }
+    val csvSaveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
+        savePendingExport(uri)
+    }
+    val m3uSaveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("audio/x-mpegurl")) { uri ->
+        savePendingExport(uri)
+    }
     val coverPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         val playlistId = coverPickerPlaylistId
         if (uri != null && playlistId != null) {
             try {
                 context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                val previousUri = LocalPlaylistStore.getPlaylist(playlistId)?.customCoverUri
                 if (!LocalPlaylistStore.setCustomCover(playlistId, uri.toString())) {
                     context.contentResolver.releasePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     Toast.makeText(context, "Playlist no longer exists", Toast.LENGTH_SHORT).show()
+                } else if (!previousUri.isNullOrBlank() && previousUri != uri.toString()) {
+                    runCatching {
+                        context.contentResolver.releasePersistableUriPermission(
+                            Uri.parse(previousUri),
+                            Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                        )
+                    }
                 }
             } catch (error: SecurityException) {
                 Toast.makeText(context, "Couldn't access that image", Toast.LENGTH_SHORT).show()
@@ -387,6 +428,45 @@ fun ScrobblePlaylistsContent(
     val openCoverPicker: (String) -> Unit = { playlistId ->
         coverPickerPlaylistId = playlistId
         coverPicker.launch(arrayOf("image/*"))
+    }
+    val handleExport: (LocalPlaylist, LocalPlaylistExport.Format, Boolean) -> Unit = { playlist, format, share ->
+        val content = LocalPlaylistExport.content(playlist.title, playlist.songs, format)
+        val filename = LocalPlaylistExport.filename(playlist.title, format)
+        if (share) {
+            runCatching {
+                val sharedDirectory = File(context.cacheDir, "shared")
+                if (!sharedDirectory.exists() && !sharedDirectory.mkdirs()) {
+                    throw IOException("Couldn't create the share directory")
+                }
+                val cutoff = System.currentTimeMillis() - 24L * 60L * 60L * 1000L
+                sharedDirectory.listFiles()
+                    ?.filter { it.name.startsWith("mylo-playlist-export-") && it.lastModified() < cutoff }
+                    ?.forEach { it.delete() }
+                val stem = filename.substringBeforeLast('.')
+                val shareFile = File(
+                    sharedDirectory,
+                    "mylo-playlist-export-" + stem + "-" + UUID.randomUUID() + "." + format.extension,
+                )
+                shareFile.writeText(content, Charsets.UTF_8)
+                val uri = FileProvider.getUriForFile(context, context.packageName + ".fileprovider", shareFile)
+                val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = format.mimeType
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    clipData = ClipData.newUri(context.contentResolver, filename, uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                context.startActivity(Intent.createChooser(sendIntent, "Share playlist"))
+            }.onFailure {
+                Toast.makeText(context, "Couldn't share playlist", Toast.LENGTH_SHORT).show()
+            }
+            exportTarget = null
+        } else {
+            pendingExportContent = content
+            pendingExportFilename = filename
+            if (format == LocalPlaylistExport.Format.CSV) csvSaveLauncher.launch(filename)
+            else m3uSaveLauncher.launch(filename)
+            exportTarget = null
+        }
     }
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
     var search by rememberSaveable { mutableStateOf("") }
@@ -411,6 +491,7 @@ fun ScrobblePlaylistsContent(
             },
             onDelete = { deleteTarget = selected },
             onChangeCover = { openCoverPicker(selected.id) },
+            onExport = { exportTarget = selected },
         )
     } else {
         val visible = playlists
@@ -471,7 +552,18 @@ fun ScrobblePlaylistsContent(
                         },
                         onDelete = { deleteTarget = playlist },
                         onChangeCover = { openCoverPicker(playlist.id) },
-                        onResetCover = { LocalPlaylistStore.setCustomCover(playlist.id, null) },
+                        onResetCover = {
+                            val previousUri = LocalPlaylistStore.getPlaylist(playlist.id)?.customCoverUri
+                            if (LocalPlaylistStore.setCustomCover(playlist.id, null) && !previousUri.isNullOrBlank()) {
+                                runCatching {
+                                    context.contentResolver.releasePersistableUriPermission(
+                                        Uri.parse(previousUri),
+                                        Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                                    )
+                                }
+                            }
+                        },
+                        onExport = { exportTarget = playlist },
                     )
                 }
             }
@@ -505,6 +597,34 @@ fun ScrobblePlaylistsContent(
             dismissButton = { TextButton(onClick = { renameTarget = null }) { Text("Cancel") } },
         )
     }
+    exportTarget?.let { target ->
+        AlertDialog(
+            onDismissRequest = { exportTarget = null },
+            title = { Text("Export playlist") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(target.title + " · " + target.songs.size + " tracks", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    OutlinedButton(
+                        onClick = { handleExport(target, LocalPlaylistExport.Format.CSV, false) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text("Save as CSV") }
+                    OutlinedButton(
+                        onClick = { handleExport(target, LocalPlaylistExport.Format.M3U, false) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text("Save as M3U") }
+                    OutlinedButton(
+                        onClick = { handleExport(target, LocalPlaylistExport.Format.CSV, true) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text("Share CSV") }
+                    OutlinedButton(
+                        onClick = { handleExport(target, LocalPlaylistExport.Format.M3U, true) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text("Share M3U") }
+                }
+            },
+            confirmButton = { TextButton(onClick = { exportTarget = null }) { Text("Cancel") } },
+        )
+    }
     deleteTarget?.let { target ->
         AlertDialog(
             onDismissRequest = { deleteTarget = null },
@@ -513,6 +633,14 @@ fun ScrobblePlaylistsContent(
             confirmButton = {
                 TextButton(onClick = {
                     LocalPlaylistStore.deletePlaylist(target.id)
+                    target.customCoverUri?.let { previousUri ->
+                        runCatching {
+                            context.contentResolver.releasePersistableUriPermission(
+                                Uri.parse(previousUri),
+                                Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                            )
+                        }
+                    }
                     if (selectedId == target.id) selectedId = null
                     deleteTarget = null
                 }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
@@ -532,6 +660,7 @@ private fun PlaylistRow(
     onDelete: () -> Unit,
     onChangeCover: () -> Unit,
     onResetCover: () -> Unit,
+    onExport: () -> Unit,
 ) {
     var menuExpanded by remember(playlist.id) { mutableStateOf(false) }
     Row(
@@ -571,6 +700,10 @@ private fun PlaylistRow(
                     leadingIcon = { Icon(Icons.Rounded.PhotoLibrary, contentDescription = null) },
                     onClick = { menuExpanded = false; onChangeCover() },
                 )
+                DropdownMenuItem(
+                    text = { Text("Export") },
+                    onClick = { menuExpanded = false; onExport() },
+                )
                 if (playlist.customCoverUri != null) {
                     DropdownMenuItem(
                         text = { Text("Reset cover") },
@@ -601,6 +734,7 @@ private fun PlaylistDetailContent(
     onRename: () -> Unit,
     onDelete: () -> Unit,
     onChangeCover: () -> Unit,
+    onExport: () -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -626,6 +760,7 @@ private fun PlaylistDetailContent(
                 TextButton(onClick = onBack) { Text("Back") }
                 Spacer(Modifier.weight(1f))
                 IconButton(onClick = onChangeCover) { Icon(Icons.Rounded.PhotoLibrary, contentDescription = "Change playlist cover") }
+                IconButton(onClick = onExport) { Icon(Icons.Rounded.Share, contentDescription = "Export playlist") }
                 IconButton(onClick = onRename) { Icon(Icons.Rounded.Edit, contentDescription = "Rename playlist") }
                 IconButton(onClick = onDelete) { Icon(Icons.Rounded.DeleteOutline, contentDescription = "Delete playlist") }
             }
