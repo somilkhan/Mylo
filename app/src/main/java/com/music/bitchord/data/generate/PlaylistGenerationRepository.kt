@@ -19,6 +19,7 @@ import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
+import java.util.Locale
 
 /** The nine generator modes, mapped onto Mylo's existing data sources. */
 enum class PlaylistGenerationMode(val storageValue: String) {
@@ -192,7 +193,7 @@ class PlaylistGenerationRepository(context: Context) {
         val sourceTracks = PlaylistGenerationRules.deduplicate(sourceSongs)
         require(sourceTracks.isNotEmpty()) { "This playlist has no playable tracks to use as seeds." }
 
-        val seeds = (sourceTracks.distinctBy { it.artist.trim().lowercase() } + sourceTracks)
+        val seeds = (sourceTracks.distinctBy { it.artist.trim().lowercase(Locale.ROOT) } + sourceTracks)
             .distinctBy { it.videoId }
             .take(3)
         onProgress("Building a mix from ${seeds.size} playlist seeds…")
