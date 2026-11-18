@@ -18,6 +18,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.supervisorScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
@@ -56,6 +58,7 @@ data class PlaylistGenerationRequest(
  */
 class PlaylistGenerationRepository(context: Context) {
     private val appContext = context.applicationContext
+    private val similarTrackSearchGate = Semaphore(5)
 
     suspend fun generate(
         request: PlaylistGenerationRequest,
@@ -415,24 +418,26 @@ class PlaylistGenerationRepository(context: Context) {
         return supervisorScope {
             topTracks.map { track ->
                 async {
-                    try {
-                        val expected = PlaylistGenerationRules.trackKey(
-                            Song(videoId = "", title = track.name, artist = track.artist, thumbnailUrl = track.artworkUrl),
-                        )
-                        YtMusicRepository.search("${track.name} ${track.artist}", SearchFilter.SONGS)
-                            .getOrNull().orEmpty()
-                            .mapNotNull { result ->
-                                when (result) {
-                                    is SearchResult.TopTrack -> result.song
-                                    is SearchResult.Track -> result.song
-                                    is SearchResult.Browse -> null
+                    similarTrackSearchGate.withPermit {
+                        try {
+                            val expected = PlaylistGenerationRules.trackKey(
+                                Song(videoId = "", title = track.name, artist = track.artist, thumbnailUrl = track.artworkUrl),
+                            )
+                            YtMusicRepository.search("${track.name} ${track.artist}", SearchFilter.SONGS)
+                                .getOrNull().orEmpty()
+                                .mapNotNull { result ->
+                                    when (result) {
+                                        is SearchResult.TopTrack -> result.song
+                                        is SearchResult.Track -> result.song
+                                        is SearchResult.Browse -> null
+                                    }
                                 }
-                            }
-                            .firstOrNull { PlaylistGenerationRules.trackKey(it) == expected }
-                    } catch (cancellation: CancellationException) {
-                        throw cancellation
-                    } catch (_: Exception) {
-                        null
+                                .firstOrNull { PlaylistGenerationRules.trackKey(it) == expected }
+                        } catch (cancellation: CancellationException) {
+                            throw cancellation
+                        } catch (_: Exception) {
+                            null
+                        }
                     }
                 }
             }.awaitAll().filterNotNull()

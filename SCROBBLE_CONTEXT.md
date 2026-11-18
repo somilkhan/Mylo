@@ -1717,3 +1717,9 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 - Obtain a fresh Android CI run for the exact latest `Main-dev` head and fix any new compiler/test failures.
 - Verify on device: global action availability across list/player song surfaces, generation progress/error/cancel, playlist persistence after relaunch, current-track continuity, queue ordering, idle-player behavior and Listen Together queue limit.
 - Continue auditing the next unfinished LastWave behavior only after this implementation is compile/test verified.
+
+
+### Follow-up hardening — bounded matching and controller readiness (2026-11-19)
+- Limited Last.fm-to-YouTube exact track resolution to five concurrent searches, matching the bounded-concurrency approach used by LastWave's repository and avoiding a burst of dozens of simultaneous catalogue searches.
+- The Start Mix queue handoff now remains pending until Mylo's playback controller exists. Since it is a StateFlow, the collector receives the pending saved playlist when the controller attaches; it is consumed only when the queue helper can act.
+- This is a safety refinement to section 60, not a new generation or playlist architecture.

@@ -1834,7 +1834,9 @@ private fun BitChordApp(
     val currentQueueSongs by rememberUpdatedState(queueSongs)
     LaunchedEffect(scrobbleGenerateViewModel, controller) {
         scrobbleGenerateViewModel.pendingStartMixQueue.collect { playlist ->
-            if (playlist != null) {
+            // Keep the durable handoff pending until the playback controller
+            // exists; the StateFlow replays it when the controller attaches.
+            if (playlist != null && controller != null) {
                 scrobbleGenerateViewModel.consumeStartMixQueue(playlist.id)
                 currentQueueSongs(playlist.songs, false, true)
             }
