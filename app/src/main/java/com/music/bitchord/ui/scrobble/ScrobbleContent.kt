@@ -1,6 +1,10 @@
 package com.music.bitchord.ui.scrobble
 
+import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -29,6 +33,7 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Sort
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.IosShare
+import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.MoreVert
@@ -61,6 +66,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -368,6 +374,7 @@ fun ScrobblePlaylistsContent(
     onPlaySongs: (List<Song>, Int) -> Unit,
 ) {
     val playlists by LocalPlaylistStore.playlists.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
     var search by rememberSaveable { mutableStateOf("") }
     var sortMode by rememberSaveable { mutableStateOf(LocalPlaylistSortMode.NEWEST) }
@@ -524,6 +531,14 @@ fun ScrobblePlaylistsContent(
             text = { Text("${target.title} will be removed from this device. Listening history is not affected.") },
             confirmButton = {
                 TextButton(onClick = {
+                    target.customCoverUri?.let { savedUri ->
+                        runCatching {
+                            context.contentResolver.releasePersistableUriPermission(
+                                Uri.parse(savedUri),
+                                Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                            )
+                        }
+                    }
                     LocalPlaylistStore.deletePlaylist(target.id)
                     if (selectedId == target.id) selectedId = null
                     deleteTarget = null
@@ -556,7 +571,7 @@ private fun PlaylistRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         AsyncImage(
-            model = playlist.songs.firstOrNull()?.thumbnailUrl,
+            model = playlist.customCoverUri ?: playlist.songs.firstOrNull()?.thumbnailUrl,
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier.size(54.dp).clip(RoundedCornerShape(10.dp)).clickable(onClick = onOpen),
@@ -625,9 +640,48 @@ private fun PlaylistDetailContent(
     var addTrackLoading by remember(playlist.id) { mutableStateOf(false) }
     var addTrackError by remember(playlist.id) { mutableStateOf<String?>(null) }
     var addTrackMessage by remember(playlist.id) { mutableStateOf<String?>(null) }
+    var coverMenuExpanded by remember(playlist.id) { mutableStateOf(false) }
+    var coverMessage by remember(playlist.id) { mutableStateOf<String?>(null) }
     var exportDialogVisible by remember(playlist.id) { mutableStateOf(false) }
     var exportMessage by remember(playlist.id) { mutableStateOf<String?>(null) }
     val existingVideoIds = remember(playlist.songs) { playlist.songs.mapTo(hashSetOf()) { it.videoId } }
+    val coverPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            val newUri = uri.toString()
+            val oldUri = playlist.customCoverUri
+            try {
+                if (newUri != oldUri) {
+                    context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                val saved = LocalPlaylistStore.setCustomCover(playlist.id, newUri)
+                if (saved) {
+                    if (oldUri != null && oldUri != newUri) {
+                        runCatching {
+                            context.contentResolver.releasePersistableUriPermission(
+                                Uri.parse(oldUri),
+                                Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                            )
+                        }
+                    }
+                    coverMessage = "Cover updated"
+                } else {
+                    if (newUri != oldUri) {
+                        runCatching {
+                            context.contentResolver.releasePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+                    }
+                    coverMessage = "Playlist no longer exists"
+                }
+            } catch (error: Exception) {
+                if (newUri != oldUri) {
+                    runCatching {
+                        context.contentResolver.releasePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                }
+                coverMessage = error.message ?: "Couldn't update cover"
+            }
+        }
+    }
 
     LaunchedEffect(playlist.id, addTracksExpanded, addTrackQuery) {
         val query = addTrackQuery.trim()
@@ -676,6 +730,45 @@ private fun PlaylistDetailContent(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = onBack) { Text("Back") }
                 Spacer(Modifier.weight(1f))
+                Box {
+                    IconButton(onClick = { coverMenuExpanded = true }) {
+                        Icon(Icons.Rounded.Image, contentDescription = "Playlist cover options")
+                    }
+                    DropdownMenu(
+                        expanded = coverMenuExpanded,
+                        onDismissRequest = { coverMenuExpanded = false },
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Change cover") },
+                            leadingIcon = { Icon(Icons.Rounded.Image, contentDescription = null) },
+                            onClick = {
+                                coverMenuExpanded = false
+                                coverPicker.launch(arrayOf("image/*"))
+                            },
+                        )
+                        if (playlist.customCoverUri != null) {
+                            DropdownMenuItem(
+                                text = { Text("Reset cover") },
+                                leadingIcon = { Icon(Icons.Rounded.DeleteOutline, contentDescription = null) },
+                                onClick = {
+                                    coverMenuExpanded = false
+                                    val oldUri = playlist.customCoverUri
+                                    if (LocalPlaylistStore.setCustomCover(playlist.id, null)) {
+                                        oldUri?.let { savedUri ->
+                                            runCatching {
+                                                context.contentResolver.releasePersistableUriPermission(
+                                                    Uri.parse(savedUri),
+                                                    Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                                                )
+                                            }
+                                        }
+                                        coverMessage = "Cover reset"
+                                    }
+                                },
+                            )
+                        }
+                    }
+                }
                 IconButton(onClick = { exportDialogVisible = true }) {
                     Icon(Icons.Rounded.IosShare, contentDescription = "Export playlist")
                 }
@@ -692,10 +785,24 @@ private fun PlaylistDetailContent(
                 IconButton(onClick = onRename) { Icon(Icons.Rounded.Edit, contentDescription = "Rename playlist") }
                 IconButton(onClick = onDelete) { Icon(Icons.Rounded.DeleteOutline, contentDescription = "Delete playlist") }
             }
-            Text(playlist.title, style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
-            Text("${playlist.songs.size} tracks", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            exportMessage?.let {
-                Text(it, style = MaterialTheme.typography.bodySmall, color = if (it.startsWith("Couldn't")) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                AsyncImage(
+                    model = playlist.customCoverUri ?: playlist.songs.firstOrNull()?.thumbnailUrl,
+                    contentDescription = "Playlist cover",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.size(68.dp).clip(RoundedCornerShape(12.dp)),
+                )
+                Column(
+                    Modifier.weight(1f).padding(start = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(3.dp),
+                ) {
+                    Text(playlist.title, style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
+                    Text("${playlist.songs.size} tracks", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    coverMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    exportMessage?.let {
+                        Text(it, style = MaterialTheme.typography.bodySmall, color = if (it.startsWith("Couldn't")) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
             }
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
