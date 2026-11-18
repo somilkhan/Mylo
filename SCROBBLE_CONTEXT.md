@@ -1723,3 +1723,14 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 - Limited Last.fm-to-YouTube exact track resolution to five concurrent searches, matching the bounded-concurrency approach used by LastWave's repository and avoiding a burst of dozens of simultaneous catalogue searches.
 - The Start Mix queue handoff now remains pending until Mylo's playback controller exists. Since it is a StateFlow, the collector receives the pending saved playlist when the controller attaches; it is consumed only when the queue helper can act.
 - This is a safety refinement to section 60, not a new generation or playlist architecture.
+
+
+## 61. Start Mix locale CI failure — diagnosis and correction (2026-11-19)
+
+- Inspected Android CI run #1182 / ID `44420807573`, which tested feature-code commit `e27d4cb2c2c329c36710a5c877bf4975bfea4914`.
+- Web tests/typecheck and desktop compile/tests passed. Android compilation reached unit tests; the failure was not a Kotlin compile error in Start Mix.
+- Root cause: the new base resource key `start_mix_with_song` existed only in `values/strings.xml`. `LocaleStringsTest` requires every translatable base key in every app-supported locale and failed for all 16 supported non-English locales.
+- Added translated `start_mix_with_song` resources to `values-de`, `values-es`, `values-fr`, `values-he`, `values-hi`, `values-id`, `values-it`, `values-ja`, `values-pl`, `values-pt`, `values-ru`, `values-th`, `values-tr`, `values-vi`, `values-zh` and `values-zh-rTW`. These cover the locale tags used by `SUPPORTED_LANGUAGES`; Simplified/Traditional Chinese follow the existing `LocaleStringsTest.tagToQualifier` mapping.
+- Verified by fetching all 16 supported locale resource files from the updated `Main-dev` branch and confirming each contains `start_mix_with_song`. This is source-level verification only; the Android test suite must still rerun.
+- CI run #1182 remains a failed run for the earlier SHA; its failure is now understood and corrected in source. Trigger/inspect a fresh CI run against the latest `Main-dev` head before claiming CI green.
+- Branch rule unchanged: only `Main-dev` is modified. Do not create branches, merge, or touch `main` or read-only `last-wave`.
