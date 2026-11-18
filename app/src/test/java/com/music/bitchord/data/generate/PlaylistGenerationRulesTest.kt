@@ -60,6 +60,21 @@ class PlaylistGenerationRulesTest {
         assertEquals(listOf(fresh, saved), result)
     }
 
+    @Test
+    fun similarPlaylistCandidatesExcludeOriginalIdsAndSameRecording() {
+        val original = song("source-id", "Original track")
+        val sameRecording = song("new-upload-id", "  ORIGINAL TRACK ").copy(artist = "THE ARTIST")
+        val fresh = song("fresh-id", "Fresh track")
+
+        assertEquals(
+            listOf(fresh),
+            PlaylistGenerationRules.excludeSourcePlaylistTracks(
+                candidates = listOf(original, sameRecording, fresh),
+                sourceSongs = listOf(original.copy(artist = "The Artist")),
+            ),
+        )
+    }
+
     private fun song(id: String, title: String) =
         Song(videoId = id, title = title, artist = "The Artist", thumbnailUrl = null)
 }

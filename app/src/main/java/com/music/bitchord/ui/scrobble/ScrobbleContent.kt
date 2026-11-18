@@ -32,6 +32,8 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.MoreVert
@@ -371,6 +373,7 @@ private fun ReplayPeriod.label(): String = when (this) {
 fun ScrobblePlaylistsContent(
     contentPadding: PaddingValues,
     onPlaySongs: (List<Song>, Int) -> Unit,
+    onGenerateSimilar: (LocalPlaylist) -> Unit,
 ) {
     val playlists by LocalPlaylistStore.playlists.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -475,6 +478,9 @@ fun ScrobblePlaylistsContent(
     var renameText by rememberSaveable { mutableStateOf("") }
     var renameError by remember { mutableStateOf<String?>(null) }
     var deleteTarget by remember { mutableStateOf<LocalPlaylist?>(null) }
+    var createDialogVisible by remember { mutableStateOf(false) }
+    var createText by rememberSaveable { mutableStateOf("") }
+    var createError by remember { mutableStateOf<String?>(null) }
 
     val selected = playlists.firstOrNull { it.id == selectedId }
     BackHandler(enabled = selected != null) { selectedId = null }
@@ -493,6 +499,22 @@ fun ScrobblePlaylistsContent(
             onDelete = { deleteTarget = selected },
             onChangeCover = { openCoverPicker(selected.id) },
             onExport = { exportTarget = selected },
+            onAddTrack = { song ->
+                val current = LocalPlaylistStore.getPlaylist(selected.id)
+                when {
+                    current == null -> Toast.makeText(context, "Playlist no longer exists", Toast.LENGTH_SHORT).show()
+                    song.videoId.isBlank() -> Toast.makeText(context, "This track can't be added", Toast.LENGTH_SHORT).show()
+                    current.songs.any { existing ->
+                        existing.videoId == song.videoId ||
+                            (existing.title.equals(song.title, ignoreCase = true) &&
+                                existing.artist.equals(song.artist, ignoreCase = true))
+                    } -> Toast.makeText(context, "Track is already in this playlist", Toast.LENGTH_SHORT).show()
+                    !LocalPlaylistStore.updatePlaylistSongs(selected.id, current.songs + song) ->
+                        Toast.makeText(context, "Playlist no longer exists", Toast.LENGTH_SHORT).show()
+                    else -> Toast.makeText(context, "Added to playlist", Toast.LENGTH_SHORT).show()
+                }
+            },
+            onGenerateSimilar = { onGenerateSimilar(selected) },
         )
     } else {
         val visible = playlists
@@ -509,9 +531,21 @@ fun ScrobblePlaylistsContent(
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             item {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Playlists", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
-                    Text("Your generated and saved mixes", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(
+                        Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Text("Playlists", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
+                        Text("Your generated mixes and custom playlists", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    IconButton(onClick = {
+                        createText = ""
+                        createError = null
+                        createDialogVisible = true
+                    }) {
+                        Icon(Icons.Rounded.Add, contentDescription = "Create playlist")
+                    }
                 }
             }
             if (playlists.isNotEmpty()) {
@@ -534,7 +568,7 @@ fun ScrobblePlaylistsContent(
                     ) {
                         Text(if (playlists.isEmpty()) "No playlists yet" else "No matching playlists", style = MaterialTheme.typography.titleMedium)
                         Text(
-                            if (playlists.isEmpty()) "Generate a mix and it will be saved here." else "Try another playlist name.",
+                            if (playlists.isEmpty()) "Create a playlist or generate a mix to get started." else "Try another playlist name.",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
@@ -571,6 +605,41 @@ fun ScrobblePlaylistsContent(
         }
     }
 
+    if (createDialogVisible) {
+        AlertDialog(
+            onDismissRequest = { createDialogVisible = false },
+            title = { Text("New playlist") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = createText,
+                        onValueChange = { createText = it; createError = null },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        label = { Text("Playlist name") },
+                    )
+                    createError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val clean = createText.trim()
+                    when {
+                        clean.isBlank() -> createError = "Enter a playlist name"
+                        playlists.any { it.title.equals(clean, ignoreCase = true) } ->
+                            createError = "A playlist with that name already exists"
+                        else -> {
+                            val created = LocalPlaylistStore.savePlaylist(title = clean, songs = emptyList())
+                            createDialogVisible = false
+                            createText = ""
+                            selectedId = created.id
+                        }
+                    }
+                }) { Text("Create") }
+            },
+            dismissButton = { TextButton(onClick = { createDialogVisible = false }) { Text("Cancel") } },
+        )
+    }
     renameTarget?.let { target ->
         AlertDialog(
             onDismissRequest = { renameTarget = null },
@@ -736,7 +805,39 @@ private fun PlaylistDetailContent(
     onDelete: () -> Unit,
     onChangeCover: () -> Unit,
     onExport: () -> Unit,
+    onAddTrack: (Song) -> Unit,
+    onGenerateSimilar: () -> Unit,
 ) {
+    var showTrackSearch by rememberSaveable(playlist.id) { mutableStateOf(false) }
+    var trackSearchQuery by rememberSaveable(playlist.id) { mutableStateOf("") }
+    var trackSearchResults by remember(playlist.id) { mutableStateOf<List<Song>>(emptyList()) }
+    var trackSearchLoading by remember(playlist.id) { mutableStateOf(false) }
+
+    LaunchedEffect(showTrackSearch, trackSearchQuery, playlist.id) {
+        val query = trackSearchQuery.trim()
+        if (!showTrackSearch || query.length < 2) {
+            trackSearchResults = emptyList()
+            trackSearchLoading = false
+            return@LaunchedEffect
+        }
+        delay(300)
+        trackSearchLoading = true
+        trackSearchResults = YtMusicRepository.search(query, SearchFilter.SONGS)
+            .getOrNull()
+            .orEmpty()
+            .mapNotNull { result ->
+                when (result) {
+                    is SearchResult.TopTrack -> result.song
+                    is SearchResult.Track -> result.song
+                    is SearchResult.Browse -> null
+                }
+            }
+            .filter { it.videoId.isNotBlank() }
+            .distinctBy { it.videoId }
+            .take(8)
+        trackSearchLoading = false
+    }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(
@@ -778,6 +879,63 @@ private fun PlaylistDetailContent(
                     Icon(Icons.Rounded.Shuffle, contentDescription = null)
                     Spacer(Modifier.width(6.dp))
                     Text("Shuffle")
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(
+                    onClick = { showTrackSearch = !showTrackSearch },
+                    modifier = Modifier.weight(1f),
+                ) { Text(if (showTrackSearch) "Close search" else "Add tracks") }
+                OutlinedButton(
+                    onClick = onGenerateSimilar,
+                    enabled = playlist.songs.isNotEmpty(),
+                    modifier = Modifier.weight(1f),
+                ) { Text("Generate Similar") }
+            }
+        }
+        if (showTrackSearch) {
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = trackSearchQuery,
+                        onValueChange = { trackSearchQuery = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        label = { Text("Search YouTube Music") },
+                    )
+                    if (trackSearchLoading) LinearProgressIndicator(Modifier.fillMaxWidth())
+                    trackSearchResults.forEach { candidate ->
+                        val alreadyAdded = playlist.songs.any { it.videoId == candidate.videoId }
+                        Row(
+                            Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
+                                .padding(horizontal = 8.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            AsyncImage(
+                                model = candidate.thumbnailUrl,
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.size(44.dp).clip(RoundedCornerShape(8.dp)),
+                            )
+                            Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
+                                Text(candidate.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(candidate.artist, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            IconButton(
+                                onClick = { onAddTrack(candidate) },
+                                enabled = !alreadyAdded,
+                            ) {
+                                Icon(
+                                    if (alreadyAdded) Icons.Rounded.Check else Icons.Rounded.Add,
+                                    contentDescription = if (alreadyAdded) "Already added" else "Add track",
+                                )
+                            }
+                        }
+                    }
+                    if (trackSearchQuery.trim().length >= 2 && !trackSearchLoading && trackSearchResults.isEmpty()) {
+                        Text("No tracks found", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
             }
         }
