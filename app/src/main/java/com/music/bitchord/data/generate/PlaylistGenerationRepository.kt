@@ -144,53 +144,20 @@ class PlaylistGenerationRepository(context: Context) {
             }
             PlaylistGenerationMode.MIX -> {
                 onProgress("Building a mix from your listening…")
-                val replaySongs = try {
-                    ListeningStats.summary(ReplayPeriod.ALL_TIME).songs.take(8).map { it.song }
-                } catch (cancellation: CancellationException) {
-                    throw cancellation
-                } catch (_: Exception) {
-                    emptyList()
-                }
-                val recentSongs = try {
-                    withContext(Dispatchers.IO) { ListeningHistory.read(appContext).map { it.song } }
-                } catch (cancellation: CancellationException) {
-                    throw cancellation
-                } catch (_: Exception) {
-                    emptyList()
-                }
-
-                val (accountHistory, likedSongs) = if (SignedIn.state(appContext).value) {
-                    supervisorScope {
-                        val history = async { YtMusicRepository.history().getOrNull().orEmpty() }
-                        val liked = async { YtMusicRepository.library().getOrNull()?.likedSongs.orEmpty() }
-                        history.await() to liked.await()
-                    }
-                } else {
-                    emptyList<Song>() to emptyList()
-                }
-
+                val signals = loadTasteSignals()
                 val seeds = (
                     listOfNotNull(request.seedTrack) +
-                        replaySongs.take(4) +
-                        recentSongs.take(4) +
-                        accountHistory.take(3) +
-                        likedSongs.take(3)
+                        signals.replaySongs.take(4) +
+                        signals.recentSongs.take(4) +
+                        signals.accountHistory.take(3) +
+                        signals.likedSongs.take(3)
                     )
                     .filter { it.videoId.isNotBlank() && !it.isVideo }
                     .distinctBy { it.videoId }
                     .take(6)
 
                 onProgress("Finding radio from your listening…")
-                val radioPools = supervisorScope {
-                    seeds.map { seed ->
-                        async {
-                            YtMusicRepository.radio(seed.videoId).getOrNull().orEmpty()
-                                .filterNot { it.videoId == seed.videoId }
-                        }
-                    }.awaitAll()
-                }
-                val discovery = PlaylistGenerationRules.interleave(radioPools)
-
+                val discovery = radioFromSeeds(seeds)
                 onProgress("Blending recommendations and your library…")
                 val remote = supervisorScope {
                     val picks = async { YtMusicRepository.quickPicks().getOrNull().orEmpty() }
@@ -200,7 +167,7 @@ class PlaylistGenerationRepository(context: Context) {
                 PlaylistGenerationRules.weightedBlend(
                     pools = listOf(
                         (discovery + remote.first) to 4,
-                        (likedSongs + accountHistory + recentSongs + replaySongs) to 3,
+                        (signals.likedSongs + signals.accountHistory + signals.recentSongs + signals.replaySongs) to 3,
                         remote.second to 1,
                     ),
                     limit = target * 2,
@@ -208,8 +175,43 @@ class PlaylistGenerationRepository(context: Context) {
                 )
             }
             PlaylistGenerationMode.RECOMMENDATIONS -> {
-                onProgress("Loading your YouTube Music recommendations…")
-                YtMusicRepository.quickPicks().getOrThrow()
+                onProgress("Building recommendations from your listening…")
+                val signals = loadTasteSignals()
+                val seeds = (
+                    signals.replaySongs.take(6) +
+                        signals.recentSongs.take(6) +
+                        signals.accountHistory.take(4) +
+                        signals.likedSongs.take(4)
+                    )
+                    .filter { it.videoId.isNotBlank() && !it.isVideo }
+                    .distinctBy { it.videoId }
+                    .take(6)
+
+                onProgress("Finding tracks related to your taste…")
+                val discovery = radioFromSeeds(seeds)
+                val remote = supervisorScope {
+                    val picks = async { YtMusicRepository.quickPicks().getOrNull().orEmpty() }
+                    val home = async { homeSongs() }
+                    picks.await() to home.await()
+                }
+                val candidates = PlaylistGenerationRules.weightedBlend(
+                    pools = listOf(
+                        (discovery + remote.first) to 4,
+                        remote.second to 1,
+                    ),
+                    limit = target * 2,
+                    maxPerArtist = 2,
+                )
+                val heard = signals.replaySongs + signals.recentSongs +
+                    signals.accountHistory + signals.likedSongs
+                val fresh = PlaylistGenerationRules.excludeHeard(
+                    candidates = candidates,
+                    heardVideoIds = heard.mapTo(HashSet()) { it.videoId },
+                    heardTrackKeys = heard.mapTo(HashSet(), PlaylistGenerationRules::trackKey),
+                )
+                // Keep the recommendation mode useful when a small account has
+                // too little unseen radio; Never Heard remains the strict mode.
+                if (fresh.size >= MIN_TRACKS) fresh else candidates
             }
             PlaylistGenerationMode.NEVER_HEARD -> neverHeardCandidates(onProgress)
             PlaylistGenerationMode.LIBRARY -> {
@@ -334,6 +336,57 @@ class PlaylistGenerationRepository(context: Context) {
             throw IllegalStateException("Not enough new tracks found for this playlist. Try another source playlist.")
         }
         return result
+    }
+
+    private data class TasteSignals(
+        val replaySongs: List<Song>,
+        val recentSongs: List<Song>,
+        val accountHistory: List<Song>,
+        val likedSongs: List<Song>,
+    )
+
+    private suspend fun loadTasteSignals(): TasteSignals {
+        val replay = try {
+            ListeningStats.summary(ReplayPeriod.ALL_TIME).songs.take(12).map { it.song }
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (_: Exception) {
+            emptyList()
+        }
+        val recent = try {
+            withContext(Dispatchers.IO) { ListeningHistory.read(appContext).map { it.song }.take(30) }
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (_: Exception) {
+            emptyList()
+        }
+        val (history, liked) = if (SignedIn.state(appContext).value) {
+            supervisorScope {
+                val accountHistory = async { YtMusicRepository.history().getOrNull().orEmpty() }
+                val accountLiked = async { YtMusicRepository.library().getOrNull()?.likedSongs.orEmpty() }
+                accountHistory.await() to accountLiked.await()
+            }
+        } else {
+            emptyList<Song>() to emptyList()
+        }
+        return TasteSignals(replay, recent, history, liked)
+    }
+
+    private suspend fun radioFromSeeds(seeds: List<Song>): List<Song> {
+        val distinctSeeds = seeds.asSequence()
+            .filter { it.videoId.isNotBlank() && !it.isVideo }
+            .distinctBy { it.videoId }
+            .take(6)
+            .toList()
+        val pools = supervisorScope {
+            distinctSeeds.map { seed ->
+                async {
+                    YtMusicRepository.radio(seed.videoId).getOrNull().orEmpty()
+                        .filterNot { it.videoId == seed.videoId }
+                }
+            }.awaitAll()
+        }
+        return PlaylistGenerationRules.interleave(pools)
     }
 
     private suspend fun neverHeardCandidates(onProgress: (String) -> Unit): List<Song> {
