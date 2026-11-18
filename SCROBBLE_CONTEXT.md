@@ -1492,3 +1492,15 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 - Reduce animation skips the shared-bounds transition and the fallback row entrance. Replay period-chip color transitions also snap when Reduce animation is enabled.
 - The transition uses the existing Mylo playlist card/row styling; no new design system or Library behavior was introduced.
 - Android/desktop/web CI must pass on the resulting head, and the shared transition still requires device visual verification. The Statistics split-bar definition remains unresolved and is not fabricated.
+
+
+## 51. Verification follow-up — shared-bounds handoff (2026-11-19)
+
+- Re-fetched live Main-dev. The branch was at `29faf8a5e6e6a4d56d1c5f0e8814ac00ec32e6ec` (commit `feat(scrobble): share saved playlist transition`); the handoff's earlier SHA `0fd7e0f` is stale. The live `main` head remains `11478fde56f1817cb777b296e60907359086f383`; no main ref or file was changed.
+- Reconciled current sources: `MainActivity.kt` blob `6686758823ff0821feb6c0afb8c87dc797a3b91c`, `ScrobbleContent.kt` blob `9ab870bd3329c0bbe15682b52e4e5a237f1dcb43`, `ReplayScreen.kt` blob `7bb957e4e73b9fd7ef872fad5c985c3ba5d9ac40`, and `ScrobbleGenerateViewModel.kt` blob `e7b11bcc94d206e76423132b1542fa0fd0656c32`.
+- Confirmed stable playlist row identity: `LazyColumn.itemsIndexed` keys each row by `playlist.id`. The shared-bounds source and destination use the same `scrobble-playlist-<id>` key, and the event collector records whether the save originated from Generate before selecting Playlists. Handoff origin/id are cleared on close and after 1.6 seconds.
+- Existing focused tests include `GenerateCommitTest` (cancellation before/after generation and exactly-once commit) and `ScrobbleFabTest`; there is not yet a direct test for the MainActivity saved-playlist event → tab-navigation handoff. Do not overstate that coverage.
+- CI run #1167 / ID `44395593096`, exact head `29faf8a5e6e6a4d56d1c5f0e8814ac00ec32e6ec`: Android unit tests **passed**; desktop compile **passed**; desktop unit tests **passed**; web tests **passed**; web typecheck **passed**. The optional Android/TV/Wear APK build was **skipped** because `build_apks` was not requested. This run verifies the shared-bounds implementation at that exact commit.
+- No physical-device/emulator verification was performed. Shared transition visual quality, Glass/Standard nav combinations, and Reduce Motion behavior remain device acceptance checks.
+- Statistics source remains Mylo's actual on-device ListeningStats aggregation (track/artist/album totals and day/time buckets). No split-bar categories or denominator are defined by the existing summary/prototype decisions, so no split-bar was fabricated.
+- Next: request a direct navigation-event regression test if the event flow is extracted into a testable state holder without unnecessary architecture; obtain the optional APK build; complete device checks. Ask the user to define the split-bar's intended categories and denominator before implementing it.
