@@ -1321,3 +1321,31 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 - Tests were added for radio interleaving and title uniqueness. No local Gradle build or unit-test execution was possible; the GitHub connector returned no workflow runs or combined status entries for the current Main-dev commit.
 - No device test or visual screenshot check has been performed. Main-dev head at this audit: `e1cb98039f218795e15a188d3ebe666bd47321dd`.
 - `main` remains untouched. Continue only on `Main-dev`.
+
+
+## 41. Playlist/Generate acceptance audit after implementation (2026-11-19)
+
+### Confirmed working in source
+- Playlist list: Newest / Oldest / Name / Track count / Custom order; pinned-first automatic sorting; Move up/Move down only in Custom order and hidden while filtering.
+- Playlist row actions: Pin/Unpin, Generate similar, Move up/Move down, Rename and Delete.
+- Playlist detail: Play, Shuffle, Add tracks, cover Change/Reset, Generate similar, CSV/M3U export/share, Rename/Delete, and track Move up/Move down/Remove.
+- Add-track search: debounced, cancellation-safe, filters blank IDs/video uploads, deduplicates results and rechecks duplicates atomically in LocalPlaylistStore.
+- Seed-track search on Generate: now clears stale results while typing, rethrows cancellation, filters invalid/video results and surfaces loading, no-results and error states. Latest UI blob: `f34212b4722f6308071b903888972f94a79f68fa`.
+- Playlist detail action row was consolidated to Back, Add tracks and one overflow menu; this avoids crowding the small-screen header and keeps the actions in Mylo's existing Material 3 style.
+- Statistics still delegates to the existing ReplayScreen for Mylo Replay data; Last.fm remains a separate statistics source.
+
+### Explicitly not complete / not silently substituted
+- Track ordering currently uses explicit Move up/Move down actions. LastWave's drag-and-drop reorder/lock mode has not been ported.
+- Exact regeneration of the original request is unavailable because original count/period/seed/exclusion settings are not stored on LocalPlaylist. Generate similar creates a new source-inspired mix instead.
+- Last.fm similar-track/artist graph expansion is not implemented; Generate similar uses multi-seed YouTube Music radio and Quick Picks/Home fallback.
+- Manual playlist creation and Library ownership/visibility redesign remain deferred per the user's decision.
+- No pixel-perfect device screenshot, actual image-provider permission test, SAF export test or share-target test has been performed.
+
+### Next verification gate
+1. Run the Android unit tests and app compile on Main-dev.
+2. Fix any compile/test failures before adding more features.
+3. Device-check image URI persistence/reset/delete, CSV/M3U save/share, playlist search/add, sorting/reorder, Generate Similar cancellation and result visibility.
+4. Revisit drag-and-drop only after the current move controls and device behavior are verified.
+- The latest Main-dev UI source is `ScrobbleContent.kt` blob `f34212b4722f6308071b903888972f94a79f68fa`.
+- GitHub returned no workflow runs or combined status entries for latest commit `6e3b6fb85f711a3491164e6860cb9096ea0f04d3`; no CI result is claimed.
+- `main` remains untouched.
