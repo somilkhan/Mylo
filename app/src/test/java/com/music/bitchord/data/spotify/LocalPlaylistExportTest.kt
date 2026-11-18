@@ -10,7 +10,7 @@ class LocalPlaylistExportTest {
 
     @Test
     fun csvEscapesCommasQuotesAndLineBreaks() {
-        val song = Song(videoId = "video-1", title = "A, \"quoted\"\nTitle", artist = "Artist, One")
+        val song = Song(videoId = "video-1", title = "A, \"quoted\"\nTitle", artist = "Artist, One", thumbnailUrl = null, fromAutoplay = false)
         assertEquals(
             "Track,Artist\r\n\"A, \"\"quoted\"\"\nTitle\",\"Artist, One\"",
             LocalPlaylistExport.toCsv(listOf(song)),
@@ -20,8 +20,8 @@ class LocalPlaylistExportTest {
     @Test
     fun m3uUsesStableYouTubeMusicLinksAndSafeSingleLineMetadata() {
         val songs = listOf(
-            Song(videoId = "video_1-abc", title = "Track\nOne", artist = "Artist"),
-            Song(videoId = "video-2", title = "Second", artist = "Guest"),
+            Song(videoId = "video_1-abc", title = "Track\nOne", artist = "Artist", thumbnailUrl = null, fromAutoplay = false, thumbnailUrl = null, fromAutoplay = false),
+            Song(videoId = "video-2", title = "Second", artist = "Guest", thumbnailUrl = null, fromAutoplay = false),
         )
         assertEquals(
             "#EXTM3U\n#PLAYLIST:My Mix\n" +
@@ -34,8 +34,8 @@ class LocalPlaylistExportTest {
     @Test
     fun m3uReportsTracksWithoutPlayableVideoIdsInsteadOfWritingBrokenEntries() {
         val songs = listOf(
-            Song(videoId = "", title = "Local only", artist = "Artist"),
-            Song(videoId = "video-2", title = "Playable", artist = "Artist"),
+            Song(videoId = "", title = "Local only", artist = "Artist", thumbnailUrl = null, fromAutoplay = false, thumbnailUrl = null, fromAutoplay = false),
+            Song(videoId = "video-2", title = "Playable", artist = "Artist", thumbnailUrl = null, fromAutoplay = false, thumbnailUrl = null, fromAutoplay = false),
         )
         val output = LocalPlaylistExport.toM3u("Mix", songs)
         assertFalse(output.contains("Local only"))
