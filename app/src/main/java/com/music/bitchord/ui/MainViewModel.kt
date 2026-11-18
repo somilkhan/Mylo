@@ -1181,7 +1181,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 onResult?.invoke(local.browseId, local.title, true)
             }
-        }    }
+        }
+    }
 
     /**
      * Drops [song] from the playlist page it is being read on, and takes the
