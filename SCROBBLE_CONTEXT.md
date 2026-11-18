@@ -1604,3 +1604,13 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 - Earlier concentration test run #1171 / ID `44398750532` completed successfully on exact head `48b731a10216acefb94eb2695f31dd739752174d`.
 - Physical-device verification has not been performed. Keep the hourly chart's visual spacing/readability and TalkBack output on the device acceptance list.
 - Branch boundary: continue only on `Main-dev`; `main` remains `11478fde56f1817cb777b296e60907359086f383`. No branch creation or merge.
+
+
+## 55. Hourly timeline period-integrity correction (2026-11-19)
+
+- Rechecked the actual `MergedBucket.add(bucket, range)` path in `data/stats/ListeningStats.kt`. Weekly Replay correctly filters track/day aggregates, but the persisted hourly buckets are monthly aggregates and are intentionally not merged for `THIS_WEEK`; therefore `ReplaySummary.hourOfDay` is empty for a non-empty weekly summary.
+- Corrected `ListeningRhythmCard` to compare the 24-hour bucket total with the selected period's actual `summary.totalMs`. It renders the chart only when the hourly buckets account for the full period total. When they do not (weekly or legacy data without hourly buckets), it explicitly says the hourly breakdown is unavailable rather than falsely claiming no listening occurred.
+- Added a regression test for non-zero period listening with all-zero hourly buckets. Existing exact-24-hour, malformed/negative and true-empty cases remain covered.
+- Correction commit: `faa9d05daeba10604df27a2b55cbb1c8c416c719`.
+- CI run #1172 / ID `44400935268` still targeted the earlier implementation SHA `8405db11952bc747cd1f7343155bc1cebe150aa8` and was in progress at this update. It does **not** verify this correction commit; obtain fresh CI evidence for `faa9d05`. No pass is claimed.
+- Continue only on `Main-dev`; `main` remains untouched at `11478fde56f1817cb777b296e60907359086f383`.
