@@ -1583,3 +1583,24 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 - Android CI run `44398750532` targets exact HEAD `48b731a10216acefb94eb2695f31dd739752174d`; it was pending when this note was written. No test/build pass is claimed yet.
 - Branch integrity check: Main-dev HEAD `48b731a10216acefb94eb2695f31dd739752174d`; main remains `11478fde56f1817cb777b296e60907359086f383`. Only Main-dev was modified.
 - Remaining: verify CI, inspect any failures, run APK build if workflow supports it, and complete physical-device visual checks. Continue porting the rest of LastWave's source-backed Statistics behavior only where Mylo's stored aggregates can support it exactly; do not port fabricated session/time fallbacks.
+
+
+## 54. Source-backed hourly listening timeline port (2026-11-19)
+
+### LastWave source audit
+- Re-read LastWave Statistics source at `last-wave` head `d0dd73755bfe640c515502751f440a32e57506d5`: `ListeningStatsScreen.kt`, `ListeningStatsViewModel.kt`, `ListeningStatsModels.kt` and `ListeningStatsComponents.kt`.
+- The screen's timeline offers time-range and metric controls, but its ViewModel attributes each track's full accumulated duration to its last-played timestamp, infers session counts from play counts, and falls back to synthetic 210-second durations when exact durations are absent. Its session/habit calculations also infer durations and active-day totals. These values are not equivalent to a sampled listening timeline and are not copied.
+- Mylo's `ListeningStats` records actual audible milliseconds into 24 hourly buckets; `ReplaySummary.hourOfDay` is already merged for the selected Replay period. This is a more accurate source for a Mylo-native hourly timeline than reusing LastWave's approximations.
+
+### Mylo implementation
+- Added `app/src/main/java/com/music/bitchord/ui/replay/ListeningRhythm.kt`: a Material 3 24-hour bar chart, actual peak hour and duration, plus accessible hour/value description. It normalizes old/malformed bucket lists to 24 entries and clamps negative values.
+- Integrated the card into `ReplayScreen.kt` only when `heading == "Statistics"`; ordinary Replay/Library presentation remains unchanged. It follows the selected Replay period because it consumes that period's existing `ReplaySummary.hourOfDay`.
+- Added `app/src/test/java/com/music/bitchord/ui/replay/ListeningRhythmTest.kt` for 24-bucket peak calculation, short/negative input normalization and empty data.
+- No inferred plays, sessions, fabricated durations, remote Last.fm counts or new persistence were introduced.
+
+### Commit and verification
+- Implementation commit: `8405db11952bc747cd1f7343155bc1cebe150aa8` (`feat(stats): add real hourly listening rhythm`).
+- Android CI run #1172 / ID `44400935268` targets this exact implementation commit and was **in progress** at documentation time. No pass is claimed; inspect its jobs and logs before further release/device claims.
+- Earlier concentration test run #1171 / ID `44398750532` completed successfully on exact head `48b731a10216acefb94eb2695f31dd739752174d`.
+- Physical-device verification has not been performed. Keep the hourly chart's visual spacing/readability and TalkBack output on the device acceptance list.
+- Branch boundary: continue only on `Main-dev`; `main` remains `11478fde56f1817cb777b296e60907359086f383`. No branch creation or merge.
