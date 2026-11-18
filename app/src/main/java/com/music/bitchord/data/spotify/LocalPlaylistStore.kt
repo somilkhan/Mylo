@@ -5,8 +5,6 @@ import android.content.SharedPreferences
 import com.music.bitchord.data.model.Song
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import org.json.JSONArray
-import org.json.JSONObject
 import java.util.UUID
 
 data class LocalPlaylist(
@@ -40,44 +38,7 @@ object LocalPlaylistStore {
     private fun load() {
         if (!this::prefs.isInitialized) return
         val raw = prefs.getString(KEY_PLAYLISTS, null) ?: return
-        runCatching {
-            val list = mutableListOf<LocalPlaylist>()
-            val jsonArray = JSONArray(raw)
-            for (i in 0 until jsonArray.length()) {
-                val obj = jsonArray.getJSONObject(i)
-                val id = obj.getString("id")
-                val title = obj.getString("title")
-                val songsArray = obj.getJSONArray("songs")
-                val songs = mutableListOf<Song>()
-                for (j in 0 until songsArray.length()) {
-                    val sObj = songsArray.getJSONObject(j)
-                    val song = Song(
-                        videoId = sObj.optString("videoId", ""),
-                        title = sObj.optString("title", ""),
-                        artist = sObj.optString("artist", ""),
-                        thumbnailUrl = sObj.optString("thumbnailUrl", null).takeIf { !it.isNullOrBlank() && it != "null" },
-                        durationText = sObj.optString("durationText", null).takeIf { !it.isNullOrBlank() && it != "null" },
-                        artistId = sObj.optString("artistId", null).takeIf { !it.isNullOrBlank() && it != "null" },
-                        albumId = sObj.optString("albumId", null).takeIf { !it.isNullOrBlank() && it != "null" },
-                        albumName = sObj.optString("albumName", null).takeIf { !it.isNullOrBlank() && it != "null" },
-                        isVideo = sObj.optBoolean("isVideo", false),
-                    )
-                    songs.add(song)
-                }
-                list.add(
-                    LocalPlaylist(
-                        id = id,
-                        title = title,
-                        songs = songs,
-                        createdAtEpochMillis = obj.optLong("createdAtEpochMillis", 0L),
-                        generationMode = obj.optString("generationMode", null)
-                            .takeIf { !it.isNullOrBlank() && it != "null" },
-                        isPinned = obj.optBoolean("isPinned", false),
-                    ),
-                )
-            }
-            _playlists.value = list
-        }
+        runCatching { _playlists.value = LocalPlaylistCodec.decode(raw) }
     }
 
     @Synchronized
@@ -178,32 +139,7 @@ object LocalPlaylistStore {
     private fun persist(list: List<LocalPlaylist>) {
         if (!this::prefs.isInitialized) return
         runCatching {
-            val jsonArray = JSONArray()
-            for (playlist in list) {
-                val pObj = JSONObject()
-                pObj.put("id", playlist.id)
-                pObj.put("title", playlist.title)
-                pObj.put("createdAtEpochMillis", playlist.createdAtEpochMillis)
-                pObj.put("generationMode", playlist.generationMode)
-                pObj.put("isPinned", playlist.isPinned)
-                val songsArray = JSONArray()
-                for (song in playlist.songs) {
-                    val sObj = JSONObject()
-                    sObj.put("videoId", song.videoId)
-                    sObj.put("title", song.title)
-                    sObj.put("artist", song.artist)
-                    sObj.put("thumbnailUrl", song.thumbnailUrl)
-                    sObj.put("durationText", song.durationText)
-                    sObj.put("artistId", song.artistId)
-                    sObj.put("albumId", song.albumId)
-                    sObj.put("albumName", song.albumName)
-                    sObj.put("isVideo", song.isVideo)
-                    songsArray.put(sObj)
-                }
-                pObj.put("songs", songsArray)
-                jsonArray.put(pObj)
-            }
-            prefs.edit().putString(KEY_PLAYLISTS, jsonArray.toString()).apply()
+            prefs.edit().putString(KEY_PLAYLISTS, LocalPlaylistCodec.encode(list)).apply()
         }
     }
 }
