@@ -1099,3 +1099,41 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 1. Trace Mylo `Song` identity and YouTube Music search/radio APIs for track-add and Generate Similar; verify cancellation, timeout and stale-request behavior.
 2. Inspect all current `LocalPlaylistStore` callers (especially Library/import fallback and generated-save paths) before choosing a stable Scrobble ownership marker.
 3. Define the smallest playlist feature batch and regression tests against the acceptance matrix in section 19; then proceed under the already approved Phase 4 scope. Keep `main` untouched.
+
+
+## 34. Mylo visual-system alignment and post-rollback continuation audit (2026-11-19)
+
+### User direction reaffirmed
+- Continue only from the approved Scrobble plan and this context file. The uploaded `Mylo Final Prototype.md` is not the implementation authority.
+- Scrobble must feel native to Mylo: use its existing monochrome theme, typography, component language, spacing, dialogs, Glass/Standard navigation and player integration. Do not apply a separate LastWave visual identity or redesign approved flows.
+- Preserve the approved host behavior: the Scrobble FAB opens persistent Statistics / Generate / Playlists tabs; the regular Mylo navigation returns unchanged on exit; Glass and Standard modes both remain supported. Keep the normal Home / Explore / Library / Search tabs and playback behavior intact.
+- Library ownership / “Add to Library” remains explicitly deferred. Do not implement or infer that feature in this pass.
+
+### Current Mylo visual source of truth inspected
+- `ui/theme/Theme.kt`, blob `5ddab4736c637c03a81ebb05850ade46c89adfdb`:
+  - Dark palette is near-black with white primary text and restrained charcoal surfaces; light palette is white/off-white with black text and muted gray secondary text.
+  - Mylo typography uses the platform sans-serif family, heavy/tight display and headline styles (headlineLarge 30sp W800; headlineMedium 22sp W700; titleLarge 20sp W700; titleMedium 16sp W600), and restrained body/label styles.
+  - UI should use `MaterialTheme.colorScheme` and `MaterialTheme.typography`, not hard-coded theme colors or a second font scale.
+- `ui/components/FloatingBottomBar.kt`, blob `b6b83eb8fec7c8d1df472287afe16aaa62b57939`, and `GlassNavBar.kt` were inspected:
+  - The two bottom bars deliberately share sizing/spacing primitives, including `PILL_INSET` and `TAB_VERTICAL_PADDING`; Glass mode also has its own supported material/fallback and Reduce Animation behavior.
+  - Keep Scrobble tabs inside the existing host/bar implementation. Do not create a separate Scrobble-only tab bar or bypass the existing Glass/Standard selection.
+- Current `ui/scrobble/ScrobbleContent.kt`, blob `72d2692b572e9a9c83e87b791525c1d36b7f358e`, already references Mylo MaterialTheme typography and color scheme, and uses the existing Material 3 controls. It also contains screen-local geometry and surface styling (for example 20dp content gutters, 16dp playlist surfaces and custom alpha overlays). These values are not yet proven to match all current Mylo screen patterns. Treat them as audit targets, not permission to restyle arbitrarily.
+- No screenshot/device comparison was performed in this audit. Therefore **pixel-perfect alignment is not yet verified**. Before changing styling, compare the Scrobble pages against current Mylo Replay, Library, settings dialogs and shared components in both Glass and Standard modes; only change confirmed inconsistencies while preserving approved layout and behavior.
+
+### Current data ownership facts rechecked
+- `data/spotify/LocalPlaylistStore.kt`, blob `23c85bb33f7a9094f2b8f785ed186e4a0f947e89`, still stores local playlists in the existing SharedPreferences JSON store. `generationMode` distinguishes generated saves from imports/manual saves at the model level; `isPinned` and playlist identity are preserved. Do not introduce Room or a parallel store.
+- `BitChordApplication.kt`, blob `b55849c00b3965e25c74c005df4872220e8f7d4e`, initializes LocalPlaylistStore before UI consumers.
+- `MainActivity.kt`, blob `2b137bc5aa44ae85d006c7ae5035789814fe45f1`, currently maps every local playlist into the Library's On Device shelf. Spotify import flows call `createPlaylistWithVideoIds`; local fallback ownership is therefore a separate concern from YT Music account playlists.
+- The current Scrobble playlist page also observes the complete LocalPlaylistStore list. This overlap is known and remains deferred with the user's Library decision; do not silently filter, duplicate, move, or sync playlists as part of visual alignment.
+- `PlaylistGenerationRepository.kt`, blob `ef84b1ad96de57fadf46caf68b62bb134346955f`, uses Mylo `Song` rows and stable `videoId` identity. `ScrobbleGenerateViewModel.kt`, blob `60d99ddb35c0c17ea0a7b2f200369f3cc5f0ce69`, owns timeout/cancellation and saves only after generation returns. Keep generation separate from playback queue mutation; queue changes remain explicit user playback actions.
+
+### Confirmed next work (no speculative UI additions)
+1. Complete the outstanding source trace for Mylo's YouTube Music search/radio/artist/mood/library APIs, including cancellation/error propagation and track identity mapping. The repository source file was not yet located through the current GitHub file lookup; do not infer its implementation from call sites.
+2. Finish the LocalPlaylistStore caller map, especially the exact Spotify import local-fallback save path and Library detail/play path. Keep YT Music account playlists distinct from local imported/generated playlists.
+3. Compare current Scrobble Generate and Playlists components against Mylo's established screen/dialog patterns, then record only verified visual mismatches and the smallest safe alignment changes.
+4. Complete the approved playlist acceptance gaps from sections 10, 13, 19 and 33 only after the above traces; do not add Library integration, YT Music export/sync, or unapproved playlist features.
+5. Run focused tests and exact-head CI after implementation. No local build, emulator or physical-device validation is claimed by this audit.
+
+### Change boundary
+- This entry is documentation-only. No app source, tests, dependencies, branch structure, PR, or `main` was changed.
+- Continue on `Main-dev` only. Do not merge PR #8/#4 or modify `main` without explicit approval.
