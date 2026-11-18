@@ -85,10 +85,12 @@ import com.music.bitchord.data.spotify.LocalPlaylistSortMode
 import com.music.bitchord.data.spotify.sortLocalPlaylists
 import com.music.bitchord.data.stats.ReplayPeriod
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun ScrobbleGenerateContent(
@@ -618,20 +620,22 @@ fun ScrobblePlaylistsContent(
             confirmButton = {
                 TextButton(onClick = {
                     scope.launch {
-                        if (LocalPlaylistStore.deletePlaylist(target.id)) {
-                            target.customCoverUri?.let { savedUri ->
-                                runCatching {
-                                    context.contentResolver.releasePersistableUriPermission(
-                                        Uri.parse(savedUri),
-                                        Intent.FLAG_GRANT_READ_URI_PERMISSION,
-                                    )
+                        withContext(NonCancellable) {
+                            if (LocalPlaylistStore.deletePlaylist(target.id)) {
+                                target.customCoverUri?.let { savedUri ->
+                                    runCatching {
+                                        context.contentResolver.releasePersistableUriPermission(
+                                            Uri.parse(savedUri),
+                                            Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                                        )
+                                    }
                                 }
+                                if (selectedId == target.id) selectedId = null
+                                deleteTarget = null
+                                deleteError = null
+                            } else {
+                                deleteError = "Couldn't delete playlist. Check device storage and try again."
                             }
-                            if (selectedId == target.id) selectedId = null
-                            deleteTarget = null
-                            deleteError = null
-                        } else {
-                            deleteError = "Couldn't delete playlist. Check device storage and try again."
                         }
                     }
                 }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
@@ -755,35 +759,45 @@ private fun PlaylistDetailContent(
             val newUri = uri.toString()
             val oldUri = playlist.customCoverUri
             scope.launch {
+                var saved = false
                 try {
                     if (newUri != oldUri) {
                         context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     }
-                    val saved = LocalPlaylistStore.setCustomCover(playlist.id, newUri)
-                    if (saved) {
-                        if (oldUri != null && oldUri != newUri) {
-                            runCatching {
-                                context.contentResolver.releasePersistableUriPermission(
-                                    Uri.parse(oldUri),
-                                    Intent.FLAG_GRANT_READ_URI_PERMISSION,
-                                )
+                    withContext(NonCancellable) {
+                        saved = LocalPlaylistStore.setCustomCover(playlist.id, newUri)
+                        if (saved) {
+                            if (oldUri != null && oldUri != newUri) {
+                                runCatching {
+                                    context.contentResolver.releasePersistableUriPermission(
+                                        Uri.parse(oldUri),
+                                        Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                                    )
+                                }
                             }
-                        }
-                        coverMessage = "Cover updated"
-                    } else {
-                        if (newUri != oldUri) {
-                            runCatching {
-                                context.contentResolver.releasePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                            }
-                        }
-                        coverMessage = if (LocalPlaylistStore.getPlaylist(playlist.id) == null) {
-                            "Playlist no longer exists"
+                            coverMessage = "Cover updated"
                         } else {
-                            "Couldn't save cover. Try again."
+                            if (newUri != oldUri) {
+                                runCatching {
+                                    context.contentResolver.releasePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                }
+                            }
+                            coverMessage = if (LocalPlaylistStore.getPlaylist(playlist.id) == null) {
+                                "Playlist no longer exists"
+                            } else {
+                                "Couldn't save cover. Try again."
+                            }
                         }
                     }
+                } catch (cancelled: CancellationException) {
+                    if (!saved && newUri != oldUri) {
+                        runCatching {
+                            context.contentResolver.releasePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+                    }
+                    throw cancelled
                 } catch (error: Exception) {
-                    if (newUri != oldUri) {
+                    if (!saved && newUri != oldUri) {
                         runCatching {
                             context.contentResolver.releasePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
                         }
@@ -875,18 +889,20 @@ private fun PlaylistDetailContent(
                                     detailMenuExpanded = false
                                     val oldUri = playlist.customCoverUri
                                     scope.launch {
-                                        if (LocalPlaylistStore.setCustomCover(playlist.id, null)) {
-                                            oldUri?.let { savedUri ->
-                                                runCatching {
-                                                    context.contentResolver.releasePersistableUriPermission(
-                                                        Uri.parse(savedUri),
-                                                        Intent.FLAG_GRANT_READ_URI_PERMISSION,
-                                                    )
+                                        withContext(NonCancellable) {
+                                            if (LocalPlaylistStore.setCustomCover(playlist.id, null)) {
+                                                oldUri?.let { savedUri ->
+                                                    runCatching {
+                                                        context.contentResolver.releasePersistableUriPermission(
+                                                            Uri.parse(savedUri),
+                                                            Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                                                        )
+                                                    }
                                                 }
+                                                coverMessage = "Cover reset"
+                                            } else {
+                                                coverMessage = "Couldn't reset cover. Try again."
                                             }
-                                            coverMessage = "Cover reset"
-                                        } else {
-                                            coverMessage = "Couldn't reset cover. Try again."
                                         }
                                     }
                                 },
