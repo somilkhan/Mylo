@@ -1159,9 +1159,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                         onResult?.invoke(created.browseId, created.title, false)
                     },
                     onFailure = {
-                        val local = runCatching {
+                        val local = try {
                             com.music.bitchord.data.spotify.LocalPlaylistStore.savePlaylist(name, songs)
-                        }.getOrElse { error ->
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (error: Exception) {
                             onError?.invoke(error.message ?: "Couldn't save playlist on this device.")
                             return@launch
                         }
@@ -1169,9 +1171,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     },
                 )
             } else {
-                val local = runCatching {
+                val local = try {
                     com.music.bitchord.data.spotify.LocalPlaylistStore.savePlaylist(name, songs)
-                }.getOrElse { error ->
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
                     onError?.invoke(error.message ?: "Couldn't save playlist on this device.")
                     return@launch
                 }
