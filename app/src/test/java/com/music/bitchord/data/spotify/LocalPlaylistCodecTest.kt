@@ -30,6 +30,7 @@ class LocalPlaylistCodecTest {
         assertEquals(0L, playlist.createdAtEpochMillis)
         assertNull(playlist.generationMode)
         assertFalse(playlist.isPinned)
+        assertNull(playlist.customCoverUri)
         assertEquals("video-1", playlist.songs.single().videoId)
         assertNull(playlist.songs.single().thumbnailUrl)
         assertFalse(playlist.songs.single().isVideo)
@@ -56,6 +57,7 @@ class LocalPlaylistCodecTest {
             createdAtEpochMillis = 1_800_000_000_000L,
             generationMode = "similar-tracks",
             isPinned = true,
+            customCoverUri = "content://media/external/images/media/42",
         )
 
         val decoded = LocalPlaylistCodec.decode(LocalPlaylistCodec.encode(listOf(playlist))).single()
@@ -65,6 +67,7 @@ class LocalPlaylistCodecTest {
         assertEquals(playlist.createdAtEpochMillis, decoded.createdAtEpochMillis)
         assertEquals(playlist.generationMode, decoded.generationMode)
         assertTrue(decoded.isPinned)
+        assertEquals(playlist.customCoverUri, decoded.customCoverUri)
         assertEquals(playlist.songs.single(), decoded.songs.single())
         assertEquals(playlist.browseId, decoded.browseId)
     }
