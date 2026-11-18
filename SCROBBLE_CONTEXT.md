@@ -1428,3 +1428,11 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 3. Reuse Mylo's existing Material 3/theme tokens and animation/reduced-motion settings; keep the same final states when motion is disabled.
 4. Add focused tests for state/event correctness where possible, then rerun CI on the corrected current Main-dev source.
 5. Do not touch `main`; Library integration remains postponed.
+
+## 45. Correction — Statistics animation audit (2026-11-19)
+
+- Section 44's statement was too narrow: `ScrobbleStatisticsContent` delegates its Mylo Replay source to `ReplayScreen`; auditing only the wrapper was not enough to decide whether Statistics motion existed.
+- Inspected `ReplayScreen.kt` blob `dfb8b5ec20bc3601cf38defbc9cddd7ba3d278cf`. It imports/uses `animateColorAsState`, but has no count-up numeric animation (`animateIntAsState` / equivalent) and no animated bar-width/progress implementation for the approved split-bar growth. These two approved Statistics details remain unimplemented.
+- The shell's Scrobble entry/exit transition is present in `MainActivity.kt`: entering uses vertical slide + fade, leaving uses vertical slide-out + fade, and Reduce motion removes those transitions. This is source-confirmed; device feel still needs verification.
+- Generate success currently changes the selected Scrobble tab to Playlists through `onOpenPlaylists = { selectedScrobbleTab = 2 }`. The generated-row fly/handoff itself is not implemented in the current Scrobble content.
+- Next implementation must preserve the current Replay data and event path; add only presentation motion around real values/events. Do not fabricate a split percentage or use fake counts to match the static prototype.
