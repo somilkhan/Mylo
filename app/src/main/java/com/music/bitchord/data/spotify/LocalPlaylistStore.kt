@@ -87,7 +87,7 @@ object LocalPlaylistStore {
     suspend fun deletePlaylist(id: String): Boolean = mutate {
         val current = _playlists.value
         val updated = current.filterNot { it.id == id || it.browseId == id || it.id == id.removePrefix("local:playlist:") }
-        if (updated.size == current.size || !persist(updated)) return@withLock false
+        if (updated.size == current.size || !persist(updated)) return@mutate false
         _playlists.value = updated
         true
     }
@@ -96,11 +96,11 @@ object LocalPlaylistStore {
         val cleanId = id.removePrefix("local:playlist:").removePrefix("VL")
         val current = _playlists.value
         val index = current.indexOfFirst { it.id == cleanId || it.id == id || it.browseId == id }
-        if (index < 0) return@withLock false
+        if (index < 0) return@mutate false
         val updated = current.toMutableList().apply {
             this[index] = this[index].copy(title = newTitle)
         }
-        if (!persist(updated)) return@withLock false
+        if (!persist(updated)) return@mutate false
         _playlists.value = updated
         true
     }
@@ -110,11 +110,11 @@ object LocalPlaylistStore {
         val cleanId = normalizeId(id)
         val current = _playlists.value
         val index = current.indexOfFirst { it.id == cleanId || it.browseId == id }
-        if (index < 0) return@withLock false
+        if (index < 0) return@mutate false
         val updated = current.toMutableList().apply {
             this[index] = this[index].copy(songs = songs.toList())
         }
-        if (!persist(updated)) return@withLock false
+        if (!persist(updated)) return@mutate false
         _playlists.value = updated
         true
     }
@@ -124,13 +124,13 @@ object LocalPlaylistStore {
         val cleanId = normalizeId(id)
         val current = _playlists.value
         val index = current.indexOfFirst { it.id == cleanId || it.browseId == id }
-        if (index < 0) return@withLock false
+        if (index < 0) return@mutate false
         val existing = current[index]
-        val updatedSongs = appendUniquePlaylistSong(existing.songs, song) ?: return@withLock false
+        val updatedSongs = appendUniquePlaylistSong(existing.songs, song) ?: return@mutate false
         val updated = current.toMutableList().apply {
             this[index] = existing.copy(songs = updatedSongs)
         }
-        if (!persist(updated)) return@withLock false
+        if (!persist(updated)) return@mutate false
         _playlists.value = updated
         true
     }
@@ -139,11 +139,11 @@ object LocalPlaylistStore {
         val cleanId = normalizeId(id)
         val current = _playlists.value
         val index = current.indexOfFirst { it.id == cleanId || it.browseId == id }
-        if (index < 0) return@withLock false
+        if (index < 0) return@mutate false
         val updated = current.toMutableList().apply {
             this[index] = this[index].copy(isPinned = pinned)
         }
-        if (!persist(updated)) return@withLock false
+        if (!persist(updated)) return@mutate false
         _playlists.value = updated
         true
     }
@@ -152,11 +152,11 @@ object LocalPlaylistStore {
         val cleanId = normalizeId(id)
         val current = _playlists.value
         val index = current.indexOfFirst { it.id == cleanId || it.browseId == id }
-        if (index < 0) return@withLock false
+        if (index < 0) return@mutate false
         val updated = current.toMutableList().apply {
             this[index] = this[index].copy(customCoverUri = uri)
         }
-        if (!persist(updated)) return@withLock false
+        if (!persist(updated)) return@mutate false
         _playlists.value = updated
         true
     }
@@ -165,13 +165,13 @@ object LocalPlaylistStore {
         val cleanId = normalizeId(id)
         val current = _playlists.value
         val from = current.indexOfFirst { it.id == cleanId || it.browseId == id }
-        if (from < 0 || current.isEmpty()) return@withLock false
+        if (from < 0 || current.isEmpty()) return@mutate false
         val to = destinationIndex.coerceIn(0, current.lastIndex)
-        if (from == to) return@withLock true
+        if (from == to) return@mutate true
         val updated = current.toMutableList()
         val moved = updated.removeAt(from)
         updated.add(to, moved)
-        if (!persist(updated)) return@withLock false
+        if (!persist(updated)) return@mutate false
         _playlists.value = updated
         true
     }
@@ -180,14 +180,14 @@ object LocalPlaylistStore {
         val cleanId = normalizeId(id)
         val current = _playlists.value
         val index = current.indexOfFirst { it.id == cleanId || it.browseId == id }
-        if (index < 0) return@withLock false
+        if (index < 0) return@mutate false
         val playlist = current[index]
-        val songs = movePlaylistSong(playlist.songs, sourceIndex, expectedVideoId, direction) ?: return@withLock false
-        if (songs == playlist.songs) return@withLock true
+        val songs = movePlaylistSong(playlist.songs, sourceIndex, expectedVideoId, direction) ?: return@mutate false
+        if (songs == playlist.songs) return@mutate true
         val updated = current.toMutableList().apply {
             this[index] = playlist.copy(songs = songs)
         }
-        if (!persist(updated)) return@withLock false
+        if (!persist(updated)) return@mutate false
         _playlists.value = updated
         true
     }
@@ -196,13 +196,13 @@ object LocalPlaylistStore {
         val cleanId = normalizeId(id)
         val current = _playlists.value
         val index = current.indexOfFirst { it.id == cleanId || it.browseId == id }
-        if (index < 0) return@withLock false
+        if (index < 0) return@mutate false
         val playlist = current[index]
-        val songs = removePlaylistSong(playlist.songs, sourceIndex, expectedVideoId) ?: return@withLock false
+        val songs = removePlaylistSong(playlist.songs, sourceIndex, expectedVideoId) ?: return@mutate false
         val updated = current.toMutableList().apply {
             this[index] = playlist.copy(songs = songs)
         }
-        if (!persist(updated)) return@withLock false
+        if (!persist(updated)) return@mutate false
         _playlists.value = updated
         true
     }
