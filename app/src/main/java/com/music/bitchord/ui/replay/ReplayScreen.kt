@@ -36,6 +36,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -117,36 +118,6 @@ fun ReplayScreen(
     val context = LocalContext.current
     val summary = state.summary
     val animateStatistics = heading == "Statistics"
-    val animatedPlays = remember { Animatable(0f) }
-    val animatedMinutes = remember { Animatable(0f) }
-    LaunchedEffect(
-        animateStatistics,
-        reduceMotion,
-        summary?.period,
-        summary?.totalPlays,
-        summary?.minutes,
-    ) {
-        val current = summary ?: return@LaunchedEffect
-        if (!animateStatistics || reduceMotion) {
-            animatedPlays.snapTo(current.totalPlays.toFloat())
-            animatedMinutes.snapTo(current.minutes.toFloat())
-        } else {
-            animatedPlays.snapTo(0f)
-            animatedMinutes.snapTo(0f)
-            coroutineScope {
-                launch { animatedPlays.animateTo(current.totalPlays.toFloat(), tween(900)) }
-                launch { animatedMinutes.animateTo(current.minutes.toFloat(), tween(900)) }
-            }
-        }
-    }
-    val displayedSummary = if (animateStatistics && !reduceMotion) {
-        summary?.copy(
-            totalPlays = animatedPlays.value.toInt(),
-            totalMs = animatedMinutes.value.toLong() * 60_000L,
-        )
-    } else {
-        summary
-    }
     val leadArtwork = summary?.songs?.firstOrNull()?.song?.thumbnailUrl
     val palette = rememberArtworkColors(leadArtwork)
     val topSongs = stringResource(R.string.top_songs)
@@ -211,7 +182,9 @@ fun ReplayScreen(
                 else -> {
                     item("cards") {
                         ReplayCardRow(
-                            cards = displayedSummary!!.cards(context),
+                            cards = summary.cards(context),
+                            animateSummary = summary.takeIf { animateStatistics },
+                            reduceMotion = reduceMotion,
                             holder = holder,
                             memberSince = state.memberSince,
                             onCardClick = onOpenStory,
@@ -371,7 +344,39 @@ internal fun ReplayCardRow(
     onCardClick: (ReplayStoryPage) -> Unit,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(horizontal = PAGE_GUTTER + 4.dp),
+    animateSummary: ReplaySummary? = null,
+    reduceMotion: Boolean = false,
 ) {
+    val context = LocalContext.current
+    val animatedPlays = remember(animateSummary?.period) { Animatable(0f) }
+    val animatedMinutes = remember(animateSummary?.period) { Animatable(0f) }
+    LaunchedEffect(
+        animateSummary?.period,
+        animateSummary?.totalPlays,
+        animateSummary?.minutes,
+        reduceMotion,
+    ) {
+        val current = animateSummary ?: return@LaunchedEffect
+        if (reduceMotion) {
+            animatedPlays.snapTo(current.totalPlays.toFloat())
+            animatedMinutes.snapTo(current.minutes.toFloat())
+        } else {
+            animatedPlays.snapTo(0f)
+            animatedMinutes.snapTo(0f)
+            coroutineScope {
+                launch { animatedPlays.animateTo(current.totalPlays.toFloat(), tween(900)) }
+                launch { animatedMinutes.animateTo(current.minutes.toFloat(), tween(900)) }
+            }
+        }
+    }
+    val visibleCards = if (animateSummary != null && !reduceMotion) {
+        animateSummary.copy(
+            totalPlays = animatedPlays.value.toInt(),
+            totalMs = animatedMinutes.value.toLong() * 60_000L,
+        ).cards(context)
+    } else {
+        cards
+    }
     val rowState = rememberLazyListState()
     LazyRow(
         modifier = modifier,
@@ -380,7 +385,7 @@ internal fun ReplayCardRow(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         flingBehavior = rememberSnapFlingBehavior(lazyListState = rowState),
     ) {
-        items(cards, key = { it.label }) { card ->
+        items(visibleCards, key = { it.label }) { card ->
             ReplayCreditCard(
                 label = card.label,
                 value = card.value,

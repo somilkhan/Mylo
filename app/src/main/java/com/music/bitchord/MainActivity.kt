@@ -2723,8 +2723,11 @@ private fun BitChordApp(
                             (targetState == "library_show_all" && initialState == libraryTabKey)
                         val enteringScrobble = targetState.startsWith("scrobble-") && !initialState.startsWith("scrobble-")
                         val leavingScrobble = initialState.startsWith("scrobble-") && !targetState.startsWith("scrobble-")
+                        val scrobbleTabSwap = initialState.startsWith("scrobble-") && targetState.startsWith("scrobble-")
                         when {
                             tabSwap || libraryShowAllSwap -> EnterTransition.None togetherWith ExitTransition.None
+                            scrobbleTabSwap && reducePlayerMotion ->
+                                EnterTransition.None togetherWith ExitTransition.None
                             (enteringScrobble || leavingScrobble) && reducePlayerMotion ->
                                 EnterTransition.None togetherWith ExitTransition.None
                             enteringScrobble ->

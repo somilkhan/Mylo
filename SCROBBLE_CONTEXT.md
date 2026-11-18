@@ -1472,3 +1472,13 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 - Reduce animation snaps both values directly to their real totals without changing the data or layout.
 - The split-bar remains unimplemented: current ReplaySummary has totals and ranked songs/artists/albums/genres, but no approved source/category definition or denominator for the bar. Do not infer one.
 - CI/device verification remains pending; no build or test pass is claimed. Continue only on Main-dev; main remains untouched.
+
+
+## 49. Reduce-motion coverage and counter performance (2026-11-19)
+
+- Moved the Statistics count-up state into ReplayCardRow so only the metric-card row recomposes during the 900 ms count-up; Replay charts and the rest of the page no longer recompose on every animation frame.
+- Scrobble-to-Scrobble tab changes now use no transition when Reduce animation is enabled. The existing entry/exit transitions, FAB, playlist-row arrival and Statistics counters already snap/skip under the same setting.
+- Glass FloatingTabBar now skips its container size animation when Reduce animation is enabled. Its pill motion and inline/expanded AnimatedContent already use the setting; Standard FloatingBottomBar already snaps its indicator.
+- No change to data, tab state, or playlist persistence when animations are disabled.
+- Full shared-bounds Generate-to-Playlists transition remains open; current row entrance is the safe fallback until the shared transition is implemented and device-checked. Split-bar categories/denominator remain unspecified and are not invented.
+- The preceding CI run #1163 caught the missing ReplayScreen remember import; this commit adds it and isolates animation recomposition. Fresh CI is required for this head.

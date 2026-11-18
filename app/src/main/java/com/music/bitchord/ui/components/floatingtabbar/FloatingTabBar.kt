@@ -866,7 +866,7 @@ private fun SharedTransitionScope.ExpandedTabs(
                     .clip(shapes.tabBarShape)
                     .then(tabBarContentModifier())
                     .padding(contentPadding)
-                    .animateContentSize()
+                    .then(if (reduceAnimation) Modifier else Modifier.animateContentSize())
             ) {
                 if (showPill && (!glassPill || pill.isFlat)) {
                     FlatSelectionPill(
