@@ -644,6 +644,7 @@ private fun PlaylistDetailContent(
     var coverMessage by remember(playlist.id) { mutableStateOf<String?>(null) }
     var exportDialogVisible by remember(playlist.id) { mutableStateOf(false) }
     var exportMessage by remember(playlist.id) { mutableStateOf<String?>(null) }
+    val context = LocalContext.current
     val existingVideoIds = remember(playlist.songs) { playlist.songs.mapTo(hashSetOf()) { it.videoId } }
     val coverPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
