@@ -16,6 +16,8 @@ data class LocalPlaylist(
     /** Stable generator mode identifier, null for imported/manual playlists. */
     val generationMode: String? = null,
     val isPinned: Boolean = false,
+    /** Persisted content URI chosen by the user; null uses the first track's artwork. */
+    val customCoverUri: String? = null,
 ) {
     val browseId: String get() = "local:playlist:$id"
 }
@@ -123,6 +125,20 @@ object LocalPlaylistStore {
         if (index < 0) return false
         val updated = _playlists.value.toMutableList().apply {
             this[index] = this[index].copy(isPinned = pinned)
+        }
+        _playlists.value = updated
+        persist(updated)
+        return true
+    }
+
+    /** Stores a user-selected artwork URI without changing playlist identity or tracks. */
+    @Synchronized
+    fun setCustomCover(id: String, uri: String?): Boolean {
+        val cleanId = normalizeId(id)
+        val index = _playlists.value.indexOfFirst { it.id == cleanId || it.browseId == id }
+        if (index < 0) return false
+        val updated = _playlists.value.toMutableList().apply {
+            this[index] = this[index].copy(customCoverUri = uri)
         }
         _playlists.value = updated
         persist(updated)
