@@ -8,7 +8,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.util.UUID
 
@@ -44,8 +43,13 @@ object LocalPlaylistStore {
         load()
     }
 
-    suspend fun reload() = mutationMutex.withLock {
-        withContext(Dispatchers.IO) { load() }
+    suspend fun reload() {
+        mutationMutex.lock()
+        try {
+            withContext(Dispatchers.IO) { load() }
+        } finally {
+            mutationMutex.unlock()
+        }
     }
 
     private fun load() {
@@ -211,8 +215,13 @@ object LocalPlaylistStore {
     private fun normalizeId(id: String): String =
         id.removePrefix("local:playlist:").removePrefix("VL")
 
-    private suspend fun <T> mutate(block: suspend () -> T): T = mutationMutex.withLock {
-        withContext(NonCancellable) { block() }
+    private suspend fun <T> mutate(block: suspend () -> T): T {
+        mutationMutex.lock()
+        return try {
+            withContext(NonCancellable) { block() }
+        } finally {
+            mutationMutex.unlock()
+        }
     }
 
     private suspend fun persist(list: List<LocalPlaylist>): Boolean = withContext(Dispatchers.IO) {
