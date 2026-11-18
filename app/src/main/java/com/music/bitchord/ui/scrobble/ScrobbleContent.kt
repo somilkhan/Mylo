@@ -177,7 +177,7 @@ fun ScrobbleGenerateContent(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("Generate", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
+            Text("Generate", style = MaterialTheme.typography.displayLarge, color = MaterialTheme.colorScheme.onBackground)
             Text("Build a playlist from your listening and YouTube Music.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
 
@@ -448,7 +448,7 @@ fun ScrobblePlaylistsContent(
                         modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
-                        Text("Playlists", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
+                        Text("Playlists", style = MaterialTheme.typography.displayLarge, color = MaterialTheme.colorScheme.onBackground)
                         Text("Your generated and saved mixes", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Box {
@@ -949,9 +949,15 @@ private fun PlaylistDetailContent(
                     Modifier.weight(1f).padding(start = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(3.dp),
                 ) {
-                    Text(playlist.title, style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
+                    Text(
+                        playlist.title,
+                        style = MaterialTheme.typography.displayLarge,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                     Text("${playlist.songs.size} tracks", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    coverMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = if (it.startsWith("Couldn't")) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant) }
+                    coverMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = if (it == "Cover updated" || it == "Cover reset") MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error) }
                     trackActionMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
                     generationState.savedPlaylist?.takeIf { it.generationMode == "similar-playlist" }?.let {
                         Text("Created ${it.title}. Go back to view it.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
