@@ -4802,6 +4802,7 @@ private fun BitChordApp(
                         privacy,
                         songs.map { it.videoId },
                         songs,
+                        onError = { showQueueNotice(it) },
                     ) { browseId, pTitle, savedLocally ->
                         showQueueNotice(
                             context.getString(
