@@ -108,28 +108,38 @@ fun ScrobbleGenerateContent(
     var excludeLibrary by rememberSaveable { mutableStateOf(false) }
     var seedResults by remember { mutableStateOf<List<Song>>(emptyList()) }
     var seedSearching by remember { mutableStateOf(false) }
+    var seedSearchError by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(seedQuery, mode) {
         if (mode != PlaylistGenerationMode.SIMILAR_TRACKS || seedQuery.trim().length < 2) {
             seedResults = emptyList()
+            seedSearchError = null
             seedSearching = false
             return@LaunchedEffect
         }
         delay(300)
         seedSearching = true
-        seedResults = YtMusicRepository.search(seedQuery.trim(), SearchFilter.SONGS)
-            .getOrNull()
-            .orEmpty()
-            .mapNotNull { result ->
+        seedSearchError = null
+        try {
+            val response = YtMusicRepository.search(seedQuery.trim(), SearchFilter.SONGS).getOrThrow()
+            currentCoroutineContext().ensureActive()
+            seedResults = response.mapNotNull { result ->
                 when (result) {
                     is SearchResult.TopTrack -> result.song
                     is SearchResult.Track -> result.song
                     is SearchResult.Browse -> null
                 }
-            }
-            .distinctBy { it.videoId }
-            .take(6)
-        seedSearching = false
+            }.filter { it.videoId.isNotBlank() && !it.isVideo }
+                .distinctBy { it.videoId }
+                .take(6)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            seedResults = emptyList()
+            seedSearchError = error.message ?: "Couldn't search YouTube Music"
+        } finally {
+            seedSearching = false
+        }
     }
 
     val modeDescription = when (mode) {
@@ -227,6 +237,10 @@ fun ScrobbleGenerateContent(
                         label = { Text("Search for a track") },
                     )
                     if (seedSearching) LinearProgressIndicator(Modifier.fillMaxWidth())
+                    seedSearchError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                    if (!seedSearching && seedSearchError == null && seedQuery.trim().length >= 2 && seedResults.isEmpty()) {
+                        Text("No tracks found", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                     seedResults.forEach { song ->
                         Row(
                             Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
