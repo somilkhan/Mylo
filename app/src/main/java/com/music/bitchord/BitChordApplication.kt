@@ -128,6 +128,8 @@ class BitChordApplication : Application(), SingletonImageLoader.Factory {
         ListenTogether.init(this)
         SearchHistory.init(this)
         LastPlayed.init(this)
+        // Local playlists must be loaded before MainActivity observes or mutates them.
+        com.music.bitchord.data.spotify.LocalPlaylistStore.init(this)
         BoundedContextPersistence.init(this)
         com.music.bitchord.playback.PartyPersonalQueueStash.init(this)
         // Which tracks the listener has reverted to YouTube's own upload. Read

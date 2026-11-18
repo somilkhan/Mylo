@@ -955,3 +955,45 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 - Continue the Mylo-native generator audit: identify the actual InnerTube search/radio APIs, listening-history identity, queue mutation entry points, and playlist-save caller.
 - Port generator orchestration with structured cancellation. Dismissing Scrobble must cancel generation before any save or queue mutation; never catch and convert `CancellationException` into fallback output.
 - Then integrate Statistics by reusing Mylo's actual local Replay data and keeping Last.fm remote profile metrics separate.
+
+## 27. Playlist persistence verification and Mylo-native generation engine (2026-11-18)
+
+### Verified branch / CI
+- Work is on Main-dev, parent HEAD for this implementation batch: 274d861136dc2a0565ac25e9ea765cba070f74a2.
+- Stable main remains 11478fde56f1817cb777b296e60907359086f383; it was not modified.
+- Android CI run #1089 / 44348090931 passed on exact HEAD 274d861136dc2a0565ac25e9ea765cba070f74a2: Android unit tests, desktop compile/tests, and web tests/typecheck all succeeded.
+- Root CLAUDE.md and AGENTS.md were checked again and remain absent (404). Do not claim they were read.
+
+### Persistence codec and tests
+- Extracted JSON encode/decode into app/src/main/java/com/music/bitchord/data/spotify/LocalPlaylistCodec.kt, with no Android framework dependency.
+- Added LocalPlaylistCodecTest: legacy JSON defaults, full generated metadata/song round-trip, and empty collection handling.
+- LocalPlaylistStore now delegates to the codec; existing JSON keys and song fields remain compatible.
+- Critical startup audit finding: LocalPlaylistStore.init(context) had no call site in BitChordApplication or MainActivity. That left its SharedPreferences field uninitialized, so persist() returned early and local playlists were only held in memory. Added initialization in BitChordApplication.onCreate before UI consumers run. This restores actual local playlist load/save persistence.
+
+### Mylo-native Generate domain
+- Added PlaylistGenerationRepository with all nine modes, using Mylo's existing sources rather than LastWave's Room/Last.fm-specific repositories:
+  - Top: local ListeningStats.summary(period) / Replay rankings.
+  - Recent: device-local ListeningHistory.
+  - Similar Tracks: YouTube Music radio from the selected seed video ID.
+  - Similar Artists: exact artist-page lookup, then that artist's tracks.
+  - Tag: YouTube Music mood/genre shelves, falling back to Songs search.
+  - Mix: seed radio + Quick Picks + Home shelves.
+  - Recommendations: YouTube Music Quick Picks.
+  - Never Heard: Quick Picks/Home candidates filtered by local event history (including two-second skips), local Replay totals, and signed-in YouTube Music history.
+  - Library: YouTube Music liked + added library songs.
+- Never Heard does not silently exclude saved playlists, liked tracks, or library tracks. Those are explicit request flags. Existing local playlist tracks are only soft-deprioritized for freshness unless an explicit exclusion is selected.
+- Candidate rules deduplicate by video ID, remove blank IDs/video uploads, use normalized title+artist identity for heard matching, and retain saved tracks at the end if the fresh pool is thin.
+- Added ScrobbleGenerateViewModel with a 60-second timeout, progress/error state, unique playlist naming, and a dismiss cancellation method. ViewModel teardown cancels too.
+- Added generateAndCommit: candidate work is suspending, then ensureActive() is checked immediately before a synchronous save. Cancellation during generation or immediately after the provider returns cannot reach the save callback. Generation itself does not mutate the playback queue; queue changes remain explicit playback actions.
+- Added unit tests for candidate identity/deduplication/freshness, explicit exclusion semantics, unique titles, and cancellation-before-commit.
+
+### Remaining / verification
+- This implementation batch is not yet on the branch; it is prepared against the exact parent above and will be committed atomically after the branch-head lease check.
+- The new engine/ViewModel are not yet wired into the Scrobble Generate screen. The Scrobble FAB and three-tab host are still not integrated into MainActivity.
+- Latest successful CI (#1089) predates this batch; a new exact-head Android CI run is required after commit.
+- No physical-device validation is claimed.
+
+### Next
+1. Wire the Generate ViewModel into the Scrobble Generate tab and ensure every dismissal path calls cancelGeneration().
+2. Build the Playlists tab on the now-initialized local store, including generated playlist open/play actions without changing queue semantics until the user taps Play.
+3. Integrate Statistics with local Replay as the primary source and keep Last.fm remote profile data explicitly separate.
