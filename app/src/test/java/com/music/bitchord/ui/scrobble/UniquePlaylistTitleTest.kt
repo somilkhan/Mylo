@@ -23,16 +23,4 @@ class UniquePlaylistTitleTest {
 
         assertEquals("Similar to Track", uniquePlaylistTitle(request, emptyList()))
     }
-
-    @Test
-    fun createsUniqueInspiredPlaylistTitles() {
-        assertEquals(
-            "Inspired by Late night",
-            uniqueInspiredPlaylistTitle(" Late night ", emptyList()),
-        )
-        assertEquals(
-            "Inspired by Late night (2)",
-            uniqueInspiredPlaylistTitle("Late night", listOf("Inspired by Late night")),
-        )
-    }
 }

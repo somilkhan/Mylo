@@ -1,13 +1,6 @@
 package com.music.bitchord.ui.scrobble
 
-import android.content.ClipData
-import android.content.Intent
-import android.net.Uri
-import android.widget.Toast
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.content.FileProvider
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -32,16 +25,12 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
-import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.PhotoLibrary
 import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.Shuffle
-import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
@@ -68,7 +57,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -82,12 +70,8 @@ import com.music.bitchord.data.generate.PlaylistGenerationMode
 import com.music.bitchord.data.generate.PlaylistGenerationRequest
 import com.music.bitchord.data.spotify.LocalPlaylist
 import com.music.bitchord.data.spotify.LocalPlaylistStore
-import com.music.bitchord.data.spotify.LocalPlaylistExport
 import com.music.bitchord.data.stats.ReplayPeriod
 import kotlinx.coroutines.delay
-import java.io.File
-import java.io.IOException
-import java.util.UUID
 
 @Composable
 fun ScrobbleGenerateContent(
@@ -373,114 +357,14 @@ private fun ReplayPeriod.label(): String = when (this) {
 fun ScrobblePlaylistsContent(
     contentPadding: PaddingValues,
     onPlaySongs: (List<Song>, Int) -> Unit,
-    onGenerateSimilar: (LocalPlaylist) -> Unit,
 ) {
     val playlists by LocalPlaylistStore.playlists.collectAsStateWithLifecycle()
-    val context = LocalContext.current
-    var coverPickerPlaylistId by rememberSaveable { mutableStateOf<String?>(null) }
-    var pendingExportContent by rememberSaveable { mutableStateOf<String?>(null) }
-    var pendingExportFilename by rememberSaveable { mutableStateOf<String?>(null) }
-    var exportTarget by remember { mutableStateOf<LocalPlaylist?>(null) }
-    val savePendingExport: (Uri?) -> Unit = { uri ->
-        val content = pendingExportContent
-        val filename = pendingExportFilename
-        if (uri != null && content != null && filename != null) {
-            runCatching {
-                context.contentResolver.openOutputStream(uri, "wt")?.use { output ->
-                    output.write(content.toByteArray(Charsets.UTF_8))
-                } ?: throw IOException("Couldn't open the selected document")
-            }.onSuccess {
-                Toast.makeText(context, "Saved " + filename, Toast.LENGTH_SHORT).show()
-            }.onFailure {
-                Toast.makeText(context, "Couldn't save playlist", Toast.LENGTH_SHORT).show()
-            }
-        }
-        pendingExportContent = null
-        pendingExportFilename = null
-    }
-    val csvSaveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
-        savePendingExport(uri)
-    }
-    val m3uSaveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("audio/x-mpegurl")) { uri ->
-        savePendingExport(uri)
-    }
-    val coverPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        val playlistId = coverPickerPlaylistId
-        if (uri != null && playlistId != null) {
-            try {
-                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                val previousUri = LocalPlaylistStore.getPlaylist(playlistId)?.customCoverUri
-                if (!LocalPlaylistStore.setCustomCover(playlistId, uri.toString())) {
-                    context.contentResolver.releasePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    Toast.makeText(context, "Playlist no longer exists", Toast.LENGTH_SHORT).show()
-                } else if (!previousUri.isNullOrBlank() && previousUri != uri.toString()) {
-                    runCatching {
-                        context.contentResolver.releasePersistableUriPermission(
-                            Uri.parse(previousUri),
-                            Intent.FLAG_GRANT_READ_URI_PERMISSION,
-                        )
-                    }
-                }
-            } catch (error: SecurityException) {
-                Toast.makeText(context, "Couldn't access that image", Toast.LENGTH_SHORT).show()
-            } catch (error: IllegalArgumentException) {
-                Toast.makeText(context, "Couldn't access that image", Toast.LENGTH_SHORT).show()
-            }
-        }
-        coverPickerPlaylistId = null
-    }
-    val openCoverPicker: (String) -> Unit = { playlistId ->
-        coverPickerPlaylistId = playlistId
-        coverPicker.launch(arrayOf("image/*"))
-    }
-    val handleExport: (LocalPlaylist, LocalPlaylistExport.Format, Boolean) -> Unit = { playlist, format, share ->
-        val content = LocalPlaylistExport.content(playlist.title, playlist.songs, format)
-        val filename = LocalPlaylistExport.filename(playlist.title, format)
-        if (share) {
-            runCatching {
-                val sharedDirectory = File(context.cacheDir, "shared")
-                if (!sharedDirectory.exists() && !sharedDirectory.mkdirs()) {
-                    throw IOException("Couldn't create the share directory")
-                }
-                val cutoff = System.currentTimeMillis() - 24L * 60L * 60L * 1000L
-                sharedDirectory.listFiles()
-                    ?.filter { it.name.startsWith("mylo-playlist-export-") && it.lastModified() < cutoff }
-                    ?.forEach { it.delete() }
-                val stem = filename.substringBeforeLast('.')
-                val shareFile = File(
-                    sharedDirectory,
-                    "mylo-playlist-export-" + stem + "-" + UUID.randomUUID() + "." + format.extension,
-                )
-                shareFile.writeText(content, Charsets.UTF_8)
-                val uri = FileProvider.getUriForFile(context, context.packageName + ".fileprovider", shareFile)
-                val sendIntent = Intent(Intent.ACTION_SEND).apply {
-                    type = format.mimeType
-                    putExtra(Intent.EXTRA_STREAM, uri)
-                    clipData = ClipData.newUri(context.contentResolver, filename, uri)
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                }
-                context.startActivity(Intent.createChooser(sendIntent, "Share playlist"))
-            }.onFailure {
-                Toast.makeText(context, "Couldn't share playlist", Toast.LENGTH_SHORT).show()
-            }
-            exportTarget = null
-        } else {
-            pendingExportContent = content
-            pendingExportFilename = filename
-            if (format == LocalPlaylistExport.Format.CSV) csvSaveLauncher.launch(filename)
-            else m3uSaveLauncher.launch(filename)
-            exportTarget = null
-        }
-    }
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
     var search by rememberSaveable { mutableStateOf("") }
     var renameTarget by remember { mutableStateOf<LocalPlaylist?>(null) }
     var renameText by rememberSaveable { mutableStateOf("") }
     var renameError by remember { mutableStateOf<String?>(null) }
     var deleteTarget by remember { mutableStateOf<LocalPlaylist?>(null) }
-    var createDialogVisible by remember { mutableStateOf(false) }
-    var createText by rememberSaveable { mutableStateOf("") }
-    var createError by remember { mutableStateOf<String?>(null) }
 
     val selected = playlists.firstOrNull { it.id == selectedId }
     BackHandler(enabled = selected != null) { selectedId = null }
@@ -497,24 +381,6 @@ fun ScrobblePlaylistsContent(
                 renameTarget = selected
             },
             onDelete = { deleteTarget = selected },
-            onChangeCover = { openCoverPicker(selected.id) },
-            onExport = { exportTarget = selected },
-            onAddTrack = { song ->
-                val current = LocalPlaylistStore.getPlaylist(selected.id)
-                when {
-                    current == null -> Toast.makeText(context, "Playlist no longer exists", Toast.LENGTH_SHORT).show()
-                    song.videoId.isBlank() -> Toast.makeText(context, "This track can't be added", Toast.LENGTH_SHORT).show()
-                    current.songs.any { existing ->
-                        existing.videoId == song.videoId ||
-                            (existing.title.equals(song.title, ignoreCase = true) &&
-                                existing.artist.equals(song.artist, ignoreCase = true))
-                    } -> Toast.makeText(context, "Track is already in this playlist", Toast.LENGTH_SHORT).show()
-                    !LocalPlaylistStore.updatePlaylistSongs(selected.id, current.songs + song) ->
-                        Toast.makeText(context, "Playlist no longer exists", Toast.LENGTH_SHORT).show()
-                    else -> Toast.makeText(context, "Added to playlist", Toast.LENGTH_SHORT).show()
-                }
-            },
-            onGenerateSimilar = { onGenerateSimilar(selected) },
         )
     } else {
         val visible = playlists
@@ -531,21 +397,9 @@ fun ScrobblePlaylistsContent(
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             item {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(
-                        Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        Text("Playlists", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
-                        Text("Your generated mixes and custom playlists", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    IconButton(onClick = {
-                        createText = ""
-                        createError = null
-                        createDialogVisible = true
-                    }) {
-                        Icon(Icons.Rounded.Add, contentDescription = "Create playlist")
-                    }
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Playlists", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
+                    Text("Your generated and saved mixes", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             if (playlists.isNotEmpty()) {
@@ -568,7 +422,7 @@ fun ScrobblePlaylistsContent(
                     ) {
                         Text(if (playlists.isEmpty()) "No playlists yet" else "No matching playlists", style = MaterialTheme.typography.titleMedium)
                         Text(
-                            if (playlists.isEmpty()) "Create a playlist or generate a mix to get started." else "Try another playlist name.",
+                            if (playlists.isEmpty()) "Generate a mix and it will be saved here." else "Try another playlist name.",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
@@ -586,60 +440,12 @@ fun ScrobblePlaylistsContent(
                             renameTarget = playlist
                         },
                         onDelete = { deleteTarget = playlist },
-                        onChangeCover = { openCoverPicker(playlist.id) },
-                        onResetCover = {
-                            val previousUri = LocalPlaylistStore.getPlaylist(playlist.id)?.customCoverUri
-                            if (LocalPlaylistStore.setCustomCover(playlist.id, null) && !previousUri.isNullOrBlank()) {
-                                runCatching {
-                                    context.contentResolver.releasePersistableUriPermission(
-                                        Uri.parse(previousUri),
-                                        Intent.FLAG_GRANT_READ_URI_PERMISSION,
-                                    )
-                                }
-                            }
-                        },
-                        onExport = { exportTarget = playlist },
                     )
                 }
             }
         }
     }
 
-    if (createDialogVisible) {
-        AlertDialog(
-            onDismissRequest = { createDialogVisible = false },
-            title = { Text("New playlist") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = createText,
-                        onValueChange = { createText = it; createError = null },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        label = { Text("Playlist name") },
-                    )
-                    createError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    val clean = createText.trim()
-                    when {
-                        clean.isBlank() -> createError = "Enter a playlist name"
-                        LocalPlaylistStore.playlists.value.any { it.title.equals(clean, ignoreCase = true) } ->
-                            createError = "A playlist with that name already exists"
-                        else -> {
-                            val created = LocalPlaylistStore.savePlaylist(title = clean, songs = emptyList())
-                            createDialogVisible = false
-                            createText = ""
-                            selectedId = created.id
-                        }
-                    }
-                }) { Text("Create") }
-            },
-            dismissButton = { TextButton(onClick = { createDialogVisible = false }) { Text("Cancel") } },
-        )
-    }
     renameTarget?.let { target ->
         AlertDialog(
             onDismissRequest = { renameTarget = null },
@@ -667,34 +473,6 @@ fun ScrobblePlaylistsContent(
             dismissButton = { TextButton(onClick = { renameTarget = null }) { Text("Cancel") } },
         )
     }
-    exportTarget?.let { target ->
-        AlertDialog(
-            onDismissRequest = { exportTarget = null },
-            title = { Text("Export playlist") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(target.title + " · " + target.songs.size + " tracks", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    OutlinedButton(
-                        onClick = { handleExport(target, LocalPlaylistExport.Format.CSV, false) },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) { Text("Save as CSV") }
-                    OutlinedButton(
-                        onClick = { handleExport(target, LocalPlaylistExport.Format.M3U, false) },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) { Text("Save as M3U") }
-                    OutlinedButton(
-                        onClick = { handleExport(target, LocalPlaylistExport.Format.CSV, true) },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) { Text("Share CSV") }
-                    OutlinedButton(
-                        onClick = { handleExport(target, LocalPlaylistExport.Format.M3U, true) },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) { Text("Share M3U") }
-                }
-            },
-            confirmButton = { TextButton(onClick = { exportTarget = null }) { Text("Cancel") } },
-        )
-    }
     deleteTarget?.let { target ->
         AlertDialog(
             onDismissRequest = { deleteTarget = null },
@@ -703,14 +481,6 @@ fun ScrobblePlaylistsContent(
             confirmButton = {
                 TextButton(onClick = {
                     LocalPlaylistStore.deletePlaylist(target.id)
-                    target.customCoverUri?.let { previousUri ->
-                        runCatching {
-                            context.contentResolver.releasePersistableUriPermission(
-                                Uri.parse(previousUri),
-                                Intent.FLAG_GRANT_READ_URI_PERMISSION,
-                            )
-                        }
-                    }
                     if (selectedId == target.id) selectedId = null
                     deleteTarget = null
                 }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
@@ -728,9 +498,6 @@ private fun PlaylistRow(
     onPin: () -> Unit,
     onRename: () -> Unit,
     onDelete: () -> Unit,
-    onChangeCover: () -> Unit,
-    onResetCover: () -> Unit,
-    onExport: () -> Unit,
 ) {
     var menuExpanded by remember(playlist.id) { mutableStateOf(false) }
     Row(
@@ -740,7 +507,7 @@ private fun PlaylistRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         AsyncImage(
-            model = playlist.customCoverUri ?: playlist.songs.firstOrNull()?.thumbnailUrl,
+            model = playlist.songs.firstOrNull()?.thumbnailUrl,
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier.size(54.dp).clip(RoundedCornerShape(10.dp)).clickable(onClick = onOpen),
@@ -766,21 +533,6 @@ private fun PlaylistRow(
                     onClick = { menuExpanded = false; onPin() },
                 )
                 DropdownMenuItem(
-                    text = { Text("Change cover") },
-                    leadingIcon = { Icon(Icons.Rounded.PhotoLibrary, contentDescription = null) },
-                    onClick = { menuExpanded = false; onChangeCover() },
-                )
-                DropdownMenuItem(
-                    text = { Text("Export") },
-                    onClick = { menuExpanded = false; onExport() },
-                )
-                if (playlist.customCoverUri != null) {
-                    DropdownMenuItem(
-                        text = { Text("Reset cover") },
-                        onClick = { menuExpanded = false; onResetCover() },
-                    )
-                }
-                DropdownMenuItem(
                     text = { Text("Rename") },
                     leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null) },
                     onClick = { menuExpanded = false; onRename() },
@@ -803,41 +555,7 @@ private fun PlaylistDetailContent(
     onPlaySongs: (List<Song>, Int) -> Unit,
     onRename: () -> Unit,
     onDelete: () -> Unit,
-    onChangeCover: () -> Unit,
-    onExport: () -> Unit,
-    onAddTrack: (Song) -> Unit,
-    onGenerateSimilar: () -> Unit,
 ) {
-    var showTrackSearch by rememberSaveable(playlist.id) { mutableStateOf(false) }
-    var trackSearchQuery by rememberSaveable(playlist.id) { mutableStateOf("") }
-    var trackSearchResults by remember(playlist.id) { mutableStateOf<List<Song>>(emptyList()) }
-    var trackSearchLoading by remember(playlist.id) { mutableStateOf(false) }
-
-    LaunchedEffect(showTrackSearch, trackSearchQuery, playlist.id) {
-        val query = trackSearchQuery.trim()
-        if (!showTrackSearch || query.length < 2) {
-            trackSearchResults = emptyList()
-            trackSearchLoading = false
-            return@LaunchedEffect
-        }
-        delay(300)
-        trackSearchLoading = true
-        trackSearchResults = YtMusicRepository.search(query, SearchFilter.SONGS)
-            .getOrNull()
-            .orEmpty()
-            .mapNotNull { result ->
-                when (result) {
-                    is SearchResult.TopTrack -> result.song
-                    is SearchResult.Track -> result.song
-                    is SearchResult.Browse -> null
-                }
-            }
-             .filter { it.videoId.isNotBlank() && !it.isVideo }
-            .distinctBy { it.videoId }
-            .take(8)
-        trackSearchLoading = false
-    }
-
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(
@@ -849,20 +567,9 @@ private fun PlaylistDetailContent(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         item {
-            val coverModel = playlist.customCoverUri ?: playlist.songs.firstOrNull()?.thumbnailUrl
-            if (coverModel != null) {
-                AsyncImage(
-                    model = coverModel,
-                    contentDescription = playlist.title + " cover",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxWidth().height(164.dp).clip(RoundedCornerShape(18.dp)),
-                )
-            }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = onBack) { Text("Back") }
                 Spacer(Modifier.weight(1f))
-                IconButton(onClick = onChangeCover) { Icon(Icons.Rounded.PhotoLibrary, contentDescription = "Change playlist cover") }
-                IconButton(onClick = onExport) { Icon(Icons.Rounded.Share, contentDescription = "Export playlist") }
                 IconButton(onClick = onRename) { Icon(Icons.Rounded.Edit, contentDescription = "Rename playlist") }
                 IconButton(onClick = onDelete) { Icon(Icons.Rounded.DeleteOutline, contentDescription = "Delete playlist") }
             }
@@ -879,67 +586,6 @@ private fun PlaylistDetailContent(
                     Icon(Icons.Rounded.Shuffle, contentDescription = null)
                     Spacer(Modifier.width(6.dp))
                     Text("Shuffle")
-                }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(
-                    onClick = { showTrackSearch = !showTrackSearch },
-                    modifier = Modifier.weight(1f),
-                ) { Text(if (showTrackSearch) "Close search" else "Add tracks") }
-                OutlinedButton(
-                    onClick = onGenerateSimilar,
-                    enabled = playlist.songs.any { it.videoId.isNotBlank() && !it.isVideo },
-                    modifier = Modifier.weight(1f),
-                ) { Text("Generate Similar") }
-            }
-        }
-        if (showTrackSearch) {
-            item {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = trackSearchQuery,
-                        onValueChange = { trackSearchQuery = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        label = { Text("Search YouTube Music") },
-                    )
-                    if (trackSearchLoading) LinearProgressIndicator(Modifier.fillMaxWidth())
-                    trackSearchResults.forEach { candidate ->
-                        val alreadyAdded = playlist.songs.any { existing ->
-                            existing.videoId == candidate.videoId ||
-                                (existing.title.equals(candidate.title, ignoreCase = true) &&
-                                    existing.artist.equals(candidate.artist, ignoreCase = true))
-                        }
-                        Row(
-                            Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
-                                .padding(horizontal = 8.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            AsyncImage(
-                                model = candidate.thumbnailUrl,
-                                contentDescription = null,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.size(44.dp).clip(RoundedCornerShape(8.dp)),
-                            )
-                            Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
-                                Text(candidate.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text(candidate.artist, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            IconButton(
-                                onClick = { onAddTrack(candidate) },
-                                enabled = !alreadyAdded,
-                            ) {
-                                Icon(
-                                    if (alreadyAdded) Icons.Rounded.Check else Icons.Rounded.Add,
-                                    contentDescription = if (alreadyAdded) "Already added" else "Add track",
-                                )
-                            }
-                        }
-                    }
-                    if (trackSearchQuery.trim().length >= 2 && !trackSearchLoading && trackSearchResults.isEmpty()) {
-                        Text("No tracks found", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
                 }
             }
         }

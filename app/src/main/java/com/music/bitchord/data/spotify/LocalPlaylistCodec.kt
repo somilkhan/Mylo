@@ -45,7 +45,6 @@ internal object LocalPlaylistCodec {
                         createdAtEpochMillis = obj.optLong("createdAtEpochMillis", 0L),
                         generationMode = obj.optionalString("generationMode"),
                         isPinned = obj.optBoolean("isPinned", false),
-                        customCoverUri = obj.optionalString("customCoverUri"),
                     ),
                 )
             }
@@ -61,7 +60,6 @@ internal object LocalPlaylistCodec {
                 .put("createdAtEpochMillis", playlist.createdAtEpochMillis)
                 .put("generationMode", playlist.generationMode)
                 .put("isPinned", playlist.isPinned)
-                .put("customCoverUri", playlist.customCoverUri)
             val songsArray = JSONArray()
             playlist.songs.forEach { song ->
                 songsArray.put(

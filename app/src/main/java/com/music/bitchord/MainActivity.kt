@@ -2877,10 +2877,6 @@ private fun BitChordApp(
                                         QueueSource("Scrobble Playlist", PlaybackSourceType.QUEUE),
                                     )
                                 },
-                                onGenerateSimilar = { playlist ->
-                                    selectedScrobbleTab = 1
-                                    scrobbleGenerateViewModel.generateSimilar(playlist)
-                                },
                             )
                         }
                     } else if (key == "spotify") {

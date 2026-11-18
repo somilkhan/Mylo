@@ -11,13 +11,9 @@ import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.spotify.LocalPlaylistStore
 import com.music.bitchord.data.stats.ListeningStats
 import com.music.bitchord.data.stats.ReplayPeriod
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withContext
 
 /** The nine generator modes, mapped onto Mylo's existing data sources. */
@@ -178,51 +174,6 @@ class PlaylistGenerationRepository(context: Context) {
         return result
     }
 
-    /**
-     * Builds a new playlist from several source-playlist tracks. The source
-     * remains untouched and its tracks are excluded by both video ID and
-     * normalized title/artist identity.
-     */
-    suspend fun generateSimilarToPlaylist(
-        sourceSongs: List<Song>,
-        count: Int = 30,
-        onProgress: (String) -> Unit = {},
-    ): List<Song> {
-        val seeds = sourceSongs.asSequence()
-            .filter { it.videoId.isNotBlank() && !it.isVideo }
-            .distinctBy { it.videoId }
-            .take(5)
-            .toList()
-        require(seeds.isNotEmpty()) { "This playlist has no tracks that can start YouTube Music radio" }
-
-        onProgress("Finding music inspired by " + seeds.size + " tracks…")
-        val radios = supervisorScope {
-            seeds.map { seed ->
-                async(Dispatchers.IO) {
-                    try {
-                        YtMusicRepository.radio(seed.videoId).getOrThrow()
-                    } catch (cancellation: CancellationException) {
-                        throw cancellation
-                    } catch (_: Exception) {
-                        emptyList()
-                    }
-                }
-            }.awaitAll().flatten()
-        }
-
-        currentCoroutineContext().ensureActive()
-        val candidates = PlaylistGenerationRules.excludeSourcePlaylistTracks(
-            candidates = PlaylistGenerationRules.deduplicate(radios),
-            sourceSongs = sourceSongs,
-        )
-        val result = candidates.take(count.coerceIn(MIN_TRACKS, MAX_TRACKS))
-        if (result.isEmpty()) {
-            throw IllegalStateException("Couldn't find new tracks for this playlist. Try another source playlist.")
-        }
-        onProgress("Found " + result.size + " tracks. Saving your new mix…")
-        return result
-    }
-
     private suspend fun neverHeardCandidates(onProgress: (String) -> Unit): List<Song> {
         onProgress("Checking your listening history…")
         val heard = heardTracks()
@@ -303,14 +254,6 @@ internal object PlaylistGenerationRules {
             song.videoId !in savedVideoIds && trackKey(song) !in savedTrackKeys
         }
         return (fresh + saved).take(limit.coerceAtLeast(0))
-    }
-
-    fun excludeSourcePlaylistTracks(candidates: List<Song>, sourceSongs: List<Song>): List<Song> {
-        val sourceVideoIds = sourceSongs.mapTo(HashSet()) { it.videoId }
-        val sourceTrackKeys = sourceSongs.mapTo(HashSet(), ::trackKey)
-        return candidates.filterNot { song ->
-            song.videoId in sourceVideoIds || trackKey(song) in sourceTrackKeys
-        }
     }
 
     fun trackKey(song: Song): String =

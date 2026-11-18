@@ -95,64 +95,6 @@ class ScrobbleGenerateViewModel(application: Application) : AndroidViewModel(app
         }
     }
 
-    fun generateSimilar(sourcePlaylist: LocalPlaylist) {
-        if (generationJob?.isActive == true) return
-        val token = ++generationToken
-        _uiState.update {
-            it.copy(isGenerating = true, progress = "Preparing a playlist-inspired mix…", error = null, savedPlaylist = null)
-        }
-
-        generationJob = viewModelScope.launch {
-            try {
-                val playlist = generateAndCommit(
-                    generate = {
-                        withTimeout(GENERATION_TIMEOUT_MS) {
-                            repository.generateSimilarToPlaylist(sourcePlaylist.songs) { message ->
-                                if (generationToken == token) {
-                                    _uiState.update { it.copy(progress = message) }
-                                }
-                            }
-                        }
-                    },
-                    commit = { songs ->
-                        check(generationToken == token) { "Generation was dismissed" }
-                        check(LocalPlaylistStore.getPlaylist(sourcePlaylist.id) != null) {
-                            "The source playlist was deleted"
-                        }
-                        val title = uniqueInspiredPlaylistTitle(
-                            sourcePlaylist.title,
-                            LocalPlaylistStore.playlists.value.map { it.title },
-                        )
-                        LocalPlaylistStore.savePlaylist(
-                            title = title,
-                            songs = songs,
-                            generationMode = "similar-playlist",
-                        )
-                    },
-                )
-                if (generationToken == token) {
-                    _uiState.update { it.copy(savedPlaylist = playlist) }
-                    _savedPlaylistEvents.tryEmit(playlist)
-                }
-            } catch (_: TimeoutCancellationException) {
-                if (generationToken == token) {
-                    _uiState.update { it.copy(error = "Playlist generation timed out. Check your connection and try again.") }
-                }
-            } catch (cancellation: CancellationException) {
-                throw cancellation
-            } catch (error: Exception) {
-                if (generationToken == token) {
-                    _uiState.update { it.copy(error = error.message ?: "Couldn't generate a playlist") }
-                }
-            } finally {
-                if (generationToken == token) {
-                    generationJob = null
-                    _uiState.update { it.copy(isGenerating = false, progress = "") }
-                }
-            }
-        }
-    }
-
     /** Cancels all in-flight generation before the Scrobble surface is dismissed. */
     fun cancelGeneration() {
         generationToken++
@@ -195,15 +137,4 @@ internal fun uniquePlaylistTitle(
     var suffix = 2
     while ("${base.take(58)} ($suffix)".lowercase(Locale.ROOT) in existing) suffix++
     return "${base.take(58)} ($suffix)"
-}
-
-
-internal fun uniqueInspiredPlaylistTitle(sourceTitle: String, existingTitles: List<String>): String {
-    val source = sourceTitle.trim().ifBlank { "Playlist" }.take(48)
-    val base = "Inspired by " + source
-    val existing = existingTitles.mapTo(HashSet()) { it.trim().lowercase(Locale.ROOT) }
-    if (base.lowercase(Locale.ROOT) !in existing) return base
-    var suffix = 2
-    while ((base.take(56) + " (" + suffix + ")").lowercase(Locale.ROOT) in existing) suffix++
-    return base.take(56) + " (" + suffix + ")"
 }
