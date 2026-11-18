@@ -101,7 +101,7 @@ object LocalPlaylistStore {
 
     /**
      * Replaces a playlist's tracks without changing its identity or generation metadata.
-     * Returns false when the playlist no longer exists.
+     * Returns false when the playlist is missing or the persisted write fails.
      */
     @Synchronized
     fun updatePlaylistSongs(id: String, songs: List<Song>): Boolean {
@@ -118,7 +118,7 @@ object LocalPlaylistStore {
 
     /**
      * Adds one catalogue track without duplicating its YouTube video identity.
-     * Returns false if the playlist is missing or already contains the track.
+     * Returns false if the playlist is missing, the track is duplicate/invalid, or persistence fails.
      */
     @Synchronized
     fun addSongIfAbsent(id: String, song: Song): Boolean {
