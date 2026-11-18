@@ -1289,3 +1289,35 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 - URI permission behavior and Coil loading of a persisted content URI still require device verification with an actual image provider.
 - Remaining approved work: Generate Similar/regenerate and final playlist/detail acceptance checks. Library ownership and manual playlist creation remain deferred.
 - `main` remains untouched; continue on `Main-dev` only.
+
+
+## 40. Generate Similar from an existing playlist (2026-11-19)
+
+### Implemented on Main-dev
+- Added `PlaylistGenerationRepository.generateSimilar`, file blob `56cfcde9332601b9b2b661b29860a7ac7d68b000`:
+  - Uses up to three source tracks, preferring distinct artists, as independent YouTube Music radio seeds.
+  - Interleaves the radio queues so one seed cannot dominate.
+  - Excludes every source-playlist videoId and normalized title/artist identity.
+  - If the radio pool is short, widens with Quick Picks and Home recommendations.
+  - Deduplicates candidates and prioritizes tracks not already saved locally; saved tracks are only retained when the pool is thin.
+  - Requires at least five results and caps the new mix at the existing generator maximum.
+- Added `PlaylistGenerationRules.interleave`; test coverage is in `PlaylistGenerationRulesTest.kt`, blob `69e10f995721ede41ec35eec9237a343e6dbb75e`.
+- Added `ScrobbleGenerateViewModel.generateSimilar`, file blob `e7b11bcc94d206e76423132b1542fa0fd0656c32`:
+  - Saves a new playlist named from the source title with a unique suffix when needed.
+  - Stores generation metadata as `similar-playlist`.
+  - Never edits or replaces the source playlist.
+  - Uses the existing generation timeout, cancellation token, progress/error state and saved-playlist event flow.
+- Added the action to playlist overflow and detail actions, with progress, cancel, error and saved-playlist feedback in `ScrobbleContent.kt`, blob `06d5cabe01b90fcb4d699bcda3e431f731e7767b`.
+- Wired the existing generation ViewModel through `MainActivity.kt`, blob `8a0d8b28d529ea4032f27fef162e0e5c1ffb3e3b`.
+- Added source-title uniqueness tests to `GenerateCommitTest.kt`, blob `3eeb52d51df58e4ca21180be1bee94439ed1650d`.
+
+### Important behavior boundary
+- This is a new playlist-inspired mix, not an exact replay of the original generation request. `LocalPlaylist` stores the generation mode but not the original count, period, seed and exclusion settings, so exact request replay is not currently possible.
+- The current Mylo Last.fm client does not expose the LastWave similar-track/artist graph endpoints. This implementation intentionally uses Mylo's existing YouTube Music radio and recommendation APIs instead; Last.fm graph expansion is not claimed as ported.
+- The source playlist remains intact. The new playlist is saved locally and appears in the current Scrobble/Library surfaces according to the existing behavior; the user's Library ownership redesign remains deferred.
+
+### Verification and limits
+- Reviewed the repository and ViewModel call chain, list/detail action wiring, cancellation checks, source-track exclusion and unique naming.
+- Tests were added for radio interleaving and title uniqueness. No local Gradle build or unit-test execution was possible; the GitHub connector returned no workflow runs or combined status entries for the current Main-dev commit.
+- No device test or visual screenshot check has been performed. Main-dev head at this audit: `e1cb98039f218795e15a188d3ebe666bd47321dd`.
+- `main` remains untouched. Continue only on `Main-dev`.
