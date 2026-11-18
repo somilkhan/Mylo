@@ -30,7 +30,7 @@
 - Never claim implementation, build, tests or device verification without exact-commit evidence.
 
 ### Current ref snapshot (refresh before use)
-- `Main-dev`: `bc0209e42432454fcd8067dbc0eeb09ea3b25089` (this rules update).
+- `Main-dev`: `6daf82d71686a171274d9d5a65fbc480253bb87d` (latest context/locale-fix head; refresh before use).
 - `last-wave`: `d0dd73755bfe640c515502751f440a32e57506d5`.
 
 ---
@@ -1732,5 +1732,5 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 - Root cause: the new base resource key `start_mix_with_song` existed only in `values/strings.xml`. `LocaleStringsTest` requires every translatable base key in every app-supported locale and failed for all 16 supported non-English locales.
 - Added translated `start_mix_with_song` resources to `values-de`, `values-es`, `values-fr`, `values-he`, `values-hi`, `values-id`, `values-it`, `values-ja`, `values-pl`, `values-pt`, `values-ru`, `values-th`, `values-tr`, `values-vi`, `values-zh` and `values-zh-rTW`. These cover the locale tags used by `SUPPORTED_LANGUAGES`; Simplified/Traditional Chinese follow the existing `LocaleStringsTest.tagToQualifier` mapping.
 - Verified by fetching all 16 supported locale resource files from the updated `Main-dev` branch and confirming each contains `start_mix_with_song`. This is source-level verification only; the Android test suite must still rerun.
-- CI run #1182 remains a failed run for the earlier SHA; its failure is now understood and corrected in source. Trigger/inspect a fresh CI run against the latest `Main-dev` head before claiming CI green.
+- CI run #1182 / ID `44420807573` remains failed for the earlier feature SHA. Pushes for the locale correction created run #1202 / ID `44423376514`, targeting `d6e9b9a2f08db06c409e4ed7bad1940050336211` (the complete translation source tree immediately before the docs-only commit `6daf82d`). At the time of this note, #1202 was pending and had no jobs listed yet. The current branch head is `6daf82d`; only the context Markdown differs from #1202's tested tree. Inspect #1202's Android, desktop and web jobs before claiming CI green.
 - Branch rule unchanged: only `Main-dev` is modified. Do not create branches, merge, or touch `main` or read-only `last-wave`.
