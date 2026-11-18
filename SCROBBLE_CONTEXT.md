@@ -2,6 +2,39 @@
 
 > Living engineering record. Update this file after every audit pass and before any implementation decision. This is not the public README.
 
+## 0. AGENT RULES — READ FIRST; OVERRIDES OLDER NOTES BELOW
+
+### Source of truth and branch boundaries
+- Work and commit only on `Main-dev`. Never edit `main`, create a branch, merge/cherry-pick all of `last-wave`, or invent/use an unrelated prototype as the implementation source.
+- `last-wave` is the **actual feature/code/behavior source**. Port its real implementation, interactions, algorithms, data flows, state handling and failure/cancellation behavior—not a screenshot-only imitation or a fresh approximation.
+- Adapt that code to **Mylo's UI language and existing architecture**: Mylo's Compose components, theme/tokens, typography, spacing, dialogs/sheets, navigation, state patterns, models, persistence, playback and queue APIs. Preserve Mylo's visual identity. Do not paste LastWave branding or replace Mylo's shell with LastWave's shell.
+- In short: **take the code and behavior from LastWave; make it look and integrate like Mylo.**
+- `scrobble-ui` is only a secondary reference for the agreed Scrobble FAB and tab-entry/exit behavior. It is not the source for Statistics/Generate/Playlists feature logic. Preserve Mylo's existing normal tabs, including Explore.
+- Before each task, refresh both branch heads, read this whole context file, inspect the live source files and tests on both branches, and check what previous agents already implemented. Old SHAs and notes are historical, not current truth.
+
+### Required port workflow
+1. Trace LastWave end-to-end: UI action → ViewModel/state → repository/API/storage/playback → success/error/cancellation result. Inspect callers and tests, not only screen files.
+2. Map source responsibilities to Mylo equivalents. Reuse existing Mylo scrobble manager, listening recorder, playlist store, player and queue when appropriate. Do not create duplicate pipelines, trackers, stores, models or navigation owners without evidence of a real gap.
+3. Port actual implementation and meaningful tests; adapt types/interfaces to Mylo. Preserve validation, algorithms, ordering, identity/deduplication, cancellation, retries, persistence and edge-case behavior. Build only the smallest adapter where Mylo lacks an equivalent.
+4. Translate presentation into Mylo-native UI components and conventions. Match Mylo's dialogs/sheets, labels, icon-only controls, tabs, loading/empty/error states, accessibility and motion. Avoid a second design system or generic default UI.
+5. Search for existing/renamed equivalents before adding files. Keep changes scoped; do not regress or casually redesign unrelated screens/player UI.
+6. Verify meaningful paths: cancellation, empty/error/loading, persistence/relaunch, duplicate identities, navigation/back/dismiss and existing Mylo regressions. Record exact test/build/CI commit and results; physical-device verification is separate.
+7. Update this file with current SHAs, exact files, source behavior ported, Mylo adaptations, tests, gaps and next action. Continue into implementation when requested; do not stop at audit/status or one small fix.
+
+### Recent agent mistakes — do not repeat
+- Do not ask the user to define behavior that can be found in LastWave code, tests, history or docs. Trace the actual component/data model first. For the Statistics split-bar: do not guess categories/denominator; verify the actual source and existing Mylo data. If no implementation/definition exists, record verified absence and proceed with the closest truthful source-backed implementation without asking the user to restate repository context.
+- Do not call `last-wave` a separate prototype. It is the requested code reference. Any older prototype notes below are historical context only, not a substitute for LastWave source or permission to invent behavior.
+- Do not merely copy LastWave's visual UI into Mylo. Port its real code/behavior and align the presentation to Mylo.
+- Do not trust stale branch SHAs, old audit notes, or another agent's claims without checking live source.
+- Do not stop after audit/status when the user says continue/start; proceed through safe implementation, review, tests and documentation. Ask only for a genuinely blocking decision that cannot be derived from source or existing decisions.
+- Never claim implementation, build, tests or device verification without exact-commit evidence.
+
+### Current ref snapshot (refresh before use)
+- `Main-dev`: `bc0209e42432454fcd8067dbc0eeb09ea3b25089` (this rules update).
+- `last-wave`: `d0dd73755bfe640c515502751f440a32e57506d5`.
+
+---
+
 ## 1. Agreed scope and branch responsibilities
 
 - **Target:** `Main-dev` (the repository branch is case-sensitive; the earlier lowercase `main-dev` lookup returned 404). Latest audited head: `11478fde56f1817cb777b296e60907359086f383`.
