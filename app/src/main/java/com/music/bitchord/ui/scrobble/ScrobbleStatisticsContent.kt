@@ -1,5 +1,9 @@
 package com.music.bitchord.ui.scrobble
 
+import android.content.ClipData
+import android.content.Intent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -17,7 +21,9 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
@@ -37,17 +43,22 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.FileProvider
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.music.bitchord.data.model.Song
+import com.music.bitchord.data.spotify.LocalPlaylist
+import com.music.bitchord.data.spotify.LocalPlaylistExport
 import com.music.bitchord.data.scrobbling.LastFM
 import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.data.stats.ReplayPeriod
 import com.music.bitchord.ui.replay.ReplayScreen
 import com.music.bitchord.ui.replay.ReplayState
 import com.music.bitchord.ui.replay.ReplayStoryPage
+import java.io.File
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 
@@ -334,4 +345,78 @@ private fun LastFmChartRow(
         }
         Text("$plays", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
+}
+
+
+@Composable
+internal fun ScrobblePlaylistExportDialog(
+    playlist: LocalPlaylist,
+    onDismiss: () -> Unit,
+    onMessage: (String) -> Unit,
+) {
+    val context = LocalContext.current
+    val csvSaveLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/csv"),
+    ) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.openOutputStream(uri)?.use {
+                    it.write(LocalPlaylistExport.csv(playlist).toByteArray(Charsets.UTF_8))
+                } ?: error("Couldn't open the selected file")
+            }.onSuccess { onMessage("CSV saved") }
+                .onFailure { onMessage(it.message ?: "Couldn't save CSV") }
+        }
+    }
+    val m3uSaveLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("audio/x-mpegurl"),
+    ) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.openOutputStream(uri)?.use {
+                    it.write(LocalPlaylistExport.m3u(playlist).toByteArray(Charsets.UTF_8))
+                } ?: error("Couldn't open the selected file")
+            }.onSuccess { onMessage("M3U saved") }
+                .onFailure { onMessage(it.message ?: "Couldn't save M3U") }
+        }
+    }
+
+    fun share(csv: Boolean) {
+        val content = if (csv) LocalPlaylistExport.csv(playlist) else LocalPlaylistExport.m3u(playlist)
+        val extension = if (csv) "csv" else "m3u"
+        val mimeType = if (csv) "text/csv" else "audio/x-mpegurl"
+        runCatching {
+            val directory = File(context.cacheDir, "shared/playlist_exports")
+            if (!directory.exists() && !directory.mkdirs()) error("Couldn't prepare the export file")
+            val file = File(directory, "${playlist.id}-${LocalPlaylistExport.fileName(playlist.title, extension)}")
+            file.writeText(content, Charsets.UTF_8)
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = mimeType
+                putExtra(Intent.EXTRA_STREAM, uri)
+                clipData = ClipData.newRawUri("Playlist export", uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            context.startActivity(Intent.createChooser(intent, "Share playlist"))
+        }.onSuccess { onMessage("Ready to share") }
+            .onFailure { onMessage(it.message ?: "Couldn't share playlist") }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Export playlist") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Choose a format for ${playlist.title}.")
+                TextButton(onClick = { csvSaveLauncher.launch(LocalPlaylistExport.fileName(playlist.title, "csv")); onDismiss() }) {
+                    Text("Save CSV")
+                }
+                TextButton(onClick = { share(true); onDismiss() }) { Text("Share CSV") }
+                TextButton(onClick = { m3uSaveLauncher.launch(LocalPlaylistExport.fileName(playlist.title, "m3u")); onDismiss() }) {
+                    Text("Save M3U")
+                }
+                TextButton(onClick = { share(false); onDismiss() }) { Text("Share M3U") }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
+    )
 }
