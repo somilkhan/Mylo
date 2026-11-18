@@ -10,6 +10,8 @@ import com.music.bitchord.data.spotify.LocalPlaylist
 import com.music.bitchord.data.spotify.LocalPlaylistStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -95,6 +97,57 @@ class ScrobbleGenerateViewModel(application: Application) : AndroidViewModel(app
         }
     }
 
+    /** Creates a new playlist inspired by the source; the source itself is never edited. */
+    fun generateSimilar(source: LocalPlaylist) {
+        if (generationJob?.isActive == true || source.songs.isEmpty()) return
+        val token = ++generationToken
+        _uiState.update {
+            it.copy(isGenerating = true, progress = "Preparing a similar mix…", error = null, savedPlaylist = null)
+        }
+
+        generationJob = viewModelScope.launch {
+            try {
+                val songs = withTimeout(GENERATION_TIMEOUT_MS) {
+                    repository.generateSimilar(source.songs) { message ->
+                        if (generationToken == token) {
+                            _uiState.update { it.copy(progress = message) }
+                        }
+                    }
+                }
+                currentCoroutineContext().ensureActive()
+                check(generationToken == token) { "Generation was dismissed" }
+                val title = uniquePlaylistTitle(
+                    "${source.title} Mix",
+                    LocalPlaylistStore.playlists.value.map { it.title },
+                )
+                val playlist = LocalPlaylistStore.savePlaylist(
+                    title = title,
+                    songs = songs,
+                    generationMode = "similar-playlist",
+                )
+                if (generationToken == token) {
+                    _uiState.update { it.copy(savedPlaylist = playlist) }
+                    _savedPlaylistEvents.tryEmit(playlist)
+                }
+            } catch (_: TimeoutCancellationException) {
+                if (generationToken == token) {
+                    _uiState.update { it.copy(error = "Similar playlist generation timed out. Check your connection and try again.") }
+                }
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (error: Exception) {
+                if (generationToken == token) {
+                    _uiState.update { it.copy(error = error.message ?: "Couldn't create a similar playlist") }
+                }
+            } finally {
+                if (generationToken == token) {
+                    generationJob = null
+                    _uiState.update { it.copy(isGenerating = false, progress = "") }
+                }
+            }
+        }
+    }
+
     /** Cancels all in-flight generation before the Scrobble surface is dismissed. */
     fun cancelGeneration() {
         generationToken++
@@ -132,6 +185,11 @@ internal fun uniquePlaylistTitle(
         PlaylistGenerationMode.NEVER_HEARD -> "Never Heard"
         PlaylistGenerationMode.LIBRARY -> "My Library Mix"
     }.take(64).ifBlank { "My Mix" }
+    return uniquePlaylistTitle(base, existingTitles)
+}
+
+internal fun uniquePlaylistTitle(baseTitle: String, existingTitles: List<String>): String {
+    val base = baseTitle.trim().take(64).ifBlank { "My Mix" }
     val existing = existingTitles.mapTo(HashSet()) { it.trim().lowercase(Locale.ROOT) }
     if (base.lowercase(Locale.ROOT) !in existing) return base
     var suffix = 2
