@@ -1347,5 +1347,5 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 3. Device-check image URI persistence/reset/delete, CSV/M3U save/share, playlist search/add, sorting/reorder, Generate Similar cancellation and result visibility.
 4. Revisit drag-and-drop only after the current move controls and device behavior are verified.
 - The latest Main-dev UI source is `ScrobbleContent.kt` blob `f34212b4722f6308071b903888972f94a79f68fa`.
-- GitHub returned no workflow runs or combined status entries for latest commit `6e3b6fb85f711a3491164e6860cb9096ea0f04d3`; no CI result is claimed.
+- Android CI run #1133 / ID `44383699697` targets commit `6e3b6fb85f711a3491164e6860cb9096ea0f04d3`; it is still pending with zero jobs started at the latest poll. Earlier run #1132 / ID `44383676132` for `4e35ff13adfaaa5b357fc37dd2389eaddcd6c814` was cancelled by a later push. Do not treat either as a passing result; recheck run #1133 before proceeding.
 - `main` remains untouched.
