@@ -34,9 +34,13 @@ internal data class ListeningRhythmData(
     val totalMs: Long,
     val peakHour: Int?,
     val peakDurationMs: Long,
+    val matchesPeriodTotal: Boolean,
 )
 
-internal fun calculateListeningRhythm(hourOfDay: List<Long>): ListeningRhythmData {
+internal fun calculateListeningRhythm(
+    hourOfDay: List<Long>,
+    totalListeningMs: Long? = null,
+): ListeningRhythmData {
     val normalized = List(24) { index -> hourOfDay.getOrNull(index)?.coerceAtLeast(0L) ?: 0L }
     val total = normalized.sum()
     val peak = normalized.indices
@@ -47,16 +51,20 @@ internal fun calculateListeningRhythm(hourOfDay: List<Long>): ListeningRhythmDat
         totalMs = total,
         peakHour = peak,
         peakDurationMs = peak?.let(normalized::get) ?: 0L,
+        matchesPeriodTotal = totalListeningMs == null || total == totalListeningMs.coerceAtLeast(0L),
     )
 }
 
 @Composable
 internal fun ListeningRhythmCard(
     hourOfDay: List<Long>,
+    totalListeningMs: Long,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val data = remember(hourOfDay) { calculateListeningRhythm(hourOfDay) }
+    val data = remember(hourOfDay, totalListeningMs) {
+        calculateListeningRhythm(hourOfDay, totalListeningMs)
+    }
     val colors = MaterialTheme.colorScheme
     val chartDescription = data.hours.mapIndexedNotNull { hour, ms ->
         if (ms > 0L) "${formatHour(context, hour)}: ${formatListening(context, ms)}" else null
@@ -82,13 +90,23 @@ internal fun ListeningRhythmCard(
                 style = MaterialTheme.typography.bodyMedium,
                 color = colors.onSurfaceVariant,
             )
-            if (data.peakHour == null) {
-                Text(
+            when {
+                totalListeningMs <= 0L && data.totalMs <= 0L -> Text(
                     text = "No listening time recorded for this period.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = colors.onSurfaceVariant,
                 )
-            } else {
+                !data.matchesPeriodTotal -> Text(
+                    text = "Hourly breakdown isn't available for this period yet.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.onSurfaceVariant,
+                )
+                data.peakHour == null -> Text(
+                    text = "No listening time recorded for this period.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.onSurfaceVariant,
+                )
+                else -> {
                 Text(
                     text = "Peak hour · ${formatHour(context, data.peakHour)} · ${formatListening(context, data.peakDurationMs)}",
                     style = MaterialTheme.typography.labelLarge,
@@ -119,6 +137,7 @@ internal fun ListeningRhythmCard(
                             color = colors.onSurfaceVariant,
                         )
                     }
+                }
                 }
             }
         }

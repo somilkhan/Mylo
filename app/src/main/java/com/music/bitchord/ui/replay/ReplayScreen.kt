@@ -201,6 +201,7 @@ fun ReplayScreen(
                         item("listening-rhythm") {
                             ListeningRhythmCard(
                                 hourOfDay = summary.hourOfDay,
+                                totalListeningMs = summary.totalMs,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = PAGE_GUTTER),
