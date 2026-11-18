@@ -419,7 +419,10 @@ fun ScrobblePlaylistsContent(
                 renameError = null
                 renameTarget = selected
             },
-            onDelete = { deleteTarget = selected },
+            onDelete = {
+                deleteError = null
+                deleteTarget = selected
+            },
         )
     } else {
         val visible = sortLocalPlaylists(playlists, sortMode)
