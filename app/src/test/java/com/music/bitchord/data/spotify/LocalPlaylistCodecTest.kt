@@ -74,4 +74,75 @@ class LocalPlaylistCodecTest {
         assertEquals("[]", LocalPlaylistCodec.encode(emptyList()))
         assertTrue(LocalPlaylistCodec.decode("[]").isEmpty())
     }
+
+    @Test
+    fun newestAndOldestSortsKeepPinnedPlaylistsFirst() {
+        val rows = listOf(
+            playlist("old", "Old", createdAt = 10),
+            playlist("pinned", "Pinned", createdAt = 1, pinned = true),
+            playlist("new", "New", createdAt = 30),
+        )
+
+        assertEquals(
+            listOf("pinned", "new", "old"),
+            sortLocalPlaylists(rows, LocalPlaylistSortMode.NEWEST).map { it.id },
+        )
+        assertEquals(
+            listOf("pinned", "old", "new"),
+            sortLocalPlaylists(rows, LocalPlaylistSortMode.OLDEST).map { it.id },
+        )
+    }
+
+    @Test
+    fun nameAndTrackCountSortsAreDeterministicAndKeepPinnedFirst() {
+        val rows = listOf(
+            playlist("z", "Zeta", createdAt = 1, trackCount = 1),
+            playlist("a", "alpha", createdAt = 2, trackCount = 1),
+            playlist("p", "Pinned", createdAt = 0, pinned = true),
+            playlist("b", "Beta", createdAt = 3, trackCount = 4),
+        )
+
+        assertEquals(
+            listOf("p", "a", "b", "z"),
+            sortLocalPlaylists(rows, LocalPlaylistSortMode.NAME).map { it.id },
+        )
+        assertEquals(
+            listOf("p", "b", "a", "z"),
+            sortLocalPlaylists(rows, LocalPlaylistSortMode.TRACK_COUNT).map { it.id },
+        )
+    }
+
+    @Test
+    fun customSortPreservesThePersistedStoreOrder() {
+        val rows = listOf(
+            playlist("second", "Second", createdAt = 1),
+            playlist("first", "First", createdAt = 100, pinned = true),
+        )
+
+        assertEquals(
+            listOf("second", "first"),
+            sortLocalPlaylists(rows, LocalPlaylistSortMode.CUSTOM).map { it.id },
+        )
+    }
+
+    private fun playlist(
+        id: String,
+        title: String,
+        createdAt: Long,
+        pinned: Boolean = false,
+        trackCount: Int = 0,
+    ) = LocalPlaylist(
+        id = id,
+        title = title,
+        songs = List(trackCount) { index ->
+            Song(
+                videoId = "$id-$index",
+                title = "$title $index",
+                artist = "Artist",
+                thumbnailUrl = null,
+            )
+        },
+        createdAtEpochMillis = createdAt,
+        isPinned = pinned,
+    )
 }
