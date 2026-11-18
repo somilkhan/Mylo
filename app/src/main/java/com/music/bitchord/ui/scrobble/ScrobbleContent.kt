@@ -28,6 +28,7 @@ import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Sort
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.IosShare
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.MoreVert
@@ -624,6 +625,8 @@ private fun PlaylistDetailContent(
     var addTrackLoading by remember(playlist.id) { mutableStateOf(false) }
     var addTrackError by remember(playlist.id) { mutableStateOf<String?>(null) }
     var addTrackMessage by remember(playlist.id) { mutableStateOf<String?>(null) }
+    var exportDialogVisible by remember(playlist.id) { mutableStateOf(false) }
+    var exportMessage by remember(playlist.id) { mutableStateOf<String?>(null) }
     val existingVideoIds = remember(playlist.songs) { playlist.songs.mapTo(hashSetOf()) { it.videoId } }
 
     LaunchedEffect(playlist.id, addTracksExpanded, addTrackQuery) {
@@ -673,6 +676,9 @@ private fun PlaylistDetailContent(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = onBack) { Text("Back") }
                 Spacer(Modifier.weight(1f))
+                IconButton(onClick = { exportDialogVisible = true }) {
+                    Icon(Icons.Rounded.IosShare, contentDescription = "Export playlist")
+                }
                 TextButton(
                     onClick = {
                         addTracksExpanded = !addTracksExpanded
@@ -688,6 +694,9 @@ private fun PlaylistDetailContent(
             }
             Text(playlist.title, style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
             Text("${playlist.songs.size} tracks", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            exportMessage?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = if (it.startsWith("Couldn't")) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = { onPlaySongs(playlist.songs, 0) }, enabled = playlist.songs.isNotEmpty()) {
@@ -823,4 +832,12 @@ private fun PlaylistDetailContent(
             }
         }
     }
+    if (exportDialogVisible) {
+        ScrobblePlaylistExportDialog(
+            playlist = playlist,
+            onDismiss = { exportDialogVisible = false },
+            onMessage = { exportMessage = it },
+        )
+    }
+
 }
