@@ -1614,3 +1614,23 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 - Correction commit: `faa9d05daeba10604df27a2b55cbb1c8c416c719`.
 - CI run #1172 / ID `44400935268` still targeted the earlier implementation SHA `8405db11952bc747cd1f7343155bc1cebe150aa8` and was in progress at this update. It does **not** verify this correction commit; obtain fresh CI evidence for `faa9d05`. No pass is claimed.
 - Continue only on `Main-dev`; `main` remains untouched at `11478fde56f1817cb777b296e60907359086f383`.
+
+
+## 56. Similar-artist generation source port (2026-11-19)
+
+### LastWave behavior traced
+- `GenerateRepository.fetchSimilarArtistTracks` uses Last.fm `artist.getsimilar` to discover similar artist names, then combines those with YouTube Music discovery and filters to playable tracks.
+- Mylo already has a Last.fm signed API client and a YouTube Music artist-page resolver. Its old `SIMILAR_ARTISTS` mode only opened the exact artist's page, so it did not reproduce the source's similar-artist discovery behavior.
+
+### Mylo adaptation
+- Added `LastFM.getSimilarArtists` and a parser that handles array or single-object responses, deduplicates names case-insensitively, and returns an empty result for malformed payloads.
+- Updated `PlaylistGenerationRepository` similar-artist mode to request up to eight similar artists when Last.fm API credentials are configured, resolve each name through Mylo's YouTube Music artist pages, and interleave their playable `Song` pools.
+- If Last.fm is not configured, the graph lookup fails, or similar artist pages produce no playable tracks, generation falls back to the previous exact-artist page behavior. Cancellation is rethrown; individual artist-page failures do not cancel the other pools.
+- Added parser tests for multiple/single artist payloads, case-insensitive duplicates and malformed responses.
+- Mylo's existing candidate dedupe, optional exclusions, saved-playlist freshness ordering and single save/navigation commit remain unchanged.
+
+### Commit and verification
+- Implementation commit: `441aa6720ecaaca78ea599449d24f36d3d9d613f`.
+- Android CI run #1174 / ID `44401745427` targets this exact commit and was pending when this note was written. No pass is claimed.
+- Hourly timeline period-integrity correction commit: `faa9d05daeba10604df27a2b55cbb1c8c416c719`; its CI run #1173 / ID `44401577805` was still in progress. The later #1174 run should be checked for full verification of all code at its head.
+- Continue only on `Main-dev`; `main` remains `11478fde56f1817cb777b296e60907359086f383`.
