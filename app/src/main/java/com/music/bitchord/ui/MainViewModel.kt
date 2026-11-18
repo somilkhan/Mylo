@@ -1117,6 +1117,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         videoIds: List<String>,
         songs: List<Song> = emptyList(),
         /** [savedLocally] is true when the playlist went to this device, not YouTube Music. */
+        onError: ((message: String) -> Unit)? = null,
         onResult: ((browseId: String?, title: String, savedLocally: Boolean) -> Unit)? = null,
     ) {
         val name = title.trim().ifBlank { text(R.string.new_playlist) }
@@ -1158,12 +1159,22 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                         onResult?.invoke(created.browseId, created.title, false)
                     },
                     onFailure = {
-                        val local = com.music.bitchord.data.spotify.LocalPlaylistStore.savePlaylist(name, songs)
+                        val local = runCatching {
+                            com.music.bitchord.data.spotify.LocalPlaylistStore.savePlaylist(name, songs)
+                        }.getOrElse { error ->
+                            onError?.invoke(error.message ?: "Couldn't save playlist on this device.")
+                            return@launch
+                        }
                         onResult?.invoke(local.browseId, local.title, true)
                     },
                 )
             } else {
-                val local = com.music.bitchord.data.spotify.LocalPlaylistStore.savePlaylist(name, songs)
+                val local = runCatching {
+                    com.music.bitchord.data.spotify.LocalPlaylistStore.savePlaylist(name, songs)
+                }.getOrElse { error ->
+                    onError?.invoke(error.message ?: "Couldn't save playlist on this device.")
+                    return@launch
+                }
                 onResult?.invoke(local.browseId, local.title, true)
             }
         }
