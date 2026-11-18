@@ -865,3 +865,34 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 - [ ] Resolve required design-skill availability before substantial UI design work.
 - [ ] Next code slice after environment is available: FAB + conditional nav host only, with focused Compose/host tests; then Statistics, Generate, Playlists.
 - No feature implementation commit exists on Main-dev. The only Main-dev change so far is the living context document.
+
+## 22. GitHub-only execution path and beta CI enablement (2026-11-18)
+
+### Fresh branch and instruction recheck
+- Latest Main-dev HEAD after CI configuration change: 988a833368274377b48cf681043dae6d660ea4b7.
+- Commit parent: 5cd59b308b96e1fef524d74a43fbfa91a8b7acc4. The branch now has three commits ahead of main (two context commits plus this CI commit); main was not modified.
+- Repository metadata confirms default branch main; Main-dev exists and is the explicit beta target.
+- Re-fetched the complete SCROBBLE_CONTEXT.md from Main-dev (blob d2f49f419874eed296bdcf1848561013a9b4a615).
+- Rechecked root CLAUDE.md and AGENTS.md: both absent (404). .claude/ contains only launch.json; no additional project instructions were found there. CONTRIBUTING.md remains the available Main-dev engineering guide.
+- Correct source path: app/src/main/java/com/music/bitchord/MainActivity.kt (blob f48697f73f299161856eb392d5600f1767e3c093, 304,613 bytes). The earlier attempted path without app/src was incorrect; no file was changed by that failed lookup.
+- MainActivity baseline still has four normal tabs: Home, Explore, Library, Search. Existing host uses GlassNavBar and FloatingBottomBar; no Scrobble FAB or Scrobble host state exists on Main-dev.
+- PR #8 source has ScrobbleFab.kt (blob c70fd7c0840da6a13bac59497f24053a7c17084d) and a MainActivity patch that adds FAB/tab host integration. The source PR's current exact-head Android CI run #1053 / ID 43747641686 is completed-success. This does not validate Main-dev.
+- Re-read Main-dev ScrobbleManager.kt (blob 153b488ed0eea8893ffb0e7983de9fd26a569847): elapsed pause accounting still uses wall-clock time; resume derives duration only from Song.durationText; unknown initial duration still marks the song started. No changes made to this file in this pass.
+
+### CI enablement change
+- Main-dev .github/workflows/android-ci.yml was updated from push.branches: [main] to push.branches: [main, Main-dev]; PR trigger remains pull_request.branches: [main].
+- Implementation commit: 988a833368274377b48cf681043dae6d660ea4b7, message ci(android): validate Main-dev beta pushes.
+- The first Actions API query for branch=Main-dev returned zero workflow runs immediately after the push. Exact commit CI is therefore not yet confirmed; recheck before claiming it ran or passed.
+- This allows future implementation commits on Main-dev to invoke Android CI without opening a PR against stable main. Do not change workflow permissions or release-signing behavior.
+
+### Execution method and guardrails
+- GitHub's Git Trees/Blobs/Commits APIs are available through the connected repository integration. They can create a new tree based on the exact Main-dev tree, commit it with the exact current parent, and advance Main-dev using a non-force ref update with expected_sha. This is the safe remote patch path; no whole-file Contents API replacement without fetching and validating the exact current blob first.
+- MainActivity can be fetched as a full Git blob and inspected/manipulated as text in the GitHub execution runtime; its exact source is available despite the container clone/DNS failure. GitHub Actions provides remote Gradle verification after a commit. Do not call local build/test as performed.
+- Before every tree commit: recheck branch HEAD; build only against that parent; use force=false and expected_sha; if lease fails, re-fetch and reconcile.
+- No feature implementation code has been changed yet. The only new commit in this pass changes Android CI branch filtering.
+
+### Next
+1. Recheck CI run/status for 988a833368274377b48cf681043dae6d660ea4b7.
+2. Build the Phase 1 patch by applying only approved FAB + nav host behavior, preserving the four normal tabs, existing overlays, player/keyboard suppression, Back priority, and both Glass/Standard modes.
+3. Add host-level tests; do not treat PR #8's isolated FAB test as sufficient.
+4. Then implement Statistics, Generate cancellation/semantics, and playlist persistence as separate coherent slices. Keep PR #8 destination business logic under audit against LastWave and Mylo's real stores; do not bulk-copy it.
