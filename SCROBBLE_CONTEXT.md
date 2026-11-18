@@ -1198,3 +1198,35 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 - No emulator or physical-device visual check was performed. The sort menu uses Mylo's existing Material 3 controls and monochrome theme; device-level visual alignment remains to be checked.
 - Library visibility/ownership, manual playlist creation, cover editing, export/share, Generate Similar, track search/add and other remaining playlist gaps are not part of this batch. The user's Library integration decision remains deferred.
 - `main` was not changed. Continue on `Main-dev` only.
+
+
+## 37. Playlist track search/add and repository cancellation trace (2026-11-19)
+
+### Repository contract verified
+- Located the actual shared implementation: `shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/YtMusicRepository.kt`, blob `efbd57934cd5f50449e2ceb579a9ce7cafe90ada`.
+- `search(query, SearchFilter.SONGS)` returns the first page of YouTube Music track results; rows are `SearchResult.TopTrack` / `SearchResult.Track` with `Song` payloads. The repository deduplicates search rows by videoId.
+- `radio(videoId)` calls the watch queue endpoint and parses the returned `Song` rows. Keep this API as the source for existing generation modes; do not invent a second search client.
+- The shared `call()` wrapper rethrows `CancellationException` in its `onFailure` path. New Compose search effects must still explicitly rethrow cancellation and avoid publishing stale results after a cancelled query.
+
+### Implemented on Main-dev
+- `data/spotify/LocalPlaylistStore.kt`, blob `3482fb5a3af05240f696a5c9f54d4a0b9468edd1`:
+  - Added synchronized `addSongIfAbsent`, preserving the same playlist ID, generation metadata, pin state and existing track order.
+  - Added pure `appendUniquePlaylistSong`: rejects blank IDs, video uploads and an existing matching videoId; otherwise appends one track.
+- `ui/scrobble/ScrobbleContent.kt`, blob `10354ae87110f68c426b0e77eecd1d0808794c1d`:
+  - Playlist detail now has an Add tracks / Done toggle.
+  - Search is debounced by 300ms, uses `YtMusicRepository.search(..., SearchFilter.SONGS)`, maps only track rows, removes blank/video/duplicate results and caps the display at eight.
+  - Existing tracks are disabled as Added. The synchronized store method performs the final duplicate check at insertion time.
+  - Loading, no-results and error states use Mylo's existing MaterialTheme controls; no LastWave component or visual token was copied.
+- `LocalPlaylistCodecTest.kt`, blob `e62ea4d81b2d067d6671251bc54e482517a7b16a`, now tests append order, duplicate rejection, blank-ID rejection and video-upload rejection.
+
+### Commits
+- Store insertion: `95defc7d1ccf4aaadff1ccdd8f04cc075f7ead62`.
+- Search UI: `8b579806f8aee3cb3583fd9065fe7d22a61cf45a`.
+- Tests: `4469317f85c83aa1e5b3fca9eaf590733e26994b`.
+
+### Verification and remaining work
+- The store insertion is synchronized and rechecks the latest stored list, so two quick taps cannot append the same videoId twice.
+- No local Gradle build or unit-test execution was possible in this session. The GitHub connector returned no workflow runs or combined status entries for the current test commit; tests are added but not yet verified as passing.
+- No emulator or physical-device check has been performed.
+- Still pending from the approved playlist scope: custom cover selection/reset, CSV/M3U export/share, Generate Similar/regenerate and the remaining detail/list acceptance checks. Manual playlist creation and Library visibility ownership remain deferred until the Library decision is resumed.
+- `main` remains untouched; continue on `Main-dev` only.
