@@ -231,7 +231,7 @@ fun ScrobbleGenerateContent(
                 if (mode == PlaylistGenerationMode.SIMILAR_TRACKS) {
                     OutlinedTextField(
                         value = seedQuery,
-                        onValueChange = { seedQuery = it; selectedSeed = null },
+                        onValueChange = { seedQuery = it; selectedSeed = null; seedResults = emptyList(); seedSearchError = null },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         label = { Text("Search for a track") },
