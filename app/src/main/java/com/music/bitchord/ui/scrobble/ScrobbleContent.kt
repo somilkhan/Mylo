@@ -452,6 +452,14 @@ fun ScrobblePlaylistsContent(
                     }
                 }
             }
+            generationState.savedPlaylist?.takeIf { it.generationMode == "similar-playlist" }?.let { saved ->
+                item(key = "similar_playlist_saved") {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Created ${saved.title}", modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.primary)
+                        TextButton(onClick = { selectedId = saved.id }) { Text("Open") }
+                    }
+                }
+            }
             if (generationState.isGenerating) {
                 item {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -834,6 +842,9 @@ private fun PlaylistDetailContent(
                     Text(playlist.title, style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
                     Text("${playlist.songs.size} tracks", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     coverMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    generationState.savedPlaylist?.takeIf { it.generationMode == "similar-playlist" }?.let {
+                        Text("Created ${it.title}. Go back to view it.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                    }
                     exportMessage?.let {
                         Text(it, style = MaterialTheme.typography.bodySmall, color = if (it.startsWith("Couldn't")) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
                     }
