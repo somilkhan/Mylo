@@ -1646,3 +1646,15 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 - Implementation commit: `067e3f66d36e08d02fa77fd595d5ea0b937dbe97`; follow-up test/label cleanup and this documentation update are in the current commit.
 - Earlier CI #1174 / ID `44401745427` was pending for similar-artist commit `441aa6720ecaaca78ea599449d24f36d3d9d613f`; the latest combined code must be checked on its own CI head. No pass is claimed.
 - Continue only on `Main-dev`; `main` remains `11478fde56f1817cb777b296e60907359086f383`.
+
+
+## 58. Taste-profile recommendation port (2026-11-19)
+
+- Traced LastWave `TasteProfileProvider` and `GenerateRepository.fetchRecommendations`: recommendations are seeded from real listening, account history/likes, and connected Last.fm taste; YouTube radio/discovery and Home/Quick Picks expand those seeds; heard tracks are filtered before the result is curated.
+- Mylo's previous Recommendations mode returned only YouTube Music Quick Picks. It now reuses a shared `loadTasteSignals` path for Mix and Recommendations: local Replay top tracks, local recent history, signed-in YouTube Music history/likes, and (when configured) the user's Last.fm overall top tracks.
+- Last.fm tracks are resolved through Mylo's YouTube Music song search using normalized title+artist identity. Unresolved matches are skipped rather than saving a guessed/wrong rendition.
+- Recommendations fans out up to six distinct taste seeds into YouTube Music radio, blends radio/Quick Picks with Home fallback, applies a stricter two-per-artist cap, and prefers candidates absent from local Replay, local recent history, YT Music history/likes and resolved Last.fm top tracks. If fewer than five fresh candidates exist, it falls back to the full curated candidate pool; Never Heard remains the strict mode.
+- Mix and Recommendations now share the same bounded taste-signal and radio-seed helpers. Cancellation is propagated; unavailable optional sources degrade to empty pools instead of failing the whole generation.
+- Implementation commit: `ab4d133e2fa287963f7f3d6f4ea75cfaa8757446`.
+- CI run #1177 / ID `44402436004` was pending on the earlier refactor commit `bc66572ae31cda7975c36835409e122e27538ad8`; it does not verify the Last.fm seed addition. Await CI on the latest combined head; no pass is claimed.
+- Continue only on `Main-dev`; `main` remains `11478fde56f1817cb777b296e60907359086f383`.
