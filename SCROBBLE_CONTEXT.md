@@ -1400,3 +1400,31 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 3. Continue the final prototype acceptance audit, especially FAB positioning in both nav modes, scroll-fold, normal-tab exit/reset, reduced-motion behavior, stats animations and Generate-to-Playlists animation.
 4. Do not add new playlist features while this verification gate is unresolved. Library integration remains deferred.
 5. Keep `main` untouched; work only on `Main-dev`.
+
+## 44. Prototype implementation audit — shell and motion gaps (2026-11-19)
+
+### Confirmed implemented in current Main-dev source
+- `MainActivity.kt` blob `bbb0039708eb4a4c06f54dd1756ce033c5c9cca3`:
+  - Scrobble mode has saved state and a close handler that cancels generation, expands the Scrobble nav and resets the selected Scrobble tab to Statistics.
+  - The normal tab handler closes Scrobble before selecting a normal destination; selecting a Scrobble tab only changes the Scrobble section and keeps Scrobble open.
+  - The normal app tab list remains intact (Home, Explore, Library, Search).
+  - FAB visibility is restricted to Home and suppressed by competing overlays, the full player and keyboard.
+  - FAB is positioned at the right edge above the measured floating-bar stack using the same host layout in Glass and Standard modes.
+  - Glass mode receives the dedicated Scrobble scroll connection while Scrobble is open.
+  - Scrobble's three tabs use `standaloneIndexOverride = -1`, keeping all three tabs inside the pill.
+- `GlassNavBar.kt` blob `ba27410d2563008d741a0772ebf6a7f06e8426c4` supports the standalone-index override and uses the passed scroll connection.
+- `ScrobbleFab.kt` blob `c70fd7c0840da6a13bac59497f24053a7c17084d` implements the GraphicEq/Close glyph, fold scale/lift, hidden non-interactive semantics and reduced-motion snap behavior.
+- `ScrobbleContent.kt` blob `445ab4ffa746c5624c199dac038b00ff426451af` contains the current playlist/generate UI and Mylo Material 3 styling.
+
+### Confirmed prototype gaps
+- `ScrobbleStatisticsContent.kt` blob `4b255694098cd5c2c7c33a5f9d88a4139bcc1245` contains no count-up/split-bar animation implementation (no Compose animation APIs in this file). The approved Statistics motion is therefore not yet implemented here.
+- `ScrobbleContent.kt` contains no AnimatedVisibility/AnimatedContent/animate* usage for the generated-playlist row handoff. The approved Generate → Playlists fly animation is not yet implemented in this screen.
+- The source confirms the nav shell and FAB behavior, but source inspection cannot establish pixel-perfect alignment, actual Glass/Standard placement, drop transition feel, or reduced-motion behavior on device.
+- Do not claim the approved prototype is fully implemented until these two motion gaps are resolved and all mode combinations are device-checked.
+
+### Next implementation slice
+1. Trace the exact Statistics data source and current composable ownership before adding count-up/split-bar animation; do not fabricate or combine metrics.
+2. Trace the generation success event and playlist list state to implement a single handoff animation without duplicate rows, lost saves, or stale list state.
+3. Reuse Mylo's existing Material 3/theme tokens and animation/reduced-motion settings; keep the same final states when motion is disabled.
+4. Add focused tests for state/event correctness where possible, then rerun CI on the corrected current Main-dev source.
+5. Do not touch `main`; Library integration remains postponed.
