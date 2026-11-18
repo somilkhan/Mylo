@@ -67,6 +67,44 @@ class PlaylistGenerationRulesTest {
     }
 
     @Test
+    fun weightedBlendPrefersHigherWeightAndDeduplicatesAcrossVideoIds() {
+        val lowWeight = song("low", "Same Track")
+        val highWeight = song("high", "Same Track")
+        val other = song("other", "Other Track")
+
+        val result = PlaylistGenerationRules.weightedBlend(
+            pools = listOf(
+                listOf(lowWeight, other) to 1,
+                listOf(highWeight) to 4,
+            ),
+            limit = 3,
+        )
+
+        assertEquals(listOf(highWeight, other), result)
+    }
+
+    @Test
+    fun weightedBlendCapsArtistsThenRelaxesCapToFillThinPool() {
+        val sameArtist = listOf(
+            song("a1", "A1", "Artist A"),
+            song("a2", "A2", "Artist A"),
+            song("a3", "A3", "Artist A"),
+            song("a4", "A4", "Artist A"),
+        )
+        val otherArtist = song("b1", "B1", "Artist B")
+
+        val result = PlaylistGenerationRules.weightedBlend(
+            pools = listOf((sameArtist + otherArtist) to 4),
+            limit = 5,
+            maxPerArtist = 3,
+        )
+
+        assertEquals(5, result.size)
+        assertEquals(3, result.count { it.artist == "Artist A" })
+        assertEquals(1, result.count { it.artist == "Artist B" })
+    }
+
+    @Test
     fun savedTracksAreDeprioritizedButNotDiscardedWhenPoolIsThin() {
         val saved = song("saved", "Saved")
         val fresh = song("fresh", "Fresh")
@@ -80,6 +118,6 @@ class PlaylistGenerationRulesTest {
         assertEquals(listOf(fresh, saved), result)
     }
 
-    private fun song(id: String, title: String) =
-        Song(videoId = id, title = title, artist = "The Artist", thumbnailUrl = null)
+    private fun song(id: String, title: String, artist: String = "The Artist") =
+        Song(videoId = id, title = title, artist = artist, thumbnailUrl = null)
 }

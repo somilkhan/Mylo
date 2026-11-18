@@ -143,14 +143,69 @@ class PlaylistGenerationRepository(context: Context) {
                 }
             }
             PlaylistGenerationMode.MIX -> {
-                onProgress("Building a balanced mix…")
-                val radio = request.seedTrack?.videoId
-                    ?.takeIf(String::isNotBlank)
-                    ?.let { YtMusicRepository.radio(it).getOrNull().orEmpty() }
-                    .orEmpty()
-                val picks = YtMusicRepository.quickPicks().getOrNull().orEmpty()
-                val home = homeSongs()
-                radio + picks + home
+                onProgress("Building a mix from your listening…")
+                val replaySongs = try {
+                    ListeningStats.summary(ReplayPeriod.ALL_TIME).songs.take(8).map { it.song }
+                } catch (cancellation: CancellationException) {
+                    throw cancellation
+                } catch (_: Exception) {
+                    emptyList()
+                }
+                val recentSongs = try {
+                    withContext(Dispatchers.IO) { ListeningHistory.read(appContext).map { it.song } }
+                } catch (cancellation: CancellationException) {
+                    throw cancellation
+                } catch (_: Exception) {
+                    emptyList()
+                }
+
+                val (accountHistory, likedSongs) = if (SignedIn.state(appContext).value) {
+                    supervisorScope {
+                        val history = async { YtMusicRepository.history().getOrNull().orEmpty() }
+                        val liked = async { YtMusicRepository.library().getOrNull()?.likedSongs.orEmpty() }
+                        history.await() to liked.await()
+                    }
+                } else {
+                    emptyList<Song>() to emptyList()
+                }
+
+                val seeds = (
+                    listOfNotNull(request.seedTrack) +
+                        replaySongs.take(4) +
+                        recentSongs.take(4) +
+                        accountHistory.take(3) +
+                        likedSongs.take(3)
+                    )
+                    .filter { it.videoId.isNotBlank() && !it.isVideo }
+                    .distinctBy { it.videoId }
+                    .take(6)
+
+                onProgress("Finding radio from your listening…")
+                val radioPools = supervisorScope {
+                    seeds.map { seed ->
+                        async {
+                            YtMusicRepository.radio(seed.videoId).getOrNull().orEmpty()
+                                .filterNot { it.videoId == seed.videoId }
+                        }
+                    }.awaitAll()
+                }
+                val discovery = PlaylistGenerationRules.interleave(radioPools)
+
+                onProgress("Blending recommendations and your library…")
+                val remote = supervisorScope {
+                    val picks = async { YtMusicRepository.quickPicks().getOrNull().orEmpty() }
+                    val home = async { homeSongs() }
+                    picks.await() to home.await()
+                }
+                PlaylistGenerationRules.weightedBlend(
+                    pools = listOf(
+                        (discovery + remote.first) to 4,
+                        (likedSongs + accountHistory + recentSongs + replaySongs) to 3,
+                        remote.second to 1,
+                    ),
+                    limit = target * 2,
+                    maxPerArtist = 3,
+                )
             }
             PlaylistGenerationMode.RECOMMENDATIONS -> {
                 onProgress("Loading your YouTube Music recommendations…")
@@ -350,6 +405,56 @@ internal object PlaylistGenerationRules {
             .filter { it.videoId.isNotBlank() && !it.isVideo }
             .distinctBy { it.videoId }
             .toList()
+
+    /**
+     * LastWave's weighted mix curation, adapted to Mylo's local Replay and
+     * YouTube Music sources. The highest-weight source owns duplicate identity;
+     * artist diversity is relaxed only when needed to fill the requested pool.
+     */
+    fun weightedBlend(
+        pools: List<Pair<List<Song>, Int>>,
+        limit: Int,
+        maxPerArtist: Int = 3,
+    ): List<Song> {
+        if (limit <= 0) return emptyList()
+        val bestByTrack = LinkedHashMap<String, Pair<Song, Int>>()
+        pools.forEach { (tracks, weight) ->
+            deduplicate(tracks).forEach { song ->
+                if (song.title.isBlank() || song.artist.isBlank()) return@forEach
+                val key = trackKey(song)
+                val current = bestByTrack[key]
+                if (current == null || weight > current.second) {
+                    bestByTrack[key] = song to weight
+                }
+            }
+        }
+        val ordered = bestByTrack.values.sortedByDescending { it.second }
+        val picked = ArrayList<Song>(minOf(limit, ordered.size))
+        val pickedKeys = HashSet<String>()
+        val artistCounts = HashMap<String, Int>()
+        val artistLimit = maxPerArtist.coerceAtLeast(1)
+
+        ordered.forEach { (song, _) ->
+            if (picked.size >= limit) return@forEach
+            val key = trackKey(song)
+            val artist = song.artist.trim().lowercase(Locale.ROOT)
+                .ifBlank { "unknown:${song.videoId}" }
+            if (artistCounts.getOrDefault(artist, 0) >= artistLimit) return@forEach
+            if (pickedKeys.add(key)) {
+                picked += song
+                artistCounts[artist] = artistCounts.getOrDefault(artist, 0) + 1
+            }
+        }
+
+        // A thin pool should still return the requested count when unique tracks exist.
+        if (picked.size < limit) {
+            ordered.forEach { (song, _) ->
+                if (picked.size >= limit) return@forEach
+                if (pickedKeys.add(trackKey(song))) picked += song
+            }
+        }
+        return picked
+    }
 
     fun excludeHeard(
         candidates: List<Song>,
