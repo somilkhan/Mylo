@@ -125,6 +125,20 @@ class LocalPlaylistCodecTest {
         )
     }
 
+    @Test
+    fun appendsNewPlaylistSongsWithoutDuplicatesOrVideoUploads() {
+        val existing = Song("existing", "Existing", "Artist", null)
+        val next = Song("next", "Next", "Artist", null)
+
+        assertEquals(
+            listOf(existing, next),
+            appendUniquePlaylistSong(listOf(existing), next),
+        )
+        assertNull(appendUniquePlaylistSong(listOf(existing), existing))
+        assertNull(appendUniquePlaylistSong(emptyList(), next.copy(videoId = " ")))
+        assertNull(appendUniquePlaylistSong(emptyList(), next.copy(isVideo = true)))
+    }
+
     private fun playlist(
         id: String,
         title: String,
