@@ -835,3 +835,33 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 - [ ] Copy this complete context log onto `Main-dev` before any app behavior change.
 - [ ] Begin Phase 0 source/PR/CI recheck, then Phase 1 implementation.
 - No app behavior code has been changed by this execution pass yet.
+
+
+## 21. Phase 0 execution recheck — existing PR and integration baseline (2026-11-18)
+
+### Existing PR discovery and correction
+- Open draft PR #8: `Scrobble UI, FAB and navigation redesign`, base `main`, head `scrobble-ui`, head SHA `5bf065da305e6bb663960f9e09d30572dcdc0f32`, 359 commits, 27 files changed. It is **not** based on `Main-dev`; do not assume its contents are present in the beta branch.
+- PR #8 changed files include the approved FAB/navigation integration plus a large `ScrobbleScreen.kt`, playlist store, recommendation engines, stats logic, tests and a `CLAUDE.md`. The user-approved boundary still applies: use its FAB/host behavior as reference, but audit/adapt destination business logic against `last-wave` and Main-dev's data contracts. No wholesale merge/cherry-pick.
+- PR #8 exact head workflow lookup returned Android CI run #1053 / run ID 43747641686, completed successfully. This is evidence for that exact `scrobble-ui` head only; it does not validate Main-dev or any future integration commit.
+- Open draft PR #4 is an older, separate Scrobble/history integration PR based on `main`, head `feat/scrobble-nav-fab` SHA `fa63ed9f35b6f0ef118caf2a8352da7ca5680203`; it is not the selected implementation branch. Its historical CI evidence is not transferable to this work.
+- PR #8's `CLAUDE.md` (blob SHA `3b0ef90d07b921bd2e8084d7d38598d7e59f8d5e`) was read. It requires focused scope, preserve Home/main navigation, inspect actual source/PR/tests, lifecycle-safe Compose, track identity, real functionality, regression tests, adversarial review, and exact-head CI. It also requires installed design skills/references before significant UI work; resolve that requirement before a substantial visual implementation.
+
+### Main-dev source recheck
+- Main-dev HEAD before this context update: `11478fde56f1817cb777b296e60907359086f383`; context-only commit on Main-dev: `b91dbbf813348cf1af3e021f5cde313d48f37c82`.
+- Main-dev `MainActivity.kt` blob SHA: `f48697f73f299161856eb392d5600f1767e3c093`.
+- Main-dev `ScrobbleManager.kt` blob SHA: `153b488ed0eea8893ffb0e7983de9fd26a569847`. Reconfirmed timer uses wall-clock for elapsed pause duration, resolves duration again from `Song.durationText` on resume, and marks song started even when duration is initially unknown. These previously documented defects remain candidates for a focused fix with tests.
+- Main-dev `ListeningStats.kt` blob SHA: `93cb88d2f95aceca12066a433e6c446f41ef3aad`; local Replay is monthly aggregate storage, not a raw per-play event log. Never invent historical plays/timestamps.
+- Main-dev `FloatingBottomBar.kt` blob SHA `445f6f8cc9e480e19a0ce7846f68f94fcc6f17dc`; `GlassNavBar.kt` blob SHA `88e50b6a8d9d14e5ad1f6dc00d84f2d710bd5026`. These are the existing nav components; retain their visual and behavior contracts.
+- LastWave/PR8 FAB source `ScrobbleFab.kt` blob SHA `c70fd7c0840da6a13bac59497f24053a7c17084d`; it provides a 62dp surface, Home-only visibility helper, hidden semantics/non-clickability, Reduce Motion snapping, spring scale/fade/lift and GraphicEq/Close glyph transition.
+- Main-dev root `CLAUDE.md` and `AGENTS.md` are absent (404); Main-dev `CONTRIBUTING.md` SHA remains `3f45cdfb014fcbf54ea57bfd18dadf7b20556b4c`.
+- Repository tree/API inspection is available, but this execution environment has no checked-out Mylo worktree and outbound GitHub clone/DNS is unavailable. GitHub connector can read/write individual files, but cannot run Gradle locally. No code change should be made through blind whole-file replacement; establish a safe patch/build-capable execution path before modifying the large MainActivity integration.
+
+### Next actions / status correction
+- [x] Context log copied onto Main-dev before feature work (commit `b91dbbf813348cf1af3e021f5cde313d48f37c82`).
+- [x] Confirmed PR #8 and PR #4 are existing drafts on different bases; PR #8 exact-head CI is green.
+- [x] Re-read PR #8's CLAUDE.md and Main-dev CONTRIBUTING.md; no root Main-dev CLAUDE.md/AGENTS.md.
+- [x] Rechecked Main-dev navigation, scrobble timer and Replay storage source blobs.
+- [ ] Obtain a patch-capable repository worktree/build environment (or user-provided current checkout) before implementation; do not risk replacing MainActivity wholesale via Contents API.
+- [ ] Resolve required design-skill availability before substantial UI design work.
+- [ ] Next code slice after environment is available: FAB + conditional nav host only, with focused Compose/host tests; then Statistics, Generate, Playlists.
+- No feature implementation commit exists on Main-dev. The only Main-dev change so far is the living context document.
