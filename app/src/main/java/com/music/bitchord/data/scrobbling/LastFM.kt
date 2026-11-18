@@ -14,6 +14,12 @@ import io.ktor.http.isSuccess
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.coroutines.CancellationException
 import java.net.URI
 import java.security.MessageDigest
 import java.util.Locale
@@ -39,6 +45,36 @@ object LastFM {
         val apiKey: String,
         val secret: String,
         val sessionKey: String?,
+    )
+
+    data class UserStats(
+        val username: String,
+        val realName: String?,
+        val playCount: Long,
+        val trackCount: Long,
+        val artistCount: Long,
+        val albumCount: Long,
+        val avatarUrl: String?,
+    )
+
+    data class RankedTrack(
+        val name: String,
+        val artist: String,
+        val playCount: Long,
+        val artworkUrl: String?,
+    )
+
+    data class RankedArtist(
+        val name: String,
+        val playCount: Long,
+        val artworkUrl: String?,
+    )
+
+    data class RankedAlbum(
+        val name: String,
+        val artist: String,
+        val playCount: Long,
+        val artworkUrl: String?,
     )
 
     @Volatile
@@ -225,6 +261,69 @@ object LastFM {
 
     fun isInitialized(): Boolean = runtimeConfig.apiKey.isNotEmpty() && runtimeConfig.secret.isNotEmpty()
 
+    /** Remote Last.fm profile totals; never merge these with local Replay totals. */
+    suspend fun getUserStats(username: String): Result<UserStats> = statsResult {
+        val user = username.trim()
+        require(user.isNotEmpty()) { "Last.fm username is missing" }
+        val response = postAndRead("user.getinfo", extra = mapOf("user" to user))
+        parseLastFmUserStats(response) ?: error("Last.fm returned an invalid user profile")
+    }
+
+    suspend fun getTopTracks(
+        username: String,
+        period: String = "overall",
+        limit: Int = 10,
+    ): Result<List<RankedTrack>> = statsResult {
+        val user = username.trim()
+        require(user.isNotEmpty()) { "Last.fm username is missing" }
+        require(period in LASTFM_STATS_PERIODS) { "Unsupported Last.fm statistics period" }
+        val response = postAndRead(
+            "user.gettoptracks",
+            extra = mapOf("user" to user, "period" to period, "limit" to limit.coerceIn(1, 100).toString()),
+        )
+        parseLastFmTopTracks(response)
+    }
+
+    suspend fun getTopArtists(
+        username: String,
+        period: String = "overall",
+        limit: Int = 10,
+    ): Result<List<RankedArtist>> = statsResult {
+        val user = username.trim()
+        require(user.isNotEmpty()) { "Last.fm username is missing" }
+        require(period in LASTFM_STATS_PERIODS) { "Unsupported Last.fm statistics period" }
+        val response = postAndRead(
+            "user.gettopartists",
+            extra = mapOf("user" to user, "period" to period, "limit" to limit.coerceIn(1, 100).toString()),
+        )
+        parseLastFmTopArtists(response)
+    }
+
+    suspend fun getTopAlbums(
+        username: String,
+        period: String = "overall",
+        limit: Int = 10,
+    ): Result<List<RankedAlbum>> = statsResult {
+        val user = username.trim()
+        require(user.isNotEmpty()) { "Last.fm username is missing" }
+        require(period in LASTFM_STATS_PERIODS) { "Unsupported Last.fm statistics period" }
+        val response = postAndRead(
+            "user.gettopalbums",
+            extra = mapOf("user" to user, "period" to period, "limit" to limit.coerceIn(1, 100).toString()),
+        )
+        parseLastFmTopAlbums(response)
+    }
+
+    private suspend fun <T> statsResult(block: suspend () -> T): Result<T> = try {
+        Result.success(block())
+    } catch (cancellation: CancellationException) {
+        throw cancellation
+    } catch (error: Exception) {
+        Result.failure(error)
+    }
+
+    private val LASTFM_STATS_PERIODS = setOf("overall", "7day", "1month", "3month", "6month", "12month")
+
     fun normalizeEndpoint(endpoint: String): String {
         val uri = URI(endpoint.trim())
         val scheme = uri.scheme?.lowercase(Locale.ROOT)
@@ -295,4 +394,74 @@ object LastFM {
     const val DEFAULT_SCROBBLE_DELAY_PERCENT = 0.5f
     const val DEFAULT_SCROBBLE_MIN_SONG_DURATION = 30
     const val DEFAULT_SCROBBLE_DELAY_SECONDS = 180
+}
+
+
+internal fun parseLastFmUserStats(raw: String): LastFM.UserStats? = runCatching {
+    val root = Json.parseToJsonElement(raw) as? JsonObject ?: return null
+    val user = root["user"] as? JsonObject ?: return null
+    val username = user.text("name") ?: return null
+    LastFM.UserStats(
+        username = username,
+        realName = user.text("realname"),
+        playCount = user.long("playcount"),
+        trackCount = user.long("track_count"),
+        artistCount = user.long("artist_count"),
+        albumCount = user.long("album_count"),
+        avatarUrl = user.artwork(),
+    )
+}.getOrNull()
+
+internal fun parseLastFmTopTracks(raw: String): List<LastFM.RankedTrack> =
+    parseLastFmChart(raw, "toptracks", "track").mapNotNull { row ->
+        val name = row.text("name") ?: return@mapNotNull null
+        val artist = row["artist"].artistName().orEmpty()
+        LastFM.RankedTrack(name, artist, row.long("playcount"), row.artwork())
+    }
+
+internal fun parseLastFmTopArtists(raw: String): List<LastFM.RankedArtist> =
+    parseLastFmChart(raw, "topartists", "artist").mapNotNull { row ->
+        val name = row.text("name") ?: return@mapNotNull null
+        LastFM.RankedArtist(name, row.long("playcount"), row.artwork())
+    }
+
+internal fun parseLastFmTopAlbums(raw: String): List<LastFM.RankedAlbum> =
+    parseLastFmChart(raw, "topalbums", "album").mapNotNull { row ->
+        val name = row.text("name") ?: return@mapNotNull null
+        LastFM.RankedAlbum(name, row["artist"].artistName().orEmpty(), row.long("playcount"), row.artwork())
+    }
+
+private fun parseLastFmChart(raw: String, chartKey: String, rowKey: String): List<JsonObject> =
+    runCatching {
+        val root = Json.parseToJsonElement(raw) as? JsonObject ?: return emptyList()
+        val chart = root[chartKey] as? JsonObject ?: return emptyList()
+        when (val rows = chart[rowKey]) {
+            is JsonArray -> rows.mapNotNull { it as? JsonObject }
+            is JsonObject -> listOf(rows)
+            else -> emptyList()
+        }
+    }.getOrDefault(emptyList())
+
+private fun JsonObject.text(key: String): String? =
+    (this[key] as? JsonPrimitive)?.contentOrNull
+        ?.takeIf { it.isNotBlank() && it != "null" }
+
+private fun JsonObject.long(key: String): Long =
+    text(key)?.toLongOrNull()?.coerceAtLeast(0L) ?: 0L
+
+private fun JsonObject.artwork(): String? {
+    val images = when (val value = this["image"]) {
+        is JsonArray -> value.mapNotNull { it as? JsonObject }
+        is JsonObject -> listOf(value)
+        else -> emptyList()
+    }
+    return images.asReversed().firstNotNullOfOrNull { image ->
+        image.text("#text")?.takeIf { it.startsWith("https://") || it.startsWith("http://") }
+    }
+}
+
+private fun JsonElement?.artistName(): String? = when (this) {
+    is JsonObject -> text("name")
+    is JsonPrimitive -> contentOrNull?.takeIf { it.isNotBlank() && it != "null" }
+    else -> null
 }

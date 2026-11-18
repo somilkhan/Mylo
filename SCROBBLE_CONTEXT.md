@@ -1044,3 +1044,13 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 - Scrobble page entry/exit now uses a short drop/return transition. The existing Reduce Animation setting snaps this transition and the FAB glyph/scale; the Glass bar's inline/expanded fade is also disabled when Reduce Animation is enabled.
 - Standard bottom-bar glyph tint now snaps with Reduce Animation instead of continuing a 200ms tint tween.
 - No Home content or normal tab order was changed. Exact-head CI for the previous host commit `442bb3f28834c19c3fc7f62d7e2cfe705ab18f25` passed run #1094 / `44359311548`.
+
+
+## 31. Separate Last.fm remote statistics (2026-11-18)
+
+- Added public read-only Last.fm methods for `user.getinfo`, `user.gettoptracks`, `user.gettopartists`, and `user.gettopalbums`. These methods return `Result`, validate supported chart periods, clamp limits, and rethrow coroutine cancellation rather than swallowing it.
+- Added tolerant JSON parsers for user totals and ranked charts, including Last.fm's single-object/array response shapes and image arrays. Added JVM parser tests for profile totals, chart rows, and malformed/empty payloads.
+- Statistics now defaults to **Mylo Replay** (local device listening). A separate **Last.fm** source displays remote profile totals and remote top charts for 7 days, 1 month, 3 months, 6 months, 12 months, or all time. The two sources are never combined.
+- Last.fm remote stats require a configured API client and a saved username. If unavailable, the page explains that the account must be connected in Settings; API failures have retry actions.
+- No changes to the existing Last.fm scrobble submission pipeline. The new methods are read-only.
+- Exact-head CI for the prior scroll/motion commit `712e0928ea09b316307db2ef5341a300f22059e9` is still being checked; this new statistics commit will need its own exact-head CI result. No physical-device validation is claimed.

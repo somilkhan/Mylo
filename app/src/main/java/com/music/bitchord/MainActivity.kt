@@ -326,6 +326,7 @@ import com.music.bitchord.ui.replay.ReplayScreen
 import com.music.bitchord.ui.scrobble.ScrobbleGenerateContent
 import com.music.bitchord.ui.scrobble.ScrobbleGenerateViewModel
 import com.music.bitchord.ui.scrobble.ScrobblePlaylistsContent
+import com.music.bitchord.ui.scrobble.ScrobbleStatisticsContent
 import com.music.bitchord.ui.replay.cards
 import com.music.bitchord.ui.replay.ReplayShareSheet
 import com.music.bitchord.ui.replay.ReplayStories
@@ -2838,8 +2839,8 @@ private fun BitChordApp(
                     } else if (key.startsWith("scrobble-")) {
                         val scrobbleTab = key.removePrefix("scrobble-").toIntOrNull() ?: 0
                         when (scrobbleTab) {
-                            0 -> ReplayScreen(
-                                state = replay,
+                            0 -> ScrobbleStatisticsContent(
+                                replayState = replay,
                                 holder = account?.name.orEmpty(),
                                 onPeriodChange = setReplayPeriod,
                                 onOpenStory = { replayStory = it },
@@ -2859,8 +2860,7 @@ private fun BitChordApp(
                                     showReplayShare = true
                                 },
                                 contentPadding = listPadding,
-                                listState = replayListState,
-                                heading = "Statistics",
+                                replayListState = replayListState,
                             )
                             1 -> ScrobbleGenerateContent(
                                 viewModel = scrobbleGenerateViewModel,
