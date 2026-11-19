@@ -649,6 +649,8 @@ fun ScrobblePlaylistsContent(
     reduceMotion: Boolean,
     sharedTransitionScope: SharedTransitionScope,
     animatedVisibilityScope: AnimatedVisibilityScope,
+    currentSong: Song?,
+    isPlaying: Boolean,
     onPlaySongs: (List<Song>, Int) -> Unit,
     onOpenGenerator: () -> Unit,
 ) {
@@ -675,6 +677,8 @@ fun ScrobblePlaylistsContent(
     if (selected != null) {
         PlaylistDetailContent(
             playlist = selected,
+            currentSong = currentSong,
+            isPlaying = isPlaying,
             contentPadding = contentPadding,
             onBack = { selectedId = null },
             onPlaySongs = onPlaySongs,
@@ -1114,6 +1118,8 @@ private fun PlaylistRow(
 @Composable
 private fun PlaylistDetailContent(
     playlist: LocalPlaylist,
+    currentSong: Song?,
+    isPlaying: Boolean,
     contentPadding: PaddingValues,
     viewModel: ScrobbleGenerateViewModel,
     generationState: ScrobbleGenerateUiState,
