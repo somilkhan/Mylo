@@ -650,6 +650,7 @@ fun ScrobblePlaylistsContent(
     sharedTransitionScope: SharedTransitionScope,
     animatedVisibilityScope: AnimatedVisibilityScope,
     onPlaySongs: (List<Song>, Int) -> Unit,
+    onOpenGenerator: () -> Unit,
 ) {
     val playlists by LocalPlaylistStore.playlists.collectAsStateWithLifecycle()
     val storageError by LocalPlaylistStore.loadError.collectAsStateWithLifecycle()
@@ -660,6 +661,7 @@ fun ScrobblePlaylistsContent(
     var search by rememberSaveable { mutableStateOf("") }
     var sortMode by rememberSaveable { mutableStateOf(LocalPlaylistSortMode.NEWEST) }
     var sortMenuExpanded by remember { mutableStateOf(false) }
+    var expandedPlaylistId by rememberSaveable { mutableStateOf<String?>(null) }
     var renameTarget by remember { mutableStateOf<LocalPlaylist?>(null) }
     var renameText by rememberSaveable { mutableStateOf("") }
     var renameError by remember { mutableStateOf<String?>(null) }
@@ -689,8 +691,15 @@ fun ScrobblePlaylistsContent(
             },
         )
     } else {
-        val visible = sortLocalPlaylists(playlists, sortMode)
-            .filter { it.title.contains(search, ignoreCase = true) }
+        val visible = sortLocalPlaylists(playlists, sortMode).filter { playlist ->
+            search.isBlank() ||
+                playlist.title.contains(search, ignoreCase = true) ||
+                playlist.songs.any { song ->
+                    song.title.contains(search, ignoreCase = true) ||
+                        song.artist.contains(search, ignoreCase = true)
+                }
+        }
+        val totalTracks = playlists.sumOf { it.songs.size }
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
@@ -702,38 +711,45 @@ fun ScrobblePlaylistsContent(
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             item {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        Text("Playlists", style = MaterialTheme.typography.displayLarge, color = MaterialTheme.colorScheme.onBackground)
-                        Text("Your generated and saved mixes", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    Box {
-                        IconButton(onClick = { sortMenuExpanded = true }) {
-                            Icon(Icons.Rounded.Sort, contentDescription = "Sort playlists")
+                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Text("Playlists", style = MaterialTheme.typography.displayLarge, color = MaterialTheme.colorScheme.onBackground)
+                            Text(
+                                "${playlists.size} playlists · ${totalTracks} tracks",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
-                        DropdownMenu(
-                            expanded = sortMenuExpanded,
-                            onDismissRequest = { sortMenuExpanded = false },
-                        ) {
-                            LocalPlaylistSortMode.entries.forEach { option ->
-                                DropdownMenuItem(
-                                    text = { Text(option.label) },
-                                    leadingIcon = if (sortMode == option) {
-                                        { Icon(Icons.Rounded.Check, contentDescription = null) }
-                                    } else {
-                                        null
-                                    },
-                                    onClick = {
-                                        sortMode = option
-                                        sortMenuExpanded = false
-                                    },
-                                )
+                        TextButton(onClick = onOpenGenerator) {
+                            Icon(Icons.Filled.AutoAwesome, contentDescription = null, modifier = Modifier.size(17.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Generate")
+                        }
+                        Box {
+                            IconButton(onClick = { sortMenuExpanded = true }) {
+                                Icon(Icons.Rounded.Sort, contentDescription = "Sort playlists")
+                            }
+                            DropdownMenu(
+                                expanded = sortMenuExpanded,
+                                onDismissRequest = { sortMenuExpanded = false },
+                            ) {
+                                LocalPlaylistSortMode.entries.forEach { option ->
+                                    DropdownMenuItem(
+                                        text = { Text(option.label) },
+                                        leadingIcon = if (sortMode == option) {
+                                            { Icon(Icons.Rounded.Check, contentDescription = null) }
+                                        } else null,
+                                        onClick = {
+                                            sortMode = option
+                                            sortMenuExpanded = false
+                                        },
+                                    )
+                                }
                             }
                         }
                     }
+                    Text("Your generated and saved mixes", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             storageError?.let { error ->
@@ -757,15 +773,29 @@ fun ScrobblePlaylistsContent(
             }
             if (generationState.isGenerating) {
                 item {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        LinearProgressIndicator(Modifier.fillMaxWidth())
-                        Text(generationState.progress, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        TextButton(onClick = viewModel::cancelGeneration) { Text("Cancel") }
+                    androidx.compose.material3.Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            LinearProgressIndicator(Modifier.fillMaxWidth())
+                            Text(generationState.progress, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            TextButton(onClick = viewModel::cancelGeneration) { Text("Cancel") }
+                        }
                     }
                 }
             }
             generationState.error?.let { error ->
-                item { Text(error, color = MaterialTheme.colorScheme.error) }
+                item {
+                    androidx.compose.material3.Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.errorContainer,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(error, color = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.padding(14.dp))
+                    }
+                }
             }
             if (playlists.isNotEmpty()) {
                 item {
@@ -774,68 +804,122 @@ fun ScrobblePlaylistsContent(
                         onValueChange = { search = it },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
-                        label = { Text("Find a playlist") },
+                        label = { Text("Search playlists and tracks") },
+                        leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
+                        trailingIcon = if (search.isNotEmpty()) {
+                            { IconButton(onClick = { search = "" }) { Icon(Icons.Rounded.DeleteOutline, contentDescription = "Clear search") } }
+                        } else null,
+                        shape = RoundedCornerShape(16.dp),
                     )
                 }
             }
             if (visible.isEmpty() && storageError == null) {
                 item {
                     Column(
-                        Modifier.fillMaxWidth().padding(vertical = 56.dp),
+                        Modifier.fillMaxWidth().padding(vertical = 48.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(9.dp),
                     ) {
-                        Text(if (playlists.isEmpty()) "No playlists yet" else "No matching playlists", style = MaterialTheme.typography.titleMedium)
+                        Icon(Icons.Filled.LibraryMusic, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(42.dp))
+                        Text(if (playlists.isEmpty()) "No playlists yet" else "No matching playlists", style = MaterialTheme.typography.titleLarge)
                         Text(
-                            if (playlists.isEmpty()) "Generate a mix and it will be saved here." else "Try another playlist name.",
+                            if (playlists.isEmpty()) "Create your first mix from the Generator." else "Try another playlist or track name.",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                         )
+                        if (playlists.isEmpty()) {
+                            Button(onClick = onOpenGenerator, shape = RoundedCornerShape(16.dp)) {
+                                Icon(Icons.Filled.AutoAwesome, contentDescription = null)
+                                Spacer(Modifier.width(8.dp))
+                                Text("Open Generator")
+                            }
+                        }
                     }
                 }
             } else {
                 itemsIndexed(visible, key = { _, playlist -> playlist.id }) { index, playlist ->
-                    PlaylistRow(
-                        playlist = playlist,
-                        index = index,
-                        lastIndex = visible.lastIndex,
-                        showReorder = sortMode == LocalPlaylistSortMode.CUSTOM && search.isBlank(),
-                        canGenerateSimilar = !generationState.isGenerating && playlist.songs.any { it.videoId.isNotBlank() && !it.isVideo },
-                        onGenerateSimilar = { viewModel.generateSimilar(playlist) },
-                        animateHandoff = playlist.id == highlightedPlaylistId,
-                        sharedHandoffFromGenerate = sharedHandoffFromGenerate,
-                        reduceMotion = reduceMotion,
-                        sharedTransitionScope = sharedTransitionScope,
-                        animatedVisibilityScope = animatedVisibilityScope,
-                        onMoveUp = {
-                            scope.launch {
-                                playlistActionError = if (LocalPlaylistStore.movePlaylist(playlist.id, index - 1)) null
-                                else "Couldn't save playlist order. Try again."
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        PlaylistRow(
+                            playlist = playlist,
+                            index = index,
+                            lastIndex = visible.lastIndex,
+                            showReorder = sortMode == LocalPlaylistSortMode.CUSTOM && search.isBlank(),
+                            canGenerateSimilar = !generationState.isGenerating && playlist.songs.any { it.videoId.isNotBlank() && !it.isVideo },
+                            onGenerateSimilar = { viewModel.generateSimilar(playlist) },
+                            animateHandoff = playlist.id == highlightedPlaylistId,
+                            sharedHandoffFromGenerate = sharedHandoffFromGenerate,
+                            reduceMotion = reduceMotion,
+                            sharedTransitionScope = sharedTransitionScope,
+                            animatedVisibilityScope = animatedVisibilityScope,
+                            onMoveUp = {
+                                scope.launch {
+                                    playlistActionError = if (LocalPlaylistStore.movePlaylist(playlist.id, index - 1)) null
+                                    else "Couldn't save playlist order. Try again."
+                                }
+                            },
+                            onMoveDown = {
+                                scope.launch {
+                                    playlistActionError = if (LocalPlaylistStore.movePlaylist(playlist.id, index + 1)) null
+                                    else "Couldn't save playlist order. Try again."
+                                }
+                            },
+                            onOpen = { selectedId = playlist.id },
+                            onPlay = { onPlaySongs(playlist.songs, 0) },
+                            onPin = {
+                                scope.launch {
+                                    playlistActionError = if (LocalPlaylistStore.setPinned(playlist.id, !playlist.isPinned)) null
+                                    else "Couldn't update playlist pin. Try again."
+                                }
+                            },
+                            onRename = {
+                                renameText = playlist.title
+                                renameError = null
+                                renameTarget = playlist
+                            },
+                            onDelete = {
+                                deleteError = null
+                                deleteTarget = playlist
+                            },
+                        )
+                        if (playlist.songs.isNotEmpty()) {
+                            TextButton(
+                                onClick = { expandedPlaylistId = if (expandedPlaylistId == playlist.id) null else playlist.id },
+                                modifier = Modifier.align(Alignment.End),
+                            ) {
+                                Text(if (expandedPlaylistId == playlist.id) "Hide preview" else "Preview tracks")
                             }
-                        },
-                        onMoveDown = {
-                            scope.launch {
-                                playlistActionError = if (LocalPlaylistStore.movePlaylist(playlist.id, index + 1)) null
-                                else "Couldn't save playlist order. Try again."
+                            AnimatedVisibility(visible = expandedPlaylistId == playlist.id) {
+                                Column(
+                                    Modifier.fillMaxWidth().padding(horizontal = 14.dp),
+                                    verticalArrangement = Arrangement.spacedBy(7.dp),
+                                ) {
+                                    playlist.songs.take(3).forEachIndexed { trackIndex, song ->
+                                        Row(
+                                            Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                                                .clickable { onPlaySongs(playlist.songs, trackIndex) }
+                                                .padding(vertical = 4.dp, horizontal = 2.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                        ) {
+                                            AsyncImage(
+                                                model = song.thumbnailUrl,
+                                                contentDescription = null,
+                                                contentScale = ContentScale.Crop,
+                                                modifier = Modifier.size(38.dp).clip(RoundedCornerShape(7.dp)),
+                                            )
+                                            Column(Modifier.weight(1f).padding(horizontal = 10.dp), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                                                Text(song.title, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                Text(song.artist, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                            }
+                                            Text((trackIndex + 1).toString(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                    }
+                                    TextButton(onClick = { selectedId = playlist.id }) {
+                                        Text("View all ${playlist.songs.size} tracks")
+                                    }
+                                }
                             }
-                        },
-                        onOpen = { selectedId = playlist.id },
-                        onPlay = { onPlaySongs(playlist.songs, 0) },
-                        onPin = {
-                            scope.launch {
-                                playlistActionError = if (LocalPlaylistStore.setPinned(playlist.id, !playlist.isPinned)) null
-                                else "Couldn't update playlist pin. Try again."
-                            }
-                        },
-                        onRename = {
-                            renameText = playlist.title
-                            renameError = null
-                            renameTarget = playlist
-                        },
-                        onDelete = {
-                            deleteError = null
-                            deleteTarget = playlist
-                        },
-                    )
+                        }
+                    }
                 }
             }
         }
@@ -908,6 +992,7 @@ fun ScrobblePlaylistsContent(
         )
     }
 }
+
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
