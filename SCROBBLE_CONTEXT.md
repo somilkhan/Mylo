@@ -1806,3 +1806,71 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 
 ### Branch integrity
 - Current base for this review: `Main-dev` `f658abb0caf58bef88ea6d2a75dca1ded1533b4d`. `last-wave` remains read-only at `d0dd73755bfe640c515502751f440a32e57506d5`; `main` remains untouched at `11478fde56f1817cb777b296e60907359086f383`.
+
+
+## 64. Deep UX/UI audit — Generator and Playlists vs `last-wave` (2026-11-19)
+
+### Exact source snapshot and branch boundary
+- Target branch remains `Main-dev`; current reported target head before this audit: `786599b99cb3da6cdbec40c38adc9c674a1c1d19`. Refresh before any code write.
+- Reference branch remains read-only: `last-wave` = `d0dd73755bfe640c515502751f440a32e57506d5`.
+- GitHub compare (`last-wave` base, `Main-dev` head): diverged; Main-dev is 160 commits ahead and 27 behind; merge base is `11478fde56f1817cb777b296e60907359086f383`. This confirms a selective port is required; do not merge either branch wholesale.
+- LastWave UI sources inspected:
+  - `app/src/main/java/com/lastwave/app/ui/generate/GenerateScreen.kt` blob `06dbba0c77d1e06d02d60abfd98455f13d22f278` (420 lines).
+  - `.../ui/generate/GenerateViewModel.kt` blob `74b283322be32a9a17be644a3679f7ee76fd8398` (357 lines).
+  - `.../data/generate/GenerateRepository.kt` blob `e81bac3a8c938402931225e5c8f5a7cbda1645df` (1,715 lines).
+  - `.../ui/playlist/PlaylistScreen.kt` blob `2bea1f6d4f9ccc9f08164b85a7a95a485d69fa56` (694 lines).
+  - `.../ui/playlist/PlaylistViewModel.kt` blob `0fe9109f3a0cce5cd3e23d90f6822e13e0678162` (903 lines).
+  - `.../ui/playlist/PlaylistDetailScreen.kt` blob `54712d5106f9a244677c3679373609948ddf110b`.
+  - `.../ui/playlist/PlaylistComponents.kt` blob `80805ea8cef2911ae28593e5b824e9a575dc7f19`.
+  - `.../data/playlist/PlaylistRepository.kt` blob `37bd36c5d269b494aafd8c536fc54eac50f3f5a5` (704 lines).
+  - LastWave design rules: `DESIGN.md` blob `e6a058245f67fb0a04eb180ab467b2b8369c2e2d`; polished/minimal hierarchy, content-first, 4dp spacing rhythm, use theme tokens, all loading/empty/error/long-text/RTL/large-font/landscape states designed, touch targets >=48dp.
+- Current Main-dev UI/data sources inspected:
+  - `app/src/main/java/com/music/bitchord/ui/scrobble/ScrobbleContent.kt` blob `9ab870bd3329c0bbe15682b52e4e5a237f1dcb43` (1,211 lines).
+  - `.../ui/scrobble/ScrobbleGenerateViewModel.kt` blob `714589ff7a2d4f1977f96c8b4dc93dddbccc8a52`.
+  - `.../data/generate/PlaylistGenerationRepository.kt` blob `7fa7ac842c13b33b2d101f8b082b20e57b39f8c3`.
+  - `.../data/spotify/LocalPlaylistStore.kt` blob `15eda239dfe96f4c94553cb4f779dae1faf5acae`.
+- The UI comparison below is source inspection, not screenshot/device verification.
+
+### Generator — what LastWave actually presents
+- Nine modes are presented as a vertically composed expressive selectable group. Each mode has a distinct icon badge, title, explanatory subtitle, selected treatment and press feedback. The selected mode reveals its own options section; the user is not required to infer mode behavior from a row of compact chips.
+- The options surface adapts to the mode:
+  - Top and Library: six period choices (overall, 12 months, 6 months, 3 months, 1 month, 7 days).
+  - Recent, Mix, Recommendations and Never Heard: explicit explanatory helper text.
+  - Similar Tracks: track name + artist inputs, search action, and a top-tracks shortcut; search results are selectable.
+  - Similar Artists: artist query/search and selectable artist suggestions.
+  - Tag: free-text tag plus 12 genre quick chips.
+  - Recommendations: fixed count is explained; other modes expose a 5–35 track slider.
+- Generation state appears as a dedicated expressive progress card/message. Errors are a distinct error-container card with icon and dismiss action. On success, the ViewModel emits navigation to the newly saved playlist rather than leaving the result as an ambiguous inline status.
+- LastWave's UI mode labels/descriptions and mode-specific controls are part of the UX contract, not decoration. Its repository/VM also own source blending, request deduplication, candidate precheck, artist caps, playable-ID pinning, exclusions and mode-specific fallback behavior. These algorithms must be compared independently; do not replace Mylo's existing repository just to reproduce the appearance.
+
+### Generator — confirmed Mylo gaps and existing strengths
+- Mylo already exposes the same nine broad modes and has meaningful per-mode behavior in `PlaylistGenerationRepository`; preserve it rather than duplicating LastWave's generator engine.
+- Mylo's mode chooser is a horizontally scrolling row of `FilterChip` controls with one shared mode description. It lacks LastWave's expressive icon/title/subtitle selection rows and clear selected-mode hierarchy. This is a confirmed presentation gap.
+- Mylo's TOP period selector exposes four Replay periods (All time / This year / This month / This week), not LastWave's six YT Music/Last.fm windows. Do not add six labels unless Mylo's underlying data sources can truthfully calculate those periods; map the actual supported ranges first.
+- Similar Tracks currently has a useful Mylo-specific path: the current playing song can be selected, and a debounced YouTube Music song search produces up to six selectable seed results. This differs from LastWave's text + artist search and top-track shortcut. Keep the working YT Music identity/search path; evaluate adding artist disambiguation and top-track suggestions without creating a second search pipeline.
+- Similar Artists and Tag are currently plain text fields. The Tag flow has no visible quick-select genre chips; Similar Artists has no visible result/suggestion selection flow. LastWave provides selectable artist suggestions and 12 tag chips. These are confirmed discoverability/interaction gaps.
+- Mylo's MIX exposes an optional now-playing/search seed; LastWave's regular Mix options are only explanatory text and its separate Start Mix launch path uses `MixLauncher`. Keep Mylo's intentional seed behavior unless the actual generation contract proves it wrong.
+- Mylo's Never Heard mode already exposes three opt-in exclusion toggles (saved playlists, liked tracks, library) and explanatory text; this is richer than the inspected LastWave screen. Preserve and visually integrate it.
+- Mylo already exposes track count 5–35, progress text + Cancel, inline errors, and a saved-playlist result card with a route to Playlists. The presentation is comparatively plain: no dedicated expressive progress/error treatment, and success is a small inline card rather than an obvious next-step transition. Review the actual handoff before changing navigation; do not lose the saved-playlist ID or Start Mix queue intent.
+- The current form is one long vertically scrolling page. Options and mode chooser lack the LastWave hierarchy and visual grouping. This is the central confirmed Generator UX incompleteness, even though the generator algorithms are not wholly absent.
+
+### Playlists — what LastWave actually presents and supports
+- Playlist list is a full feature surface, not just a saved-items list: expressive header with playlist/track totals, create action, sort selector (newest/oldest/name/track count), search that matches playlist title and track title/artist, generator shortcut, saved/regenerated banner, loading/empty/error states, playlist cards with expandable track previews, selection and multi-delete, and per-playlist actions.
+- ViewModel coordinates Room-backed local playlists, remote YouTube Music library playlists, optional Spotify playlist projection, sync state, refresh-on-resume, download status, create/rename/delete, pin/cover, reorder, exports, regeneration, and error/toast feedback. These remote-provider surfaces are LastWave-specific and must not be faked in Mylo.
+- Playlist detail is a dedicated high-hierarchy screen: large full-bleed cover/hero with scroll/parallax behavior, playlist metadata, prominent Play action and current-playing state, locate-current-track action, persistent per-playlist sort preference, search/filter, reorder lock, drag reorder with edge auto-scroll, stable displayed-order row keys, and rich track rows/context actions. It handles remote/liked/local playlists differently and routes the Local Songs playlist to a local-music hub.
+- Detail overflow actions include playlist management and export; track actions include context menu, track management and ordering. Loading and missing-detail states are explicitly represented. The inspected detail also preserves a cached playlist while detail refreshes.
+
+### Playlists — confirmed Mylo gaps and existing strengths
+- Mylo's list currently has a simple header, sort menu, storage/action errors, generation progress/error, title-only search, empty/no-match state and playlist rows. Rows show cover/title/count/pinned state and expose Play plus an overflow menu for Pin, Generate Similar, Move Up/Down, Rename and Delete.
+- Mylo's list search only filters playlist titles; it does not search track names/artists. There is no visible create-playlist action, playlist/track total summary, generator shortcut in the list header, multi-select/multi-delete, or expanded track preview. These are confirmed differences from LastWave's playlist-list UX; decide which make sense for Mylo rather than blindly importing provider-specific features.
+- Mylo's detail already supports Play, Shuffle, custom cover change/reset, Generate Similar, export, rename/delete, add-track search, duplicate-track prevention, per-track play, Move Up/Down and Remove. Its local store supports pinning and custom playlist ordering. Preserve these existing capabilities.
+- Mylo detail is materially simpler than LastWave's: compact 68dp cover/title header and basic action buttons; no large cover-led hero, current-playback indicator/locate action, in-detail search, sort controls, reorder lock/drag gesture, or LastWave-style grouped track rows/context menu. Track ordering is menu-based Move Up/Down rather than drag. This is a confirmed UX gap, not proof that the underlying playlist storage is broken.
+- Mylo's list/detail use the existing `LocalPlaylistStore` and `Song` model; LastWave uses Room `PlaylistRepository` and `GeneratedTrack` with remote playlist types. Do not replace Mylo storage/model or introduce a second playlist database as a design shortcut. Reuse Mylo's durable store and playback callbacks.
+
+### Audit conclusion and implementation direction
+- The earlier port delivered functional generator and playlist foundations, but the screen-level experience is not a faithful UX port and is visibly under-composed compared with LastWave. The user's correction is valid.
+- Priority 1: redesign Generator presentation in Mylo's native Compose/theme language around the LastWave information hierarchy: mode selection rows with icon/title/subtitle; clearly scoped options; mode-specific seed/tag/artist affordances; improved progress/error/success feedback. Preserve Mylo's current generation state, validation, current-song seed, exclusions, cancellation, saved-playlist event and Start Mix behavior.
+- Priority 2: redesign playlist list/detail hierarchy. Start with title+track-aware search, totals, a clear Generator entry point, richer playlist cards/expanded previews and empty/loading/error states; then detail hero, current-track/locate affordance, sort/search and safer drag reorder only after mapping Mylo's existing player identity and LocalPlaylistStore mutation semantics.
+- Reuse LastWave's design ideas and real interaction patterns, but adapt to Mylo's theme, Compose components, `Song`/local playlist identity, local playback APIs and navigation. Provider-specific Spotify/remote-YT sync, Room entities and Local Songs hub are not assumed in-scope.
+- Before implementation, inspect every relevant Mylo caller and existing shared components/tests; search for existing artwork/track-row/menu/dialog patterns to avoid duplicates. Keep the existing Scrobble tab host and player UI unchanged.
+- No code was changed in this audit pass. No build, automated test or device visual verification is claimed. The next pass is a focused UI implementation plan and source audit of Mylo playback identity, sort/reorder and playlist store APIs before editing.
