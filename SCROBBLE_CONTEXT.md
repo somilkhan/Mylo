@@ -2243,3 +2243,47 @@ Section 70 was written while workflow run 44446937265 was still in progress. The
 - This is a compile failure, not a failing behavioral unit test. No APK was produced.
 - Next action is to fix the exact Check reference, run the Android unit-test/build job again, then wait for desktop and web jobs. Do not proceed to Statistics implementation until the latest generator code compiles cleanly.
 
+## 72. Generator Check icon correction and Statistics merge source audit (2026-11-19)
+
+### Live refs and branch safety
+- Repository: `somilkhan/Mylo`.
+- `Main-dev` code HEAD before this documentation update: `c32a9a0e2cc75d8da6ac115e830ebae78c9c1b0e`.
+- `main`: `11478fde56f1817cb777b296e60907359086f383` (unchanged).
+- `last-wave`: `d0dd73755bfe640c515502751f440a32e57506d5` (read-only).
+- No branch was created, merged, rebased or force-updated.
+
+### Generator CI correction
+- Refreshed the failed run `44446937265` and inspected the Android job log. The diagnostic is an unresolved reference at `ScrobbleContent.kt:760:45`: `Icons.Filled.Check` is used while the file imports `androidx.compose.material.icons.rounded.Check`; the compiler's candidate is `Icons.Rounded.Check`.
+- Re-fetched the full current source at Main-dev and confirmed exactly one mismatched reference at line 760; the Rounded.Check import already exists and other Rounded.Check usages compile syntactically in the same file.
+- Changed only that expression to `Icons.Rounded.Check`. No dependency, import, unrelated formatting or other source file changed.
+- Code commit: `c32a9a0e2cc75d8da6ac115e830ebae78c9c1b0e`, parent `ce0292c7f78020e57d6247118f4cd9076074ec1e`.
+- Changed file: `app/src/main/java/com/music/bitchord/ui/scrobble/ScrobbleContent.kt`, new blob `64cd472ebe372aca73b5d66c9210e490a756e9e6`.
+- CI workflow `.github/workflows/android-ci.yml` includes push on `Main-dev`; the Kotlin source change is not excluded by its markdown-only `paths-ignore`. However, the GitHub connector returned no combined status entries and no commit workflow-run records for this push SHA (its exposed workflow-run lookup did not surface a push run). Therefore the correction is **not yet CI-verified**. Do not proceed to Statistics implementation until Android compile/unit tests are confirmed green on this or a later exact code SHA.
+- No local Gradle execution or APK build was performed.
+
+### Statistics merge audit — exact Mylo data contracts
+- Current `ScrobbleStatisticsContent.kt` blob `f7eaa395f6bd808b359631071b3fbfdaf3071e4b` still has a `MYLO_REPLAY / LAST_FM` source toggle. This directly conflicts with the approved one-screen/no-source-toggle spec.
+- The current Last.fm `RankedTrack` model in `LastFM.kt` blob `3f11b074880077d6142c1ee0328cb5250171dee8` contains only `name`, `artist`, `playCount` and `artworkUrl`. The current `user.gettoptracks` parser reads playcount; it does not supply per-track listened milliseconds.
+- Mylo `ListeningStats.summary(period)` (existing `ListeningStats.kt` blob `93cb88d2f95aceca12066a433e6c446f41ef3aad`) already applies the exact local ReplayPeriod and returns per-track `Song`, actual listened milliseconds and play counts. Weekly values come from per-day buckets; other periods use the corresponding monthly aggregate selection.
+- Consequence: remote Last.fm play counts can be merged by normalized artist+title using `max(local, remote)`; remote listened milliseconds cannot be inferred from a scrobble count or track-length metadata. Keep listened-time totals and time-based concentration truthful/local-only unless a genuine per-play duration source is found. Do not multiply play count by track duration or otherwise fabricate remote time. This is consistent with the explicit handoff limitation in section 70, even though the high-level spec's time-merge wording cannot be fulfilled from the current Last.fm response model.
+- Existing Statistics concentration is based on `ReplaySummary.songs.ms` and `ReplaySummary.totalMs`; it is measured local listening-time concentration, not remote scrobble concentration.
+
+### Last.fm period-source finding (official API documentation checked)
+- Existing `getTopTracks` accepts Last.fm periods `overall`, `7day`, `1month`, `3month`, `6month`, `12month` and supports pagination. Those windows do not exactly match Mylo's calendar-aligned This week / This month / This year ranges.
+- Last.fm `user.getrecenttracks` supports explicit `from` and `to` Unix timestamps (UTC), page number and a maximum of 200 rows per page. It includes timestamped scrobbles and may include a now-playing row without a timestamp. This provides a source for exact period counts after filtering/paginating; the current Mylo LastFM client does not yet expose this method.
+- All-time can use paginated `user.gettoptracks(period=overall)`; calendar periods should use recent-track timestamps with exact period boundaries rather than silently substituting rolling Last.fm periods. Pagination and rate/failure behavior still need implementation and focused tests.
+- API references: official Last.fm `user.getrecenttracks` docs and `user.gettoptracks` docs (web citations will be included in the user-facing summary).
+
+### Prototype and UX source review
+- Re-read the complete uploaded `AGENT-BRIEF.md`, `mylo-ux-spec.md` and `CHANGE-THEME-TOGGLE.md`; all current implementation constraints in section 0 and sections 67–71 were checked against the actual source documents.
+- Read all 2,246 lines of the live `SCROBBLE_CONTEXT.md`, including sections 0 and 67–71.
+- Read the complete 758-line `mylo-replay-prototype-v3.html` source: gradient palette and device shell; Statistics period selector, concentration card and merged track rows; nine mode rows and mode dialog; count stepper, Cancel/Generate states; playlist shelf and new-row arrival; FAB/nav/mini-player/full-player behavior; sample-only data and prototype controls.
+- Attempted headless Chromium browser rendering twice, but the browser process timed out before producing a screenshot. The HTML was inspected from source; **browser-rendered visual inspection remains blocked/unverified**. Do not claim a rendered browser review or pixel comparison.
+
+### Next safe work
+1. Obtain exact-head CI evidence for `c32a9a0e2cc75d8da6ac115e830ebae78c9c1b0e`; inspect all Android, desktop and web jobs/logs. If the push run cannot be surfaced by the current GitHub integration, use a supported Actions run lookup before claiming pass.
+2. Once Generator compiles, implement the single merged Statistics view: normalized identity, one row per key, `max(local, Last.fm)` plays, local-only when disconnected, exact same period boundaries, 5-minute cache, stale-while-refresh, forced pull-to-refresh, retry notice only when connected, and focused tests.
+3. Add Last.fm recent-track pagination for exact calendar ranges; use the existing LastFM Ktor client. For all-time, paginate top tracks. Exclude now-playing entries without timestamps.
+4. Keep time listened and the time-based concentration card based only on genuine Mylo listened milliseconds until a real remote duration source exists. Do not synthesize remote durations.
+5. Resolve the Library period question from the actual model: it has no added timestamp, so no fake date filter. Preserve playlist search/detail extras pending explicit product-owner decision.
+6. Continue full acceptance and exact-head CI; produce an APK from a verified code SHA before device testing. No physical-device or screenshot acceptance is claimed.
