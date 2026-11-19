@@ -1914,3 +1914,47 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 - Not yet redesigned: playlist detail hierarchy and controls. It still uses a compact cover/title row, basic Play/Shuffle, menu-based track move/remove, and has no in-detail search/sort, current-track indicator/locate action, or drag reorder. These remain the next design slice.
 - No physical-device visual verification is claimed. Check compact phone layout, long titles, empty playlist, large font, landscape, light/dark theme, add-track/search states and playlist handoff after the next APK build.
 - Latest reported Main-dev commit after this slice: `525bf8c4a1ece5664937931e3fa14dfa28685b6b`. Refresh branch refs before further edits. `last-wave` remains read-only; `main` remains untouched.
+
+
+## 66. Theme/contrast correction and playlist-detail UX continuation (2026-11-19)
+
+### Context and live refs rechecked
+- Re-read the current `SCROBBLE_CONTEXT.md` end-to-end for its governing rules and prior implementation history, including sections 0, 34–41 and 60–65. Older SHA snapshots remain historical; this section records the live refs for this pass.
+- Refreshed branch heads before editing:
+  - `Main-dev` parent before this pass: `a3628752306e5fe36fdc1ca633822201a315ad4e`.
+  - `last-wave` read-only reference: `d0dd73755bfe640c515502751f440a32e57506d5`.
+  - `main` untouched: `11478fde56f1817cb777b296e60907359086f383`.
+- LastWave detail source rechecked at `app/src/main/java/com/lastwave/app/ui/playlist/PlaylistDetailScreen.kt`; the live Mylo visual source remains `ui/theme/Theme.kt` and `ui/scrobble/ScrobbleContent.kt`.
+
+### Confirmed contrast/theme defects
+- Mylo's original `DarkColors` / `LightColors` set only a subset of Material 3 tokens. Generator and playlist surfaces consume `primaryContainer`, `secondaryContainer`, `surfaceContainerHighest`, `errorContainer` and matching content colors, so unspecified tokens fell back to Material 3 defaults rather than Mylo's deliberately monochrome palette. This was a real source-level color drift risk.
+- Playlist shelf cards used `Row.background(surfaceVariant)` without a Surface/content-color provider. Playlist and track titles without explicit colors therefore inherited the surrounding content color rather than the intended `onSurface` for the grey card. In dark mode that can render dark/default text against a dark charcoal card. This matches the user's reported black-on-grey contrast symptom.
+- The page roots also lacked an explicit `Surface` to establish the background and content color for all plain text on Generator, playlist shelf and detail.
+- The latest pre-fix commit `a3628752306e5fe36fdc1ca633822201a315ad4e` had added required `currentSong` and `isPlaying` parameters to `ScrobblePlaylistsContent` but had not passed them from its MainActivity call site. The call site was incomplete and would not compile. This pass wired the actual `player.song` and `player.isPlaying` values.
+
+### Implemented on Main-dev — commit `6f81c08c3c92b7a7d6a51af11c15257f55c41f9a`
+- `ui/theme/Theme.kt`:
+  - Completed the dark and light Material 3 palettes for primary/on-primary, primary container, secondary/container, tertiary/container, surface/container tiers, inverse surfaces, outline, scrim and error/container pairs.
+  - All generator/playlist accent and container tokens are now intentionally monochrome and consistent in both themes. The existing `AccentRed` remains a separate Replay-only accent; no artwork-derived or wallpaper/dynamic color is introduced.
+  - Contrast spot-checks for the actual chosen token pairs: dark title/card 17.01:1; light title/card 14.97:1; dark secondary surface 13.31:1; light secondary surface 14.18:1; muted text on dark/light surfaces 8.62:1 / 6.51:1. These are calculated token-pair ratios, not screenshot measurements.
+- `ui/scrobble/ScrobbleContent.kt`:
+  - Generator and Playlists/detail now each have a page-level themed `Surface` with explicit background and foreground content colors.
+  - Playlist shelf cards now use Material 3 `Surface` with explicit `surfaceVariant` + `onSurface`, preventing text color from being inherited incorrectly.
+  - Playlist detail has a larger cover-led Mylo-native hero card, explicit title/metadata colors, a current-playing label and a Locate action that scrolls to the current track by exact `videoId`.
+  - Added in-playlist title/artist search and view-only sort options (Custom order / Title / Artist). Sorting preserves original track indices; move/remove/play actions still target the original playlist entries. Move Up/Down remains available only in Custom order with no active search, so a sorted/filtered visual index can never be mistaken for a storage index.
+  - Current track rows receive a theme-aware selected surface and explicit foreground colors. Search, sort, empty results, menus, progress/error and existing add/remove/export/cover states inherit the explicit page theme.
+  - Source scan of this file found no hard-coded black/white/hex colors; remaining background styling uses Material 3 theme tokens.
+- `MainActivity.kt`: passed `player.song` and `player.isPlaying` to the playlist shelf/detail host, completing the playback-state connection introduced by the preceding commit.
+- Existing LocalPlaylistStore remains the only persistence path. No LastWave Room database, remote playlist type, new queue owner or second theme system was introduced.
+
+### Remaining parity and verification
+- LastWave's detail supports drag reordering and remembers per-playlist sort settings. Mylo still uses its already-tested Move Up/Down store operation; the new sort selection is screen-saveable but not yet persisted per playlist. Do not implement drag reorder until the gesture, stable identity and durable move transaction are traced and covered by tests.
+- The playlist hero is deliberately Mylo-native and neutral, not a LastWave full-bleed artwork/dynamic-color surface. No dynamic accent/color sampling is used on Generator or playlist detail.
+- Android CI run #1204 / ID `44432162937` targets this exact commit. At documentation time Android APK/unit tests, desktop compile/tests and web tests/typecheck were still in progress; no pass is claimed yet. Inspect all jobs and logs before calling it green.
+- No emulator or physical-device screenshot/visual verification has been performed. Device review must cover forced Light, forced Dark and System themes; generator mode selection/options/progress/error/success; playlist shelf row title/metadata/action menus; detail hero, long playlist names, current-track locate, search/sort, add-track, empty playlist, dialogs and playback state.
+- Do not treat successful compilation as visual acceptance. The user's reported contrast issue remains open for device confirmation even though the source-level inheritance and palette defects are corrected.
+
+### Branch integrity
+- Current `Main-dev` head after this commit: `6f81c08c3c92b7a7d6a51af11c15257f55c41f9a`.
+- `last-wave` remains read-only at `d0dd73755bfe640c515502751f440a32e57506d5`; `main` remains untouched at `11478fde56f1817cb777b296e60907359086f383`.
+- Continue on `Main-dev` only. Refresh refs and read this context before the next edit.
