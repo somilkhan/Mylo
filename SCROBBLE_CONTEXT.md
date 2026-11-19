@@ -1734,3 +1734,41 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 - Verified by fetching all 16 supported locale resource files from the updated `Main-dev` branch and confirming each contains `start_mix_with_song`. This is source-level verification only; the Android test suite must still rerun.
 - CI run #1182 / ID `44420807573` remains failed for the earlier feature SHA. Pushes for the locale correction created run #1202 / ID `44423376514`, targeting `d6e9b9a2f08db06c409e4ed7bad1940050336211` (the complete translation source tree immediately before the docs-only commit `6daf82d`). At the time of this note, #1202 was pending and had no jobs listed yet. The current branch head is `6daf82d`; only the context Markdown differs from #1202's tested tree. Inspect #1202's Android, desktop and web jobs before claiming CI green.
 - Branch rule unchanged: only `Main-dev` is modified. Do not create branches, merge, or touch `main` or read-only `last-wave`.
+
+
+## 62. Start Mix CI #1202 duplicate-resource correction and integration review (2026-11-19)
+
+### Live repository / branch verification
+- Rechecked live refs before editing: `Main-dev` was `d5d3907776b25e5912de94ef52cf92c321d77f18`; `last-wave` remained `d0dd73755bfe640c515502751f440a32e57506d5`; `main` remained `11478fde56f1817cb777b296e60907359086f383`.
+- Work remains scoped to `Main-dev`. LastWave and main were read-only.
+- Read the current context record through its Start Mix sections and refreshed the source files listed below; older snapshots elsewhere in this living log are historical, not live branch truth.
+
+### CI #1202 exact failure
+- Run #1202 / ID `44423376514` tested `d6e9b9a2f08db06c409e4ed7bad1940050336211` and completed with overall `failure`.
+- Android unit-test job failed during Android resource merge, before the unit-test suite could execute. The exact error was duplicate `String/start_mix_with_song` declarations in `values-de`, `values-es`, `values-fr` and `values-he`.
+- Desktop compile/tests passed; web tests/typecheck passed.
+- Root cause: these four locale files already contained the key, and the locale correction added an identical second declaration. The previous section 61's "each contains the key" check did not check uniqueness. This is a correction to that earlier verification claim.
+- Live Main-dev inspection found exactly two identical declarations in each of those four files and exactly one declaration in each of the other 12 supported locale files.
+
+### Corrective change
+- Removed only the second identical `start_mix_with_song` declaration from `values-de/strings.xml`, `values-es/strings.xml`, `values-fr/strings.xml` and `values-he/strings.xml`.
+- All 16 supported locale directories must contain exactly one declaration after this change. No translation text, base string, UI code or feature behavior is changed.
+- This is a resource-merge fix, not evidence that Android unit tests pass. A new CI run is required.
+
+### Start Mix source review — confirmed so far
+- `SongActionsSheet.kt` exposes the action only when a callback exists, the row is online, the video ID/title/artist are nonblank and the item is not a video.
+- `ScrobbleGenerateViewModel.startMixWithSong` validates the seed again and rejects a second start while a generation job is active. It creates a Similar Tracks request with the selected `Song` as the seed.
+- The repository validates the seed again before discovery. Its existing generation pipeline remains separate from persistence/player writes; the ViewModel saves with `LocalPlaylistStore` and publishes the queue handoff only after save returns.
+- `MainActivity` keeps the pending handoff in StateFlow until a playback controller is available, then consumes the matching playlist ID and passes the songs to the existing queue helper.
+- The queue helper is called with `startIfIdle = true`; it starts the generated songs if the controller has no media items, otherwise it inserts into the user queue. Listen Together limits are applied by the shared queue helper.
+- Found stale comments in the queue-handoff block saying it "never starts playback when idle" and in the helper saying Start Mix cannot start from idle. Those comments contradict the actual `startIfIdle = true` call and helper behavior; correct them in a later grouped code/doc change after the surrounding queue behavior has been fully traced. No runtime behavior was changed in this pass.
+
+### Verification still required
+- Re-run Android CI after this resource fix; inspect all jobs and logs. Do not call #1202 green.
+- Continue the queue-ordering and AutoPlay insertion review, controller lifecycle/recreation, handoff consumption race, save failure/cancellation boundaries, duplicate saved-playlist navigation, Listen Together limit and playback continuity review.
+- Existing pure-rule tests cover seed eligibility and similar-track curation; they do not yet prove ViewModel lifecycle, durable save/queue handoff or physical playback.
+- Device verification remains outstanding for every item in section 60. No device result is claimed.
+- Next: inspect `queueSongs`, `QueueCoordinator.findUserQueueInsertionIndex`, `LocalPlaylistStore.savePlaylist`, the saved-playlist collector/deduplication and the ViewModel cancellation/reset path; add targeted regression coverage only for verified gaps.
+
+### Branch integrity
+- Expected resulting branch: `Main-dev` only. `last-wave` remains read-only; `main` must remain untouched.
