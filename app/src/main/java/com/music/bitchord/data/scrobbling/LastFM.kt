@@ -145,14 +145,14 @@ object LastFM {
     }
 
     suspend fun getToken() =
-        runCatching {
+        statsResult {
             postAndDecode<TokenResponse>(
                 method = "auth.getToken",
             )
         }
 
     suspend fun getSession(token: String) =
-        runCatching {
+        statsResult {
             postAndDecode<Authentication>(
                 method = "auth.getSession",
                 extra = mapOf("token" to token),
@@ -171,7 +171,7 @@ object LastFM {
     suspend fun getMobileSession(
         username: String,
         password: String,
-    ) = runCatching {
+    ) = statsResult {
         postAndDecode<Authentication>(
             method = "auth.getMobileSession",
             extra = mapOf("username" to username, "password" to password),
@@ -183,13 +183,19 @@ object LastFM {
         override val message: String,
     ) : Exception(message)
 
+    class ScrobbleRejectedException(
+        val ignoredCode: Int,
+        val retryable: Boolean,
+        override val message: String,
+    ) : Exception(message)
+
     suspend fun updateNowPlaying(
         artist: String,
         track: String,
         album: String? = null,
         trackNumber: Int? = null,
         duration: Int? = null,
-    ) = runCatching {
+    ) = statsResult {
         postAndRead(
             method = "track.updateNowPlaying",
             sessionKey = requireSessionKey(),
@@ -211,8 +217,8 @@ object LastFM {
         album: String? = null,
         trackNumber: Int? = null,
         duration: Int? = null,
-    ) = runCatching {
-        postAndRead(
+    ) = statsResult {
+        val response = postAndRead(
             method = "track.scrobble",
             sessionKey = requireSessionKey(),
             extra =
@@ -225,6 +231,8 @@ object LastFM {
                     duration?.let { put("duration[0]", it.toString()) }
                 },
         )
+        validateLastFmScrobbleResponse(response)
+        response
     }
 
     fun initialize(
@@ -427,6 +435,43 @@ object LastFM {
     const val DEFAULT_SCROBBLE_DELAY_SECONDS = 180
 }
 
+
+internal fun validateLastFmScrobbleResponse(raw: String) {
+    val root = Json.parseToJsonElement(raw) as? JsonObject
+        ?: throw IllegalStateException("Last.fm returned an invalid scrobble response")
+    val scrobbles = root["scrobbles"] as? JsonObject
+        ?: throw IllegalStateException("Last.fm returned no scrobble result")
+    val attributes = scrobbles["@attr"] as? JsonObject
+    val accepted = attributes?.text("accepted")?.toIntOrNull()
+    val ignored = attributes?.text("ignored")?.toIntOrNull()
+
+    if (accepted == null && ignored == null) {
+        throw IllegalStateException("Last.fm returned no scrobble acceptance status")
+    }
+    if ((accepted ?: 0) > 0 && (ignored ?: 0) == 0) return
+
+    val rows = when (val value = scrobbles["scrobble"]) {
+        is JsonArray -> value.mapNotNull { it as? JsonObject }
+        is JsonObject -> listOf(value)
+        else -> emptyList()
+    }
+    val ignoredCode = rows.firstNotNullOfOrNull { row ->
+        (row["ignoredMessage"] as? JsonObject)?.text("code")?.toIntOrNull()
+    } ?: 0
+    val message = when (ignoredCode) {
+        1 -> "Last.fm ignored the artist"
+        2 -> "Last.fm rejected the track"
+        3 -> "Last.fm rejected an old scrobble timestamp"
+        4 -> "Last.fm rejected a future scrobble timestamp"
+        5 -> "Last.fm daily scrobble limit exceeded"
+        else -> "Last.fm did not accept the scrobble"
+    }
+    throw LastFM.ScrobbleRejectedException(
+        ignoredCode = ignoredCode,
+        retryable = ignoredCode == 5,
+        message = message,
+    )
+}
 
 internal fun parseLastFmUserStats(raw: String): LastFM.UserStats? = runCatching {
     val root = Json.parseToJsonElement(raw) as? JsonObject ?: return null
