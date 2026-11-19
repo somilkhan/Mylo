@@ -1874,3 +1874,43 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 - Reuse LastWave's design ideas and real interaction patterns, but adapt to Mylo's theme, Compose components, `Song`/local playlist identity, local playback APIs and navigation. Provider-specific Spotify/remote-YT sync, Room entities and Local Songs hub are not assumed in-scope.
 - Before implementation, inspect every relevant Mylo caller and existing shared components/tests; search for existing artwork/track-row/menu/dialog patterns to avoid duplicates. Keep the existing Scrobble tab host and player UI unchanged.
 - No code was changed in this audit pass. No build, automated test or device visual verification is claimed. The next pass is a focused UI implementation plan and source audit of Mylo playback identity, sort/reorder and playlist store APIs before editing.
+
+
+## 65. UX implementation — Generator and playlist shelf first slice (2026-11-19)
+
+### Generator presentation changes
+- Updated `app/src/main/java/com/music/bitchord/ui/scrobble/ScrobbleContent.kt`:
+  - Replaced the horizontal mode-chip picker with vertically composed selectable mode rows. Each of the nine modes now has an icon, title, explanatory subtitle and selected treatment.
+  - Added a distinct Options hierarchy with a mode-specific explanation and controls.
+  - Kept Mylo's real four Replay periods; no unsupported LastWave-only date windows were invented.
+  - Retained the existing debounced YouTube Music seed search and now-playing seed; search results now render with artwork, title/artist and selected feedback.
+  - Added twelve tag quick-select chips, clearer artist/tag labels, and track-count range labels.
+  - Kept Never Heard's existing opt-in exclusions and Mix's optional now-playing seed.
+  - Reworked progress, error and saved-playlist feedback into clearer themed surfaces; added error dismissal to `ScrobbleGenerateViewModel`.
+  - Hid the Generate action while generation is active and preserved the existing shared-bounds playlist handoff animation.
+- Added `dismissError()` to `ScrobbleGenerateViewModel`; no generator repository, mode algorithm, persistence, cancellation token or Start Mix queue behavior was changed.
+- Related code commits:
+  - `60ebeaee354ba159626290365d8f69c042dbfb1d` — generator hierarchy and mode-specific controls.
+  - `6bcf18c5033f9ed496b29cb0dfcfe9d21f0f3347` — generator error dismissal.
+  - `0cce7f27ebf89abe7ac5b4674cf1856361f46b1e` — hide action during generation and preserve shared transition.
+
+### Playlist shelf changes
+- Updated `ScrobblePlaylistsContent` in the same `ScrobbleContent.kt`:
+  - Search now matches playlist title, track title and artist.
+  - Header now reports playlist and track totals and exposes a direct Generate action.
+  - Empty state has a Generator entry point; no new storage model or empty-playlist creation path was introduced.
+  - Generation progress/error presentation is clearer.
+  - Each playlist can reveal a compact three-track preview; tapping a preview track starts playback at that exact playlist index.
+  - Existing pin, sort, custom-order, move up/down, rename, delete, generate-similar, storage retry, export and cover behaviors were retained.
+- Updated `MainActivity.kt` to route the shelf's Generate action to the existing Scrobble Generate tab.
+- Related commits:
+  - `13e517856a9b85266a017333f17db6d4f375f868` — playlist shelf search, summary, Generator entry and expandable track previews.
+  - `525bf8c4a1ece5664937931e3fa14dfa28685b6b` — wire shelf Generator action to the existing tab host.
+
+### Review and verification status
+- Re-read the updated generator/shelf source and the MainActivity call site after the edits. Existing LocalPlaylistStore operations remain the only persistence path.
+- Combined commit status query for `0cce7f27` returned no status records at the time checked; no green CI result is claimed for the new UI.
+- The user-triggered clean APK build began before these UI commits, so that APK cannot verify this new UI unless the user rebuilt from the later `Main-dev` head.
+- Not yet redesigned: playlist detail hierarchy and controls. It still uses a compact cover/title row, basic Play/Shuffle, menu-based track move/remove, and has no in-detail search/sort, current-track indicator/locate action, or drag reorder. These remain the next design slice.
+- No physical-device visual verification is claimed. Check compact phone layout, long titles, empty playlist, large font, landscape, light/dark theme, add-track/search states and playlist handoff after the next APK build.
+- Latest reported Main-dev commit after this slice: `525bf8c4a1ece5664937931e3fa14dfa28685b6b`. Refresh branch refs before further edits. `last-wave` remains read-only; `main` remains untouched.
