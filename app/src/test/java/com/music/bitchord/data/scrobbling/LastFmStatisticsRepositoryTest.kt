@@ -1,5 +1,6 @@
 package com.music.bitchord.data.scrobbling
 
+import com.music.bitchord.data.generate.PlaylistGenerationRules
 import com.music.bitchord.data.stats.ReplayPeriod
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -115,8 +116,16 @@ class LastFmStatisticsRepositoryTest {
         val calendar = source.fetch("zen", ReplayPeriod.THIS_WEEK, range)
         assertEquals(listOf(1, 2), api.recentPages)
         assertEquals(2, calendar.size)
-        assertEquals(2L, calendar.first { it.name == "Track A" }.playCount)
-        assertEquals(1L, calendar.first { it.name == "Track B" }.playCount)
+        val trackA = calendar.single {
+            PlaylistGenerationRules.trackKey(it.name, it.artist) ==
+                PlaylistGenerationRules.trackKey("Track A", "Artist A")
+        }
+        val trackB = calendar.single {
+            PlaylistGenerationRules.trackKey(it.name, it.artist) ==
+                PlaylistGenerationRules.trackKey("Track B", "Artist B")
+        }
+        assertEquals(2L, trackA.playCount)
+        assertEquals(1L, trackB.playCount)
     }
 
     private class FakeSource : LastFmStatsDataSource {
