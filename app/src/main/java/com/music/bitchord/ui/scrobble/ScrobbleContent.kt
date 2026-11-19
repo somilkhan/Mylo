@@ -188,7 +188,7 @@ fun ScrobbleGenerateContent(
                     is SearchResult.Track -> result.song
                     is SearchResult.Browse -> null
                 }
-            }.filter { it.videoId.isNotBlank() && !it.isVideo }
+            }.filter { PlaylistGenerationRules.canStartMixWithSong(it) }
                 .distinctBy { it.videoId }
                 .take(6)
         } catch (cancelled: CancellationException) {
@@ -201,10 +201,23 @@ fun ScrobbleGenerateContent(
         }
     }
 
+    val generationRequest = PlaylistGenerationRequest(
+        mode = mode,
+        count = count,
+        period = period,
+        seedTrack = selectedSeed,
+        seedArtist = artist,
+        tag = tag,
+        excludeSavedPlaylists = excludeSaved,
+        excludeLiked = excludeLiked,
+        excludeLibrary = excludeLibrary,
+    )
+    val retryingCurrentRequest = uiState.error != null && uiState.activeRequest == generationRequest
+
     val canGenerate = !uiState.isGenerating &&
         (mode != PlaylistGenerationMode.LIBRARY || ytmSignedIn) &&
         when (mode) {
-            PlaylistGenerationMode.SIMILAR_TRACKS -> selectedSeed?.videoId?.isNotBlank() == true
+            PlaylistGenerationMode.SIMILAR_TRACKS -> selectedSeed?.let { PlaylistGenerationRules.canStartMixWithSong(it) } == true
             PlaylistGenerationMode.SIMILAR_ARTISTS -> artist.isNotBlank()
             // Tag deliberately reaches repository validation so an empty value
             // produces an actionable validation error instead of a dead button.
@@ -263,7 +276,7 @@ fun ScrobbleGenerateContent(
                         mode = option,
                         enabled = !uiState.isGenerating && (option != PlaylistGenerationMode.LIBRARY || ytmSignedIn),
                         disabledReason = if (option == PlaylistGenerationMode.LIBRARY && !ytmSignedIn) {
-                            "Sign in to YouTube Music to use this."
+                            "Sign in to YouTube Music to use this"
                         } else {
                             null
                         },
@@ -381,9 +394,7 @@ fun ScrobbleGenerateContent(
                     Text(mode.description(), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
 
-                if (!lastFmConnected &&
-                    (mode == PlaylistGenerationMode.SIMILAR_ARTISTS || mode == PlaylistGenerationMode.RECOMMENDATIONS)
-                ) {
+                if (!lastFmConnected) {
                     Surface(
                         shape = RoundedCornerShape(14.dp),
                         color = MaterialTheme.colorScheme.surfaceVariant,
@@ -618,19 +629,7 @@ fun ScrobbleGenerateContent(
                     }
                     Button(
                         onClick = {
-                            viewModel.generate(
-                                PlaylistGenerationRequest(
-                                    mode = mode,
-                                    count = count,
-                                    period = period,
-                                    seedTrack = selectedSeed,
-                                    seedArtist = artist,
-                                    tag = tag,
-                                    excludeSavedPlaylists = excludeSaved,
-                                    excludeLiked = excludeLiked,
-                                    excludeLibrary = excludeLibrary,
-                                ),
-                            )
+                            viewModel.generate(generationRequest)
                         },
                         enabled = canGenerate,
                         modifier = Modifier.weight(1.45f).height(52.dp),
@@ -639,7 +638,7 @@ fun ScrobbleGenerateContent(
                         Text(
                             when {
                                 uiState.isGenerating -> "Building your mix…"
-                                uiState.error != null -> "Retry"
+                                retryingCurrentRequest -> "Retry"
                                 else -> "Generate playlist"
                             },
                         )
@@ -666,7 +665,7 @@ private fun GeneratorSeedPicker(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
         GeneratorFieldLabel(label)
-        currentSong?.let { playing ->
+        currentSong?.takeIf { PlaylistGenerationRules.canStartMixWithSong(it) }?.let { playing ->
             OutlinedButton(
                 onClick = {
                     val alreadySelected = selectedSeed?.videoId == playing.videoId
