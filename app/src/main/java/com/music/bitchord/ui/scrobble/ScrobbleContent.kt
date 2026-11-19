@@ -402,27 +402,29 @@ fun ScrobbleGenerateContent(
                 }
             }
 
-            Button(
-                onClick = {
-                    viewModel.generate(
-                        PlaylistGenerationRequest(
-                            mode = mode,
-                            count = count.toInt(),
-                            period = period,
-                            seedTrack = selectedSeed,
-                            seedArtist = artist,
-                            tag = tag,
-                            excludeSavedPlaylists = excludeSaved,
-                            excludeLiked = excludeLiked,
-                            excludeLibrary = excludeLibrary,
-                        ),
-                    )
-                },
-                enabled = canGenerate,
-                modifier = Modifier.fillMaxWidth().height(54.dp),
-                shape = RoundedCornerShape(18.dp),
-            ) {
-                Text(if (mode == PlaylistGenerationMode.SIMILAR_TRACKS) "Build track radio" else "Generate playlist")
+            if (!uiState.isGenerating) {
+                Button(
+                    onClick = {
+                        viewModel.generate(
+                            PlaylistGenerationRequest(
+                                mode = mode,
+                                count = count.toInt(),
+                                period = period,
+                                seedTrack = selectedSeed,
+                                seedArtist = artist,
+                                tag = tag,
+                                excludeSavedPlaylists = excludeSaved,
+                                excludeLiked = excludeLiked,
+                                excludeLibrary = excludeLibrary,
+                            ),
+                        )
+                    },
+                    enabled = canGenerate,
+                    modifier = Modifier.fillMaxWidth().height(54.dp),
+                    shape = RoundedCornerShape(18.dp),
+                ) {
+                    Text(if (mode == PlaylistGenerationMode.SIMILAR_TRACKS) "Build track radio" else "Generate playlist")
+                }
             }
         }
 
@@ -467,10 +469,22 @@ fun ScrobbleGenerateContent(
         }
 
         uiState.savedPlaylist?.let { playlist ->
+            val sharedBoundsModifier = if (
+                playlist.id == highlightedPlaylistId && sharedHandoffFromGenerate && !reduceMotion
+            ) {
+                with(sharedTransitionScope) {
+                    Modifier.sharedBounds(
+                        rememberSharedContentState(key = "scrobble-playlist-" + playlist.id),
+                        animatedVisibilityScope = animatedVisibilityScope,
+                    )
+                }
+            } else {
+                Modifier
+            }
             androidx.compose.material3.Surface(
                 shape = RoundedCornerShape(20.dp),
                 color = MaterialTheme.colorScheme.secondaryContainer,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().then(sharedBoundsModifier),
             ) {
                 Row(
                     Modifier.padding(16.dp),
