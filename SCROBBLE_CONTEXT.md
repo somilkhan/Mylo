@@ -2287,3 +2287,50 @@ Section 70 was written while workflow run 44446937265 was still in progress. The
 4. Keep time listened and the time-based concentration card based only on genuine Mylo listened milliseconds until a real remote duration source exists. Do not synthesize remote durations.
 5. Resolve the Library period question from the actual model: it has no added timestamp, so no fake date filter. Preserve playlist search/detail extras pending explicit product-owner decision.
 6. Continue full acceptance and exact-head CI; produce an APK from a verified code SHA before device testing. No physical-device or screenshot acceptance is claimed.
+
+## 73. Generator acceptance correction and Statistics prototype reconciliation (2026-11-19)
+
+### Exact generator CI history
+- Icon correction commit: `c32a9a0e2cc75d8da6ac115e830ebae78c9c1b0e`; CI run `44511083975` / run #1218 passed Android unit tests/compilation, desktop compile/tests and web tests/typecheck.
+- Follow-up generator behavior commit: `5475a8918532703b6aedbee95e605eb8259b6851`; CI run `44512075488` / run #1219 failed Android compilation because `PlaylistGenerationRules` had not been imported into `ScrobbleContent.kt`. Desktop and web passed. This was introduced by that follow-up edit.
+- Corrective import commit: `2e744bccdaeef515f0c6be01cd504bc38695f629`; CI run `44512913794` / run #1220 passed all three jobs. Android log: `compileDevDebugKotlin`, `testDevDebugUnitTest`, `BUILD SUCCESSFUL`; desktop compile and tests also `BUILD SUCCESSFUL`; web tests/typecheck passed.
+- The four Android warnings in `ScrobbleContent.kt` (redundant exhaustive-when else, two deprecated `Icons.Rounded.Sort` references, unnecessary safe call) are present in the parent source at `ce0292c7f78020e57d6247118f4cd9076074ec1e`; they are pre-existing and were not introduced by the icon/seed/retry edits. Avoid unrelated cleanup in this pass.
+- APK packaging was skipped on push events by the workflow's explicit condition. No APK has been built or device-tested. The workflow supports `workflow_dispatch(build_apks=true)` or the owner-only `/build-apk` PR comment path; a suitable current-head build still needs to be triggered after the final code SHA is ready.
+
+### Generator source acceptance corrections
+- `PlaylistGenerationRules.canStartMixWithSong` is the existing shared rule for a valid YouTube Music seed: nonblank video ID, not a video, not a local URI, and nonblank title/artist. Reused it for Similar Tracks search/current-song candidates and enablement rather than duplicating validation.
+- Retry now uses the retained failed request when the current controls still match it. If the user changes inputs after a failure, the action becomes a new Generate request instead of retrying stale inputs.
+- Last.fm's optional/disconnected note is shown in all nine mode dialogs, consistent with the approved spec; no mode requires Last.fm.
+- The signed-out Library disabled explanation now exactly matches the UX spec (no trailing punctuation). Library period remains All time only because the current YouTube Music library model has no added timestamp; no date filter is fabricated.
+- Existing repository audit: all nine modes have distinct source paths; Similar Tracks requires a valid seed; Mix seed remains optional; Never Heard exclusions remain opt-in; count is 5–35 by 5, default 25; Tag empty input is validated; repository generation completes before the durable playlist commit; `generateAndCommit` checks cancellation before commit; suspend wrappers rethrow `CancellationException`; the saved-playlist event is collected by MainActivity to switch to Playlists and highlight the new row. These are source-level checks, not full device acceptance.
+- Exact source file: `app/src/main/java/com/music/bitchord/ui/scrobble/ScrobbleContent.kt`, current blob after the corrective commit `d78bae3bfc6d1787efd5da9921b50002ac8e85ba`.
+
+### Statistics prototype reconciliation — important correction
+- The live `ScrobbleStatisticsContent.kt` still has separate `Mylo Replay` and `Last.fm` source chips and a separate remote profile/top-artists/top-albums surface. This conflicts with the approved prototype's single merged Statistics page.
+- The prototype's actual `mergedRows()` uses `max(local, lastfm)`, and its concentration calculation uses those merged **play counts** (top track / next two / remaining plays). Its subtitle currently says “listening time”, which is inconsistent with the JavaScript calculation. Do not reproduce that misleading subtitle.
+- Implement concentration from merged play counts and correct the copy to describe play distribution. Preserve actual Mylo listened milliseconds as a separate, clearly local-only listening-time figure; never infer remote milliseconds from play counts, timestamps or track-length metadata.
+- The existing live `TrackConcentration.kt` calculates shares from local milliseconds. That is not the prototype's merged-play concentration and must be reconciled during the Statistics implementation.
+- Use the existing `PlaylistGenerationRules.trackKey` identity helper for normalized artist+title matching; add a title/artist overload and use `Locale.ROOT` rather than creating a second normalizer. Aggregate duplicate identities within each source first, then apply `max(local, Last.fm)` across sources.
+- The live Statistics period is calendar-based: Monday-to-today for week, first-of-month-to-today for month, Jan 1-to-today for year, and all stored history for All time. The current Last.fm top-track period values are rolling windows and must not be substituted for those calendar ranges.
+
+### Last.fm API evidence and implementation plan
+- Official `user.getrecenttracks` docs: `https://www.last.fm/api/show/user.getRecentTracks`. Supports UTC Unix `from`/`to`, page number and a maximum of 200 results/page; response can include a now-playing row marked `nowplaying=true`, which has no scrobble timestamp and must be excluded. It requires an API key but no user authentication.
+- Official `user.gettoptracks` docs: `https://www.last.fm/api/show/user.getTopTracks`. Supports `overall`, `7day`, `1month`, `3month`, `6month`, `12month`, plus pagination; these named periods are not Mylo's exact calendar periods.
+- For All time, paginate `user.gettoptracks(period=overall)` and use playcount. For week/month/year, paginate `user.getrecenttracks(from,to)` using the same local calendar boundaries as ReplayPeriod, converted to UTC epoch seconds; aggregate each timestamped scrobble by normalized identity.
+- Last.fm's returned track/chart records provide play counts and metadata, not per-track listened milliseconds. Keep listening-time values local-only. Do not multiply scrobble count by track duration or derive listened time from gaps between scrobbles.
+- Five-minute in-memory cache keyed by account + period + calendar-range start; stale cache remains readable during refresh and after failure. Refresh on Statistics screen entry only when stale; pull-to-refresh forces it; no polling. When disconnected, ignore remote cache and show local-only. Show retry notice only when connected.
+- Tests required: normalized identity; duplicate source aggregation; cross-source max/no-sum; disconnected local-only; exact period boundaries; recent-track timestamp/nowplaying parsing; pagination; five-minute cache; force refresh; stale cache retained after failure.
+
+### Visual and playlist UX audit
+- Generator and playlist surfaces use the same `ScrobbleHubTheme` tokens; root surfaces use `background/onBackground`, playlist rows/detail surfaces explicitly use `surfaceVariant/onSurface`, and no hard-coded black/white text colors were found in `ScrobbleContent.kt`. The previous black-on-grey playlist-title defect is not present in the current source. Device verification remains outstanding.
+- The prototype concentration segment colors are white, pink and grey (`#fff`, `#e8b9cd`, `#4a4650`); the current concentration bar uses primary/tertiary/outlineVariant, so update it to the matching semantic tokens (tertiary/secondary/outline) when changing the calculation.
+- Playlist shelf currently searches title + track title + artist and has sort modes; detail currently has track search/sort. The approved Library spec requires title-only shelf search and excludes track-level list search. Per handover, preserve these extras for now and record the product-owner decision; do not silently remove or claim they are approved.
+- Complete uploaded source documents, `SCROBBLE_CONTEXT.md` sections 0 and 67–73, and the 758-line prototype source were read. Headless Chromium timed out before producing a screenshot; browser-rendered inspection and visual/device acceptance remain unverified.
+
+### Next implementation pass
+1. Build the merged Statistics data model using the existing identity helper; sum duplicates within each source, then take the cross-source max.
+2. Add Last.fm paginated recent-track and top-track page APIs/parsers; exclude now-playing; preserve cancellation and surface rate-limit/network errors.
+3. Add the 5-minute cache/repository and ViewModel stale-while-refresh state.
+4. Replace the source toggle with the prototype-aligned single Statistics page, four calendar periods, merged concentration/list rows, skeleton/empty/retry states and pull-to-refresh. Preserve local-only listened time.
+5. Add focused parser, merge, period, cache, stale-failure and concentration tests. Keep UI theme tokens aligned with the approved prototype.
+6. Run exact-head Android, desktop and web CI. Then request the optional Android/TV/Wear APK artifact for that exact final code SHA before device verification.
