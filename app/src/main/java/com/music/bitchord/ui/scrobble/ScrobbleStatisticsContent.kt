@@ -105,9 +105,6 @@ internal fun ScrobbleStatisticsContent(
                     )
                     Text("Statistics", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
                 }
-                TextButton(onClick = viewModel::refresh) {
-                    Text("Refresh")
-                }
             }
 
             Row(
