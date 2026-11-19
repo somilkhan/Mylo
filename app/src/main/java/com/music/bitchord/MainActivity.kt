@@ -330,6 +330,7 @@ import com.music.bitchord.ui.scrobble.ScrobbleGenerateContent
 import com.music.bitchord.ui.scrobble.ScrobbleGenerateViewModel
 import com.music.bitchord.ui.scrobble.ScrobblePlaylistsContent
 import com.music.bitchord.ui.scrobble.ScrobbleStatisticsContent
+import com.music.bitchord.ui.scrobble.ScrobbleHubTheme
 import com.music.bitchord.ui.replay.cards
 import com.music.bitchord.ui.replay.ReplayShareSheet
 import com.music.bitchord.ui.replay.ReplayStories
@@ -549,6 +550,7 @@ private fun BitChordApp(
     // takes part in the docking asks for [activeDock] / this, never for the
     // dock or the motion directly.
     val reducePlayerMotion by AppSettings.reduceAnimation.collectAsStateWithLifecycle()
+    val scrobbleGradientTheme by AppSettings.scrobbleGradientTheme.collectAsStateWithLifecycle()
     val activeDock = playerDock.takeIf { !reducePlayerMotion }
     playerSheetMotion.flingVelocity = with(LocalDensity.current) { PLAYER_PULL_FLING_VELOCITY.toPx() }
     // How the app takes the player down, whatever for: a back press, or a page
@@ -2893,7 +2895,8 @@ private fun BitChordApp(
                         )
                     } else if (key.startsWith("scrobble-")) {
                         val scrobbleTab = key.removePrefix("scrobble-").toIntOrNull() ?: 0
-                        when (scrobbleTab) {
+                        ScrobbleHubTheme(gradientEnabled = scrobbleGradientTheme) {
+                            when (scrobbleTab) {
                             0 -> ScrobbleStatisticsContent(
                                 replayState = replay,
                                 reduceMotion = reducePlayerMotion,
@@ -2917,6 +2920,7 @@ private fun BitChordApp(
                                 },
                                 contentPadding = listPadding,
                                 replayListState = replayListState,
+                                gradientThemeEnabled = scrobbleGradientTheme,
                             )
                             1 -> ScrobbleGenerateContent(
                                 viewModel = scrobbleGenerateViewModel,
@@ -2948,6 +2952,7 @@ private fun BitChordApp(
                                 },
                                 onOpenGenerator = { selectedScrobbleTab = 1 },
                             )
+                            }
                         }
                     } else if (key == "spotify") {
                         SpotifyLibraryScreen(

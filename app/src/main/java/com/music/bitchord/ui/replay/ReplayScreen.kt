@@ -115,6 +115,8 @@ fun ReplayScreen(
     landingPage: ReplayStoryPage = ReplayStoryPage.INTRO,
     heading: String? = null,
     reduceMotion: Boolean = false,
+    drawArtworkBackdrop: Boolean = true,
+    forceDarkVisuals: Boolean = false,
 ) {
     val context = LocalContext.current
     val summary = state.summary
@@ -140,28 +142,28 @@ fun ReplayScreen(
     }
 
     Box(modifier.fillMaxSize()) {
-        MeshGradientBackground(palette = palette, trackKey = leadArtwork, animated = false)
-        // The mesh is built to sit behind a player, where the only thing over it
-        // is a handful of large controls. A page of ranked lists needs a good
-        // deal more separation than that, so most of it is put back under ink.
-        val dark = isDarkMode()
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        if (dark) listOf(
-                            Color.Black.copy(alpha = 0.30f),
-                            Color.Black.copy(alpha = 0.72f),
-                            Color.Black.copy(alpha = 0.88f),
-                        ) else listOf(
-                            Color.White.copy(alpha = 0.25f),
-                            Color.White.copy(alpha = 0.65f),
-                            Color.White.copy(alpha = 0.82f),
+        val dark = forceDarkVisuals || isDarkMode()
+        if (drawArtworkBackdrop) {
+            MeshGradientBackground(palette = palette, trackKey = leadArtwork, animated = false)
+            // Keep the standalone Replay page's artwork backdrop and ink treatment.
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            if (dark) listOf(
+                                Color.Black.copy(alpha = 0.30f),
+                                Color.Black.copy(alpha = 0.72f),
+                                Color.Black.copy(alpha = 0.88f),
+                            ) else listOf(
+                                Color.White.copy(alpha = 0.25f),
+                                Color.White.copy(alpha = 0.65f),
+                                Color.White.copy(alpha = 0.82f),
+                            ),
                         ),
                     ),
-                ),
-        )
+            )
+        }
 
         val textColor = if (dark) Color.White else Color.Black
         val textVariant = if (dark) Color.White.copy(alpha = 0.55f) else Color.Black.copy(alpha = 0.55f)

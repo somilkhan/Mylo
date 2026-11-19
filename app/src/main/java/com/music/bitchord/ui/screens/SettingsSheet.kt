@@ -241,6 +241,7 @@ fun SettingsScreen(
     val lyricsSources by AppSettings.lyricsSources.collectAsStateWithLifecycle()
     val translationLanguage by AppSettings.translationLanguage.collectAsStateWithLifecycle()
     val theme by AppSettings.themeMode.collectAsStateWithLifecycle()
+    val scrobbleGradientTheme by AppSettings.scrobbleGradientTheme.collectAsStateWithLifecycle()
     val sessionId by AppSettings.audioSessionId.collectAsStateWithLifecycle()
     val outputPcmMode by AppSettings.outputPcmMode.collectAsStateWithLifecycle()
     val preferUsbDac by AppSettings.preferUsbDac.collectAsStateWithLifecycle()
@@ -926,6 +927,25 @@ fun SettingsScreen(
                     selectedIndex = ThemeMode.entries.indexOf(theme),
                     onSelect = { AppSettings.setThemeMode(ThemeMode.entries[it]) },
                     modifier = Modifier.padding(start = ROW_INSET, end = ROW_INSET, bottom = 14.dp),
+                )
+            }
+            val scrobbleGradientThemeTitle = "Scrobble gradient theme"
+            row(scrobbleGradientThemeTitle, "statistics", "generate", "playlists", "gradient") {
+                SettingsRow(
+                    icon = Icons.Rounded.Gradient,
+                    title = scrobbleGradientThemeTitle,
+                    subtitle = "Use the approved gradient on Statistics, Generate and Playlists",
+                    trailing = {
+                        Switch(
+                            checked = scrobbleGradientTheme,
+                            onCheckedChange = AppSettings::setScrobbleGradientTheme,
+                            colors = SwitchDefaults.colors(
+                                checkedTrackColor = MaterialTheme.colorScheme.primary,
+                                checkedBorderColor = MaterialTheme.colorScheme.primary,
+                            ),
+                        )
+                    },
+                    onClick = { AppSettings.setScrobbleGradientTheme(!scrobbleGradientTheme) },
                 )
             }
             val reduceAnimationTitle = stringResource(R.string.reduce_animation)

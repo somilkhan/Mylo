@@ -86,6 +86,7 @@ fun ScrobbleStatisticsContent(
     onShare: () -> Unit,
     contentPadding: PaddingValues,
     replayListState: LazyListState,
+    gradientThemeEnabled: Boolean = true,
 ) {
     var source by rememberSaveable { mutableStateOf(ScrobbleStatsSource.MYLO_REPLAY) }
     Column(Modifier.fillMaxSize()) {
@@ -135,6 +136,8 @@ fun ScrobbleStatisticsContent(
                 modifier = Modifier.weight(1f),
                 listState = replayListState,
                 heading = "Statistics",
+                drawArtworkBackdrop = false,
+                forceDarkVisuals = gradientThemeEnabled,
                 )
             }
             ScrobbleStatsSource.LAST_FM -> LastFmRemoteStatistics(
