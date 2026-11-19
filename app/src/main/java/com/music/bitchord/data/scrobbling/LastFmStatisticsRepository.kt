@@ -19,6 +19,7 @@ internal data class LastFmStatsPeriodRange(
 
 internal data class LastFmStatsCacheKey(
     val username: String,
+    val endpoint: String,
     val period: ReplayPeriod,
     val rangeStartEpochSeconds: Long?,
 )
@@ -191,6 +192,7 @@ internal class LastFmStatisticsRepository(
     private val cache: LastFmStatsCache = LastFmStatsCache(),
     private val now: () -> Instant = Instant::now,
     private val zone: () -> ZoneId = ZoneId::systemDefault,
+    private val endpoint: () -> String = { LastFM.currentConfig().endpoint },
 ) {
     fun query(username: String, period: ReplayPeriod): LastFmStatsQuery {
         val normalizedUsername = username.trim().lowercase(Locale.ROOT)
@@ -211,6 +213,7 @@ internal class LastFmStatisticsRepository(
         return LastFmStatsQuery(
             key = LastFmStatsCacheKey(
                 username = normalizedUsername,
+                endpoint = endpoint().trim(),
                 period = period,
                 rangeStartEpochSeconds = range?.startInclusiveEpochSeconds,
             ),

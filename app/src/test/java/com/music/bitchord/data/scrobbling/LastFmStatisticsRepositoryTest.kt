@@ -4,6 +4,7 @@ import com.music.bitchord.data.generate.PlaylistGenerationRules
 import com.music.bitchord.data.stats.ReplayPeriod
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -45,6 +46,27 @@ class LastFmStatisticsRepositoryTest {
         val allTime = repository.query("zen", ReplayPeriod.ALL_TIME)
         assertEquals(null, allTime.range)
         assertEquals("zen", allTime.key.username)
+    }
+
+    @Test
+    fun cacheIsScopedToTheConfiguredLastFmEndpoint() = runBlocking {
+        var endpoint = LastFM.DEFAULT_API_ENDPOINT
+        val repository = LastFmStatisticsRepository(
+            source = FakeSource(),
+            cache = LastFmStatsCache { 1_000L },
+            now = { now },
+            zone = { zone },
+            endpoint = { endpoint },
+        )
+        val lastFmQuery = repository.query("zen", ReplayPeriod.ALL_TIME)
+        repository.refresh("zen", lastFmQuery, force = false).getOrThrow()
+        assertTrue(repository.cached(lastFmQuery) != null)
+
+        endpoint = LastFM.LIBREFM_API_ENDPOINT
+        val libreFmQuery = repository.query("zen", ReplayPeriod.ALL_TIME)
+
+        assertNotEquals(lastFmQuery.key, libreFmQuery.key)
+        assertEquals(null, repository.cached(libreFmQuery))
     }
 
     @Test
