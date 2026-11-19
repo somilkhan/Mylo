@@ -109,7 +109,7 @@ internal fun ScrobbleStatisticsContent(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, top = 12.dp)
+                    .padding(start = 20.dp, end = 20.dp, top = 12.dp)
                     .clip(RoundedCornerShape(50))
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                     .border(
