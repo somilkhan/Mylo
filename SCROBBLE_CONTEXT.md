@@ -2334,3 +2334,79 @@ Section 70 was written while workflow run 44446937265 was still in progress. The
 4. Replace the source toggle with the prototype-aligned single Statistics page, four calendar periods, merged concentration/list rows, skeleton/empty/retry states and pull-to-refresh. Preserve local-only listened time.
 5. Add focused parser, merge, period, cache, stale-failure and concentration tests. Keep UI theme tokens aligned with the approved prototype.
 6. Run exact-head Android, desktop and web CI. Then request the optional Android/TV/Wear APK artifact for that exact final code SHA before device verification.
+
+
+## 74. Last.fm Statistics data-layer implementation and CI correction (2026-11-19)
+
+### Live refs at handoff
+- Working branch: `Main-dev`.
+- Code HEAD before this documentation-only update: `59e70a38230466b14c8d596725e46da9cf4a0d07`.
+- Previous code HEAD: `e501d76e21ede3d7ab35f1fbd9e91659fdc0b94f` (`fix(stats): restore concentration label formatting`).
+- Statistics data-layer commit: `8fd7a7ce735d6a9e8bd6171eff90bc49865265c5`.
+- Recent-history test correction: `59e70a38230466b14c8d596725e46da9cf4a0d07`.
+- Current reference branches were refreshed: `main` = `11478fde56f1817cb777b296e60907359086f383`; `last-wave` = `d0dd73755bfe640c515502751f440a32e57506d5`. Treat these as observations, refresh again before work. Do not modify `main` or `last-wave`.
+- Latest known documentation blob before this update: `ac541eca9d0bdc762a12a81e1de530a6fc1d6348`.
+
+### Statistics data layer added (commit 8fd7a7c)
+Files added:
+- `app/src/main/java/com/music/bitchord/data/scrobbling/LastFmStatisticsRepository.kt`
+  - Last.fm API/data-source abstraction, page-by-page top-track and recent-scrobble retrieval, exact local-calendar range construction, in-memory five-minute cache keyed by normalized username/period/range, forced refresh, and stale-cache preservation on failure.
+  - All-time uses paginated `user.gettoptracks(period=overall)`; calendar periods use paginated `user.getrecenttracks(from,to)`.
+  - Recent tracks without timestamps and now-playing rows are excluded. API pagination checks cancellation between pages.
+  - Last.fm does not provide per-track listened milliseconds in these responses. This layer returns remote play counts only; it does not manufacture remote durations.
+- `app/src/main/java/com/music/bitchord/ui/scrobble/ScrobbleStatisticsModel.kt`
+  - Pure merge model using the existing `PlaylistGenerationRules.trackKey` helper.
+  - Duplicate identities aggregate within each source; connected cross-source plays use `max(local, Last.fm)`; disconnected mode ignores remote rows and is local-only.
+  - The model carries actual local listening milliseconds only. Remote-only rows have zero local duration; do not label that as a remote duration.
+- `app/src/test/java/com/music/bitchord/data/scrobbling/LastFmStatisticsRepositoryTest.kt`
+  - Period boundaries, five-minute cache, force refresh, stale data after failure, pagination and timestamp filtering.
+- `app/src/test/java/com/music/bitchord/ui/scrobble/ScrobbleStatisticsModelTest.kt`
+  - Normalized duplicate merging, max-not-sum, remote-only rows, disconnected local-only behavior and no invented remote listening time.
+
+Existing files modified in the same data-layer commit:
+- `LastFM.kt`: page result models, paginated top-track/recent-track API methods and parsers.
+- `PlaylistGenerationRepository.kt`: shared normalized track identity overload uses `Locale.ROOT`.
+- Parser and generation rule tests were extended for pagination parsing and normalized identity.
+
+### CI run 1221 — failure details
+- Run: `44514359856` (Android CI, run #1221), tested commit `8fd7a7ce735d6a9e8bd6171eff90bc49865265c5`.
+- Web tests/typecheck: passed.
+- Desktop compile/tests: passed.
+- Android: compilation completed; unit-test task failed with 1 failing test out of 1,175 completed (1 skipped).
+- Failing test: `LastFmStatisticsRepositoryTest.paginatesAllTimeAndCalendarHistoryAndFiltersOutsideTimestamps`.
+- Root cause was a brittle test assertion, not pagination ordering: the implementation chooses the most recent scrobble as the representative display record for a normalized identity. The fake second page used `track-a` while the first page used `Track A`; the test then searched for exact display text `Track A` and threw `NoSuchElementException`. The normalized identity and aggregated count were correct.
+- Do not repeat the earlier inaccurate explanation that the API page order was wrong; the failure was the case-sensitive representative-name assertion.
+
+### Test correction and current CI
+- Corrected the test to locate Track A and Track B by the shared normalized identity helper, not exact display-name casing.
+- Test correction commit: `59e70a38230466b14c8d596725e46da9cf4a0d07`.
+- CI run #1224: `44516837259`, push event, testing that exact SHA. At the time this section was written, Android, desktop and web jobs were still running. Recheck the run before claiming results.
+- The failed run #1221 does not establish the corrected test passes. No final green CI claim is permitted until run #1224 (or a newer exact-head run) completes.
+- Push-triggered CI skips APK packaging under the current workflow condition. A separate supported manual/owner-triggered APK build is still required after final code integration.
+
+### Important implementation boundary — UI is not integrated yet
+- This pass added the data layer and pure merge model only. It did **not** replace the live Statistics screen source toggles, did not wire the repository/cache into the Statistics ViewModel, and did not change the concentration card to merged play-count distribution.
+- The live Statistics UI remains unintegrated with these new classes until a separate, reviewed UI/ViewModel pass is made. Do not describe the merged Statistics experience as implemented or accepted yet.
+- Preserve the prototype reconciliation in section 73: concentration should be derived from merged play counts and its copy should describe play distribution. Actual Mylo listened milliseconds remain a distinct local-only figure. Do not infer Last.fm duration.
+- Check whether Last.fm API credentials are initialized after process restart before wiring the repository. The current settings/login path initializes LastFM during sign-in; verify startup restoration and enabled-account behavior rather than assuming it.
+- Confirm all four calendar periods against the actual `ReplayPeriod` implementation and timezone semantics. The repository query uses the device's current `ZoneId`; verify this matches the app's existing period definition.
+- Review request volume/rate limiting for full-history recent-track pagination. Do not remove pagination or silently truncate history; preserve cancellation and handle retryable failures visibly.
+
+### Immediate next-chat instructions
+1. Refresh `Main-dev`, `main`, and `last-wave`; verify clean/current worktree through GitHub state before writing. Continue only on `Main-dev`.
+2. Poll CI run `44516837259` for commit `59e70a38230466b14c8d596725e46da9cf4a0d07`. Inspect every job and relevant logs. If any failure, diagnose exact source/test line and correct it before UI integration.
+3. Read this context file and the uploaded brief/spec/theme document again before touching UI. Preserve the prototype and section 73 decisions.
+4. Audit the new repository/parser/model code for API response shape, credentials reinitialization after process restart, pagination/rate-limit behavior, cache concurrency and calendar boundary correctness. Add only focused fixes supported by evidence.
+5. Integrate the repository into the existing Statistics ViewModel and replace the separate local/Last.fm source choices with one merged Statistics view. Keep stale content visible, refresh on entry only if stale, force refresh on pull-to-refresh, no polling, retry notice only while connected.
+6. Implement concentration from merged play-count shares (prototype behavior) and label it as play distribution. Keep Mylo listening milliseconds visibly local-only. Do not fabricate remote time.
+7. Add ViewModel/UI state tests for loading, empty, disconnected local-only, connected refresh, stale refresh, failure/retry and forced refresh. Recheck the actual period controls and all four ranges.
+8. Reconcile the playlist search/sort discrepancy from section 73 with the product owner; do not silently remove title+track+artist search or track-level sorting.
+9. Run Android unit tests, Android compile/assemble, desktop tests, web tests/typecheck and inspect full CI logs on the exact final SHA. Request a fresh APK from that exact code SHA after CI.
+10. Update this file with exact code/doc SHAs, test results, CI IDs, APK provenance, visual evidence, unresolved defects and product-owner decisions. Device visual acceptance remains outstanding; CI is not a substitute.
+
+### Known status at this handoff
+- Generator implementation is present; see sections 70–73 for its exact acceptance corrections and prior green CI run #1220.
+- Theme and durable queue implementation are documented in earlier sections; device/process-restart verification is still outstanding.
+- Statistics merge data layer exists, but screen/ViewModel integration and full acceptance remain incomplete.
+- Playlist spec discrepancy remains an explicit product-owner decision.
+- No fresh APK or device screenshots have been verified for the latest Statistics code.
