@@ -2,36 +2,67 @@
 
 > Living engineering record. Update this file after every audit pass and before any implementation decision. This is not the public README.
 
-## 0. AGENT RULES — READ FIRST; OVERRIDES OLDER NOTES BELOW
+## 0. CURRENT AGENT RULES — READ FIRST; LIBRARY SOURCES ARE CANONICAL
 
-### Source of truth and branch boundaries
-- Work and commit only on `Main-dev`. Never edit `main`, create a branch, merge/cherry-pick all of `last-wave`, or invent/use an unrelated prototype as the implementation source.
-- `last-wave` is the **actual feature/code/behavior source**. Port its real implementation, interactions, algorithms, data flows, state handling and failure/cancellation behavior—not a screenshot-only imitation or a fresh approximation.
-- Adapt that code to **Mylo's UI language and existing architecture**: Mylo's Compose components, theme/tokens, typography, spacing, dialogs/sheets, navigation, state patterns, models, persistence, playback and queue APIs. Preserve Mylo's visual identity. Do not paste LastWave branding or replace Mylo's shell with LastWave's shell.
-- In short: **take the code and behavior from LastWave; make it look and integrate like Mylo.**
-- `scrobble-ui` is only a secondary reference for the agreed Scrobble FAB and tab-entry/exit behavior. It is not the source for Statistics/Generate/Playlists feature logic. Preserve Mylo's existing normal tabs, including Explore.
-- Before each task, refresh both branch heads, read this whole context file, inspect the live source files and tests on both branches, and check what previous agents already implemented. Old SHAs and notes are historical, not current truth.
+### Definitive source documents (read the actual files before every implementation task)
+The user's ChatGPT Sources Library is the authoritative product/UX instruction source. The repository context is a synchronized engineering record and handover, not a replacement for those documents.
 
-### Required port workflow
-1. Trace LastWave end-to-end: UI action → ViewModel/state → repository/API/storage/playback → success/error/cancellation result. Inspect callers and tests, not only screen files.
-2. Map source responsibilities to Mylo equivalents. Reuse existing Mylo scrobble manager, listening recorder, playlist store, player and queue when appropriate. Do not create duplicate pipelines, trackers, stores, models or navigation owners without evidence of a real gap.
-3. Port actual implementation and meaningful tests; adapt types/interfaces to Mylo. Preserve validation, algorithms, ordering, identity/deduplication, cancellation, retries, persistence and edge-case behavior. Build only the smallest adapter where Mylo lacks an equivalent.
-4. Translate presentation into Mylo-native UI components and conventions. Match Mylo's dialogs/sheets, labels, icon-only controls, tabs, loading/empty/error states, accessibility and motion. Avoid a second design system or generic default UI.
-5. Search for existing/renamed equivalents before adding files. Keep changes scoped; do not regress or casually redesign unrelated screens/player UI.
-6. Verify meaningful paths: cancellation, empty/error/loading, persistence/relaunch, duplicate identities, navigation/back/dismiss and existing Mylo regressions. Record exact test/build/CI commit and results; physical-device verification is separate.
-7. Update this file with current SHAs, exact files, source behavior ported, Mylo adaptations, tests, gaps and next action. Continue into implementation when requested; do not stop at audit/status or one small fix.
+1. `/Mylo/AGENT-BRIEF.md` — scope, hard constraints, generation/statistics behavior, durable scrobble queue, accessibility, mandatory verification and delivery format.
+2. `/Mylo/mylo-ux-spec.md` — approved Scrobble Hub screen behavior, labels, modes, states, playlist capabilities, decisions and out-of-scope items.
+3. `/Mylo/CHANGE-THEME-TOGGLE.md` — the one approved Settings change and exact gradient toggle behavior/storage.
+4. `/Agent skills/Universal Agent Engineering/references/ui-ux-review.md` — whole-journey UI/UX, interaction, accessibility and visual-quality review checklist.
 
-### Recent agent mistakes — do not repeat
-- Do not ask the user to define behavior that can be found in LastWave code, tests, history or docs. Trace the actual component/data model first. For the Statistics split-bar: do not guess categories/denominator; verify the actual source and existing Mylo data. If no implementation/definition exists, record verified absence and proceed with the closest truthful source-backed implementation without asking the user to restate repository context.
-- Do not call `last-wave` a separate prototype. It is the requested code reference. Any older prototype notes below are historical context only, not a substitute for LastWave source or permission to invent behavior.
-- Do not merely copy LastWave's visual UI into Mylo. Port its real code/behavior and align the presentation to Mylo.
-- Do not trust stale branch SHAs, old audit notes, or another agent's claims without checking live source.
-- Do not stop after audit/status when the user says continue/start; proceed through safe implementation, review, tests and documentation. Ask only for a genuinely blocking decision that cannot be derived from source or existing decisions.
-- Never claim implementation, build, tests or device verification without exact-commit evidence.
+The supplied `mylo-replay-prototype-v3.html` is the visual and interaction reference named by AGENT-BRIEF. Open and inspect it in a browser before UI edits. Its data is explicitly sample/demo data: never copy sample tracks, counts, simulated network behavior or fake success into the app. The prototype is not the source of truth for business rules, persistence, real data, or Settings toggle implementation.
 
-### Current ref snapshot (refresh before use)
-- `Main-dev`: `6daf82d71686a171274d9d5a65fbc480253bb87d` (latest context/locale-fix head; refresh before use).
-- `last-wave`: `d0dd73755bfe640c515502751f440a32e57506d5`.
+### Source precedence and conflict handling
+- Library Markdown above is definitive for approved product intent. This file records implementation history, verified repository state, discrepancies and next steps.
+- Use AGENT-BRIEF for scope/constraints/acceptance; mylo-ux-spec for screen behavior; CHANGE-THEME-TOGGLE for the sole approved Settings addition; ui-ux-review for the quality audit.
+- Where the UX spec and prototype differ, the spec wins. Where spec and repository code differ, inspect the actual code/callers/tests first and document the discrepancy; do not silently rewrite either. The spec says the product owner corrects the spec when code inspection establishes that the approved behavior needs revision.
+- If sources conflict or a required decision is absent, record the exact conflict and ask only if it blocks safe implementation. Do not invent a resolution.
+- Sections 1–66 below are the chronological audit/implementation record. They are useful history, not current instructions where they conflict with this section or the current Library documents. In particular, older notes that describe LastWave as the implementation source are historical; the current AGENT-BRIEF directs agents to the Mylo repository's existing Compose/data layers and the supplied v3 HTML as the visual/interaction reference. Do not wholesale port LastWave or another branch.
+
+### Scope — implement only what the Library brief authorizes
+- Implement/maintain the three Mylo Scrobble Hub screens: Statistics, Generate and Playlists, using existing Compose/Material 3 components and existing Mylo data layers.
+- Implement the durable scrobble queue described in AGENT-BRIEF section 6.
+- Do not redesign or casually change the FAB, navigation swap, mini-player, full player, Home, Explore, Library, Search, Settings layout, app-wide theme, approved gradient palette, icons, dialog look, or unrelated screens.
+- Narrow exception: add exactly one Settings > Appearance switch labelled **Scrobble gradient theme**, following the existing Settings row pattern. Do not restructure Settings or add a toggle anywhere else.
+- Toggle ON (default true): the three hub screens use the approved v3 prototype gradient theme. Toggle OFF: only those three screens use the existing Mylo theme. No changes to FAB/nav/player or other app screens. Preserve the approved gradient palette; do not introduce dynamic artwork/wallpaper colors.
+- Do not add a mini-player close button. FAB Close remains the hub exit.
+- Preserve the existing four normal tabs and all current Mylo shell behavior unless the product owner explicitly changes the spec.
+
+### Hard implementation constraints
+- Use existing storage. No Room dependency, new database or new competing repository/store without written product-owner approval.
+- Playlist persistence remains `LocalPlaylistStore` (SharedPreferences JSON); local stats remain the existing `ListeningStats` month JSON.
+- Real data only. No sample numbers, placeholder tracks, invented counts or fake history in app UI.
+- Statistics: normalized artist + title identity; one row per key; when Last.fm is connected use max(local, Last.fm), never sum; when disconnected use local only. Apply period to both sources before merge and apply the same merge semantics to time listened and concentration.
+- Last.fm cache is 5 minutes; fetch on hub open only when stale; pull-to-refresh forces fetch; no polling. Keep stale content visible during fetch and after refresh failure. Only show the refresh-failure notice while Last.fm is connected.
+- Generate all nine existing `PlaylistGenerationMode` modes. Last.fm is optional in every mode. Library is disabled only when YouTube Music is signed out, with the exact reason in the UX spec. Count is 5–35 in steps of 5, default 25. Respect mode-specific inputs, opt-in Never Heard exclusions, success/failure behavior and cancellation.
+- Playlist list search is title-only per the current UX spec; track-level search is explicitly out of scope there. Required row actions and detail actions are listed in the spec. Drag reorder and track-level list search are out of scope.
+- Scrobble queue: retryable failures must persist across process death; preserve order; cap 200 and drop/log oldest on overflow; flush on app start and after successful scrobbles when network is available and Last.fm is connected; permanent invalid-session/track-rejected failures are dropped/logged. No Room.
+- Queue storage decision: product owner has not supplied a separate choice in the available handoff. AGENT-BRIEF explicitly says to default to a single JSON file written through temp-file-and-rename if unanswered. Use that fallback and report it; do not block or invent another database.
+- Coroutine safety: always rethrow `CancellationException`; do not swallow cancellation in `runCatching`; avoid nested `runCatching` that hides failures; do not use lossy `tryEmit` for must-deliver events; do not start network work from composition; closing the hub cancels generation.
+
+### Repository and branch safety
+- Repository: `somilkhan/Mylo`.
+- Integration/working branch currently authorized by the existing project workflow: `Main-dev` (case-sensitive). Never edit or push `main`.
+- AGENT-BRIEF contains internally conflicting wording: “Work only on branch Main-dev” and “Create your own feature branch from it.” The existing context workflow and recent user direction have been Main-dev-only. Until the product owner explicitly resolves this contradiction, do not create a new branch; keep this documentation update and subsequent work on `Main-dev`. Record this ambiguity rather than silently changing branch policy.
+- `last-wave` is read-only if a comparison is explicitly useful. No wholesale merge, cherry-pick or file replacement.
+- Before every task, refresh live refs, inspect current working tree/branch, preserve uncommitted/user changes, read the full current context and the four Library docs, inspect callers/tests, and search for existing/renamed equivalents before adding code.
+- Check line endings before editing; preserve CRLF/LF. Avoid unrelated formatting/import churn. Never commit secrets, keys or `local.properties`.
+
+### Required engineering and UX workflow
+1. Read all four Library Markdown files and open the v3 HTML prototype in a browser.
+2. Read this full context file and refresh live branch/commit refs. Inspect actual code, call sites, data owners, existing storage, settings preference store and tests before planning edits.
+3. Trace complete user journeys, not just widgets: navigation → action → ViewModel/state → repository/API/storage/playback → result, including loading/empty/error/offline/permission/cancel/retry/relaunch paths.
+4. Search for duplicate or renamed equivalents before adding components, preferences, queue managers, stores, models or navigation owners.
+5. Make the smallest scoped change. Preserve Mylo's existing UI language and the approved prototype's hierarchy/behavior; do not invent a second design system or redesign excluded surfaces.
+6. Review with the shared ui-ux-review playbook: hierarchy, navigation/back/deep links, progressive disclosure, interaction states, recovery, semantic accessibility, contrast, scaling, touch targets, RTL/localization, motion/reduced motion, clipping and real device screenshots where possible.
+7. Verify exact acceptance items in AGENT-BRIEF. Run `./gradlew assembleDebug` (or exact CI equivalent), unit tests and the requested device/emulator scenarios. Add focused tests for the specified merge/cache/count/title/queue behaviors.
+8. Update this file after each meaningful pass with exact refs, code/doc commits, changed files, confirmed behavior, test/build output, device evidence, open gaps and next action. Continue through safe implementation when asked; do not stop after an audit or one small fix.
+9. Never claim build, tests, APK, screenshots or device verification without exact-commit evidence. Clearly list anything not verified.
+
+### Mandatory delivery
+Report branch and commit hashes; one-line file/change rationale; exact build/test/CI results; device verification and anything not verified; queue storage choice; out-of-scope findings; and deliberately omitted work with reasons. Keep the user-facing summary concise unless a detailed handover is requested.
 
 ---
 
@@ -1958,3 +1989,62 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 - Code commit for this pass: `6f81c08c3c92b7a7d6a51af11c15257f55c41f9a`. This context update is a separate Markdown-only follow-up; refresh the live ref before further work.
 - `last-wave` remains read-only at `d0dd73755bfe640c515502751f440a32e57506d5`; `main` remains untouched at `11478fde56f1817cb777b296e60907359086f383`.
 - Continue on `Main-dev` only. Refresh refs and read this context before the next edit.
+
+
+
+## 67. Library UX source-of-truth alignment and handoff refresh (2026-11-19)
+
+### Library sources read and adopted
+Read the complete contents of:
+- `/Mylo/AGENT-BRIEF.md` — canonical implementation scope, hard rules, statistics/generation behavior, queue option A, accessibility, mandatory acceptance and delivery.
+- `/Mylo/mylo-ux-spec.md` — approved v2 UX specification dated 2026-11-19.
+- `/Mylo/CHANGE-THEME-TOGGLE.md` — exact Settings-only gradient switch requirements.
+- `/Agent skills/Universal Agent Engineering/references/ui-ux-review.md` — whole-journey UI/UX review checklist.
+Also inspected `mylo-replay-prototype-v3.html` (758 lines). It contains the approved dark gradient visual language, Statistics concentration/period/list layout, nine mode rows, Playlist shelf, count/period dialog, 62dp FAB, mini player and normal/hub navigation. The prototype's controls and sample track data are explicitly demo-only; its simulated stats/generation/network behaviors must not be ported as real logic. It does not implement the Settings toggle, durable queue or full playlist detail.
+
+### Canonical product requirements now reflected in section 0
+- The Library docs are definitive; this context file is the repo-side engineering mirror/history. New agents must open the Library docs themselves rather than relying only on this file.
+- The feature scope is Statistics, Generate, Playlists and the durable scrobble queue, using existing Mylo Compose/data/storage. The one permitted Settings change is the Appearance switch “Scrobble gradient theme”; no other shell/player/settings redesign.
+- ON is default true and uses the exact approved prototype gradient on the three hub screens only. OFF uses the existing Mylo theme on those screens only. No dynamic artwork colors. The toggle is Settings-only, persisted under `scrobble_gradient_theme` in the existing preferences store, read/write guarded by try/catch, read failure defaults to true, and it must apply on return without Activity/app restart.
+- Statistics merge is normalized artist+title, one row per identity, max(local, Last.fm) when connected, local-only when disconnected; apply periods to both sources before merging and use the same rule for time listened/concentration. Five-minute cache, no polling, keep stale content during refresh.
+- All nine existing generation modes remain available; Last.fm is optional; Library requires signed-in YouTube Music; count is 5–35/step 5/default 25; cancel stops network work; closing hub cancels generation; success saves then navigates/highlights Playlists; failure saves nothing and keeps retry available.
+- Playlist list search is title-only; track-level list search and drag reorder are out of scope. Required shelf and detail actions are defined in the UX spec.
+- Durable queue is required. Since no product-owner storage selection is present, use the brief's explicit fallback: a single JSON file written through temp-file-and-rename. Cap 200, preserve order, flush on app start/network availability and after successful scrobble, drop/log permanent failures, and drop/log oldest on overflow.
+- Shared UI/UX review must cover the entire journey and all interaction/accessibility/visual states, not just changed composables.
+
+### Important source/code discrepancies to preserve for deliberate review
+- Historical section 65 says playlist shelf search was expanded to track title and artist. That conflicts with the current approved spec's title-only playlist search and “track-level search is out of scope.” Do not assume the historical implementation note is still approved. Inspect the current code and report the exact behavior; do not silently remove or extend it. If the product owner wants to retain it, update the Library spec through the owner rather than treating this context file as authority.
+- Historical section 66 added in-detail search and sort. The current spec explicitly lists detail actions and says drag reorder is out of scope, but does not clearly enumerate those extra detail controls. Inspect the live code and document whether these are harmless extras or a scope mismatch before changing them.
+- Historical section 66 completed Material 3 monochrome theme tokens and page surfaces. The current Library spec now requires the approved gradient as the default ON state and the existing Mylo theme as OFF. These are not interchangeable: preserve the approved gradient palette and implement the Settings preference without recoloring the rest of the app.
+- The prototype is not a substitute for the real Mylo data pipeline or the exact merge/cache/cancellation/persistence rules in the Markdown.
+
+### Live repository refs and CI checked
+- Repository: `somilkhan/Mylo`.
+- `Main-dev` current HEAD before this documentation update: `a3f85753e299d95c60cc478dca876eba461097c0`.
+- `main` remains untouched at `11478fde56f1817cb777b296e60907359086f383`.
+- `last-wave` remains read-only at `d0dd73755bfe640c515502751f440a32e57506d5`.
+- Current context file blob before this update: `8b9ce63b333b4332c03465afada3749c4dda3fa7`.
+- Latest UI/theme code commit remains `6f81c08c3c92b7a7d6a51af11c15257f55c41f9a`; the current branch head after that contains documentation-only commits.
+- CI run #1211 / run ID `44432162937` completed with conclusion **success** for code commit `6f81c08c3c92b7a7d6a51af11c15257f55c41f9a`:
+  - Web unit tests and web workspace typecheck: passed.
+  - Android unit tests: passed.
+  - Desktop compile and unit tests: passed.
+  - Android APK build and artifact upload: skipped (optional build was not requested by this run). No APK was produced by this CI run.
+- This CI result verifies that commit only; it does not prove physical-device appearance or the full device acceptance matrix.
+
+### Current implementation checks and remaining work
+- `SettingsSheet.kt` at blob `7916a220667ad468401c8442640426462feebe7e` was inspected; the required `scrobble_gradient_theme` key/label was not found. The Settings-only toggle is not yet implemented in that screen.
+- `Theme.kt` at blob `0c693ffde840d05737c6b4708d97b05453bf69b5` and `ScrobbleContent.kt` at blob `52235257d3f7ad84546ebf4f0206e9858e4d412b` were checked; the previous implementation is the explicit Material 3/monochrome theme correction from section 66, not yet verified as the approved gradient-on default.
+- `ScrobbleManager.kt` at blob `153b488ed0eea8893ffb0e7983de9fd26a569847` was inspected and contains no durable queue implementation. Before adding one, perform a repo-wide search for any existing pending-scrobble persistence/worker/network observer so a duplicate queue is not introduced.
+- `MainActivity.kt` at blob `a209acb20614994e255564513146512d14e1c452` passes `player.song` and `player.isPlaying` into the playlist host; the earlier missing-call-site issue is fixed.
+- No new APK, emulator screenshot, physical-device visual acceptance, force-close preference persistence test, corrupted-preference test, offline scrobble replay test, or complete nine-mode device test is evidenced by this pass.
+- The required queue fallback is clear: use one JSON file with atomic temp-file-and-rename unless the owner explicitly chooses otherwise. No Room.
+- The brief's branch wording is internally inconsistent (“Work only on branch Main-dev” and “Create your own feature branch from it”). Existing project direction has been Main-dev-only; this documentation pass remains on Main-dev. Do not create a new branch until the owner clarifies.
+
+### Next agent's exact priority order
+1. Refresh refs and read section 0 plus all four Library Markdown docs; open the supplied v3 HTML in a browser. Do not trust old SHAs.
+2. Audit existing Settings preference ownership and row patterns, then implement the one Appearance switch exactly as specified; verify default true, ON/OFF hub-only behavior, persistence after process restart and read-failure fallback.
+3. Repo-wide audit the scrobble submission path, existing retry/network observers, persistence conventions and tests. Add exactly one durable queue only if no equivalent exists; use JSON temp-file-and-rename, cap/order/flush/permanent-error rules and focused tests.
+4. Reconcile the playlist search/detail extras in sections 65–66 against the current spec and live code. Do not silently remove existing behavior; record any product-owner spec correction needed.
+5. Run required build and unit tests; inspect CI against the exact resulting SHA. Request/produce a fresh APK and perform the device acceptance matrix (Statistics sources/periods/cache/refresh; all nine Generate modes and cancellation; playlist actions/empty/search; FAB/nav/back/overlay/player/keyboard; toggle in both states and persistence; offline queue restart/flush/no duplicate).
+6. Update this context file again with exact commit, file/blob SHAs, test commands/results, APK provenance and device evidence. Do not call the task complete while required verification remains open.
