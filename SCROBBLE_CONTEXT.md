@@ -1955,6 +1955,6 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 - Do not treat successful compilation as visual acceptance. The user's reported contrast issue remains open for device confirmation even though the source-level inheritance and palette defects are corrected.
 
 ### Branch integrity
-- Current `Main-dev` head after this commit: `6f81c08c3c92b7a7d6a51af11c15257f55c41f9a`.
+- Code commit for this pass: `6f81c08c3c92b7a7d6a51af11c15257f55c41f9a`. This context update is a separate Markdown-only follow-up; refresh the live ref before further work.
 - `last-wave` remains read-only at `d0dd73755bfe640c515502751f440a32e57506d5`; `main` remains untouched at `11478fde56f1817cb777b296e60907359086f383`.
 - Continue on `Main-dev` only. Refresh refs and read this context before the next edit.
