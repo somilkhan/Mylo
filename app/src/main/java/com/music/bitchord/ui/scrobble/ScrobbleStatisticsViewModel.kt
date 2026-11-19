@@ -32,7 +32,7 @@ internal data class ScrobbleStatisticsUiState(
 class ScrobbleStatisticsViewModel : ViewModel() {
     private val repository = LastFmStatisticsRepository()
     private val _state = MutableStateFlow(ScrobbleStatisticsUiState())
-    val state = _state.asStateFlow()
+    internal val state = _state.asStateFlow()
 
     private var loadJob: Job? = null
     private var activeRequestKey: String? = null

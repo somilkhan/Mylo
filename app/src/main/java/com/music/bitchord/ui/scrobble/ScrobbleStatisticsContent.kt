@@ -376,6 +376,7 @@ private fun MergedStatisticsTrackRow(
 }
 
 
+@Composable
 internal fun ScrobblePlaylistExportDialog(
     playlist: LocalPlaylist,
     onDismiss: () -> Unit,
