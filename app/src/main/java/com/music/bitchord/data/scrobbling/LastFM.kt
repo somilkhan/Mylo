@@ -64,6 +64,18 @@ object LastFM {
         val artworkUrl: String?,
     )
 
+    data class RecentTrack(
+        val name: String,
+        val artist: String,
+        val artworkUrl: String?,
+        val timestamp: Long,
+    )
+
+    data class PagedResult<T>(
+        val items: List<T>,
+        val totalPages: Int,
+    )
+
     data class RankedArtist(
         val name: String,
         val playCount: Long,
@@ -323,6 +335,50 @@ object LastFM {
         parseLastFmTopTracks(response)
     }
 
+    /** All-time top tracks, exposed page-by-page for exact statistics merging. */
+    suspend fun getTopTracksPage(
+        username: String,
+        page: Int = 1,
+        limit: Int = 100,
+    ): Result<PagedResult<RankedTrack>> = statsResult {
+        val user = username.trim()
+        require(user.isNotEmpty()) { "Last.fm username is missing" }
+        val response = postAndRead(
+            "user.gettoptracks",
+            extra = mapOf(
+                "user" to user,
+                "period" to "overall",
+                "limit" to limit.coerceIn(1, 100).toString(),
+                "page" to page.coerceAtLeast(1).toString(),
+            ),
+        )
+        parseLastFmTopTracksPage(response)
+    }
+
+    /** Calendar-range scrobbles; timestamps are Unix seconds and contain no listened duration. */
+    suspend fun getRecentTracksPage(
+        username: String,
+        from: Long,
+        to: Long,
+        page: Int = 1,
+        limit: Int = 200,
+    ): Result<PagedResult<RecentTrack>> = statsResult {
+        val user = username.trim()
+        require(user.isNotEmpty()) { "Last.fm username is missing" }
+        require(from < to) { "Invalid Last.fm history range" }
+        val response = postAndRead(
+            "user.getrecenttracks",
+            extra = mapOf(
+                "user" to user,
+                "from" to from.toString(),
+                "to" to to.toString(),
+                "page" to page.coerceAtLeast(1).toString(),
+                "limit" to limit.coerceIn(1, 200).toString(),
+            ),
+        )
+        parseLastFmRecentTracksPage(response)
+    }
+
     suspend fun getTopArtists(
         username: String,
         period: String = "overall",
@@ -515,6 +571,36 @@ internal fun parseLastFmTopTracks(raw: String): List<LastFM.RankedTrack> =
         LastFM.RankedTrack(name, artist, row.long("playcount"), row.artwork())
     }
 
+internal fun parseLastFmTopTracksPage(raw: String): LastFM.PagedResult<LastFM.RankedTrack> {
+    val root = Json.parseToJsonElement(raw) as? JsonObject
+        ?: error("Last.fm top tracks response is not a JSON object")
+    val chart = root["toptracks"] as? JsonObject
+        ?: error("Last.fm top tracks response is missing toptracks")
+    val items = chart.rows("track").mapNotNull { row ->
+        val name = row.text("name")?.trim()?.takeIf(String::isNotEmpty) ?: return@mapNotNull null
+        val artist = row["artist"].artistName()?.trim()?.takeIf(String::isNotEmpty) ?: return@mapNotNull null
+        LastFM.RankedTrack(name, artist, row.long("playcount"), row.artwork())
+    }
+    return LastFM.PagedResult(items, chart.totalPages())
+}
+
+internal fun parseLastFmRecentTracksPage(raw: String): LastFM.PagedResult<LastFM.RecentTrack> {
+    val root = Json.parseToJsonElement(raw) as? JsonObject
+        ?: error("Last.fm recent tracks response is not a JSON object")
+    val chart = root["recenttracks"] as? JsonObject
+        ?: error("Last.fm recent tracks response is missing recenttracks")
+    val items = chart.rows("track").mapNotNull { row ->
+        val attributes = row["@attr"] as? JsonObject
+        if (attributes?.text("nowplaying") == "true") return@mapNotNull null
+        val timestamp = (row["date"] as? JsonObject)?.text("uts")?.toLongOrNull()
+            ?: return@mapNotNull null
+        val name = row.text("name")?.trim()?.takeIf(String::isNotEmpty) ?: return@mapNotNull null
+        val artist = row["artist"].artistName()?.trim()?.takeIf(String::isNotEmpty) ?: return@mapNotNull null
+        LastFM.RecentTrack(name, artist, row.artwork(), timestamp)
+    }
+    return LastFM.PagedResult(items, chart.totalPages())
+}
+
 internal fun parseLastFmTopArtists(raw: String): List<LastFM.RankedArtist> =
     parseLastFmChart(raw, "topartists", "artist").mapNotNull { row ->
         val name = row.text("name") ?: return@mapNotNull null
@@ -526,6 +612,15 @@ internal fun parseLastFmTopAlbums(raw: String): List<LastFM.RankedAlbum> =
         val name = row.text("name") ?: return@mapNotNull null
         LastFM.RankedAlbum(name, row["artist"].artistName().orEmpty(), row.long("playcount"), row.artwork())
     }
+
+private fun JsonObject.rows(key: String): List<JsonObject> = when (val value = this[key]) {
+    is JsonArray -> value.mapNotNull { it as? JsonObject }
+    is JsonObject -> listOf(value)
+    else -> emptyList()
+}
+
+private fun JsonObject.totalPages(): Int =
+    (this["@attr"] as? JsonObject)?.text("totalPages")?.toIntOrNull()?.coerceAtLeast(1) ?: 1
 
 private fun parseLastFmChart(raw: String, chartKey: String, rowKey: String): List<JsonObject> =
     runCatching {
@@ -557,7 +652,7 @@ private fun JsonObject.artwork(): String? {
 }
 
 private fun JsonElement?.artistName(): String? = when (this) {
-    is JsonObject -> text("name")
+    is JsonObject -> text("name") ?: text("#text")
     is JsonPrimitive -> contentOrNull?.takeIf { it.isNotBlank() && it != "null" }
     else -> null
 }

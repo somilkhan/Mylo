@@ -96,4 +96,47 @@ class LastFMStatsParserTest {
         assertTrue(parseLastFmTopArtists("[]").isEmpty())
         assertTrue(parseLastFmTopAlbums("""{"topalbums":{"album":null}}""").isEmpty())
     }
+    @Test
+    fun parsesPagedTopTracksAndRecentScrobbles() {
+        val top = parseLastFmTopTracksPage(
+            """
+            {
+              "toptracks": {
+                "track": [
+                  {"name":"Track A","playcount":"42","artist":{"name":"Artist A"}}
+                ],
+                "@attr": {"page":"1","totalPages":"3"}
+              }
+            }
+            """.trimIndent(),
+        )
+        assertEquals(3, top.totalPages)
+        assertEquals("Track A", top.items.single().name)
+        assertEquals(42L, top.items.single().playCount)
+
+        val recent = parseLastFmRecentTracksPage(
+            """
+            {
+              "recenttracks": {
+                "track": [
+                  {"name":"Track A","artist":{"#text":"Artist A"},"date":{"uts":"1795082400"}},
+                  {"name":"Now Playing","artist":{"#text":"Artist B"},"@attr":{"nowplaying":"true"}},
+                  {"name":"Missing Date","artist":{"#text":"Artist C"}}
+                ],
+                "@attr": {"page":"1","totalPages":"2"}
+              }
+            }
+            """.trimIndent(),
+        )
+        assertEquals(2, recent.totalPages)
+        assertEquals(1, recent.items.size)
+        assertEquals("Artist A", recent.items.single().artist)
+        assertEquals(1795082400L, recent.items.single().timestamp)
+    }
+
+    @Test
+    fun malformedPagedHistoryResponseFailsInsteadOfLookingLikeAnEmptyPeriod() {
+        assertTrue(runCatching { parseLastFmRecentTracksPage("""{"error":6,"message":"User not found"}""") }.isFailure)
+    }
+
 }

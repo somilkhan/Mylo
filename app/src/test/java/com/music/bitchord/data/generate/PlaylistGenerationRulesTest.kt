@@ -166,6 +166,14 @@ class PlaylistGenerationRulesTest {
         assertEquals(listOf("a1", "a2", "b1", "c1"), result.map { it.videoId })
     }
 
+
+    @Test
+    fun trackIdentityNormalizesCaseWhitespaceAndPunctuation() {
+        val fromSong = PlaylistGenerationRules.trackKey(song("one", "Don't Stop!", "AC/DC"))
+        val fromLastFm = PlaylistGenerationRules.trackKey("dont stop", "ac dc")
+        assertEquals(fromSong, fromLastFm)
+    }
+
     private fun song(id: String, title: String, artist: String = "The Artist") =
         Song(videoId = id, title = title, artist = artist, thumbnailUrl = null)
 }

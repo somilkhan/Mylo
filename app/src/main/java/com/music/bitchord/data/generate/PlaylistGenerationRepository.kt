@@ -748,9 +748,11 @@ internal object PlaylistGenerationRules {
             )
             .filter(Char::isLetterOrDigit)
 
-    fun trackKey(song: Song): String =
-        "${normalize(song.title)}|${normalize(song.artist)}"
+    fun trackKey(song: Song): String = trackKey(song.title, song.artist)
+
+    fun trackKey(title: String, artist: String): String =
+        "${normalize(title)}|${normalize(artist)}"
 
     private fun normalize(value: String): String =
-        value.lowercase().filter(Char::isLetterOrDigit)
+        value.lowercase(Locale.ROOT).filter(Char::isLetterOrDigit)
 }
