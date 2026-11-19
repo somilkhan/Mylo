@@ -2048,3 +2048,48 @@ Also inspected `mylo-replay-prototype-v3.html` (758 lines). It contains the appr
 4. Reconcile the playlist search/detail extras in sections 65–66 against the current spec and live code. Do not silently remove existing behavior; record any product-owner spec correction needed.
 5. Run required build and unit tests; inspect CI against the exact resulting SHA. Request/produce a fresh APK and perform the device acceptance matrix (Statistics sources/periods/cache/refresh; all nine Generate modes and cancellation; playlist actions/empty/search; FAB/nav/back/overlay/player/keyboard; toggle in both states and persistence; offline queue restart/flush/no duplicate).
 6. Update this context file again with exact commit, file/blob SHAs, test commands/results, APK provenance and device evidence. Do not call the task complete while required verification remains open.
+
+
+## 68. Settings gradient preference and Scrobble Hub theme implementation (2026-11-19)
+
+### Exact repository state
+- Repository: `somilkhan/Mylo`.
+- Branch: `Main-dev`.
+- Parent documentation HEAD before implementation: `47187db1e4de0ecbabd3e1f31574a2be39073baa`.
+- Implementation commit now at `Main-dev`: `2d0fe6383b4a3cbaa322a1b8911bba6943febdd4`.
+- Implementation tree: `74184442d24e692d67dcd287878157a6255c0b2c`.
+- `main` was not modified. `last-wave` was not modified.
+
+### Implemented
+- `AppSettings.scrobbleGradientTheme` is owned by the existing `AppSettings` SharedPreferences store.
+- Exact key: `scrobble_gradient_theme`; default is `true`.
+- Read is guarded by try/catch and falls back to true. Write is guarded by try/catch and uses synchronous `commit()` before publishing the new flow value.
+- Added the single approved Appearance row: “Scrobble gradient theme”. No switch was added inside the hub.
+- Added a local Scrobble Hub theme wrapper around only Statistics, Generate and Playlists. ON uses the v3 dark gradient and matching local Material 3 color tokens; OFF uses the app's current Material 3 theme. The setting is collected as a StateFlow, so returning to the hub should apply it without restarting the Activity.
+- Statistics' embedded Replay view now has an opt-out for its artwork-derived mesh backdrop; standalone Replay keeps its prior backdrop. This avoids artwork-derived colors in the hub.
+- Changed files:
+  - `app/src/main/java/com/music/bitchord/data/settings/AppSettings.kt`
+  - `app/src/main/java/com/music/bitchord/ui/screens/SettingsSheet.kt`
+  - `app/src/main/java/com/music/bitchord/MainActivity.kt`
+  - `app/src/main/java/com/music/bitchord/ui/replay/ReplayScreen.kt`
+  - `app/src/main/java/com/music/bitchord/ui/scrobble/ScrobbleStatisticsContent.kt`
+  - `app/src/main/java/com/music/bitchord/ui/scrobble/ScrobbleHubTheme.kt` (new)
+
+### Verification and remaining gaps
+- GitHub confirms `Main-dev` points to implementation commit `2d0fe6383b4a3cbaa322a1b8911bba6943febdd4`.
+- Android CI run #? / run ID `44443894497` was observed as `in_progress` immediately after push. No pass/fail result was available at this documentation point.
+- No local Gradle build, APK, emulator/device screenshot, toggle process-restart test, or corrupted-preference fallback test has been performed. Do not call the implementation visually or device verified until those checks exist.
+- The supplied HTML was inspected at source level (including its CSS gradient values and page structure). Headless Chromium attempts timed out in this execution environment, so browser rendering/visual comparison remains outstanding.
+- The exact Library docs remain canonical; this section records implementation, not a change to their requirements.
+
+### Live discrepancies retained for deliberate reconciliation
+- Current Statistics code still presents separate “Mylo Replay” and “Last.fm” source chips rather than the approved merged source view. This is not changed in this pass.
+- Current playlist shelf search still matches playlist title, track title and artist, while the approved spec says title-only. This is not changed in this pass.
+- Section 66's in-detail search/sort extras still require a precise live-code comparison with the UX spec before any removal or retention decision.
+
+### Next actions
+1. Check Android CI for exact commit `2d0fe6383b4a3cbaa322a1b8911bba6943febdd4`; fix any compile/test failure before moving on.
+2. Continue the repository-wide durable-queue audit. Existing `AppSettings.watchConnection` is the only network observer found so far; it exposes `meteredConnection` as null/offline or a Boolean/active network state. `AccountLibrarySyncWorker` is unrelated account-library sync, and `PlaybackTracker` retries YouTube Music history rather than Last.fm scrobbles. `ScrobbleManager` has no persistence/retry queue.
+3. Trace `PlaybackService.observeScrobbling`, `BitChordApplication.initLastfm`, `LastFM.scrobble` and cancellation/error classification before implementing one JSON temp-file-and-rename queue.
+4. Reconcile the Statistics source selector and playlist search/detail extras deliberately; do not silently change approved behavior.
+5. Build, run focused tests, produce a fresh APK from the exact code SHA and complete device acceptance before declaring done.
