@@ -75,7 +75,7 @@ internal object LastFmScrobbleQueue {
         // StateFlow emits its current value immediately, so this performs the
         // app-start flush and then reacts to network/account changes without polling.
         scope.launch {
-            combine<Any, QueueConnectionSnapshot>(
+            combine<Any?, QueueConnectionSnapshot>(
                 AppSettings.meteredConnection,
                 AppSettings.lastfmEnabled,
                 AppSettings.lastfmScrobbleEnabled,
@@ -95,13 +95,13 @@ internal object LastFmScrobbleQueue {
                 )
             }.distinctUntilChanged().collectLatest { snapshot ->
                 if (!snapshot.canFlush) return@collectLatest
-                LastFM.configure(
-                    endpoint = snapshot.endpoint.ifBlank { LastFM.DEFAULT_API_ENDPOINT },
-                    apiKey = snapshot.apiKey,
-                    secret = snapshot.secret,
-                    sessionKey = snapshot.sessionKey,
-                )
                 try {
+                    LastFM.configure(
+                        endpoint = snapshot.endpoint.ifBlank { LastFM.DEFAULT_API_ENDPOINT },
+                        apiKey = snapshot.apiKey,
+                        secret = snapshot.secret,
+                        sessionKey = snapshot.sessionKey,
+                    )
                     activeQueue.flush()
                 } catch (cancellation: CancellationException) {
                     throw cancellation
@@ -177,7 +177,7 @@ internal class DurableLastFmScrobbleQueue(
     suspend fun enqueue(entry: LastFmScrobbleEntry) = withContext(Dispatchers.IO) {
         storageMutex.withLock {
             val entries = readUnsafe()
-            if (entries.size >= MAX_ENTRIES) {
+            while (entries.size >= MAX_ENTRIES) {
                 val dropped = entries.removeAt(0)
                 log("Queue reached $MAX_ENTRIES entries; dropped oldest pending scrobble id=${dropped.id}", null)
             }
