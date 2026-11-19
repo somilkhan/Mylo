@@ -2410,3 +2410,44 @@ Existing files modified in the same data-layer commit:
 - Statistics merge data layer exists, but screen/ViewModel integration and full acceptance remain incomplete.
 - Playlist spec discrepancy remains an explicit product-owner decision.
 - No fresh APK or device screenshots have been verified for the latest Statistics code.
+## 75. Statistics UI integration continuation and CI correction (2026-11-19)
+
+### Startup sequence and authoritative inputs
+- Re-read the complete current SCROBBLE_CONTEXT.md (2,413 lines; source blob before this update: 853aea52e60a25224443d554b0cc3c35fcb1b76b), including section 0 and the latest Statistics handoff.
+- Re-read the complete uploaded source files: AGENT-BRIEF.md (113 lines), CHANGE-THEME-TOGGLE.md (60 lines), and mylo-ux-spec.md (133 lines). Rechecked the full 758-line mylo-replay-prototype-v3.html source. Do not treat earlier summaries as substitutes for the source documents.
+- Refreshed live refs and recent commits before edits. Working branch is Main-dev; no changes were made to main or last-wave.
+- The uploaded brief says not to change the approved dialog/FAB/navigation/theme/layout except the one Settings toggle. Any small visual correction must be justified as a documented accessibility/contrast/touch-target correction and must not redesign approved surfaces.
+
+### Exact branch and code state
+- Branch: Main-dev.
+- Code HEAD at start of this pass: 89c98cc5ce041f78a1d83524c483192d7d188346.
+- Recent Statistics commits inspected:
+  - 7cd77f501f86171a18c487f431e851779132bf27 — Compose visibility fixes for the export dialog and ViewModel state.
+  - 424d4c908444288bdfb74cb4414ffdf58285075d — removed duplicate header Refresh action; pull-to-refresh remains.
+  - e83e80f17576bcd0a1808c48a57b6746590dadb8 — scope statistics cache by Last.fm endpoint and add regression test for Last.fm/Libre.fm isolation.
+  - 4e3b0dc6cc6fa269d30d6b0a2c627f49d3af47fb — initial segmented period selector / heading typography alignment.
+  - 89c98cc5ce041f78a1d83524c483192d7d188346 — corrected Compose padding named arguments from unsupported horizontal/top to start/end/top.
+- Relevant current source: app/src/main/java/com/music/bitchord/ui/scrobble/ScrobbleStatisticsContent.kt, blob 919718a662a5bdf0ca2650224fe9c394ecef2cb2. The period selector uses 48dp controls, semantic tertiary/onTertiary selected colors, and a rounded segmented container. It retains the existing layout hierarchy; this is not a new design system.
+- No Statistics data-layer or Generator/Playlist source changes were made in this pass.
+
+### CI diagnosis and exact verification
+- Run 44540015036 tested 4e3b0dc6cc6fa269d30d6b0a2c627f49d3af47fb. Web tests/typecheck passed. Android compilation failed at ScrobbleStatisticsContent.kt:112: the Compose version's Modifier.padding overload does not accept horizontal or top named arguments; it requires start/end/top/bottom (or a PaddingValues overload). Desktop job was cancelled when the newer push superseded it.
+- Corrected the named arguments in commit 89c98cc5ce041f78a1d83524c483192d7d188346. This is the exact current code SHA.
+- CI run 44540170278 is running against that exact SHA at the time of this context update. Web tests/typecheck completed successfully. Android unit tests and desktop compilation/tests were still in progress; poll the run and inspect logs before claiming a pass. Push workflow skips APK packaging; no APK or device verification is claimed.
+- The earlier data-layer CI run 44539208892 on e83e80f1 completed successfully. The prior run 44538287131 on 424d4c90 also completed successfully. The exact latest selector change is not covered by those older green runs.
+
+### Confirmed findings and remaining risks
+- The cache key now includes the configured Last.fm endpoint as well as normalized username, period and calendar-range identity. This prevents a Last.fm cache entry being reused after switching to Libre.fm for the same username. Regression test was added in LastFmStatisticsRepositoryTest.kt.
+- The Statistics screen has started moving toward a single merged view, but full product acceptance is not complete. Continue checking the live ViewModel/repository wiring and every state against the UX spec; do not infer completion from the presence of the merge model.
+- The uploaded UX spec requires loading skeletons, a real empty state with Settings action, local-only mode when disconnected, stale data retained while fetching/after failure, and retry notice only while connected. Verify these behaviors in the current ViewModel and screen, with tests.
+- The segmented selector's 48dp height satisfies the stated minimum touch target. Selected/unselected text uses semantic Material color roles rather than hard-coded black/white. Still inspect all Statistics text/background combinations, the Generator dialogs and Playlist shelf/detail in both gradient ON and OFF themes; a source-level color scan is not a substitute for device screenshots.
+- Keep listening milliseconds distinct from remote Last.fm play counts. The current Last.fm API data layer does not provide per-track listened milliseconds; do not synthesize remote durations. Reconcile the high-level spec's time-merge wording by documenting this actual API limitation, and preserve truthful local-only time until a genuine remote duration source exists.
+- Playlist search/sort discrepancy and other product-owner decisions recorded in section 73 remain open. Library integration remains explicitly postponed/out of scope.
+
+### Immediate next actions for the next agent
+1. Poll CI run 44540170278 for exact SHA 89c98cc5ce041f78a1d83524c483192d7d188346; inspect all three jobs and logs. If it fails, fix the exact failing issue and update this file in the same commit as the code correction.
+2. Continue the Statistics screen/ViewModel integration audit from the current source. Compare the implementation against every UX-spec state, period, merge rule, refresh rule and accessibility requirement; add focused tests before claiming completion.
+3. Review contrast and theme behavior across Statistics, Generator and Playlists in both toggle states. Do not change the approved palette or unrelated screens. If visual tooling is unavailable, state that screenshots/device inspection remain outstanding.
+4. Verify Last.fm account/config restoration after process restart, pagination/rate-limit behavior, cancellation and cache concurrency before calling the remote integration production-ready.
+5. Run exact-head Android unit tests/compile, desktop tests and web checks. Request an APK only from the final exact code SHA through the supported workflow path, then verify it on device if available.
+6. Update this file again with the resulting code SHA, documentation SHA, CI run IDs/log outcomes, files changed, device evidence and remaining acceptance items.
