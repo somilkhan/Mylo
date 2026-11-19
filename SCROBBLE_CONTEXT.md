@@ -2093,3 +2093,62 @@ Also inspected `mylo-replay-prototype-v3.html` (758 lines). It contains the appr
 3. Trace `PlaybackService.observeScrobbling`, `BitChordApplication.initLastfm`, `LastFM.scrobble` and cancellation/error classification before implementing one JSON temp-file-and-rename queue.
 4. Reconcile the Statistics source selector and playlist search/detail extras deliberately; do not silently change approved behavior.
 5. Build, run focused tests, produce a fresh APK from the exact code SHA and complete device acceptance before declaring done.
+
+
+## 69. Durable Last.fm scrobble queue and theme-token verification (2026-11-19)
+
+### Exact repository state
+- Repository: `somilkhan/Mylo`.
+- Branch: `Main-dev`.
+- Code HEAD: `b4b6cb515073c9f826d30a07d0b2747b4df5815e`.
+- Queue implementation commit: `77ed58edebe73ecc356f830fbb26b3e80490f963`.
+- Queue compile/type correction and prototype-token refinement commit: `b4b6cb515073c9f826d30a07d0b2747b4df5815e`.
+- Parent documentation HEAD: `0d8811d3b5200fc55ce9a62efa738364ec612b60`.
+- `main` and `last-wave` remain untouched.
+
+### Durable queue implemented
+- Added one queue owner: `LastFmScrobbleQueue`, backed by one app-private JSON file: `filesDir/lastfm-scrobble-queue.json`.
+- Writes go to a sibling temporary file, flush and sync the file descriptor, then use an atomic same-filesystem move to replace the queue file.
+- New scrobbles are persisted before network submission, so a retryable failure or process death during the request leaves the pending entry on disk.
+- FIFO order is preserved. The queue is capped at 200 entries; overflow drops and logs the oldest entry.
+- App startup and changes in the existing `AppSettings.meteredConnection` / Last.fm account / scrobble-enabled flows trigger a flush. Each new submission also triggers a flush, which drains the FIFO until empty or a retryable failure is reached.
+- No Room, second database, WorkManager, second network observer, or duplicate scrobbler was introduced.
+- Permanent Last.fm errors are removed and logged; transient network/timeout, HTTP 408/429/5xx, Last.fm service/rate-limit codes 8/11/16/29 and the daily scrobble-limit response remain queued. Invalid session and rejected/ignored track responses are permanent. Last.fm's response body is now inspected for accepted/ignored counts instead of treating every HTTP 2xx as an accepted scrobble.
+- Suspend Last.fm result wrappers now rethrow `CancellationException`; the queue also rethrows cancellation and leaves the head entry pending.
+- `ScrobbleManager` submits through the application-owned queue scope, so PlaybackService teardown does not cancel a pending queue write.
+
+### Tests added
+- `LastFmScrobbleQueueTest`: FIFO order, 200-entry overflow/drop-oldest, simulated store recreation, retryable failure retention and replay, invalid-session permanent drop, rejected-track permanent drop, daily-limit retryability, and cancellation propagation.
+- `LastFMScrobbleResponseTest`: accepted response, ignored/rejected track and daily-limit response classification.
+
+### Theme refinement
+- Gradient surface/container tokens now use the prototype's translucent card color (`rgba(42,39,48,.78)`).
+- Base gradient stops now match the prototype's 0%, 42%, and 100% positions.
+- Radial glow scaling now derives the ellipse aspect ratio from the actual canvas dimensions instead of using a fixed vertical scale.
+- No dynamic artwork or wallpaper colors were introduced.
+
+### Verification
+- GitHub Actions run #1211 / run ID `44432162937` for the earlier code SHA `6f81c08c3c92b7a7d6a51af11c15257f55c41f9a`: passed; APK step skipped.
+- Theme implementation run ID `44443894497` for `2d0fe6383b4a3cbaa322a1b8911bba6943febdd4`: passed; APK step skipped.
+- Durable queue + token refinement run ID `44444935088` for exact code SHA `b4b6cb515073c9f826d30a07d0b2747b4df5815e`: **passed** web tests/typecheck, Android unit tests, and desktop compile/tests.
+- The workflow explicitly skipped “Build Android app, TV and Wear OS APKs” and “Upload debug APKs”. No fresh APK was produced.
+- No emulator/physical-device verification, offline replay test on a device, force-stop/restart test, or screenshot evidence exists yet.
+- The HTML prototype has been inspected at source level (CSS, mode definitions and dialog interaction). Headless Chromium did not start successfully in this environment; browser-rendered visual comparison remains outstanding.
+
+### Delivery semantics limitation
+- This queue provides durable **at-least-once** delivery, not a mathematical exactly-once guarantee. The process can die after Last.fm accepts a request but before the local queue entry is removed; the next startup may resend that entry. The current Last.fm `track.scrobble` API contract exposes no documented client idempotency key. Do not claim crash-window exactly-once delivery.
+
+### Live spec discrepancies found; not silently changed
+- Statistics still exposes separate local Replay and Last.fm source choices; the approved UX requires one merged view, normalized artist/title identity and max(local, Last.fm) semantics. The merge is not implemented yet.
+- Generator still uses an inline mode/options layout rather than the prototype's mode-row-to-dialog flow. Its current count slider permits one-track increments, the Library mode row is not disabled when YouTube Music is signed out, Mix lacks searched-seed input, and the approved optional-Last.fm notes are missing. These are implementation gaps to address next.
+- The approved UX specifies a period for Library generation, but the current YT Music `LibraryPage` / remote `Song` model exposes no library-added timestamp and the generation repository currently ignores `request.period` for Library. Do not invent a date basis; ask the product owner whether Library period should mean last-played date or whether it should remain All time until an added-date source exists.
+- Playlist shelf search currently matches playlist title, track title and artist, and adds shelf sorting. Playlist detail also adds track-list search and sorting. The approved UX specifies title-only shelf search and marks track-level list search out of scope. These extras are preserved pending product-owner confirmation; do not silently delete them. The Add Track search is a separate required detail action and should remain.
+- Current generator/playlist extras have not been reconciled with the approved UX. No functionality was removed in this pass.
+
+### Next actions
+1. Continue with generator UX reconciliation: mode rows, bottom-sheet dialog, exact nine mode labels, 5–35 count stepper (step 5), signed-out Library disabled state, optional Mix seed search, Last.fm optional notes, retry/cancel behavior and non-lossy success event delivery.
+2. Fix all suspend network wrappers used by generation so cancellation cannot be swallowed and followed by fallback network requests.
+3. Ask the product owner for Library period semantics before enabling a non-All-time Library filter.
+4. Implement Statistics merge semantics and remove the separate source toggle only after tracing the existing local and Last.fm data paths.
+5. Ask whether track-aware shelf search, shelf sorting, detail track search and detail sorting are intentional approved extensions or should be reverted to the strict UX spec.
+6. Build a fresh APK from the final exact code SHA, then complete emulator/device acceptance. CI success is not visual/device acceptance.
