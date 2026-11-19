@@ -2229,3 +2229,17 @@ Also inspected `mylo-replay-prototype-v3.html` (758 lines). It contains the appr
 7. Build a fresh APK from the exact green code SHA and complete device acceptance: theme ON/OFF and persistence/fallback; Statistics periods/loading/empty/refresh/failure/source merge; all nine Generator modes including signed-out Library, Last.fm disconnected, seed/tag/exclusions/count/cancel/failure/retry/success; playlist list/detail actions and search; FAB/nav/Back/overlays/keyboard/full player; offline queue persistence/restart/network replay and duplicate-delivery limitation.
 8. Update this file again with exact code/doc SHAs, changed paths, CI logs, APK provenance and device evidence. Do not claim the task complete until the mandatory acceptance gaps are closed.
 
+
+
+## 71. CI correction after section 70 (2026-11-19)
+
+Section 70 was written while workflow run 44446937265 was still in progress. The subsequent Android job result is now available and supersedes the provisional status recorded there:
+
+- Run 44446937265 targets code SHA 5d0f40b8031cb3b13346f846b71cffa8f80ce1ef.
+- Web tests and typecheck: passed.
+- Android unit-test job: failed during Kotlin compilation at app/src/main/java/com/music/bitchord/ui/scrobble/ScrobbleContent.kt:760:45.
+- Exact diagnostic: unresolved reference; the only candidate shown was Icons.Rounded.Check, rejected due to receiver type mismatch. Inspect the expression at/around line 760 and the imported/actual receiver type; do not guess a replacement without checking the intended component.
+- Desktop compile/tests job was still in progress at the time of this correction; refresh run 44446937265 for its final conclusion.
+- This is a compile failure, not a failing behavioral unit test. No APK was produced.
+- Next action is to fix the exact Check reference, run the Android unit-test/build job again, then wait for desktop and web jobs. Do not proceed to Statistics implementation until the latest generator code compiles cleanly.
+
