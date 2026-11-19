@@ -94,7 +94,7 @@ class LastFmStatisticsRepositoryTest {
         assertTrue(result.isFailure)
         assertEquals(fresh, repository.cached(query)?.tracks)
         assertFalse(repository.isFresh(query))
-        assertEquals(first.size, 1)
+        assertEquals(1, first.size)
     }
 
     @Test
@@ -163,13 +163,13 @@ class LastFmStatisticsRepositoryTest {
             recentPages += page
             val items = when (page) {
                 1 -> listOf(
-                    LastFM.RecentTrack("Track A", "Artist A", null, 999L),
-                    LastFM.RecentTrack("Track A", "Artist A", null, 1_000L),
+                    LastFM.RecentTrack("Track A", "Artist A", null, 2_000L),
                     LastFM.RecentTrack("Track B", "Artist B", null, 1_500L),
+                    LastFM.RecentTrack("Outside", "Artist C", null, 2_001L),
                 )
                 else -> listOf(
-                    LastFM.RecentTrack("track-a", "artist a", null, 2_000L),
-                    LastFM.RecentTrack("Outside", "Artist C", null, 2_001L),
+                    LastFM.RecentTrack("track-a", "artist a", null, 1_000L),
+                    LastFM.RecentTrack("Outside", "Artist C", null, 999L),
                 )
             }
             return Result.success(LastFM.PagedResult(items, 2))

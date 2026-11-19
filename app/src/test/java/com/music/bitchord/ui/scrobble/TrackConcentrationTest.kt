@@ -6,45 +6,44 @@ import org.junit.Test
 
 class TrackConcentrationTest {
     @Test
-    fun percentagesRepresentTopOneNextTwoAndRemainingTracks() {
-        val result = calculateTrackConcentration(
-            trackDurationsMs = listOf(40L, 30L, 20L, 10L),
-            totalListeningMs = 100L,
-            totalPlays = 20,
-        )!!
+    fun percentagesRepresentTopOneNextTwoAndRemainingMergedPlays() {
+        val result = calculateTrackConcentration(listOf(40L, 30L, 20L, 10L))!!
 
         assertEquals(40, result.topTrackPercent)
         assertEquals(50, result.nextTwoPercent)
         assertEquals(10, result.otherTracksPercent)
         assertEquals(100, result.topTrackPercent + result.nextTwoPercent + result.otherTracksPercent)
-        assertEquals(40L, result.topTrackMs)
-        assertEquals(50L, result.nextTwoMs)
-        assertEquals(10L, result.otherTracksMs)
-        assertEquals("5.0", result.averagePlaysPerTrack)
+        assertEquals(40L, result.topTrackPlays)
+        assertEquals(50L, result.nextTwoPlays)
+        assertEquals(10L, result.otherTracksPlays)
+        assertEquals(100L, result.totalPlays)
+        assertEquals(4, result.uniqueTracks)
+        assertEquals("25.0", result.averagePlaysPerTrack)
     }
 
     @Test
-    fun oneTrackAssignsRemainingShareToTopTrack() {
-        val result = calculateTrackConcentration(listOf(120L), 120L, 3)!!
+    fun oneTrackAssignsAllPlaysToTopTrack() {
+        val result = calculateTrackConcentration(listOf(3L))!!
 
         assertEquals(100, result.topTrackPercent)
         assertEquals(0, result.nextTwoPercent)
         assertEquals(0, result.otherTracksPercent)
+        assertEquals(3L, result.topTrackPlays)
     }
 
     @Test
-    fun emptyOrZeroDurationInputHasNoConcentration() {
-        assertNull(calculateTrackConcentration(emptyList(), 100L, 4))
-        assertNull(calculateTrackConcentration(listOf(100L), 0L, 4))
+    fun emptyOrZeroPlayInputHasNoConcentration() {
+        assertNull(calculateTrackConcentration(emptyList()))
+        assertNull(calculateTrackConcentration(listOf(0L, -4L)))
     }
 
     @Test
-    fun negativeTrackDurationsCannotProduceNegativeShares() {
-        val result = calculateTrackConcentration(listOf(100L, -20L), 100L, 2)!!
+    fun negativePlayCountsCannotProduceNegativeShares() {
+        val result = calculateTrackConcentration(listOf(100L, -20L))!!
 
         assertEquals(100, result.topTrackPercent)
         assertEquals(0, result.nextTwoPercent)
         assertEquals(0, result.otherTracksPercent)
-        assertEquals(0L, result.otherTracksMs)
+        assertEquals(0L, result.otherTracksPlays)
     }
 }

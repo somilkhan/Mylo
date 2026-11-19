@@ -330,6 +330,7 @@ import com.music.bitchord.ui.scrobble.ScrobbleGenerateContent
 import com.music.bitchord.ui.scrobble.ScrobbleGenerateViewModel
 import com.music.bitchord.ui.scrobble.ScrobblePlaylistsContent
 import com.music.bitchord.ui.scrobble.ScrobbleStatisticsContent
+import com.music.bitchord.ui.scrobble.ScrobbleStatisticsViewModel
 import com.music.bitchord.ui.scrobble.ScrobbleHubTheme
 import com.music.bitchord.ui.replay.cards
 import com.music.bitchord.ui.replay.ReplayShareSheet
@@ -501,6 +502,7 @@ private fun BitChordApp(
 ) {
     val context = LocalContext.current
     val scrobbleGenerateViewModel: ScrobbleGenerateViewModel = viewModel()
+    val scrobbleStatisticsViewModel: ScrobbleStatisticsViewModel = viewModel()
     val clipboard = LocalClipboardManager.current
     val hazeState = remember { HazeState() }
     // Recording the backdrop layer costs a draw pass, so it only runs when a
@@ -2898,29 +2900,16 @@ private fun BitChordApp(
                         ScrobbleHubTheme(gradientEnabled = scrobbleGradientTheme) {
                             when (scrobbleTab) {
                             0 -> ScrobbleStatisticsContent(
-                                replayState = replay,
+                                viewModel = scrobbleStatisticsViewModel,
                                 reduceMotion = reducePlayerMotion,
-                                holder = account?.name.orEmpty(),
-                                onPeriodChange = setReplayPeriod,
-                                onOpenStory = { replayStory = it },
                                 onPlaySong = { song ->
                                     playRadio(song, QueueSource(replayLabel, PlaybackSourceType.REPLAY))
                                 },
-                                onOpenArtist = { id, name ->
+                                onOpenSettings = {
                                     closeScrobble()
-                                    openByName(id, name, null, BrowseType.ARTIST)
-                                },
-                                onOpenAlbum = { id, title, artist, art ->
-                                    closeScrobble()
-                                    openByName(id, title, artist, BrowseType.ALBUM, art)
-                                },
-                                onShare = {
-                                    replaySharePage = null
-                                    showReplayShare = true
+                                    showSettings = true
                                 },
                                 contentPadding = listPadding,
-                                replayListState = replayListState,
-                                gradientThemeEnabled = scrobbleGradientTheme,
                             )
                             1 -> ScrobbleGenerateContent(
                                 viewModel = scrobbleGenerateViewModel,
@@ -5434,6 +5423,7 @@ private fun BitChordApp(
                                     AppSettings.setLastfmSessionKey(auth.session.key)
                                     AppSettings.setLastfmUsername(auth.session.name)
                                     AppSettings.setLastfmEnabled(true)
+                                    scrobbleStatisticsViewModel.onLastFmConnected()
                                     showLastfmLogin = false
                                 }
                                 .onFailure { e ->

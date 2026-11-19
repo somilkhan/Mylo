@@ -19,11 +19,14 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.music.bitchord.data.stats.ReplaySummary
+import java.text.NumberFormat
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -31,53 +34,50 @@ internal data class TrackConcentration(
     val topTrackPercent: Int,
     val nextTwoPercent: Int,
     val otherTracksPercent: Int,
-    val topTrackMs: Long,
-    val nextTwoMs: Long,
-    val otherTracksMs: Long,
+    val topTrackPlays: Long,
+    val nextTwoPlays: Long,
+    val otherTracksPlays: Long,
     val uniqueTracks: Int,
-    val totalPlays: Int,
+    val totalPlays: Long,
     val averagePlaysPerTrack: String,
 )
 
-internal fun calculateTrackConcentration(summary: ReplaySummary): TrackConcentration? =
-    calculateTrackConcentration(summary.songs.map { it.ms }, summary.totalMs, summary.totalPlays)
+internal fun calculateTrackConcentration(trackPlays: List<Long>): TrackConcentration? {
+    val tracks = trackPlays.map { it.coerceAtLeast(0L) }.filter { it > 0L }.sortedDescending()
+    if (tracks.isEmpty()) return null
 
-internal fun calculateTrackConcentration(
-    trackDurationsMs: List<Long>,
-    totalListeningMs: Long,
-    totalPlays: Int,
-): TrackConcentration? {
-    if (trackDurationsMs.isEmpty() || totalListeningMs <= 0L) return null
-    val tracks = trackDurationsMs.map { it.coerceAtLeast(0L) }.sortedDescending()
-    val topMs = tracks.first()
-    val nextMs = tracks.drop(1).take(2).sum()
-    val topPercent = ((topMs.toDouble() / totalListeningMs) * 100.0).roundToInt().coerceIn(0, 100)
-    val nextPercent = ((nextMs.toDouble() / totalListeningMs) * 100.0).roundToInt().coerceIn(0, 100 - topPercent)
-    val othersPercent = (100 - topPercent - nextPercent).coerceAtLeast(0)
-    val otherMs = (totalListeningMs - topMs - nextMs).coerceAtLeast(0L)
+    val total = tracks.sum()
+    if (total <= 0L) return null
+
+    val topPlays = tracks.first()
+    val nextPlays = tracks.drop(1).take(2).sum()
+    val otherPlays = (total - topPlays - nextPlays).coerceAtLeast(0L)
+    val topPercent = ((topPlays.toDouble() / total) * 100.0).roundToInt().coerceIn(0, 100)
+    val nextPercent = ((nextPlays.toDouble() / total) * 100.0).roundToInt().coerceIn(0, 100 - topPercent)
+    val otherPercent = (100 - topPercent - nextPercent).coerceAtLeast(0)
     val count = tracks.size
-    val average = String.format(Locale.ROOT, "%.1f", totalPlays.coerceAtLeast(0).toFloat() / count)
 
     return TrackConcentration(
         topTrackPercent = topPercent,
         nextTwoPercent = nextPercent,
-        otherTracksPercent = othersPercent,
-        topTrackMs = topMs,
-        nextTwoMs = nextMs,
-        otherTracksMs = otherMs,
+        otherTracksPercent = otherPercent,
+        topTrackPlays = topPlays,
+        nextTwoPlays = nextPlays,
+        otherTracksPlays = otherPlays,
         uniqueTracks = count,
-        totalPlays = totalPlays.coerceAtLeast(0),
-        averagePlaysPerTrack = average,
+        totalPlays = total,
+        averagePlaysPerTrack = String.format(Locale.ROOT, "%.1f", total.toDouble() / count),
     )
 }
 
 @Composable
 internal fun TrackConcentrationCard(
-    summary: ReplaySummary,
+    trackPlays: List<Long>,
+    localListeningMs: Long,
     reduceMotion: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    val data = calculateTrackConcentration(summary) ?: return
+    val data = remember(trackPlays) { calculateTrackConcentration(trackPlays) } ?: return
     val top by animateFloatAsState(
         targetValue = data.topTrackPercent / 100f,
         animationSpec = if (reduceMotion) snap() else tween(650),
@@ -99,6 +99,7 @@ internal fun TrackConcentrationCard(
         modifier = modifier.padding(horizontal = 20.dp, vertical = 8.dp),
         shape = RoundedCornerShape(20.dp),
         color = colors.surfaceContainerHigh,
+        contentColor = colors.onSurface,
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -106,7 +107,7 @@ internal fun TrackConcentrationCard(
         ) {
             Text("Track concentration", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Text(
-                "How your listening time is distributed across your tracks.",
+                "How your plays are distributed across your tracks.",
                 style = MaterialTheme.typography.bodySmall,
                 color = colors.onSurfaceVariant,
             )
@@ -114,34 +115,67 @@ internal fun TrackConcentrationCard(
                 Modifier.fillMaxWidth().height(10.dp).clip(RoundedCornerShape(50)),
                 horizontalArrangement = Arrangement.spacedBy(2.dp),
             ) {
-                if (data.topTrackPercent > 0) Box(Modifier.weight(top.coerceAtLeast(0.001f)).height(10.dp).background(colors.primary))
-                if (data.nextTwoPercent > 0) Box(Modifier.weight(next.coerceAtLeast(0.001f)).height(10.dp).background(colors.tertiary))
-                if (data.otherTracksPercent > 0) Box(Modifier.weight(others.coerceAtLeast(0.001f)).height(10.dp).background(colors.outlineVariant))
+                if (data.topTrackPercent > 0) {
+                    Box(Modifier.weight(top.coerceAtLeast(0.001f)).height(10.dp).background(colors.tertiary))
+                }
+                if (data.nextTwoPercent > 0) {
+                    Box(Modifier.weight(next.coerceAtLeast(0.001f)).height(10.dp).background(colors.secondary))
+                }
+                if (data.otherTracksPercent > 0) {
+                    Box(Modifier.weight(others.coerceAtLeast(0.001f)).height(10.dp).background(colors.outline))
+                }
             }
-            ConcentrationBreakdownRow("Top track", data.topTrackPercent, data.topTrackMs, colors.primary)
-            ConcentrationBreakdownRow("Next 2 tracks", data.nextTwoPercent, data.nextTwoMs, colors.tertiary)
-            ConcentrationBreakdownRow("Other tracks", data.otherTracksPercent, data.otherTracksMs, colors.outlineVariant)
+            ConcentrationBreakdownRow("Top track", data.topTrackPercent, data.topTrackPlays, colors.tertiary)
+            ConcentrationBreakdownRow("Next 2 tracks", data.nextTwoPercent, data.nextTwoPlays, colors.secondary)
+            ConcentrationBreakdownRow("Other tracks", data.otherTracksPercent, data.otherTracksPlays, colors.outline)
             Spacer(Modifier.height(2.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-                Column {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(18.dp),
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(data.averagePlaysPerTrack, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     Text("Avg plays / track", style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant)
                 }
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(data.uniqueTracks.toString(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     Text("Unique tracks", style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant)
                 }
             }
+            Text(
+                "Mylo listening time · \${if (localListeningMs > 0L) formatConcentrationDuration(localListeningMs) else "Not recorded yet"}",
+                style = MaterialTheme.typography.labelSmall,
+                color = colors.onSurfaceVariant,
+            )
         }
     }
 }
 
 @Composable
-private fun ConcentrationBreakdownRow(label: String, percent: Int, durationMs: Long, color: androidx.compose.ui.graphics.Color) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Box(Modifier.padding(top = 5.dp).width(8.dp).height(8.dp).clip(RoundedCornerShape(50)).background(color))
+private fun ConcentrationBreakdownRow(
+    label: String,
+    percent: Int,
+    plays: Long,
+    color: Color,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Box(
+            Modifier
+                .width(8.dp)
+                .height(8.dp)
+                .clip(RoundedCornerShape(50))
+                .background(color),
+        )
         Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
-        Text("$percent% · ${formatConcentrationDuration(durationMs)}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            "$percent% · \${NumberFormat.getIntegerInstance().format(plays)} plays",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -149,5 +183,5 @@ private fun formatConcentrationDuration(ms: Long): String {
     val minutes = ms.coerceAtLeast(0L) / 60_000L
     val hours = minutes / 60
     val remainder = minutes % 60
-    return if (hours > 0) "${hours}h ${remainder}m" else "${minutes}m"
+    return if (hours > 0) "\${hours}h \${remainder}m" else "\${minutes}m"
 }
