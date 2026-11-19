@@ -110,6 +110,7 @@ import com.music.bitchord.data.model.SearchResult
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.generate.PlaylistGenerationMode
 import com.music.bitchord.data.generate.PlaylistGenerationRepository
+import com.music.bitchord.data.generate.PlaylistGenerationRules
 import com.music.bitchord.data.generate.PlaylistGenerationRequest
 import com.music.bitchord.data.spotify.LocalPlaylist
 import com.music.bitchord.data.spotify.LocalPlaylistStore
