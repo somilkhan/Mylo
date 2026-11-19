@@ -143,7 +143,7 @@ internal fun TrackConcentrationCard(
                 }
             }
             Text(
-                "Mylo listening time · \${if (localListeningMs > 0L) formatConcentrationDuration(localListeningMs) else "Not recorded yet"}",
+                "Mylo listening time · ${if (localListeningMs > 0L) formatConcentrationDuration(localListeningMs) else "Not recorded yet"}",
                 style = MaterialTheme.typography.labelSmall,
                 color = colors.onSurfaceVariant,
             )
@@ -172,7 +172,7 @@ private fun ConcentrationBreakdownRow(
         )
         Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
         Text(
-            "$percent% · \${NumberFormat.getIntegerInstance().format(plays)} plays",
+            "$percent% · ${NumberFormat.getIntegerInstance().format(plays)} plays",
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -183,5 +183,5 @@ private fun formatConcentrationDuration(ms: Long): String {
     val minutes = ms.coerceAtLeast(0L) / 60_000L
     val hours = minutes / 60
     val remainder = minutes % 60
-    return if (hours > 0) "\${hours}h \${remainder}m" else "\${minutes}m"
+    return if (hours > 0) "${hours}h ${remainder}m" else "${minutes}m"
 }
