@@ -2152,3 +2152,80 @@ Also inspected `mylo-replay-prototype-v3.html` (758 lines). It contains the appr
 4. Implement Statistics merge semantics and remove the separate source toggle only after tracing the existing local and Last.fm data paths.
 5. Ask whether track-aware shelf search, shelf sorting, detail track search and detail sorting are intentional approved extensions or should be reverted to the strict UX spec.
 6. Build a fresh APK from the final exact code SHA, then complete emulator/device acceptance. CI success is not visual/device acceptance.
+
+
+## 70. Generator mode/dialog implementation pass and next-chat handoff (2026-11-19)
+
+### Live refs — refresh before any further work
+- Repository: somilkhan/Mylo.
+- Working branch: Main-dev.
+- Current code HEAD before this documentation-only commit: 5d0f40b8031cb3b13346f846b71cffa8f80ce1ef.
+- Parent documentation/code state: 6a948124e8c64f712be38d4c84695fe87da6a741.
+- Recent generator commits:
+  - 96b7c6d221d765ab41aae55c3421340c66989c58 — initial mode/dialog implementation and cancellation-related cleanup.
+  - a10dbf290e18a00f18eb89344398ee0e41c48593 — Kotlin interpolation correction and cancellation log correction.
+  - 5d0f40b8031cb3b13346f846b71cffa8f80ce1ef — generator helper/constant fixes after CI compilation diagnostics.
+- main remains untouched at 11478fde56f1817cb777b296e60907359086f383.
+- last-wave remains read-only at d0dd73755bfe640c515502751f440a32e57506d5.
+- This section is an implementation record. The four Library Markdown sources and v3 prototype remain canonical.
+
+### Work completed in this pass
+
+#### Generator UI — app/src/main/java/com/music/bitchord/ui/scrobble/ScrobbleContent.kt
+- Replaced the prior always-inline Generator controls with nine selectable mode rows that open a modal bottom sheet for mode-specific configuration.
+- Applied the UX labels: Top, Recent, Similar Tracks, Similar Artists, Tag, Mix, Recommendations, Never Heard and Library.
+- Added mode descriptions and a shared seed picker:
+  - Similar Tracks requires a selected seed track.
+  - Mix supports an optional seed, including the currently playing track or a searched YouTube Music result.
+  - Seed search is debounced, limited to six playable unique results, and reports loading/empty/error states.
+- Added mode-specific controls for artist, tag/genre suggestions, period and Never Heard opt-in exclusions.
+- Added the Last.fm optionality note for Similar Artists and Recommendations when Last.fm is disconnected; repository Last.fm calls are now guarded by the existing AppSettings.lastfmEnabled state as well as Last.fm initialization.
+- Library mode is disabled when YouTube Music is signed out and shows the current explanation text: “Sign in to YouTube Music to use this.” Confirm this against the exact UX-spec wording during the next source-document review.
+- Replaced the old count slider with a +/- stepper, using repository constants; visible range is 5–35 in increments of five, initial value 25.
+- Added progress/cancel presentation, retry presentation for a retained failed request, saved-playlist confirmation and an Open action to navigate to Playlists.
+- Added disabled-state styling for unavailable mode rows and their icons.
+- Kept the existing app shell/FAB/player/navigation and the established generator algorithms out of scope; no generator engine rewrite was attempted.
+
+#### Generator state/cancellation — app/src/main/java/com/music/bitchord/ui/scrobble/ScrobbleGenerateViewModel.kt
+- Added activeRequest to UI state so a failed generation can retry the exact request.
+- The request is retained when generation fails and cleared on explicit cancel/result clear.
+- Success delivery now uses suspending emit for _savedPlaylistEvents rather than lossy tryEmit.
+- Cancellation remains explicitly rethrown; ViewModel teardown calls cancelGeneration().
+- The Start Mix queue-on-save flag is now cleared only after a successful save (or explicit cancellation/clear), rather than being cleared before generation starts. A failed attempt therefore does not silently lose the requested post-save playback behavior.
+
+#### Repository and suspend-wrapper safety
+- app/src/main/java/com/music/bitchord/data/generate/PlaylistGenerationRepository.kt now consults AppSettings.lastfmEnabled.value before optional Last.fm discovery/enrichment paths, in addition to checking Last.fm initialization. This keeps Last.fm optional when the integration is disabled.
+- PlaylistGenerationRepository.MIN_TRACKS and MAX_TRACKS are exposed from the existing repository constants for the UI; the private similar-mix minimum remains private.
+- shared/src/jvmSharedMain/kotlin/com/music/bitchord/data/YtMusicRepository.kt replaces the remaining runCatching uses around suspend calls with a helper that rethrows CancellationException. A source scan of this file at current HEAD found no remaining runCatching.
+- Do not infer from that file-only scan that every suspend wrapper in the whole repository has been audited; continue the full call-path/cancellation review.
+
+### CI history and current verification state
+- Earlier queue/theme implementation CI:
+  - Run 44444935088, code SHA b4b6cb515073c9f826d30a07d0b2747b4df5815e: passed web tests/typecheck, Android unit tests, desktop compile/tests. APK build/upload steps were skipped.
+  - Run 44443894497, code SHA 2d0fe6383b4a3cbaa322a1b8911bba6943febdd4: passed; APK build/upload steps were skipped.
+  - Run 44432162937, code SHA 6f81c08c3c92b7a7d6a51af11c15257f55c41f9a: passed; APK build/upload steps were skipped.
+- Generator validation:
+  - Run 44446099478 for a10dbf290e18a00f18eb89344398ee0e41c48593 failed in Android Kotlin compilation. Web tests/typecheck and desktop compile/tests passed.
+  - The compiler diagnostics included duplicate @OptIn annotations, unresolved description, unresolved old exclusion helper calls, inaccessible private repository count constants, and an unresolved seed-result helper. These are recorded as the reason for the follow-up correction commit; do not treat the failed run as a passing build.
+  - Follow-up code commit 5d0f40b8031cb3b13346f846b71cffa8f80ce1ef exposes the count constants and updates the exclusion helper/annotation area. Its CI run 44446937265 was in progress at the time this section was written. Web tests/typecheck had passed; Android unit tests and desktop compile/tests were still running. Refresh this run and inspect every job/log before making any pass claim.
+- No fresh APK has been produced for the theme/queue/generator changes. No emulator or physical-device verification, screenshots, toggle restart/fallback tests, or offline queue replay tests are evidenced.
+- The durable queue's delivery semantics remain at-least-once, not exactly-once; the crash window after Last.fm acceptance and before local removal can produce a resend.
+
+### Remaining product/spec gaps — do not silently treat as solved
+1. Statistics merge remains unimplemented. Current Statistics still has separate local Replay and Last.fm source choices. Required normalized artist+title merge, one row per identity, max(local, Last.fm), period applied to both sources before merge, same semantics for time listened/concentration, five-minute cache and stale-content refresh behavior still need implementation.
+2. Library period semantics remain unresolved. Existing YouTube Music library rows do not expose an added date in the model/data path inspected previously. The current Generator period UI should not imply a date filter that the repository cannot truthfully apply. Preserve All time until the product owner clarifies whether period should mean last-played date or a real library-added timestamp can be sourced.
+3. Playlist search/detail extras remain unresolved. Current shelf search matches playlist title, track title and artist, and shelf sorting exists; detail has track search/sort. Approved spec says title-only shelf search and track-level list search out of scope. Do not remove or extend these without the product-owner decision recorded in section 69.
+4. Settings/theme work is source-implemented but not device-verified. The Appearance toggle and hub-only gradient wrapper are recorded in sections 68–69. Verify exact prototype fidelity, default ON, OFF fallback theme, process-restart persistence, corrupt preference fallback and return-to-hub live application.
+5. Durable queue is implemented but needs full acceptance. JSON temp-file-and-rename, FIFO, 200 cap, startup/network/success flush and permanent/transient classification are recorded in section 69. Re-run focused tests and verify offline → process death/restart → network restore on device. Do not claim exactly-once.
+6. No fresh APK/device evidence. Produce a new APK from the exact final code SHA after CI is green, then complete the full acceptance matrix from AGENT-BRIEF.
+
+### Exact next-chat start instructions
+1. Refresh Main-dev, main and last-wave refs. Confirm the new documentation commit and current code HEAD; never assume the SHAs above are still live.
+2. Read this entire SCROBBLE_CONTEXT.md (especially section 0 and sections 67–70), then read the four Library Markdown sources in full and open mylo-replay-prototype-v3.html in a browser. Do not rely on this handover alone for exact labels or product intent.
+3. Check workflow run 44446937265 for exact code SHA 5d0f40b8031cb3b13346f846b71cffa8f80ce1ef. If Android fails, inspect the first Kotlin diagnostic and fix the actual cause before continuing. Run the full Android build/unit tests and desktop/web checks after corrections. Avoid a chain of tiny commits; group verified fixes.
+4. Inspect the latest ScrobbleContent.kt and ViewModel at the refreshed HEAD. Confirm every helper referenced by the new dialog exists, exact nine mode labels, seed search and selected-seed validation, Never Heard inputs, retry retention, success-save-before-navigation, count bounds and signed-out Library state. Re-run static scans for cancellation swallowing and any remaining runCatching around suspend work across the generation call graph.
+5. Continue with Statistics merge implementation only after tracing the local ListeningStats period summary and Last.fm source data shape. Last.fm top-track play counts do not provide per-track listened milliseconds; do not fabricate duration. Determine what real remote duration/history data exists and keep local-only time listened where remote duration cannot be sourced. Add normalized identity/merge/cache tests.
+6. Resolve the Library period decision without inventing a timestamp. Preserve playlist search/detail extras pending explicit spec-owner confirmation.
+7. Build a fresh APK from the exact green code SHA and complete device acceptance: theme ON/OFF and persistence/fallback; Statistics periods/loading/empty/refresh/failure/source merge; all nine Generator modes including signed-out Library, Last.fm disconnected, seed/tag/exclusions/count/cancel/failure/retry/success; playlist list/detail actions and search; FAB/nav/Back/overlays/keyboard/full player; offline queue persistence/restart/network replay and duplicate-delivery limitation.
+8. Update this file again with exact code/doc SHAs, changed paths, CI logs, APK provenance and device evidence. Do not claim the task complete until the mandatory acceptance gaps are closed.
+
