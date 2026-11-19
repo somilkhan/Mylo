@@ -1772,3 +1772,37 @@ No feature code, build, test run, PR, merge or Main-dev commit was made during t
 
 ### Branch integrity
 - Expected resulting branch: `Main-dev` only. `last-wave` remains read-only; `main` must remain untouched.
+
+
+## 63. Start Mix regression review — queue semantics and CI verification (2026-11-19)
+
+### CI #1203 — exact correction commit verified
+- Run #1203 / ID `44425520017` tested exact commit `f658abb0caf58bef88ea6d2a75dca1ded1533b4d`.
+- Overall conclusion: **success**.
+- Android unit tests: passed.
+- Desktop compile and unit tests: passed.
+- Web unit tests and typecheck: passed.
+- This resolves the duplicate-resource failure from #1202. CI now verifies the locale cleanup and all code present at the tested SHA. It does not provide device verification.
+
+### Queue behavior traced
+- `QueueTimeline.findUserQueueInsertionIndex` inserts Add to Queue after all existing `USER_QUEUE` entries and before the first non-user entry (normally `CONTEXT` or `AUTOPLAY`). Existing `QueueCoordinatorTest` cases cover both a populated user queue and the no-user-queue insertion point.
+- The Start Mix handoff uses the existing `queueSongs(playlist.songs, false, true)` helper. With a non-empty local player timeline, it inserts the generated songs without replacing the current item; in Listen Together, `PartySync.onLocalIntent` publishes local queue edits to the server and clamps the published queue to the 25-upcoming-track limit.
+- With an empty local player timeline, the helper calls the normal `play(songs, 0)` path. Outside a party, this starts the generated list through the existing context-queue path.
+- **Confirmed Listen Together edge requiring follow-up:** the normal `playFrom` party branch builds its party timeline from only the selected song plus the already-existing party upcoming queue (`QueueCoordinator.buildPartyPlaybackQueue`). It does not pass the remaining songs from the generated list. Therefore Start Mix from an empty local timeline while in an unlocked party can start the first generated recommendation but does not include the rest of that generated mix in the party queue. The non-empty local-timeline path does publish appended songs and applies the 25-item limit. This discrepancy must be resolved or explicitly accepted before Start Mix is called fully integrated. Do not bypass PartySync or write the party queue directly without preserving its sequence/host-control rules.
+- Corrected two stale MainActivity comments that claimed the idle path never starts playback. The comments now describe the normal empty-player path and distinguish Listen Together's server-owned queue behavior. No runtime behavior changed.
+
+### Persistence and cancellation boundary traced
+- `LocalPlaylistStore.savePlaylist` creates a stable local playlist ID, persists the complete encoded list through SharedPreferences `commit()` on IO, and only then updates its StateFlow. `init()` reloads that JSON on application startup. Save failure throws before publishing the new in-memory list.
+- Store mutations run under a Mutex and `NonCancellable` block. Once the store mutation begins, a cancellation can arrive while the durable write is in progress; the store still completes its atomic write. The caller's cancelled context may then stop the ViewModel from publishing the saved-playlist event and queue handoff, leaving a durable playlist without automatic playback/navigation. The current `generateAndCommit` test suite covers cancellation before commit, but not cancellation during/after a durable store commit. Add a focused regression test or explicitly define this post-commit cancellation behavior before changing it.
+- The ViewModel's generation token prevents a stale/cancelled generation from publishing UI events after the token changes. `cancelGeneration` clears the pending queue intent, increments the token and cancels the job. Save errors are caught and exposed through the existing Generate error state.
+- The StateFlow queue handoff is consumed once a controller is observed, before the queue helper's own launched coroutine confirms that it applied the queue. If the host guard rejects the action or the controller disappears in that gap, the handoff may be consumed without a queue mutation. Host rejection is expected to show the host-only notice; controller-disconnect timing remains an untested lifecycle edge.
+
+### Remaining blockers before moving on
+- Resolve/test the Listen Together empty-timeline Start Mix behavior above, including party queue ordering and the 25-upcoming limit.
+- Add targeted tests for cancellation during durable save and for queue-handoff/controller lifecycle if the implementation can be extracted into testable helpers.
+- Verify duplicate taps, screen dismissal during generation, activity recreation, playlist persistence after process relaunch, current-track continuity, AutoPlay ordering, host-only refusal and the party path on a real device.
+- Keep all these separate from automated CI results. CI #1203 is green; physical-device verification remains outstanding.
+- Do not start the next LastWave feature until the Start Mix party-path gap and the required device checks are addressed or explicitly accepted.
+
+### Branch integrity
+- Current base for this review: `Main-dev` `f658abb0caf58bef88ea6d2a75dca1ded1533b4d`. `last-wave` remains read-only at `d0dd73755bfe640c515502751f440a32e57506d5`; `main` remains untouched at `11478fde56f1817cb777b296e60907359086f383`.

@@ -1780,8 +1780,8 @@ private fun BitChordApp(
                 if (refusedByHost()) return@launch
                 val c = controller
                 if (c == null || c.mediaItemCount == 0) {
-                    // Normal queue actions can start from idle; Start Mix cannot
-                    // interrupt a silent player just because discovery finished.
+                    // Explicit startIfIdle callers may start an empty local player.
+                    // In a party, playFrom routes through the server-owned queue.
                     if (startIfIdle) play(songs, 0)
                 } else {
                     val toAdd = if (ListenTogether.state.value.inParty) {
@@ -1829,8 +1829,9 @@ private fun BitChordApp(
     val playSongsNext: (List<Song>) -> Unit = { songs -> queueSongs(songs, true, true) }
 
     // Consume the one-shot queue handoff after the playlist has been persisted.
-    // It appends behind existing user-queued songs, before AutoPlay, and never
-    // starts playback when the player is idle.
+    // With an existing timeline, the shared queue helper inserts after USER_QUEUE
+    // and before CONTEXT/AutoPlay. An empty timeline follows the normal play path;
+    // Listen Together then applies its server-owned queue semantics.
     val currentQueueSongs by rememberUpdatedState(queueSongs)
     LaunchedEffect(scrobbleGenerateViewModel, controller) {
         scrobbleGenerateViewModel.pendingStartMixQueue.collect { playlist ->
