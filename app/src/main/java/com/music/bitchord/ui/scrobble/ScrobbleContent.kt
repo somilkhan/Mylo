@@ -35,6 +35,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ErrorOutline
@@ -56,6 +57,7 @@ import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.MyLocation
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.Shuffle
@@ -72,6 +74,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -178,6 +181,11 @@ fun ScrobbleGenerateContent(
         else -> true
     }
 
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background,
+        contentColor = MaterialTheme.colorScheme.onBackground,
+    ) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -507,6 +515,7 @@ fun ScrobbleGenerateContent(
             }
         }
     }
+    }
 }
 
 @Composable
@@ -674,6 +683,11 @@ fun ScrobblePlaylistsContent(
     val selected = playlists.firstOrNull { it.id == selectedId }
     BackHandler(enabled = selected != null) { selectedId = null }
 
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background,
+        contentColor = MaterialTheme.colorScheme.onBackground,
+    ) {
     if (selected != null) {
         PlaylistDetailContent(
             playlist = selected,
@@ -928,6 +942,7 @@ fun ScrobblePlaylistsContent(
             }
         }
     }
+    }
 
     renameTarget?.let { target ->
         AlertDialog(
@@ -1032,10 +1047,14 @@ private fun PlaylistRow(
         Modifier
     }
     val rowContent: @Composable () -> Unit = {
+            Surface(
+                modifier = Modifier.fillMaxWidth().then(sharedBoundsModifier),
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+            ) {
             Row(
-                Modifier.fillMaxWidth().then(sharedBoundsModifier).clip(RoundedCornerShape(16.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f))
-                    .padding(12.dp),
+                Modifier.fillMaxWidth().padding(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 AsyncImage(
@@ -1097,6 +1116,7 @@ private fun PlaylistRow(
                     }
                 }
             }
+            }
     }
     if (animateHandoff && !reduceMotion && !sharedHandoffFromGenerate) {
         val handoffVisibility = remember(playlist.id) {
@@ -1114,6 +1134,8 @@ private fun PlaylistRow(
         rowContent()
     }
 }
+
+private enum class PlaylistDetailSort { CUSTOM, TITLE, ARTIST }
 
 @Composable
 private fun PlaylistDetailContent(
@@ -1229,7 +1251,34 @@ private fun PlaylistDetailContent(
         }
     }
 
+
+    var trackSearchVisible by remember(playlist.id) { mutableStateOf(false) }
+    var trackSearchQuery by remember(playlist.id) { mutableStateOf("") }
+    var trackSort by rememberSaveable(playlist.id) { mutableStateOf(PlaylistDetailSort.CUSTOM) }
+    var trackSortMenuExpanded by remember(playlist.id) { mutableStateOf(false) }
+    val listState = rememberLazyListState()
+    val displayedTracks = remember(playlist.songs, trackSearchQuery, trackSort) {
+        val query = trackSearchQuery.trim()
+        val matching = playlist.songs.withIndex().filter { (_, song) ->
+            query.isBlank() ||
+                song.title.contains(query, ignoreCase = true) ||
+                song.artist.contains(query, ignoreCase = true)
+        }
+        when (trackSort) {
+            PlaylistDetailSort.CUSTOM -> matching
+            PlaylistDetailSort.TITLE -> matching.sortedBy { it.value.title.lowercase() }
+            PlaylistDetailSort.ARTIST -> matching.sortedWith(
+                compareBy<IndexedValue<Song>> { it.value.artist.lowercase() }
+                    .thenBy { it.value.title.lowercase() },
+            )
+        }
+    }
+    val currentTrackId = currentSong?.videoId?.takeIf { it.isNotBlank() }
+    val currentTrackDisplayIndex = if (isPlaying && currentTrackId != null) {
+        displayedTracks.indexOfFirst { it.value.videoId == currentTrackId }
+    } else -1
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(
             start = 20.dp,
@@ -1326,36 +1375,67 @@ private fun PlaylistDetailContent(
                     }
                 }
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                AsyncImage(
-                    model = playlist.customCoverUri ?: playlist.songs.firstOrNull()?.thumbnailUrl,
-                    contentDescription = "Playlist cover",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.size(68.dp).clip(RoundedCornerShape(12.dp)),
-                )
-                Column(
-                    Modifier.weight(1f).padding(start = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(3.dp),
+
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(22.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+            ) {
+                Row(
+                    Modifier.fillMaxWidth().padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
-                    Text(
-                        playlist.title,
-                        style = MaterialTheme.typography.displayLarge,
-                        color = MaterialTheme.colorScheme.onBackground,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
+                    AsyncImage(
+                        model = playlist.customCoverUri ?: playlist.songs.firstOrNull()?.thumbnailUrl,
+                        contentDescription = "Playlist cover",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.size(88.dp).clip(RoundedCornerShape(14.dp)),
                     )
-                    Text("${playlist.songs.size} tracks", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    coverMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = if (it == "Cover updated" || it == "Cover reset") MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error) }
-                    trackActionMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
-                    generationState.savedPlaylist?.takeIf { it.generationMode == "similar-playlist" }?.let {
-                        Text("Created ${it.title}. Go back to view it.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
-                    }
-                    exportMessage?.let {
-                        Text(it, style = MaterialTheme.typography.bodySmall, color = if (it.startsWith("Couldn't")) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+                    Column(
+                        Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(5.dp),
+                    ) {
+                        Text(
+                            playlist.title,
+                            style = MaterialTheme.typography.headlineMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            "${playlist.songs.size} tracks",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        if (currentTrackDisplayIndex >= 0) {
+                            Text(
+                                "NOW PLAYING",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
                     }
                 }
             }
-            Spacer(Modifier.height(8.dp))
+
+            coverMessage?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (it == "Cover updated" || it == "Cover reset") MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
+                )
+            }
+            trackActionMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+            generationState.savedPlaylist?.takeIf { it.generationMode == "similar-playlist" }?.let {
+                Text("Created ${it.title}. Go back to view it.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+            }
+            exportMessage?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = if (it.startsWith("Couldn't")) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = { onPlaySongs(playlist.songs, 0) }, enabled = playlist.songs.isNotEmpty()) {
                     Icon(Icons.Rounded.PlayArrow, contentDescription = null)
@@ -1367,8 +1447,96 @@ private fun PlaylistDetailContent(
                     Spacer(Modifier.width(6.dp))
                     Text("Shuffle")
                 }
+                if (currentTrackDisplayIndex >= 0) {
+                    TextButton(
+                        onClick = {
+                            val precedingItems = 1 +
+                                (if (generationState.isGenerating) 1 else 0) +
+                                (if (generationState.error != null) 1 else 0) +
+                                (if (addTracksExpanded) 1 + addTrackResults.size else 0) +
+                                (if (trackSearchVisible) 1 else 0)
+                            scope.launch {
+                                listState.animateScrollToItem(precedingItems + currentTrackDisplayIndex)
+                            }
+                        },
+                    ) {
+                        Icon(Icons.Rounded.MyLocation, contentDescription = null)
+                        Spacer(Modifier.width(4.dp))
+                        Text("Locate")
+                    }
+                }
+            }
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                TextButton(
+                    onClick = {
+                        trackSearchVisible = !trackSearchVisible
+                        if (!trackSearchVisible) trackSearchQuery = ""
+                    },
+                ) {
+                    Icon(Icons.Rounded.Search, contentDescription = null)
+                    Spacer(Modifier.width(5.dp))
+                    Text(if (trackSearchVisible) "Hide search" else "Search tracks")
+                }
+                Spacer(Modifier.weight(1f))
+                Box {
+                    TextButton(onClick = { trackSortMenuExpanded = true }) {
+                        Icon(Icons.Rounded.Sort, contentDescription = null)
+                        Spacer(Modifier.width(5.dp))
+                        Text(
+                            when (trackSort) {
+                                PlaylistDetailSort.CUSTOM -> "Custom order"
+                                PlaylistDetailSort.TITLE -> "Title"
+                                PlaylistDetailSort.ARTIST -> "Artist"
+                            },
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = trackSortMenuExpanded,
+                        onDismissRequest = { trackSortMenuExpanded = false },
+                    ) {
+                        PlaylistDetailSort.entries.forEach { option ->
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        when (option) {
+                                            PlaylistDetailSort.CUSTOM -> "Custom order"
+                                            PlaylistDetailSort.TITLE -> "Title"
+                                            PlaylistDetailSort.ARTIST -> "Artist"
+                                        },
+                                    )
+                                },
+                                leadingIcon = if (trackSort == option) {
+                                    { Icon(Icons.Rounded.Check, contentDescription = null) }
+                                } else null,
+                                onClick = {
+                                    trackSort = option
+                                    trackSortMenuExpanded = false
+                                },
+                            )
+                        }
+                    }
+                }
             }
         }
+
+        if (trackSearchVisible) {
+            item(key = "playlist_track_search") {
+                OutlinedTextField(
+                    value = trackSearchQuery,
+                    onValueChange = { trackSearchQuery = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text("Search this playlist") },
+                    leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
+                    trailingIcon = if (trackSearchQuery.isNotEmpty()) {
+                        { IconButton(onClick = { trackSearchQuery = "" }) { Icon(Icons.Rounded.DeleteOutline, contentDescription = "Clear search") } }
+                    } else null,
+                    shape = RoundedCornerShape(16.dp),
+                )
+            }
+        }
+
         if (generationState.isGenerating) {
             item(key = "similar_generation_progress") {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -1452,69 +1620,128 @@ private fun PlaylistDetailContent(
             }
         }
         if (playlist.songs.isEmpty()) {
-            item { Text("This playlist is empty.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 28.dp)) }
+            item {
+                Text(
+                    "This playlist is empty.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(vertical = 28.dp),
+                )
+            }
+        } else if (displayedTracks.isEmpty()) {
+            item {
+                Text(
+                    "No tracks match your search.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(vertical = 28.dp),
+                )
+            }
         } else {
-            itemsIndexed(playlist.songs, key = { index, song -> "${playlist.id}-${song.videoId}-$index" }) { index, song ->
+            itemsIndexed(
+                displayedTracks,
+                key = { _, indexedSong -> "${playlist.id}-${indexedSong.value.videoId}-${indexedSong.index}" },
+            ) { _, indexedSong ->
+                val index = indexedSong.index
+                val song = indexedSong.value
+                val isCurrentTrack = isPlaying && currentTrackId != null && song.videoId == currentTrackId
                 var trackMenuExpanded by remember(playlist.id, song.videoId, index) { mutableStateOf(false) }
-                Row(
-                    Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-                        .clickable { onPlaySongs(playlist.songs, index) }
-                        .padding(vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(13.dp),
+                    color = if (isCurrentTrack) MaterialTheme.colorScheme.primaryContainer
+                    else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.24f),
+                    contentColor = if (isCurrentTrack) MaterialTheme.colorScheme.onPrimaryContainer
+                    else MaterialTheme.colorScheme.onSurface,
                 ) {
-                    AsyncImage(model = song.thumbnailUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(46.dp).clip(RoundedCornerShape(7.dp)))
-                    Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
-                        Text(song.title, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Medium)
-                        Text(song.artist, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    Box {
-                        IconButton(onClick = { trackMenuExpanded = true }) {
-                            Icon(Icons.Rounded.MoreVert, contentDescription = "Track actions")
-                        }
-                        DropdownMenu(
-                            expanded = trackMenuExpanded,
-                            onDismissRequest = { trackMenuExpanded = false },
+                    Row(
+                        Modifier.fillMaxWidth().clickable { onPlaySongs(playlist.songs, index) }.padding(horizontal = 10.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        AsyncImage(
+                            model = song.thumbnailUrl,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)),
+                        )
+                        Column(
+                            Modifier.weight(1f).padding(horizontal = 10.dp),
+                            verticalArrangement = Arrangement.spacedBy(2.dp),
                         ) {
-                            DropdownMenuItem(
-                                text = { Text("Move up") },
-                                leadingIcon = { Icon(Icons.Rounded.ArrowUpward, contentDescription = null) },
-                                enabled = index > 0,
-                                onClick = {
-                                    trackMenuExpanded = false
-                                    scope.launch {
-                                        trackActionMessage = if (LocalPlaylistStore.moveSong(playlist.id, index, song.videoId, -1)) null
-                                        else "Couldn't save track order. Try again."
-                                    }
-                                },
+                            Text(
+                                song.title,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                fontWeight = FontWeight.Medium,
+                                color = if (isCurrentTrack) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
                             )
-                            DropdownMenuItem(
-                                text = { Text("Move down") },
-                                leadingIcon = { Icon(Icons.Rounded.ArrowDownward, contentDescription = null) },
-                                enabled = index < playlist.songs.lastIndex,
-                                onClick = {
-                                    trackMenuExpanded = false
-                                    scope.launch {
-                                        trackActionMessage = if (LocalPlaylistStore.moveSong(playlist.id, index, song.videoId, 1)) null
-                                        else "Couldn't save track order. Try again."
-                                    }
-                                },
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Remove from playlist") },
-                                leadingIcon = { Icon(Icons.Rounded.DeleteOutline, contentDescription = null) },
-                                onClick = {
-                                    trackMenuExpanded = false
-                                    scope.launch {
-                                        trackActionMessage = if (LocalPlaylistStore.removeSong(playlist.id, index, song.videoId)) null
-                                        else "Couldn't remove track. Try again."
-                                    }
-                                },
-                            )
+                            if (isCurrentTrack) {
+                                Text(
+                                    "NOW PLAYING",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Bold,
+                                )
+                            } else {
+                                Text(
+                                    song.artist,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                        Box {
+                            IconButton(onClick = { trackMenuExpanded = true }) {
+                                Icon(Icons.Rounded.MoreVert, contentDescription = "Track actions")
+                            }
+                            DropdownMenu(
+                                expanded = trackMenuExpanded,
+                                onDismissRequest = { trackMenuExpanded = false },
+                            ) {
+                                if (trackSort == PlaylistDetailSort.CUSTOM && trackSearchQuery.isBlank()) {
+                                    DropdownMenuItem(
+                                        text = { Text("Move up") },
+                                        leadingIcon = { Icon(Icons.Rounded.ArrowUpward, contentDescription = null) },
+                                        enabled = index > 0,
+                                        onClick = {
+                                            trackMenuExpanded = false
+                                            scope.launch {
+                                                trackActionMessage = if (LocalPlaylistStore.moveSong(playlist.id, index, song.videoId, -1)) null
+                                                else "Couldn't save track order. Try again."
+                                            }
+                                        },
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Move down") },
+                                        leadingIcon = { Icon(Icons.Rounded.ArrowDownward, contentDescription = null) },
+                                        enabled = index < playlist.songs.lastIndex,
+                                        onClick = {
+                                            trackMenuExpanded = false
+                                            scope.launch {
+                                                trackActionMessage = if (LocalPlaylistStore.moveSong(playlist.id, index, song.videoId, 1)) null
+                                                else "Couldn't save track order. Try again."
+                                            }
+                                        },
+                                    )
+                                }
+                                DropdownMenuItem(
+                                    text = { Text("Remove from playlist") },
+                                    leadingIcon = { Icon(Icons.Rounded.DeleteOutline, contentDescription = null) },
+                                    onClick = {
+                                        trackMenuExpanded = false
+                                        scope.launch {
+                                            trackActionMessage = if (LocalPlaylistStore.removeSong(playlist.id, index, song.videoId)) null
+                                            else "Couldn't remove track. Try again."
+                                        }
+                                    },
+                                )
+                            }
                         }
                     }
                 }
             }
         }
+
     }
     if (exportDialogVisible) {
         ScrobblePlaylistExportDialog(

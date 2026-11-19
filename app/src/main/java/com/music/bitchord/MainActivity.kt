@@ -2931,6 +2931,8 @@ private fun BitChordApp(
                             )
                             else -> ScrobblePlaylistsContent(
                                 viewModel = scrobbleGenerateViewModel,
+                                currentSong = player.song,
+                                isPlaying = player.isPlaying,
                                 contentPadding = listPadding,
                                 highlightedPlaylistId = scrobbleHandoffPlaylistId,
                                 sharedHandoffFromGenerate = scrobbleHandoffFromGenerate,
