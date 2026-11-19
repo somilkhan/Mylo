@@ -29,6 +29,7 @@ data class ScrobbleGenerateUiState(
     val progress: String = "",
     val error: String? = null,
     val savedPlaylist: LocalPlaylist? = null,
+    val activeRequest: PlaylistGenerationRequest? = null,
 )
 
 /**
@@ -80,9 +81,16 @@ class ScrobbleGenerateViewModel(application: Application) : AndroidViewModel(app
     fun generate(request: PlaylistGenerationRequest) {
         if (generationJob?.isActive == true) return
         val queueAfterSave = queueMixOnSave
-        queueMixOnSave = false
         val token = ++generationToken
-        _uiState.update { it.copy(isGenerating = true, progress = "Preparing your playlist…", error = null, savedPlaylist = null) }
+        _uiState.update {
+            it.copy(
+                isGenerating = true,
+                progress = "Preparing your playlist…",
+                error = null,
+                savedPlaylist = null,
+                activeRequest = request,
+            )
+        }
 
         generationJob = viewModelScope.launch {
             try {
@@ -109,9 +117,12 @@ class ScrobbleGenerateViewModel(application: Application) : AndroidViewModel(app
                     },
                 )
                 if (generationToken == token) {
-                    if (queueAfterSave) _pendingStartMixQueue.value = playlist
+                    if (queueAfterSave) {
+                        _pendingStartMixQueue.value = playlist
+                        queueMixOnSave = false
+                    }
                     _uiState.update { it.copy(savedPlaylist = playlist) }
-                    _savedPlaylistEvents.tryEmit(playlist)
+                    _savedPlaylistEvents.emit(playlist)
                 }
             } catch (_: TimeoutCancellationException) {
                 if (generationToken == token) {
@@ -136,8 +147,15 @@ class ScrobbleGenerateViewModel(application: Application) : AndroidViewModel(app
     fun generateSimilar(source: LocalPlaylist) {
         if (generationJob?.isActive == true || source.songs.isEmpty()) return
         val token = ++generationToken
+        queueMixOnSave = false
         _uiState.update {
-            it.copy(isGenerating = true, progress = "Preparing a similar mix…", error = null, savedPlaylist = null)
+            it.copy(
+                isGenerating = true,
+                progress = "Preparing a similar mix…",
+                error = null,
+                savedPlaylist = null,
+                activeRequest = null,
+            )
         }
 
         generationJob = viewModelScope.launch {
@@ -162,7 +180,7 @@ class ScrobbleGenerateViewModel(application: Application) : AndroidViewModel(app
                 )
                 if (generationToken == token) {
                     _uiState.update { it.copy(savedPlaylist = playlist) }
-                    _savedPlaylistEvents.tryEmit(playlist)
+                    _savedPlaylistEvents.emit(playlist)
                 }
             } catch (_: TimeoutCancellationException) {
                 if (generationToken == token) {
@@ -189,7 +207,7 @@ class ScrobbleGenerateViewModel(application: Application) : AndroidViewModel(app
         generationToken++
         generationJob?.cancel()
         generationJob = null
-        _uiState.update { it.copy(isGenerating = false, progress = "", error = null) }
+        _uiState.update { it.copy(isGenerating = false, progress = "", error = null, activeRequest = null) }
     }
 
     fun dismissError() {
@@ -197,7 +215,8 @@ class ScrobbleGenerateViewModel(application: Application) : AndroidViewModel(app
     }
 
     fun clearResult() {
-        _uiState.update { it.copy(savedPlaylist = null, error = null) }
+        queueMixOnSave = false
+        _uiState.update { it.copy(savedPlaylist = null, error = null, activeRequest = null) }
     }
 
     override fun onCleared() {

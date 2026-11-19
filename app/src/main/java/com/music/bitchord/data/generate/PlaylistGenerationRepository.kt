@@ -92,7 +92,7 @@ class PlaylistGenerationRepository(context: Context) {
                 // LastWave's source is artist.getsimilar -> each similar artist's top tracks.
                 // Mylo resolves those names through its existing YouTube Music artist pages,
                 // so every returned row is already playable and retains Mylo's Song model.
-                val similarArtists = if (LastFM.isInitialized()) {
+                val similarArtists = if ((AppSettings.lastfmEnabled.value && LastFM.isInitialized())) {
                     LastFM.getSimilarArtists(artist, limit = 20).getOrNull().orEmpty().take(8)
                 } else {
                     emptyList()
@@ -281,7 +281,7 @@ class PlaylistGenerationRepository(context: Context) {
         val seedTracks = sourceTracks.filter { it.title.isNotBlank() && it.artist.isNotBlank() }.take(4)
         onProgress("Finding artists and tracks related to this playlist…")
 
-        val similarArtistNames = if (LastFM.isInitialized()) {
+        val similarArtistNames = if ((AppSettings.lastfmEnabled.value && LastFM.isInitialized())) {
             supervisorScope {
                 sourceArtists.map { artist ->
                     async {
@@ -328,7 +328,7 @@ class PlaylistGenerationRepository(context: Context) {
             candidates = curate(basePools + (remote to 1))
         }
 
-        if (candidates.size < minSize && LastFM.isInitialized()) {
+        if (candidates.size < minSize && (AppSettings.lastfmEnabled.value && LastFM.isInitialized())) {
             onProgress("Exploring more similar artists…")
             val extraNames = supervisorScope {
                 sourceArtists.take(2).map { artist ->
@@ -412,7 +412,7 @@ class PlaylistGenerationRepository(context: Context) {
 
     private suspend fun resolveLastFmTasteSeeds(): List<Song> {
         val username = AppSettings.lastfmUsername.value.trim()
-        if (username.isEmpty() || !LastFM.isInitialized()) return emptyList()
+        if (username.isEmpty() || !(AppSettings.lastfmEnabled.value && LastFM.isInitialized())) return emptyList()
         val topTracks = LastFM.getTopTracks(username, period = "overall", limit = 20)
             .getOrNull().orEmpty().take(6)
         return supervisorScope {
@@ -465,7 +465,7 @@ class PlaylistGenerationRepository(context: Context) {
             emptyList()
         }
         val radioTracks = PlaylistGenerationRules.deduplicate(primary + branch)
-        val lastFmTracks = if (radioTracks.size < target && LastFM.isInitialized()) {
+        val lastFmTracks = if (radioTracks.size < target && (AppSettings.lastfmEnabled.value && LastFM.isInitialized())) {
             onProgress("Looking for more similar tracks…")
             resolveLastFmSimilarTracks(seed, target)
         } else {
