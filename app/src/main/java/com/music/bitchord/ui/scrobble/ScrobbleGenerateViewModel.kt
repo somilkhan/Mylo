@@ -192,6 +192,10 @@ class ScrobbleGenerateViewModel(application: Application) : AndroidViewModel(app
         _uiState.update { it.copy(isGenerating = false, progress = "", error = null) }
     }
 
+    fun dismissError() {
+        _uiState.update { it.copy(error = null) }
+    }
+
     fun clearResult() {
         _uiState.update { it.copy(savedPlaylist = null, error = null) }
     }
