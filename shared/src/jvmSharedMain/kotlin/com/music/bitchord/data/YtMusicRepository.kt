@@ -1245,7 +1245,7 @@ object YtMusicRepository {
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (error: Exception) {
-                Log.w(TAG, "$label failed: \${error.message}")
+                Log.w(TAG, "$label failed: ${error.message}")
                 Result.failure(error)
             }
         }

@@ -353,7 +353,7 @@ fun ScrobbleGenerateContent(
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                             Text("Playlist saved", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                             Text(playlist.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text("\${playlist.songs.size} tracks", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("${playlist.songs.size} tracks", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         TextButton(onClick = onOpenPlaylists) { Text("Open") }
                     }
@@ -564,8 +564,8 @@ fun ScrobbleGenerateContent(
                         }
                     }
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("\${PlaylistGenerationRepository.MIN_TRACKS} tracks", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text("\${PlaylistGenerationRepository.MAX_TRACKS} tracks", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("${PlaylistGenerationRepository.MIN_TRACKS} tracks", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("${PlaylistGenerationRepository.MAX_TRACKS} tracks", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
 
