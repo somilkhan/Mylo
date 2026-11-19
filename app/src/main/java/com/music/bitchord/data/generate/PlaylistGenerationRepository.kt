@@ -603,9 +603,9 @@ class PlaylistGenerationRepository(context: Context) {
         )
     }
 
-    private companion object {
+    companion object {
         const val MIN_TRACKS = 5
-        const val MIN_SIMILAR_MIX_SIZE = 20
+        private const val MIN_SIMILAR_MIX_SIZE = 20
         const val MAX_TRACKS = 35
     }
 }

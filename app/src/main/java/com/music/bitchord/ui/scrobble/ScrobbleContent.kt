@@ -124,8 +124,6 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-@OptIn(ExperimentalSharedTransitionApi::class)
-@Composable
 @OptIn(ExperimentalSharedTransitionApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun ScrobbleGenerateContent(
@@ -518,9 +516,16 @@ fun ScrobbleGenerateContent(
                     PlaylistGenerationMode.NEVER_HEARD -> {
                         Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                             GeneratorFieldLabel("Optional exclusions")
-                            ExclusionToggle("Tracks in saved playlists", excludeSaved) { excludeSaved = it }
-                            ExclusionToggle("Liked tracks", excludeLiked) { excludeLiked = it }
-                            ExclusionToggle("Library tracks", excludeLibrary) { excludeLibrary = it }
+                            GeneratorExclusionToggle("Tracks in saved playlists", excludeSaved, enabled = true) { excludeSaved = it }
+                            GeneratorExclusionToggle("Liked tracks", excludeLiked, enabled = ytmSignedIn) { excludeLiked = it }
+                            GeneratorExclusionToggle("Library tracks", excludeLibrary, enabled = ytmSignedIn) { excludeLibrary = it }
+                            if (!ytmSignedIn) {
+                                Text(
+                                    "Sign in to YouTube Music to exclude liked or library tracks.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                             Text(
                                 "Only tracks you've actually heard are excluded by default. Add these filters if you want a stricter discovery mix.",
                                 style = MaterialTheme.typography.bodySmall,
@@ -724,6 +729,64 @@ private fun GeneratorSeedPicker(
     }
 }
 @Composable
+private fun GeneratorSeedResult(
+    song: Song,
+    selected: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    androidx.compose.material3.Surface(
+        onClick = onClick,
+        enabled = enabled,
+        shape = RoundedCornerShape(14.dp),
+        color = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            Modifier.padding(9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            AsyncImage(
+                model = song.thumbnailUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.size(44.dp).clip(RoundedCornerShape(10.dp)),
+            )
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(song.title, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(song.artist, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            if (selected) Icon(Icons.Filled.Check, contentDescription = "Selected", tint = MaterialTheme.colorScheme.primary)
+        }
+    }
+}
+
+@Composable
+private fun GeneratorExclusionToggle(
+    label: String,
+    checked: Boolean,
+    enabled: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(enabled = enabled) { onCheckedChange(!checked) }
+            .padding(horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Checkbox(checked = checked, onCheckedChange = onCheckedChange, enabled = enabled)
+        Text(
+            label,
+            color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+        )
+    }
+}
+
+@Composable
 private fun GeneratorSectionTitle(text: String) {
     Text(text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
 }
@@ -809,6 +872,18 @@ private fun PlaylistGenerationMode.label(): String = when (this) {
     PlaylistGenerationMode.NEVER_HEARD -> "Never Heard"
     PlaylistGenerationMode.LIBRARY -> "Library"
 }
+private fun PlaylistGenerationMode.description(): String = when (this) {
+    PlaylistGenerationMode.TOP -> "Your most-played tracks from Mylo Replay."
+    PlaylistGenerationMode.RECENT -> "Your latest listening history."
+    PlaylistGenerationMode.SIMILAR_TRACKS -> "Choose a track and build a radio around its sound."
+    PlaylistGenerationMode.SIMILAR_ARTISTS -> "Build a playlist around an artist you want to hear."
+    PlaylistGenerationMode.TAG -> "Describe a mood or genre and discover matching music."
+    PlaylistGenerationMode.MIX -> "Blend your taste with recommendations and an optional seed."
+    PlaylistGenerationMode.RECOMMENDATIONS -> "Use your current YouTube Music recommendations."
+    PlaylistGenerationMode.NEVER_HEARD -> "Find recommendations filtered against your listening history."
+    PlaylistGenerationMode.LIBRARY -> "Tracks saved or liked in your YouTube Music library."
+}
+
 
 private fun ReplayPeriod.label(): String = when (this) {
     ReplayPeriod.ALL_TIME -> "All time"
