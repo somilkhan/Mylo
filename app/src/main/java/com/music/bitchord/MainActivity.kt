@@ -2944,6 +2944,7 @@ private fun BitChordApp(
                                         QueueSource("Scrobble Playlist", PlaybackSourceType.QUEUE),
                                     )
                                 },
+                                onOpenGenerator = { selectedScrobbleTab = 1 },
                             )
                         }
                     } else if (key == "spotify") {
