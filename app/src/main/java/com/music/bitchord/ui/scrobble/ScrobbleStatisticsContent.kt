@@ -31,9 +31,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
-import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -59,6 +56,8 @@ import com.music.bitchord.data.spotify.LocalPlaylistExport
 import com.music.bitchord.ui.components.AlertAction
 import com.music.bitchord.ui.components.AlertRule
 import com.music.bitchord.ui.components.AlertScaffold
+import com.music.bitchord.ui.components.PullToRefresh
+import androidx.compose.material3.pulltorefresh.PullToRefreshState
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
 import com.music.bitchord.data.stats.RankedEntry
@@ -82,10 +81,12 @@ internal fun ScrobbleStatisticsContent(
     onOpenArtist: (String?, String) -> Unit,
     onOpenAlbum: (String?, String, String?, String?) -> Unit,
     contentPadding: PaddingValues,
+    refreshing: Boolean,
+    onRefresh: () -> Unit,
+    pullState: PullToRefreshState,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    val pullToRefreshState = rememberPullToRefreshState()
     val lastFmEnabled by AppSettings.lastfmEnabled.collectAsStateWithLifecycle()
     val lastFmUsername by AppSettings.lastfmUsername.collectAsStateWithLifecycle()
     val lastFmApiKey by AppSettings.lastfmApiKey.collectAsStateWithLifecycle()
@@ -104,22 +105,11 @@ internal fun ScrobbleStatisticsContent(
         color = MaterialTheme.colorScheme.background,
         contentColor = MaterialTheme.colorScheme.onBackground,
     ) {
-        PullToRefreshBox(
-            state = pullToRefreshState,
-            isRefreshing = state.isRefreshing,
-            onRefresh = viewModel::refresh,
+        PullToRefresh(
+            refreshing = refreshing,
+            onRefresh = onRefresh,
+            state = pullState,
             modifier = Modifier.fillMaxSize(),
-            indicator = {
-                PullToRefreshDefaults.Indicator(
-                    state = pullToRefreshState,
-                    isRefreshing = state.isRefreshing,
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .padding(top = contentPadding.calculateTopPadding() + 8.dp),
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    color = scrobbleAccentColor(),
-                )
-            },
         ) {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
