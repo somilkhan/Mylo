@@ -149,6 +149,7 @@ import com.music.bitchord.data.model.SearchFilter
 import com.music.bitchord.data.model.SearchResult
 import com.music.bitchord.data.model.ShelfItem
 import com.music.bitchord.data.model.Song
+import com.music.bitchord.data.stats.ReplayPeriod
 import com.music.bitchord.data.model.isUnresolvedSpotify
 import com.music.bitchord.data.model.UiState
 import com.music.bitchord.data.model.UserPlaylist
@@ -627,6 +628,7 @@ private fun BitChordApp(
     // category cards ask it to start at their matching ranked section.
     var replayLandingPage by rememberSaveable { mutableStateOf(ReplayStoryPage.INTRO) }
     var replayStory by rememberSaveable { mutableStateOf<ReplayStoryPage?>(null) }
+    var replayStoryPeriod by rememberSaveable { mutableStateOf<ReplayPeriod?>(null) }
     var showReplayShare by rememberSaveable { mutableStateOf(false) }
     /** Which story card the share sheet is for, or null for the whole Replay. */
     var replaySharePage by rememberSaveable { mutableStateOf<ReplayStoryPage?>(null) }
@@ -825,6 +827,7 @@ private fun BitChordApp(
         closeScrobble()
         showReplay = false
         replayStory = null
+        replayStoryPeriod = null
         showReplayShare = false
         showAccountScrobbling = false
         showSources = false
@@ -2612,7 +2615,10 @@ private fun BitChordApp(
         // Replay's three layers unwind in the order they were opened. Ahead of
         // every other handler because they are drawn over everything else.
         BackHandler(enabled = showReplayShare) { showReplayShare = false }
-        BackHandler(enabled = replayStory != null && !showReplayShare) { replayStory = null }
+        BackHandler(enabled = replayStory != null && !showReplayShare) {
+            replayStory = null
+            replayStoryPeriod = null
+        }
         BackHandler(
             enabled = showReplay && replayStory == null && !showReplayShare,
         ) {
@@ -2871,7 +2877,10 @@ private fun BitChordApp(
                             holder = account?.name.orEmpty(),
                             reduceMotion = reducePlayerMotion,
                             onPeriodChange = setReplayPeriod,
-                            onOpenStory = { replayStory = it },
+                            onOpenStory = {
+                                replayStoryPeriod = replay.period
+                                replayStory = it
+                            },
                             // A track tapped on a chart is one the user already
                             // knows they like, so it starts a station off itself
                             // rather than queueing the chart it was on — the
@@ -2909,10 +2918,12 @@ private fun BitChordApp(
                                     closeScrobble()
                                     showSettings = true
                                 },
-                                onOpenReplay = {
-                                    replayLandingPage = ReplayStoryPage.INTRO
-                                    showReplay = true
-                                    replayStory = ReplayStoryPage.INTRO
+                                holder = account?.name.orEmpty(),
+                                memberSince = replay.memberSince,
+                                onOpenReplay = { page, period ->
+                                    replayStoryPeriod = period
+                                    setReplayPeriod(period)
+                                    replayStory = page
                                 },
                                 onOpenArtist = { id, name ->
                                     closeScrobble()
@@ -3657,7 +3668,10 @@ private fun BitChordApp(
                                     state = replay,
                                     holder = account?.name.orEmpty(),
                                     onPeriodChange = setReplayPeriod,
-                                    onOpenStory = { replayStory = it },
+                                    onOpenStory = {
+                                        replayStoryPeriod = replay.period
+                                        replayStory = it
+                                    },
                                     onPlaySong = { song ->
                                         playRadio(song, QueueSource(replayLabel, PlaybackSourceType.REPLAY))
                                     },
@@ -3805,7 +3819,10 @@ private fun BitChordApp(
                         settingsSubScreen != null -> ({ settingsSubScreen = null })
                         showSettings -> ({ showSettings = false })
                         showReplayShare -> ({ showReplayShare = false })
-                        replayStory != null -> ({ replayStory = null })
+                        replayStory != null -> ({
+                            replayStory = null
+                            replayStoryPeriod = null
+                        })
                         showReplay -> ({ showReplay = false })
                         detailActiveShelf != null -> ({ detailActiveShelf = null })
                         detail != null -> ({ viewModel.closeDetail(); Unit })
@@ -4430,17 +4447,23 @@ private fun BitChordApp(
         // row, and a story laid out inside it would run alongside the player
         // instead of over it.
         replayStory?.let { start ->
-            replay.summary?.takeUnless { it.isEmpty }?.let { summary ->
-                ReplayStories(
+            val requestedPeriod = replayStoryPeriod
+            if (requestedPeriod == null || replay.summaryPeriod == requestedPeriod) {
+                replay.summary?.takeUnless { it.isEmpty }?.let { summary ->
+                    ReplayStories(
                     summary = summary,
                     start = start,
-                    onClose = { replayStory = null },
+                    onClose = {
+                        replayStory = null
+                        replayStoryPeriod = null
+                    },
                     onShare = { card ->
                         replaySharePage = card
                         showReplayShare = true
                     },
                     paused = showReplayShare,
-                )
+                    )
+                }
             }
         }
 
