@@ -2769,3 +2769,35 @@ The product owner explicitly approved the proposed Statistics additions and inst
 
 ### Next
 - Continue the approved UI review through the remaining Generator, playlist and Statistics action surfaces. Keep changes local to the Scrobble hub and preserve the standard theme's layout.
+
+## 92. Gradient action, accent and progress contrast correction (2026-11-20 11:30 IST)
+
+### Root cause
+- The Scrobble gradient scheme intentionally uses a dark `primary` token (`#4B4262`) with light `onPrimary`. Material 3 TextButton and OutlinedButton defaults use `primary` as their foreground. Against the Scrobble dark/translucent surfaces, several actions therefore inherited a low-contrast dark-purple foreground. The same issue affected primary-tinted status text/icons, checkbox checked state and progress indicators.
+- This is a Scrobble-only issue. Do not change the shared app theme or the approved gradient palette to compensate.
+
+### Changes on Main-dev
+- `ScrobbleHubTheme.kt`, code commit `e36b621e9d91dacc475e8d30e6b6f4e6f7836484`:
+  - Added `LocalScrobbleGradientEnabled` scoped to the Scrobble Hub theme.
+  - Added small Scrobble-only color helpers for text buttons, outlined buttons, filled primary buttons, accent foregrounds and checkboxes.
+  - When gradient is OFF, helpers return the normal Material 3 defaults unchanged. When ON, text/outlined actions use the appropriate readable surface foreground; filled actions use the approved pink secondary accent with its dark on-color.
+- `ScrobbleContent.kt`, code commits `e63ab63041d75856ebad46246f851c1fa88b8a92` and `862b6e27543dcd8bc826765a60139bbbf6355821`:
+  - Applied semantic foregrounds to all 20 TextButton call sites and both OutlinedButton call sites.
+  - Filled Generate, Open Generator, and Play actions use the pink accent only when gradient is ON; OFF retains default button colors.
+  - Current count, selected seed, selected check, NOW PLAYING, successful add/creation messages, SongRow active tint and all six linear progress indicators now use the readable Scrobble accent.
+  - Generator exclusion Checkbox uses a pink checked state with a dark checkmark only when gradient is ON; OFF retains the existing defaults.
+  - Tidied rename/delete confirmation action formatting; behavior and validation are unchanged.
+- `ScrobbleStatisticsContent.kt`, code commit `c65467e0f8ce95a855e97dd8c510e3d52aef79f3`:
+  - The refresh spinner now uses the same readable Scrobble accent, while the fixed 24dp icon/loading slot and ViewModel refresh callback remain unchanged.
+  - Statistics Replay, retry and export dialog text actions use readable semantic foregrounds on the gradient theme; the empty-state Open Settings action uses the accent-filled button.
+- These helpers are scoped to Scrobble and preserve default Mylo button/checkbox colors with the gradient toggle OFF.
+
+### Verification
+- Static source audit: every Scrobble `TextButton` call site in the two content files now uses the helper; both OutlinedButton call sites use the outlined helper; filled actions and the generator Checkbox use their respective helpers.
+- Static source audit confirms no direct `MaterialTheme.colorScheme.primary` foreground remains in `ScrobbleContent.kt`; remaining `primaryContainer` uses are intentional container/icon pairings.
+- No local Gradle build, APK, device/emulator run, or screenshots have been performed.
+- Combined commit status for `c65467e0f8ce95a855e97dd8c510e3d52aef79f3` returned `statuses=[]`; the workflow lookup returned no PR-triggered run. This is not a passing CI result.
+- Device screenshots remain necessary to confirm gradient ON/OFF behavior, especially Generator count/seed selection, checked exclusions, playlist actions, dialogs, Statistics refresh spinner and Track Concentration chart.
+
+### Next
+- Re-read the current Scrobble source and this context before any further changes. Check whether any remaining Scrobble icons or non-button controls still use low-contrast `primary` foregrounds. Keep all changes inside the hub and preserve OFF-mode defaults.
