@@ -61,6 +61,7 @@ import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.MyLocation
+import com.music.bitchord.ui.components.SongRow
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.Shuffle
@@ -955,12 +956,7 @@ fun ScrobblePlaylistsContent(
         )
     } else {
         val visible = sortLocalPlaylists(playlists, sortMode).filter { playlist ->
-            search.isBlank() ||
-                playlist.title.contains(search, ignoreCase = true) ||
-                playlist.songs.any { song ->
-                    song.title.contains(search, ignoreCase = true) ||
-                        song.artist.contains(search, ignoreCase = true)
-                }
+            search.isBlank() || playlist.title.contains(search, ignoreCase = true)
         }
         val totalTracks = playlists.sumOf { it.songs.size }
         LazyColumn(
@@ -1067,7 +1063,7 @@ fun ScrobblePlaylistsContent(
                         onValueChange = { search = it },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
-                        label = { Text("Search playlists and tracks") },
+                        label = { Text("Find a playlist") },
                         leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
                         trailingIcon = if (search.isNotEmpty()) {
                             { IconButton(onClick = { search = "" }) { Icon(Icons.Rounded.DeleteOutline, contentDescription = "Clear search") } }
@@ -1380,8 +1376,6 @@ private fun PlaylistRow(
     }
 }
 
-private enum class PlaylistDetailSort { CUSTOM, TITLE, ARTIST }
-
 @Composable
 private fun PlaylistDetailContent(
     playlist: LocalPlaylist,
@@ -1497,30 +1491,10 @@ private fun PlaylistDetailContent(
     }
 
 
-    var trackSearchVisible by remember(playlist.id) { mutableStateOf(false) }
-    var trackSearchQuery by remember(playlist.id) { mutableStateOf("") }
-    var trackSort by rememberSaveable(playlist.id) { mutableStateOf(PlaylistDetailSort.CUSTOM) }
-    var trackSortMenuExpanded by remember(playlist.id) { mutableStateOf(false) }
     val listState = rememberLazyListState()
-    val displayedTracks = remember(playlist.songs, trackSearchQuery, trackSort) {
-        val query = trackSearchQuery.trim()
-        val matching = playlist.songs.withIndex().filter { (_, song) ->
-            query.isBlank() ||
-                song.title.contains(query, ignoreCase = true) ||
-                song.artist.contains(query, ignoreCase = true)
-        }
-        when (trackSort) {
-            PlaylistDetailSort.CUSTOM -> matching
-            PlaylistDetailSort.TITLE -> matching.sortedBy { it.value.title.lowercase() }
-            PlaylistDetailSort.ARTIST -> matching.sortedWith(
-                compareBy<IndexedValue<Song>> { it.value.artist.lowercase() }
-                    .thenBy { it.value.title.lowercase() },
-            )
-        }
-    }
     val currentTrackId = currentSong?.videoId?.takeIf { it.isNotBlank() }
     val currentTrackDisplayIndex = if (isPlaying && currentTrackId != null) {
-        displayedTracks.indexOfFirst { it.value.videoId == currentTrackId }
+        playlist.songs.indexOfFirst { it.videoId == currentTrackId }
     } else -1
     LazyColumn(
         state = listState,
@@ -1712,74 +1686,7 @@ private fun PlaylistDetailContent(
                 }
             }
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                TextButton(
-                    onClick = {
-                        trackSearchVisible = !trackSearchVisible
-                        if (!trackSearchVisible) trackSearchQuery = ""
-                    },
-                ) {
-                    Icon(Icons.Rounded.Search, contentDescription = null)
-                    Spacer(Modifier.width(5.dp))
-                    Text(if (trackSearchVisible) "Hide search" else "Search tracks")
-                }
-                Spacer(Modifier.weight(1f))
-                Box {
-                    TextButton(onClick = { trackSortMenuExpanded = true }) {
-                        Icon(Icons.Rounded.Sort, contentDescription = null)
-                        Spacer(Modifier.width(5.dp))
-                        Text(
-                            when (trackSort) {
-                                PlaylistDetailSort.CUSTOM -> "Custom order"
-                                PlaylistDetailSort.TITLE -> "Title"
-                                PlaylistDetailSort.ARTIST -> "Artist"
-                            },
-                        )
-                    }
-                    DropdownMenu(
-                        expanded = trackSortMenuExpanded,
-                        onDismissRequest = { trackSortMenuExpanded = false },
-                    ) {
-                        PlaylistDetailSort.entries.forEach { option ->
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        when (option) {
-                                            PlaylistDetailSort.CUSTOM -> "Custom order"
-                                            PlaylistDetailSort.TITLE -> "Title"
-                                            PlaylistDetailSort.ARTIST -> "Artist"
-                                        },
-                                    )
-                                },
-                                leadingIcon = if (trackSort == option) {
-                                    { Icon(Icons.Rounded.Check, contentDescription = null) }
-                                } else null,
-                                onClick = {
-                                    trackSort = option
-                                    trackSortMenuExpanded = false
-                                },
-                            )
-                        }
-                    }
-                }
-            }
-        }
 
-        if (trackSearchVisible) {
-            item(key = "playlist_track_search") {
-                OutlinedTextField(
-                    value = trackSearchQuery,
-                    onValueChange = { trackSearchQuery = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    label = { Text("Search this playlist") },
-                    leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
-                    trailingIcon = if (trackSearchQuery.isNotEmpty()) {
-                        { IconButton(onClick = { trackSearchQuery = "" }) { Icon(Icons.Rounded.DeleteOutline, contentDescription = "Clear search") } }
-                    } else null,
-                    shape = RoundedCornerShape(16.dp),
-                )
-            }
         }
 
         if (generationState.isGenerating) {
@@ -1872,121 +1779,61 @@ private fun PlaylistDetailContent(
                     modifier = Modifier.padding(vertical = 28.dp),
                 )
             }
-        } else if (displayedTracks.isEmpty()) {
-            item {
-                Text(
-                    "No tracks match your search.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(vertical = 28.dp),
-                )
-            }
         } else {
             itemsIndexed(
-                displayedTracks,
-                key = { _, indexedSong -> "${playlist.id}-${indexedSong.value.videoId}-${indexedSong.index}" },
-            ) { _, indexedSong ->
-                val index = indexedSong.index
-                val song = indexedSong.value
+                playlist.songs,
+                key = { _, song -> "${playlist.id}-${song.videoId}" },
+            ) { index, song ->
                 val isCurrentTrack = isPlaying && currentTrackId != null && song.videoId == currentTrackId
-                var trackMenuExpanded by remember(playlist.id, song.videoId, index) { mutableStateOf(false) }
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(13.dp),
-                    color = if (isCurrentTrack) MaterialTheme.colorScheme.primaryContainer
-                    else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.24f),
-                    contentColor = if (isCurrentTrack) MaterialTheme.colorScheme.onPrimaryContainer
-                    else MaterialTheme.colorScheme.onSurface,
-                ) {
-                    Row(
-                        Modifier.fillMaxWidth().clickable { onPlaySongs(playlist.songs, index) }.padding(horizontal = 10.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        AsyncImage(
-                            model = song.thumbnailUrl,
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)),
-                        )
-                        Column(
-                            Modifier.weight(1f).padding(horizontal = 10.dp),
-                            verticalArrangement = Arrangement.spacedBy(2.dp),
-                        ) {
-                            Text(
-                                song.title,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                fontWeight = FontWeight.Medium,
-                                color = if (isCurrentTrack) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
-                            )
-                            if (isCurrentTrack) {
-                                Text(
-                                    "NOW PLAYING",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    fontWeight = FontWeight.Bold,
-                                )
-                            } else {
-                                Text(
-                                    song.artist,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
+                var trackMenuExpanded by remember(playlist.id, song.videoId) { mutableStateOf(false) }
+                SongRow(
+                    song = song,
+                    onClick = { onPlaySongs(playlist.songs, index) },
+                    onLongPress = { trackMenuExpanded = true },
+                    onMore = { trackMenuExpanded = true },
+                    isCurrent = isCurrentTrack,
+                    isPlaying = isCurrentTrack && isPlaying,
+                    activeTint = MaterialTheme.colorScheme.primary,
+                )
+                DropdownMenu(expanded = trackMenuExpanded, onDismissRequest = { trackMenuExpanded = false }) {
+                    DropdownMenuItem(
+                        text = { Text("Move up") },
+                        leadingIcon = { Icon(Icons.Rounded.ArrowUpward, contentDescription = null) },
+                        enabled = index > 0,
+                        onClick = {
+                            trackMenuExpanded = false
+                            scope.launch {
+                                trackActionMessage = if (LocalPlaylistStore.moveSong(playlist.id, index, song.videoId, -1)) null
+                                else "Couldn't save track order. Try again."
                             }
-                        }
-                        Box {
-                            IconButton(onClick = { trackMenuExpanded = true }) {
-                                Icon(Icons.Rounded.MoreVert, contentDescription = "Track actions")
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Move down") },
+                        leadingIcon = { Icon(Icons.Rounded.ArrowDownward, contentDescription = null) },
+                        enabled = index < playlist.songs.lastIndex,
+                        onClick = {
+                            trackMenuExpanded = false
+                            scope.launch {
+                                trackActionMessage = if (LocalPlaylistStore.moveSong(playlist.id, index, song.videoId, 1)) null
+                                else "Couldn't save track order. Try again."
                             }
-                            DropdownMenu(
-                                expanded = trackMenuExpanded,
-                                onDismissRequest = { trackMenuExpanded = false },
-                            ) {
-                                if (trackSort == PlaylistDetailSort.CUSTOM && trackSearchQuery.isBlank()) {
-                                    DropdownMenuItem(
-                                        text = { Text("Move up") },
-                                        leadingIcon = { Icon(Icons.Rounded.ArrowUpward, contentDescription = null) },
-                                        enabled = index > 0,
-                                        onClick = {
-                                            trackMenuExpanded = false
-                                            scope.launch {
-                                                trackActionMessage = if (LocalPlaylistStore.moveSong(playlist.id, index, song.videoId, -1)) null
-                                                else "Couldn't save track order. Try again."
-                                            }
-                                        },
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text("Move down") },
-                                        leadingIcon = { Icon(Icons.Rounded.ArrowDownward, contentDescription = null) },
-                                        enabled = index < playlist.songs.lastIndex,
-                                        onClick = {
-                                            trackMenuExpanded = false
-                                            scope.launch {
-                                                trackActionMessage = if (LocalPlaylistStore.moveSong(playlist.id, index, song.videoId, 1)) null
-                                                else "Couldn't save track order. Try again."
-                                            }
-                                        },
-                                    )
-                                }
-                                DropdownMenuItem(
-                                    text = { Text("Remove from playlist") },
-                                    leadingIcon = { Icon(Icons.Rounded.DeleteOutline, contentDescription = null) },
-                                    onClick = {
-                                        trackMenuExpanded = false
-                                        scope.launch {
-                                            trackActionMessage = if (LocalPlaylistStore.removeSong(playlist.id, index, song.videoId)) null
-                                            else "Couldn't remove track. Try again."
-                                        }
-                                    },
-                                )
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Remove from playlist") },
+                        leadingIcon = { Icon(Icons.Rounded.DeleteOutline, contentDescription = null) },
+                        onClick = {
+                            trackMenuExpanded = false
+                            scope.launch {
+                                trackActionMessage = if (LocalPlaylistStore.removeSong(playlist.id, index, song.videoId)) null
+                                else "Couldn't remove track. Try again."
                             }
-                        }
-                    }
+                        },
+                    )
                 }
             }
         }
-
     }
     if (exportDialogVisible) {
         ScrobblePlaylistExportDialog(
