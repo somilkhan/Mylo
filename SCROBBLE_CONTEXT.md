@@ -3315,3 +3315,63 @@ Before making another dialog/icon change, the next agent must read this entire `
 - `main` untouched. No new branch. Working branch remains `Main-dev`.
 - Next agent must read this entire `SCROBBLE_CONTEXT.md` plus the four current Library/source documents before implementing any correction; do not repeat the audit or overwrite newer work from an earlier SHA.
 
+## 110. FAB and Scrobble navigation corrections (2026-11-20 23:35 IST)
+
+### Starting point and exact source
+- Implemented the confirmed fixes from section 109; no visual redesign or normal-navigation redesign was made.
+- Branch: `Main-dev`.
+- Code HEAD before this documentation update: `1dc31d733b0118d75d73b68f4ed466f7089a4dbf`.
+- Current source blobs:
+  - `MainActivity.kt`: `531e75144c6843ce66eb0f07195afcd78e4d7c7a`
+  - `ScrobbleFab.kt`: `76b351f02be408d9fbe702d99811a7302a129b70`
+  - `ScrobbleFabTest.kt`: `f37e3437a6c624a005ff6721a13266d16a60967d`
+- Changes are limited to those three files plus this context document. `main` was not touched.
+
+### Implemented corrections
+
+1. **Top-bar Back**
+   - Added `showScrobble -> closeScrobble` to the top-bar Back decision after higher-priority Settings/Replay nested destinations and before detail destinations.
+   - Existing modal-specific BackHandlers remain later in composition and retain priority for their own dialogs/sheets.
+   - The dedicated system Back handler for the hub remains.
+
+2. **Centralized programmatic normal-tab navigation**
+   - Added `navigateToNormalTab(tab)`, which calls `closeScrobble()` before changing `selectedTab` whenever the hub is open.
+   - Routed the non-playing Search deep-link path, playback-source HOME/SEARCH/EXPLORE paths, and successful web sign-in tab selection through this helper.
+   - Playback-source navigation still closes the hub before restoring its context destination, including Browse/History/Replay source destinations.
+   - The user-driven normal tab callback continues to close the hub before applying its existing cleanup and selection behavior.
+   - This preserves the existing replacement navigation and does not introduce a second normal tab bar.
+
+3. **Resilient FAB Close affordance**
+   - `scrobbleFabVisible` now accepts `hubOpen`.
+   - Visibility permits the FAB when either the underlying selected tab is Home or the hub is open, while still suppressing it for a blocking overlay, full player or keyboard.
+   - MainActivity passes `showScrobble` as `hubOpen`. This is a defensive fallback if an unforeseen host route changes the underlying tab while the hub remains open; the explicit navigation helper remains the primary invariant.
+
+4. **Independent blocking surfaces**
+   - Hoisted the WebDAV upload-conflict StateFlow collection to the top-level state collection area so the FAB visibility calculation can observe it.
+   - Added `showUpdateDialog` and `uploadConflict != null` to `scrobbleOverlayOpen`.
+   - Removed the former later duplicate upload-conflict collection; the existing alert UI and answer/skip behavior remain unchanged.
+
+5. **Back-handler priority**
+   - Excluded `showScrobble` from the generic detail, Settings and root-tab BackHandlers that could otherwise compete with the dedicated hub Back handler when an underlying state is inconsistent.
+   - No nested dialog Back behavior was intentionally changed.
+
+6. **Regression tests**
+   - Added tests proving an open hub retains its Close affordance if the underlying tab changes.
+   - Added tests proving blocking overlays, full player and keyboard still suppress the FAB even while the hub is open.
+   - Existing Home/other-tab/overlay/player/keyboard assertions remain.
+
+### Explicitly not changed
+- The hub continues replacing the four normal tabs with Statistics/Generate/Playlists. The approved UX sentence “tap any normal tab to exit” remains structurally unreachable while those normal tabs are replaced. No second nav row or alternate gesture was invented; this requires product clarification.
+- FAB size, icon, color, placement formula, fold behavior, animations, and Glass/Standard bar design were not changed.
+- No global navigation architecture or unrelated routes were refactored.
+
+### Validation status
+- Source changes and tests were committed to `Main-dev`.
+- Latest code commit at the time of this entry: `1dc31d733b0118d75d73b68f4ed466f7089a4dbf`.
+- GitHub Actions runs triggered by intermediate commits were cancelled by subsequent pushes; no passing run for the final code SHA has been established.
+- No Gradle build, APK, emulator run, or POCO device acceptance has been performed in this pass. Do not report the changes as build-verified.
+- Required next checks: inspect the workflow run for the final code SHA; run the Android unit test task containing `ScrobbleFabTest`; run the Android app build; inspect compiler/test diagnostics; then verify top-bar Back, system Back, nested modal Back, WebDAV conflict, update dialog, playback-source navigation and deep-link navigation on device.
+
+### Continuation rule
+- Read sections 109 and 110 in full before continuing. Do not repeat the completed fixes or alter the normal-tab replacement behavior without explicit product approval.
+
