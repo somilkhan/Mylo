@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.AlertDialog
@@ -56,6 +57,7 @@ import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.data.spotify.LocalPlaylist
 import com.music.bitchord.data.spotify.LocalPlaylistExport
+import com.music.bitchord.data.stats.RankedEntry
 import com.music.bitchord.data.stats.ReplayPeriod
 import java.io.File
 import java.text.NumberFormat
@@ -67,6 +69,9 @@ internal fun ScrobbleStatisticsContent(
     reduceMotion: Boolean,
     onPlaySong: (Song) -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenReplay: () -> Unit,
+    onOpenArtist: (String?, String) -> Unit,
+    onOpenAlbum: (String?, String, String?, String?) -> Unit,
     contentPadding: PaddingValues,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -216,6 +221,60 @@ internal fun ScrobbleStatisticsContent(
                                 modifier = Modifier.fillMaxWidth(),
                             )
                         }
+                        item(key = "replay-action") {
+                            TextButton(
+                                onClick = onOpenReplay,
+                                modifier = Modifier.padding(horizontal = 20.dp),
+                            ) {
+                                Icon(
+                                    imageVector = com.music.bitchord.ui.icons.BitChordIcons.Play,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text("Play your Replay")
+                            }
+                        }
+                        state.localSummary?.artists?.take(10)?.forEachIndexed { index, artist ->
+                            if (index == 0) {
+                                item(key = "top-artists-heading") {
+                                    Text(
+                                        "Top artists",
+                                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                    )
+                                }
+                            }
+                            item(key = "top-artist-${artist.title.lowercase()}-${artist.browseId.orEmpty()}") {
+                                ReplayInsightRow(
+                                    rank = index + 1,
+                                    entry = artist,
+                                    circular = true,
+                                    onClick = { onOpenArtist(artist.browseId, artist.title) },
+                                )
+                            }
+                        }
+                        state.localSummary?.albums?.take(10)?.forEachIndexed { index, album ->
+                            if (index == 0) {
+                                item(key = "top-albums-heading") {
+                                    Text(
+                                        "Top albums",
+                                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                    )
+                                }
+                            }
+                            item(key = "top-album-${album.title.lowercase()}-${album.subtitle.orEmpty().lowercase()}-${album.browseId.orEmpty()}") {
+                                ReplayInsightRow(
+                                    rank = index + 1,
+                                    entry = album,
+                                    circular = false,
+                                    onClick = { onOpenAlbum(album.browseId, album.title, album.subtitle, album.artworkUrl) },
+                                )
+                            }
+                        }
                         item(key = "tracks-heading") {
                             Text(
                                 "Your tracks",
@@ -236,6 +295,85 @@ internal fun ScrobbleStatisticsContent(
         }
     }
 }
+
+@Composable
+private fun ReplayInsightRow(
+    rank: Int,
+    entry: RankedEntry,
+    circular: Boolean,
+    onClick: () -> Unit,
+) {
+    val colors = MaterialTheme.colorScheme
+    val shape = if (circular) CircleShape else RoundedCornerShape(10.dp)
+    val minutes = (entry.ms / 60_000L).coerceAtLeast(0L)
+    val duration = if (minutes >= 60) "${minutes / 60}h ${minutes % 60}m" else "${minutes}m"
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp)
+            .clickable(role = Role.Button, onClick = onClick),
+        shape = RoundedCornerShape(16.dp),
+        color = colors.surfaceVariant,
+        contentColor = colors.onSurface,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                rank.toString(),
+                modifier = Modifier.width(20.dp),
+                style = MaterialTheme.typography.labelMedium,
+                color = colors.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(shape)
+                    .background(colors.surfaceContainerHighest),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (!entry.artworkUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = entry.artworkUrl,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
+                    )
+                } else {
+                    Text(
+                        entry.title.take(1).uppercase(),
+                        color = colors.onSurfaceVariant,
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                }
+            }
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    entry.title,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = colors.onSurface,
+                )
+                Text(
+                    listOfNotNull(entry.subtitle, duration, "${entry.plays} plays").joinToString(" · "),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
 
 @Composable
 private fun StatisticsRetryNotice(
