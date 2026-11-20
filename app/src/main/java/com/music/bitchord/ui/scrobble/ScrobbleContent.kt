@@ -873,6 +873,20 @@ private fun GeneratorModeRow(
     }
 }
 
+internal fun playlistGenerationModeLabel(storageValue: String?): String? = when (storageValue) {
+    PlaylistGenerationMode.TOP.storageValue -> PlaylistGenerationMode.TOP.label()
+    PlaylistGenerationMode.RECENT.storageValue -> PlaylistGenerationMode.RECENT.label()
+    PlaylistGenerationMode.SIMILAR_TRACKS.storageValue -> PlaylistGenerationMode.SIMILAR_TRACKS.label()
+    PlaylistGenerationMode.SIMILAR_ARTISTS.storageValue -> PlaylistGenerationMode.SIMILAR_ARTISTS.label()
+    PlaylistGenerationMode.TAG.storageValue -> PlaylistGenerationMode.TAG.label()
+    PlaylistGenerationMode.MIX.storageValue -> PlaylistGenerationMode.MIX.label()
+    PlaylistGenerationMode.RECOMMENDATIONS.storageValue -> PlaylistGenerationMode.RECOMMENDATIONS.label()
+    PlaylistGenerationMode.NEVER_HEARD.storageValue -> PlaylistGenerationMode.NEVER_HEARD.label()
+    PlaylistGenerationMode.LIBRARY.storageValue -> PlaylistGenerationMode.LIBRARY.label()
+    "similar-playlist" -> "Similar Playlist"
+    else -> null
+}
+
 private fun PlaylistGenerationMode.label(): String = when (this) {
     PlaylistGenerationMode.TOP -> "Top"
     PlaylistGenerationMode.RECENT -> "Recent"
