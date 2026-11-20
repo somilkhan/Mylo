@@ -1082,7 +1082,7 @@ fun ScrobblePlaylistsContent(
                         Icon(Icons.Filled.LibraryMusic, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(42.dp))
                         Text(if (playlists.isEmpty()) "No playlists yet" else "No matching playlists", style = MaterialTheme.typography.titleLarge)
                         Text(
-                            if (playlists.isEmpty()) "Create your first mix from the Generator." else "Try another playlist or track name.",
+                            if (playlists.isEmpty()) "Create your first mix from the Generator." else "Try another playlist name.",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                         )
@@ -1290,19 +1290,19 @@ private fun PlaylistRow(
     val rowContent: @Composable () -> Unit = {
             Surface(
                 modifier = Modifier.fillMaxWidth().then(sharedBoundsModifier),
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(18.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant,
                 contentColor = MaterialTheme.colorScheme.onSurface,
             ) {
             Row(
-                Modifier.fillMaxWidth().padding(12.dp),
+                Modifier.fillMaxWidth().padding(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 AsyncImage(
                     model = playlist.customCoverUri ?: playlist.songs.firstOrNull()?.thumbnailUrl,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.size(54.dp).clip(RoundedCornerShape(10.dp)).clickable(onClick = onOpen),
+                    modifier = Modifier.size(52.dp).clip(RoundedCornerShape(10.dp)).clickable(onClick = onOpen),
                 )
                 Column(
                     Modifier.weight(1f).clickable(onClick = onOpen).padding(horizontal = 12.dp),
