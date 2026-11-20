@@ -2688,3 +2688,12 @@ The product owner explicitly approved the proposed Statistics additions and inst
 ### Remaining
 - Review whether top artist/album insight rows should display the same duration/plays metadata and rank treatment as Replay's legacy chart; current rows show rank, artwork, title, subtitle, local duration and play count.
 - Continue the remaining approved Statistics/UI review. Do not introduce a second Replay route, player owner, source tab, or fabricated Last.fm duration.
+
+
+## 87. Generator icon-family alignment — implementation pass (2026-11-20 11:10 IST)
+
+- Code commit: `7bc5c7585d623b378b56735bd53ef29a12fad2f1` on `Main-dev`.
+- File: `app/src/main/java/com/music/bitchord/ui/scrobble/ScrobbleContent.kt`.
+- Reused existing `BitChordIcons` assets where the semantics match: Search fields, Similar Tracks, Mix, Never Heard, Library, and the mode-row chevron. Play, Shuffle and Pin were already aligned in sections 83–84.
+- Kept Material icons for modes/actions that do not have a semantically equivalent Mylo icon. No icon size, layout, action, or dependency changes.
+- This is source-level consistency work, not device visual verification. CI for this exact latest source SHA must be polled; no test result is transferred from earlier commits.
