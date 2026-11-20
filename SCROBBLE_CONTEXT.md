@@ -2525,3 +2525,37 @@ The product owner explicitly approved the proposed Statistics additions and inst
 - Preserve approved layout hierarchy and behavior unless a defect requires a narrowly scoped correction. Prefer reuse of Mylo components/tokens over new abstractions.
 - No placeholder data, fake counts, sample tracks, duplicate repositories, duplicate players, new icon packs or new database dependencies.
 - Do not claim any issue fixed until code change, tests and visual verification are evidenced. CI success alone does not prove gradient/dialog rendering on device.
+
+
+## 78. Replay parity source inspection — confirmed legacy features (2026-11-20)
+
+### Existing Replay source inspected
+- Inspected 'app/src/main/java/com/music/bitchord/ui/replay/ReplayScreen.kt' on 'Main-dev' (full source).
+- The previous Replay experience is richer than the current merged Statistics screen. Its loaded state contains:
+  - Four headline Replay cards ('ReplayCardRow') that open corresponding Replay story pages.
+  - **Play your Replay** action ('ReplayActionRow(BitChordIcons.Play, ...)') opening the Replay INTRO story.
+  - Listening Rhythm card when 'heading == Statistics'.
+  - Top Songs chart with tap-to-play.
+  - Top Artists chart with tap-to-open artist.
+  - Top Albums chart with tap-to-open album.
+  - Top Genres chart when genre data is available, or a pending-genres note.
+  - Habits section.
+  - Share My Replay action.
+- The current 'ScrobbleStatisticsContent.kt' has only the merged period selector, Track Concentration card, Your Tracks merged rows, and loading/empty/retry states. It does not currently contain the old Replay cards, Play your Replay action, Listening Rhythm, Artists/Albums/Genres charts, Habits or Replay share/story actions.
+- Therefore these are confirmed parity gaps, not speculative features. Do not conflate the current Statistics screen with full Replay parity.
+- Product-owner approval in section 77 authorizes reviewing useful legacy Replay artist/album insights and Play Replay integration in the single merged Statistics screen. Before implementation, inspect each old card/story action and the underlying ReplayViewModel/summary data to distinguish features that can be truthfully merged with Last.fm from local-only Replay features. Keep source attribution invisible in the main UI; clearly label local-only metrics where remote Last.fm data cannot supply them.
+- Do not copy the old artwork-driven Replay backdrop into the merged Scrobble Statistics screen; the approved Scrobble gradient is fixed and must remain consistent. Do not restore separate Replay story navigation as a second Statistics destination unless the existing action requires a focused story/detail flow and its UX is verified.
+
+### Current defect clues verified from source
+- Generator dialog is a 'ModalBottomSheet' in 'ScrobbleGenerateContent'; it explicitly sets 'containerColor = MaterialTheme.colorScheme.surface'. The gradient theme defines 'surface = Color(0xC72A2730)' (about 78% opacity), so the sheet itself is translucent while the background gradient remains visible. This is a plausible direct cause of the user's gradient-ON count-selector backdrop issue; verify actual window/sheet layering and any nested surfaces before changing global theme opacity.
+- Statistics uses Material3 'PullToRefreshBox' directly and binds 'onRefresh = viewModel::refresh'. Home uses the app's shared 'PullToRefresh' component with its existing state and refresh callback. The next pass must inspect the shared component's exact indicator/icon and state behavior before reusing it; preserve the Statistics force-fetch semantics.
+- Scrobble Generator currently imports a mix of 'Icons.Filled.*' and 'Icons.Rounded.*' Material glyphs (e.g. thumb-up, history, music-note, people, sell, shuffle, auto-awesome, explore, library-music, more-vert, image, edit, delete, etc.). Mylo's 'BitChordIcons' already exists and is used in the old Replay screen and app shell. Audit exact available vectors and map each Scrobble action to existing Mylo icon assets instead of assuming every Material glyph is outdated.
+- Scrobble playlist detail is implemented locally inside 'ScrobbleContent.kt' as 'PlaylistDetailContent'; it currently owns its own top actions, cover controls, track search/sort and track rows. Reuse/align with the app's existing playlist/detail presentation after tracing the actual Mylo playlist detail host and its component/data requirements. Do not replace it blindly with an unrelated YouTube Music detail page.
+
+### Next implementation slice
+1. Start with the narrowly scoped gradient-ON Generator sheet surface fix; make the sheet opaque enough to avoid gradient bleed while leaving the approved background gradient and gradient-OFF current Mylo theme unchanged. Add a testable color-selection helper if needed, but avoid abstractions used only once.
+2. Inspect and reuse Mylo's shared dialog/sheet conventions for Generator and Scrobble-specific confirmation/edit dialogs. Keep all required controls and cancellation semantics.
+3. Inspect the shared Home pull-to-refresh implementation and 'BitChordIcons'; align Statistics refresh affordance and icons with existing Mylo assets without replacing its force-refresh/cache logic.
+4. Trace Mylo's playlist detail UI, then align Scrobble playlist artwork/layout/actions with the established design.
+5. Add the approved Replay parity features to the single merged Statistics screen based on verified data availability. At minimum, account for the old Replay cards and Play your Replay action, and evaluate Listening Rhythm, Top Artists, Top Albums, Top Genres, Habits and Share using real data. Never invent Last.fm durations or sample counts.
+6. Update this context with exact code/doc commits and tests after each meaningful pass.
