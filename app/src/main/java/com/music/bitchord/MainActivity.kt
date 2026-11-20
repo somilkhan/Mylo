@@ -2833,6 +2833,7 @@ private fun BitChordApp(
                     }
                     if (key == "history") {
                         HistoryScreen(
+                            hazeState = hazeState,
                             state = historyState,
                             sections = historySections,
                             isLocal = historyIsLocal,
