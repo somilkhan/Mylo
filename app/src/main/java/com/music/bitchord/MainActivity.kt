@@ -504,6 +504,7 @@ private fun BitChordApp(
     val context = LocalContext.current
     val scrobbleGenerateViewModel: ScrobbleGenerateViewModel = viewModel()
     val scrobbleStatisticsViewModel: ScrobbleStatisticsViewModel = viewModel()
+    val scrobbleStatisticsState by scrobbleStatisticsViewModel.state.collectAsStateWithLifecycle()
     val clipboard = LocalClipboardManager.current
     val hazeState = remember { HazeState() }
     // Recording the backdrop layer costs a draw pass, so it only runs when a
@@ -1137,6 +1138,7 @@ private fun BitChordApp(
     val homePull = rememberPullToRefreshState()
     val explorePull = rememberPullToRefreshState()
     val libraryPull = rememberPullToRefreshState()
+    val scrobbleStatisticsPull = rememberPullToRefreshState()
     val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
     val currentFeed = when {
         showSettings || showAccountScrobbling || detail != null -> null
@@ -1154,11 +1156,14 @@ private fun BitChordApp(
         if (currentFeed == MainViewModel.Feed.LIBRARY) viewModel.onLibraryShown()
     }
 
-    val currentPull = when (currentFeed) {
-        MainViewModel.Feed.HOME -> homePull
-        MainViewModel.Feed.EXPLORE -> explorePull
-        MainViewModel.Feed.LIBRARY -> libraryPull
-        null -> null
+    val currentPull = when {
+        showScrobble && selectedScrobbleTab == 0 -> scrobbleStatisticsPull
+        else -> when (currentFeed) {
+            MainViewModel.Feed.HOME -> homePull
+            MainViewModel.Feed.EXPLORE -> explorePull
+            MainViewModel.Feed.LIBRARY -> libraryPull
+            null -> null
+        }
     }
     val scrolled by remember(currentListState) {
         derivedStateOf {
@@ -2912,6 +2917,9 @@ private fun BitChordApp(
                             0 -> ScrobbleStatisticsContent(
                                 viewModel = scrobbleStatisticsViewModel,
                                 reduceMotion = reducePlayerMotion,
+                                refreshing = scrobbleStatisticsState.isRefreshing,
+                                onRefresh = scrobbleStatisticsViewModel::refresh,
+                                pullState = scrobbleStatisticsPull,
                                 onPlaySong = { song ->
                                     playRadio(song, QueueSource(replayLabel, PlaybackSourceType.REPLAY))
                                 },
@@ -3794,7 +3802,8 @@ private fun BitChordApp(
                         detail != null -> detailScrolled
                         else -> scrolled || selectedTab == TAB_SEARCH
                     },
-                    refreshing = currentFeed != null && currentFeed in refreshing,
+                    refreshing = (currentFeed != null && currentFeed in refreshing) ||
+                        (showScrobble && selectedScrobbleTab == 0 && scrobbleStatisticsState.isRefreshing),
                     pullFraction = { currentPull?.distanceFraction ?: 0f },
                     onBack = when {
                         showSpotify && detail == null -> ({ showSpotify = false })
