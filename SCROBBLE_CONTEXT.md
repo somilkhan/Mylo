@@ -3200,3 +3200,37 @@ This is new device feedback, not a claim that the previous acceptance matrix is 
 - `main` untouched; no new branch.
 - No new refresh button, polling loop, data source, persistence, or global Home behavior change.
 - Playlist generation/storage identifiers and playlist actions remain unchanged.
+
+## 108. Dialog icon-family and Mylo alert consistency pass (2026-11-20 23:12 IST)
+
+### User feedback
+The user reported that dialog icons and dialog UI did not feel consistent with Mylo. This pass extends the earlier section 102 alert audit to the remaining custom dialogs; preserve dialog behavior and avoid a broad redesign.
+
+### Findings and changes on `Main-dev`
+- Found a remaining stock Material 3 `AlertDialog` nested inside `LyricsSourcesDialog` for the PaxSenix API key. Replaced it with the shared Mylo `AlertScaffold`, hairline `AlertRule`, stacked `AlertAction` rows and `PillTextField`; the key remains masked and save/cancel/keyboard-done behavior is preserved.
+- Replaced Material Rounded check/search/person/drag-handle/cast glyphs in account, language, lyrics-source and Cast dialogs with the Mylo `BitChordIcons` family.
+- Added matching custom icon vectors to `BitChordIcons`: Person, DragHandle, Cast, CastConnected, AudioFile, Memory, Tune, GraphicEq and VolumeUp. The Audio Pipeline's five stage icons now use these Mylo glyphs too.
+- Kept the Cast/Audio Pipeline popup's player-specific dark palette, wider diagnostic layout, live receiver discovery and signal-flow visualization. These are intentional player surfaces, not generic settings alerts; the shared Mylo icon family is now used within them.
+- No navigation, playback, account, lyrics-source, cast, audio pipeline or settings behavior was intentionally changed.
+
+### Files changed
+- `sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/icons/BitChordIcons.kt` — add Mylo-style vector glyphs used by dialogs.
+- `app/src/main/java/com/music/bitchord/ui/components/AccountAlerts.kt` — use the shared Mylo check glyph.
+- `app/src/main/java/com/music/bitchord/ui/components/AccountChannelDialog.kt` — use Mylo person/check glyphs.
+- `app/src/main/java/com/music/bitchord/ui/components/AppLanguageDialog.kt` — use Mylo check glyph.
+- `app/src/main/java/com/music/bitchord/ui/components/TranslationLanguageDialog.kt` — use Mylo search/check glyphs.
+- `app/src/main/java/com/music/bitchord/ui/components/LyricsSourcesDialog.kt` — use Mylo check/drag glyphs and replace the nested stock Material alert.
+- `app/src/main/java/com/music/bitchord/ui/components/CastDialog.kt` — use Mylo cast/connected/check glyphs.
+- `app/src/main/java/com/music/bitchord/ui/components/AudioPipelineDialog.kt` — use Mylo glyphs for all five pipeline stages.
+
+### Source and verification
+- Starting `Main-dev` HEAD: `a42754905af7822597e614bfbf002d887a8f2346`.
+- Icon and dialog changes were committed directly to `Main-dev`; latest code HEAD before this documentation update: `71b670a0d5b86b9da7a35359d5bab110bf5ea353`.
+- Code commits: `411b2ac`, `de37b1a`, `baea282`, `f4ea14f`, `23a6776`, `5ee9a0d`, `3ab59a5`, `cbc3f4f`, `ad3cb7f`, `e8c2350`, `71b670a`.
+- Exact-HEAD Android CI run for `e8c2350b49e62482ab80bf33e34d7fd667645db4` was pending at the time of the check. The final source commit `71b670a0d5b86b9da7a35359d5bab110bf5ea353` still needs its own CI result. Do not call this pass build-green yet.
+- No visual screenshot or device verification has been captured for the new glyphs or nested alert. Verify both light/dark themes, reduced-blur mode, large font scale, keyboard-open layout and TalkBack after a fresh signed APK is installed.
+- No new dependencies, database, storage or feature behavior were added.
+
+### Continuation gate
+Before making another dialog/icon change, the next agent must read this entire `SCROBBLE_CONTEXT.md` and the approved `mylo-ux-spec.md`, then inspect current `Main-dev` HEAD and exact changed files. Do not repeat this pass or overwrite newer work based on an earlier SHA.
+
