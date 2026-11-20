@@ -2971,3 +2971,71 @@ The product owner explicitly approved the proposed Statistics additions and inst
 - Latest inspected `Main-dev` HEAD before this audit append: `f085e93020ac8ea320266bc337b1290733006911`; application code remains `7d7f5f4d25ff14d86d2c2659b892c50b59947a67`.
 - Work only on `Main-dev`; `main` untouched; `last-wave` remains reference-only.
 - No application code has been changed in this audit entry. Do not repeat the previous color/contrast audit; this pass is driven by the newly reported installed-build defects.
+
+
+## 101. Post-install Scrobble UX fixes — implementation pass (2026-11-20 13:46 IST)
+
+### Correction to section 100 playlist-detail diagnosis
+- The earlier note that `DetailScreen` was only a remote YouTube page was incomplete. It already supports local `local:` pages, and `ReleaseHeader` has an explicit local-page Play/Shuffle branch.
+- The generated playlist editor was nevertheless rendering its own compact 88dp-cover header and its own local `LazyColumn`. It did this to retain local-only operations (add tracks, custom cover, export, rename/delete, track reorder/remove and similar generation), not because the app lacked local playlist data.
+- Added `LocalPlaylistReleaseHeader` in `ui/screens/DetailScreen.kt`. It constructs the local `DetailPage` presentation and calls the exact existing `ReleaseHeader` used by `DetailScreen` (artwork-derived palette, sleeve sizing, title/metadata and local Play/Shuffle pills). `PlaylistDetailContent` now uses this shared header and keeps its single local editor list plus the existing shared `SongRow`. This avoids a destructive full-page swap that would silently drop local editor actions. There is one scroll container, not a nested scroll list.
+
+### Implemented source changes
+1. **Replay cards restored in Statistics**
+   - `ScrobbleStatisticsContent.kt` now renders the existing `ReplayCardRow` and `ReplaySummary.cards(context)` cards (minutes listened, top song, top artist, top album) from the same local Replay summary.
+   - Card taps open the matching Replay story; the Play your Replay action opens the INTRO story. No new or fabricated statistics were introduced.
+2. **Replay navigation and period consistency**
+   - Statistics-origin stories no longer set `showReplay = true`; the story overlays Statistics and closing/back returns to Statistics.
+   - Replay-page-origin stories keep the Replay page underneath; Library-origin stories keep Library underneath. The overlay therefore returns to its actual launch surface.
+   - `ReplayState` now records `summaryPeriod`. Statistics card stories set the Replay period to the card's loaded period and wait for that exact summary before rendering, avoiding a story from a different period.
+3. **Statistics refresh**
+   - Removed the standalone refresh IconButton.
+   - Moved the Statistics heading and period selector inside the same `LazyColumn` wrapped by `PullToRefreshBox`, so the gesture can begin over the page header/period controls as well as the data list.
+   - The ViewModel retains the last completed period's visible data while the next period loads. Added `loadedPeriod` and `existingStatisticsTracksForPeriod`; old-period local rows are not merged with a new-period Last.fm cache. A small progress line marks the stale-while-loading transition.
+4. **Mylo dialogs and fields**
+   - Scrobble Rename, Delete and Export in-app dialogs now use `AlertScaffold`, `AlertRule` and `AlertAction` with semantic Scrobble action colors.
+   - Added optional `contentColor` to shared `AlertAction`; existing callers retain their prior default.
+   - Generator artist/tag/seed fields, playlist search and add-track search now use Mylo's `PillTextField` instead of stock `OutlinedTextField`.
+   - Android `OpenDocument`/`CreateDocument` pickers and the Android share chooser remain OS-owned surfaces by design; they are not in-app dialogs and cannot be restyled as Mylo alerts.
+5. **Mylo icon family**
+   - Added outlined People, Tag, Sparkles, Sort, More, Edit, Delete, Image, Share, Locate, ArrowUp/Down, Error and Close vectors to `BitChordIcons`.
+   - Replaced Material icon imports across Scrobble Generator, playlist list/detail, Replay screen and Replay stories with the matching Mylo glyphs. The local playlist placeholder now uses `BitChordIcons.Queue`.
+   - No global icon-family change was made outside the surfaces covered by this audit.
+6. **Generator and playlist presentation**
+   - Generator modes now render as a single divided list of 64dp-minimum rows rather than separate rounded cards; the existing nine-mode order, disabled Library sign-in reason and optional Last.fm note are preserved.
+   - Mode icon tiles are 40dp with the Mylo outline family; descriptions remain single-line and ellipsized.
+   - Generated playlist detail now uses the same release header as the app's normal detail page; local editor actions and existing playback ownership remain intact.
+7. **Regression coverage**
+   - Added `ScrobbleStatisticsPeriodStateTest` for retaining a completed period snapshot during a period switch without mixing new-period cache rows, and for using a matching cache on first load.
+   - Existing relevant tests were inspected before adding coverage: `ScrobbleStatisticsModelTest`, `TrackConcentrationTest`, `UniquePlaylistTitleTest`, `LastFmStatisticsRepositoryTest` and `GenerateCommitTest`. No duplicate tests were added for their already-covered behavior.
+
+### Verification state at this entry
+- Current `Main-dev` HEAD: `759e185a5fdd1d8e952ad911329f48e7c54cbff2`.
+- Key current source blobs:
+  - `ScrobbleStatisticsContent.kt`: `2b0dabcadc8dc468b556d9da5dada54f44407dea`
+  - `ScrobbleStatisticsViewModel.kt`: `c06cde72755f4f5482cf7bf33f33b9f34e94be5e`
+  - `ReplayModel.kt`: `b659c9b4e8291c28f52c518425389fc76036c1cc`
+  - `MainActivity.kt`: `afe0ca361c46a9f050a4a0660060d03841472a95`
+  - `ScrobbleContent.kt`: `d7e607e3f22a36d8cb5031f3a201d1178f975daf`
+  - `DetailScreen.kt`: `59ee11480a43a5bef328bc7fa063312f0b253a25`
+  - `BitChordIcons.kt`: `22246859818b0de385f3abf5272315a543406e5d`
+  - `ReplayScreen.kt`: `d4607d4b357f76bfc1039833ba4c06bae28b2790`
+  - `ReplayStories.kt`: `e1673d89d17522dbfb1a75eb70947cca3f50a2da`
+  - New test: `ScrobbleStatisticsPeriodStateTest.kt`, blob `e090c6bb217b51a65d07565fc906dd7134220a16`.
+- Exact-HEAD Android CI run `44701608657` was pending at the time of this entry. Earlier runs for intermediate commits were cancelled by later pushes and are not verification results.
+- No build success, test success, signed APK or physical-device result is claimed for these new changes until the exact HEAD workflow completes.
+- The previously installed APK predates these fixes. A new exact-HEAD APK must be built and installed before the user can verify them.
+
+### Remaining audit / acceptance work
+1. Wait for run `44701608657`; inspect Android, Desktop and Web jobs and logs. Fix only concrete compile/test failures, then wait for the latest exact-HEAD run.
+2. Build/sign a new phone APK from the verified final `Main-dev` HEAD and provide the artifact; the user's earlier installed APK does not contain these changes.
+3. Device-check Replay cards and values for All Time/Year/Month/Week; story completion/back from Statistics, Replay page and Library; verify card/story period matches.
+4. Device-check pull refresh from header, period row and list; connected/disconnected behavior, empty/stale/error/retry states and repeated fast swipes.
+5. Device-check Generator rows/dialogs, all nine modes, Mylo pill fields, Library sign-in gate, Last.fm note, keyboard and cancel/retry.
+6. Device-check local playlist header, cover, Play/Shuffle, Locate, add/remove/reorder, rename/delete/export and persistence after relaunch; ensure one scroll container and no clipped controls.
+7. Device-check Mylo alert scrims/actions, custom icons at normal and accessibility font scales, gradient ON/OFF contrast and reduced motion.
+8. Capture screenshots and exact device model/OS/build number; record pass/fail evidence here. Do not mark the UX audit complete from source review or CI alone.
+
+### Branch and scope
+- Work remains on `Main-dev`; `main` untouched; `last-wave` remains reference-only.
+- No Library integration, new database, second playlist store, duplicate player, global theme redesign or global icon redesign was introduced.
