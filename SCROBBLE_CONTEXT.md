@@ -2606,3 +2606,23 @@ The product owner explicitly approved the proposed Statistics additions and inst
 
 ### Next
 - Continue the source trace of Mylo's reusable song-row/cover/detail primitives and inspect the approved v3 HTML for the exact playlist visual reference. Then make the smallest playlist compliance/UI-alignment changes and update this file with exact code/doc commits and test evidence.
+
+
+## 82. Playlist UI alignment — first implementation pass (2026-11-20)
+
+### Changes on Main-dev
+- Code commits: `56bf911ab7cb7f0bf98c1c82571c7506c3d6ed50`, `0b368c7209e9d9f96910e78d6ec1b49dc76e6b4e`, `ad079800cb6e58c9b1b56c631b99926920936d36` (same focused file/change sequence; latest branch HEAD is `ad079800cb6e58c9b1b56c631b99926920936d36`). File: `app/src/main/java/com/music/bitchord/ui/scrobble/ScrobbleContent.kt`.
+- Playlist-list search now matches playlist titles only, as the approved UX spec requires. Search placeholder is now "Find a playlist" and the no-match hint refers only to playlist names.
+- Removed the unapproved track-level search and track sorting controls from Playlist Detail. The spec explicitly excludes track-level search for now; detail track ordering remains the existing custom order.
+- Detail track rows now use the app-wide `com.music.bitchord.ui.components.SongRow` component, with the existing Scrobble player callback and current-track state. This reuses Mylo's 52dp artwork, typography, current-track accent and native row treatment rather than maintaining a second custom track-row card. Existing per-track Move up/Move down and Remove actions remain available from the shared row's overflow/long-press menu.
+- Playlist-list row treatment now follows the approved v3 reference proportions more closely: 52dp cover, 8dp row inset, 18dp card radius. Existing LocalPlaylistStore, pin/reorder/rename/delete, play, generation handoff and playback ownership are unchanged.
+
+### Verification
+- Latest CI run: `44681037747`, exact code SHA `ad079800cb6e58c9b1b56c631b99926920936d36`; run was pending at documentation time. Poll before reporting a pass/failure.
+- Static source check confirms old `PlaylistDetailSort`, `trackSearchQuery`, `displayedTracks` and playlist-list track-title/artist matching are removed. A stale Locate offset reference was found and removed before the latest commit.
+- No local Gradle build, APK packaging, device/emulator test or screenshots were performed. Visual sign-off remains outstanding for both gradient states.
+
+### Remaining playlist work
+- This is not a complete playlist redesign. Playlist detail header/cover, top action hierarchy, list card text contrast and the overflow/dialog visual patterns still need comparison against Mylo's actual playlist/detail design and the approved reference. Do not assume `SongRow` alone completes the visual pass.
+- Confirm whether the existing per-track Move up/Move down actions are the intended interpretation of the approved detail Move Up/Down wording; retain current behavior until that is reconciled rather than silently removing it.
+- Continue auditing playlist detail and Generator dialogs against Mylo's existing component patterns, then test all playlist actions and both theme states.
