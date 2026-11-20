@@ -29,6 +29,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonObject
 import java.util.Locale
@@ -163,7 +165,25 @@ object YtMusicRepository {
      * through either.
      */
     private suspend fun fetchHistory(): List<Song> =
+        if (HISTORY_SINGLE_SOURCE) fetchHistoryShared() else fetchHistoryDirect()
+
+    private suspend fun fetchHistoryDirect(): List<Song> =
         InnertubeParser.collectSongsDeep(Innertube.browse(HISTORY)).distinctBy { it.videoId }
+
+    /**
+     * Concurrent callers (Home, Recents, Generate, sync) share one request per account
+     * identity. Results are cached only if the identity did not change while fetching.
+     */
+    private suspend fun fetchHistoryShared(): List<Song> = historyLock.withLock {
+        val key = Innertube.activeIdentityKey() ?: return@withLock fetchHistoryDirect()
+        historyShare.get(key)?.let { return@withLock it }
+        val songs = fetchHistoryDirect()
+        if (Innertube.activeIdentityKey() == key) historyShare.put(key, songs)
+        songs
+    }
+
+    private val historyLock = Mutex()
+    private val historyShare = HistoryShareCache<List<Song>>()
 
     /**
      * The account's listening history, in the order YouTube Music keeps it.
@@ -282,6 +302,12 @@ object YtMusicRepository {
     }
 
     private const val HISTORY = "FEmusic_history"
+
+    /**
+     * Rollout switch for the shared history fetch. Off keeps the previous behaviour
+     * exactly. Turned on only after the device checklist passes.
+     */
+    private const val HISTORY_SINGLE_SOURCE = false
     private const val RECENT_TITLE = "Recents"
 
     /** Enough to scroll through, short of turning the shelf into the history page. */

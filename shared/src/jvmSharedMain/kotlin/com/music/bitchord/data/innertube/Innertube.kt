@@ -260,6 +260,17 @@ object Innertube {
      * Act as this channel from now on; both null goes back to the shell's
      * default. Takes effect on the next request — nothing is cached from it.
      */
+    /**
+     * Identity of the account and channel the next request will act as, for keying
+     * per-account caches. Null when browsing as a guest. Never contains the raw cookie.
+     */
+    fun activeIdentityKey(): String? {
+        val current = cookie ?: return null
+        val channel = channelOverride
+        return "${current.hashCode()}|${channel?.pageId.orEmpty()}|" +
+            "${channel?.dataSyncId.orEmpty()}|${channel?.authUser.orEmpty()}"
+    }
+
     fun selectChannel(pageId: String?, dataSyncId: String?, authUser: String? = null) {
         channelOverride = if (pageId == null && dataSyncId == null) {
             null
