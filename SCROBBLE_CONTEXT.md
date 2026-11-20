@@ -2716,3 +2716,25 @@ The product owner explicitly approved the proposed Statistics additions and inst
 ### Next
 - Continue the approved Scrobble-only visual audit. The Statistics refresh affordance currently uses a rounded Refresh glyph and calls the ViewModel's explicit refresh action; Home's refresh path is pull-to-refresh rather than a matching header icon. Do not claim exact Home icon parity unless a shared source component is found.
 - Inspect the remaining Statistics card contrast and dialog/action patterns, then update this file with exact evidence. Keep device visual verification explicitly outstanding until screenshots exist.
+
+## 89. Statistics refresh control stability and Home refresh source trace (2026-11-20 11:18 IST)
+
+### Source trace
+- Home, Explore and Library use the shared `PullToRefresh` wrapper in `sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/components/Common.kt`. The wrapper intentionally suppresses the in-content puck (`indicator = {}`) because the app's top bar draws the refresh indicator from the hoisted `PullToRefreshState.distanceFraction`.
+- Statistics is not one of those feed destinations and has no corresponding Home header-refresh icon to reuse. It retains a direct `viewModel.refresh()` action; do not wire it to the Home feed's pull state or refresh repository.
+- The Statistics control already used the rounded Refresh glyph. The observed layout risk was its content slot changing from a 24dp icon to a 20dp spinner while loading.
+
+### Changes on Main-dev
+- Code commit: `9d5f1790d4275c113966e85b2aab232fec7a7123`.
+- File: `app/src/main/java/com/music/bitchord/ui/scrobble/ScrobbleStatisticsContent.kt`.
+- Wrapped the refresh icon and progress indicator in a fixed 24dp centered slot; the glyph is explicitly 24dp and the loading indicator remains 20dp. The button remains disabled while refreshing and still calls the same ViewModel refresh action.
+- No feed refresh logic, shared top bar, or non-Scrobble screen was changed.
+
+### Verification
+- Static source review confirms the fixed 24dp slot and unchanged refresh callback.
+- No local Gradle build, APK, emulator/device run, or screenshots were performed.
+- Workflow run `44682643152` (from the preceding Replay implementation) is being checked separately below; it does not verify this later refresh-control commit.
+- CI must be checked for the exact new code SHA before calling it verified. Visual check on device is still required to confirm the reported icon glitch is gone.
+
+### Next
+- Continue the Scrobble-only audit across Statistics cards, Generator and playlist surfaces. Check semantic foregrounds against each actual container color, especially gradient ON/OFF; do not change global theme tokens or other screens.
