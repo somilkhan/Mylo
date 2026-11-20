@@ -2647,3 +2647,11 @@ The product owner explicitly approved the proposed Statistics additions and inst
 - Continue the approved Scrobble-only dialog/icon audit, especially Generator sheet and playlist rename/delete/export confirmations; preserve existing action semantics and use existing Mylo patterns.
 - Inspect the actual Home/global refresh affordance before claiming exact refresh-icon parity. Home's shared `PullToRefresh` component intentionally has an empty indicator; it is not itself the visible refresh icon.
 - Continue approved Statistics Replay parity only after tracing legacy ReplayViewModel data and playback action ownership.
+
+
+## 84. Playlist Locate compile failure — corrected (2026-11-20 11:02 IST)
+
+- CI run `44681037747` for code SHA `ad079800cb6e58c9b1b56c631b99926920936d36` completed with Android unit-test compilation failure. The compiler identified a dangling '+' in the playlist detail Locate action's `precedingItems` expression at `ScrobbleContent.kt:1675`; the next line consequently reported unresolved `precedingItems`. Web tests/typecheck passed. Desktop compilation passed; Desktop tests were cancelled. This is a source compilation defect, not an infrastructure-only CI failure.
+- Corrected the malformed expression and completed replacing the remaining playlist-detail Shuffle glyph with `BitChordIcons.Shuffle`.
+- Corrective code commit: `2ed0f38c650844887324716bbfa8bd3711e2f73c` (Main-dev).
+- A new CI run is required for this exact code SHA; do not claim it passes until checked. No local Gradle build or device verification is available.
