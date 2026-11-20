@@ -2626,3 +2626,24 @@ The product owner explicitly approved the proposed Statistics additions and inst
 - This is not a complete playlist redesign. Playlist detail header/cover, top action hierarchy, list card text contrast and the overflow/dialog visual patterns still need comparison against Mylo's actual playlist/detail design and the approved reference. Do not assume `SongRow` alone completes the visual pass.
 - Confirm whether the existing per-track Move up/Move down actions are the intended interpretation of the approved detail Move Up/Down wording; retain current behavior until that is reconciled rather than silently removing it.
 - Continue auditing playlist detail and Generator dialogs against Mylo's existing component patterns, then test all playlist actions and both theme states.
+
+
+## 83. Playlist contrast and Mylo icon alignment — implementation pass (2026-11-20 11:00 IST)
+
+### Changes on Main-dev
+- Code commit: `efac528dec1e56de3b7b869ba15f932dee6a96bd`.
+- File: `app/src/main/java/com/music/bitchord/ui/scrobble/ScrobbleContent.kt`.
+- Playlist-list title now explicitly uses `MaterialTheme.colorScheme.onSurface` rather than relying only on inherited Surface content color. This makes the title's intended foreground semantic explicit on both gradient and standard themes, addressing the reported black-title/grey-card contrast failure at source level.
+- Playlist Play, Shuffle and Pin actions now reuse the existing `BitChordIcons` artwork (Play, Shuffle, Pin) instead of separate rounded Material glyphs. No new icon assets or dependencies were introduced.
+- Existing LocalPlaylistStore, row behavior, playback callbacks and detail actions are unchanged.
+
+### Verification
+- Static source review confirms the explicit title color and shared icon references are present. This is not visual device verification; gradient ON/OFF screenshots are still required.
+- CI for the preceding code SHA `ad079800cb6e58c9b1b56c631b99926920936d36` (run `44681037747`) had Web tests/typecheck passed; Android unit tests and Desktop compile/tests were still running at the last poll. APK packaging was skipped by workflow configuration.
+- New code SHA `efac528dec1e56de3b7b869ba15f932dee6a96bd` requires its own CI run; do not transfer the previous run's result to this SHA.
+- No local Gradle build, APK, emulator/device test or screenshot has been performed.
+
+### Remaining
+- Continue the approved Scrobble-only dialog/icon audit, especially Generator sheet and playlist rename/delete/export confirmations; preserve existing action semantics and use existing Mylo patterns.
+- Inspect the actual Home/global refresh affordance before claiming exact refresh-icon parity. Home's shared `PullToRefresh` component intentionally has an empty indicator; it is not itself the visible refresh icon.
+- Continue approved Statistics Replay parity only after tracing legacy ReplayViewModel data and playback action ownership.
