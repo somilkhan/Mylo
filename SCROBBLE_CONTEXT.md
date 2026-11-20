@@ -2892,3 +2892,12 @@ The product owner explicitly approved the proposed Statistics additions and inst
 - Do not repeat the completed contrast/icon pass without a newly evidenced defect.
 - Next required action: run `.github/workflows/android-ci.yml` for exact HEAD `6e25dd572b8b94dc4cac51a59e12ed7527cac85e` using repository-owner GitHub Actions access (manual dispatch with APK build enabled, or an authorized push/PR workflow). Then inspect Android, Desktop and Web job results and obtain APK artifacts only if the Android build succeeds.
 - Device visual and functional acceptance remains outstanding: gradient ON/OFF screenshots, all nine generator modes, Statistics/Replay navigation, playlist actions/persistence, FAB/back/overlay behavior, and offline queue restart/network recovery.
+
+
+## 98. Post-verification documentation commit (2026-11-20 12:26 IST)
+
+- Section 97 was appended and committed as `c65568b775378dec518f200bb5af41ba237e43db`; the updated `SCROBBLE_CONTEXT.md` blob is `3f319f2975d07ba175c90c3f078abaf0347c9e6b`.
+- Current `Main-dev` HEAD is now `c65568b775378dec518f200bb5af41ba237e43db`. Comparing it with its parent `6e25dd572b8b94dc4cac51a59e12ed7527cac85e` confirms exactly one documentation-only change: `SCROBBLE_CONTEXT.md` (+33 lines).
+- The application source is still unchanged at code SHA `7d7f5f4d25ff14d86d2c2659b892c50b59947a67`; all four Scrobble source blobs listed in section 97 remain unchanged.
+- Combined status and the available PR-workflow lookup for the new documentation HEAD are both empty. This documentation-only commit is excluded by the workflow's `paths-ignore` rule and is not a build result.
+- For build acceptance, CI must check out current `Main-dev` HEAD `c65568b775378dec518f200bb5af41ba237e43db` (whose application source is identical to `7d7f5f4`). The manual workflow dispatch must target `Main-dev`; enable APK packaging only if APK artifacts are needed. This session still lacks a workflow-dispatch action.
