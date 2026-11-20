@@ -2559,3 +2559,12 @@ The product owner explicitly approved the proposed Statistics additions and inst
 4. Trace Mylo's playlist detail UI, then align Scrobble playlist artwork/layout/actions with the established design.
 5. Add the approved Replay parity features to the single merged Statistics screen based on verified data availability. At minimum, account for the old Replay cards and Play your Replay action, and evaluate Listening Rhythm, Top Artists, Top Albums, Top Genres, Habits and Share using real data. Never invent Last.fm durations or sample counts.
 6. Update this context with exact code/doc commits and tests after each meaningful pass.
+
+
+## 79. First approved defect fix — Generator sheet opacity (2026-11-20)
+
+- Code commit: 'ef8fb4ae09fd8e4d30c1ca5c49a2a7369cd9e13f'. File: 'app/src/main/java/com/music/bitchord/ui/scrobble/ScrobbleContent.kt'. The Generator 'ModalBottomSheet' container now uses the active surface color at alpha 1.0. This preserves the existing gradient palette/background and makes the sheet itself opaque; when gradient is OFF, the existing Mylo surface is already opaque, so its appearance is unchanged.
+- Why: the gradient color scheme defines 'surface = Color(0xC72A2730)', which allowed the background gradient to show through the Generator sheet, including behind the playlist-size stepper. This fix is deliberately scoped to the sheet rather than changing every Scrobble surface globally.
+- CI run '44676421950' is testing exact code SHA 'ef8fb4ae09fd8e4d30c1ca5c49a2a7369cd9e13f'. Web tests/typecheck passed. Android unit tests/build and Desktop compile/tests were still running at the time of this note. Recheck the exact run before claiming full CI success. APK/device rendering is not verified.
+- No dialog restyling, icon replacement, Statistics refresh change, playlist detail redesign or Replay parity feature has been implemented yet. Those remain the next approved slices. Do not mark all six reported issues resolved from this single opacity correction.
+- Next: poll CI; inspect Home's shared pull-to-refresh state/indicator and Mylo dialog conventions; trace playlist detail visual primitives; then implement the next narrow changes with focused tests and update this record.
