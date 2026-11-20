@@ -2948,6 +2948,7 @@ private fun BitChordApp(
                             )
                             else -> ScrobblePlaylistsContent(
                                 viewModel = scrobbleGenerateViewModel,
+                                hazeState = hazeState,
                                 currentSong = player.song,
                                 isPlaying = player.isPlaying,
                                 contentPadding = listPadding,
