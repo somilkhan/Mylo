@@ -3458,3 +3458,45 @@ Before making another dialog/icon change, the next agent must read this entire `
 - Fix commit: `eadda3b9540071ee59e20662ce7c3eb2f3ed0d29`.
 - The fix is on `Main-dev`, so it is included automatically in draft PR #11. No changes to `main`.
 - This is a source-level correction only. Do not call it verified until a new CI run for the updated head completes successfully. Android APK assembly and emulator/POCO checks remain outstanding.
+
+
+## 114. Exact-head CI passed; APK build requested; legacy PR overlap reviewed (2026-11-21 13:00 IST)
+
+### Live refs and integration PR
+- Repository: `somilkhan/Mylo`.
+- Working branch before this documentation-only update: `Main-dev` at `550a138a69ec51f0a6eaccc3c72942475d728f73`.
+- Stable branch: `main` at `11478fde56f1817cb777b296e60907359086f383`; unchanged.
+- Draft integration PR #11 remains open, base `main`, head `Main-dev`, and is intentionally not ready/merged.
+- Live compare at review: 326 commits ahead, 0 behind; 78 changed files; 12465 additions and 594 deletions.
+
+### CI results on code head 550a138
+- Run #44790492444: https://github.com/somilkhan/Mylo/actions/runs/44790492444
+- Workflow conclusion: success on exact branch/PR code head `550a138a69ec51f0a6eaccc3c72942475d728f73`.
+- Android `:app:testDevDebugUnitTest`: passed.
+- Desktop compile and tests: passed.
+- Web unit tests and typecheck: passed.
+- Android/TV/Wear OS APK assembly and artifact upload were skipped in this run because the workflow's optional build input was not enabled. Do not treat the green workflow as APK build evidence.
+
+### APK build request
+- Verified that the default-branch `main` workflow contains the owner-only `/build-apk` issue-comment trigger, resolves the PR head SHA, and runs `:app:assembleDevDebug :tv:assembleDevDebug :wearos:assembleDevDebug` before unit tests.
+- Posted the exact `/build-apk` command to PR #11 (comment ID `7047551866`).
+- Triggered run #44793924245: https://github.com/somilkhan/Mylo/actions/runs/44793924245
+- At the time of this entry, Android SDK setup completed and the APK assembly step was still in progress; unit tests and artifact upload were pending. This run is the outstanding next check. Its issue_comment event payload SHA is the default-branch commit, so verify the successful "Resolve pull request head commit" step and checkout before describing the tested source SHA; the resolver is designed to use PR #11's current head.
+- No APK artifact is yet confirmed. No emulator or POCO device verification is established.
+
+### Older draft PR overlap / branch relationship
+- PR #4 (`feat/scrobble-nav-fab`) and PR #8 (`scrobble-ui`) remain open drafts; no close, merge, retarget or branch mutation was performed.
+- PR #11 shares 14 changed paths with PR #4 and 9 changed paths with PR #8. Shared paths include MainActivity/navigation/FAB and CI; PR #4 additionally overlaps core app/store and history/settings files, while PR #8 overlaps LastFM and floating-tab/replay files.
+- Commit graph comparisons show both older heads are **diverged** from current `Main-dev`, not ancestors/descendants. Specifically `Main-dev...feat/scrobble-nav-fab`: 369 ahead / 328 behind; `Main-dev...scrobble-ui`: 359 ahead / 327 behind. Do not merge either old PR into `main` alongside PR #11 or cherry-pick them blindly. Their final disposition (close as superseded vs keep for archival review) remains an explicit owner decision.
+
+### Remaining merge gates
+1. Finish run #44793924245; inspect the APK assembly, unit-test and upload outcomes, and verify the artifact exists.
+2. If the APKs build, install/test on emulator or POCO using the acceptance checklist in the approved source docs; report anything not exercised.
+3. Review all 78 changed paths and key diffs for unintended changes. CI success alone is not a full code review or UX acceptance.
+4. Obtain owner decision on closing/superseding PRs #4 and #8.
+5. Keep PR #11 draft until all required checks and product-owner review are complete. Merge only after explicit approval.
+
+### Safety
+- No application source code changed in this pass; this is a documentation-only record.
+- `main` remains at `11478fde56f1817cb777b296e60907359086f383`.
+- Next agent must read the entire current `SCROBBLE_CONTEXT.md` and the four canonical Library docs before any implementation; continue from run #44793924245 rather than repeating the completed CI investigation.
