@@ -43,6 +43,7 @@ import com.music.bitchord.ui.components.AlertAction
 import com.music.bitchord.ui.components.AlertRule
 import com.music.bitchord.ui.components.AlertScaffold
 import com.music.bitchord.ui.components.PillTextField
+import com.music.bitchord.ui.components.SearchField
 import com.music.bitchord.ui.icons.BitChordIcons
 import com.music.bitchord.ui.screens.LocalPlaylistReleaseHeader
 import androidx.compose.material3.Button
@@ -73,7 +74,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -254,7 +257,7 @@ fun ScrobbleGenerateContent(
             }
 
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                GeneratorSectionTitle("Choose a mix")
+                GeneratorSectionTitle("Pick a mood")
                 Column {
                     Box(
                         Modifier.fillMaxWidth().height(0.5.dp)
@@ -812,13 +815,21 @@ private fun GeneratorModeRow(
         PlaylistGenerationMode.NEVER_HEARD -> BitChordIcons.Explore
         PlaylistGenerationMode.LIBRARY -> BitChordIcons.Library
     }
+    val gradientEnabled = LocalScrobbleGradientEnabled.current
+    val iconTileBrush = if (gradientEnabled) {
+        Brush.linearGradient(listOf(Color(0xFF4A3D6B), Color(0xFFB9A7E8)))
+    } else {
+        Brush.linearGradient(
+            listOf(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.primaryContainer),
+        )
+    }
     androidx.compose.material3.Surface(
         onClick = onClick,
         enabled = enabled,
         shape = RoundedCornerShape(12.dp),
         color = Color.Transparent,
         contentColor = MaterialTheme.colorScheme.onSurface,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().alpha(if (enabled) 1f else 0.45f),
     ) {
         Row(
             Modifier.heightIn(min = 64.dp).padding(horizontal = 4.dp, vertical = 10.dp),
@@ -827,17 +838,13 @@ private fun GeneratorModeRow(
         ) {
             Box(
                 Modifier.size(40.dp).clip(RoundedCornerShape(12.dp))
-                    .background(
-                        if (enabled) MaterialTheme.colorScheme.primaryContainer
-                        else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
-                    ),
+                    .background(iconTileBrush, RoundedCornerShape(12.dp)),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     icon,
                     contentDescription = null,
-                    tint = if (enabled) MaterialTheme.colorScheme.onPrimaryContainer
-                    else MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.55f),
+                    tint = if (gradientEnabled) Color.White else MaterialTheme.colorScheme.onPrimaryContainer,
                     modifier = Modifier.size(21.dp),
                 )
             }
@@ -846,12 +853,12 @@ private fun GeneratorModeRow(
                     mode.label(),
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Medium,
-                    color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
                     disabledReason ?: mode.description().removeSuffix("."),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -1065,24 +1072,12 @@ fun ScrobblePlaylistsContent(
             }
             if (playlists.isNotEmpty()) {
                 item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Box(Modifier.weight(1f)) {
-                            PillTextField(
-                                value = search,
-                                onValueChange = { search = it },
-                                placeholder = "Find a playlist",
-                            )
-                        }
-                        if (search.isNotEmpty()) {
-                            IconButton(onClick = { search = "" }) {
-                                Icon(BitChordIcons.Delete, contentDescription = "Clear search")
-                            }
-                        }
-                    }
+                    SearchField(
+                        query = search,
+                        onQueryChange = { search = it },
+                        onSubmit = {},
+                        placeholder = "Find a playlist",
+                    )
                 }
             }
             if (visible.isEmpty() && storageError == null) {
@@ -1723,13 +1718,14 @@ private fun PlaylistDetailContent(
         }
         if (addTracksExpanded) {
             item(key = "add_tracks_search") {
-                PillTextField(
-                    value = addTrackQuery,
-                    onValueChange = {
+                SearchField(
+                    query = addTrackQuery,
+                    onQueryChange = {
                         addTrackQuery = it
                         addTrackError = null
                         addTrackMessage = null
                     },
+                    onSubmit = {},
                     placeholder = "Search YouTube Music",
                 )
                 if (addTrackLoading) LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = scrobbleAccentColor())
