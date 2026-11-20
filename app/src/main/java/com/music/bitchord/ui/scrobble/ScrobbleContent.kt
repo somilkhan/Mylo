@@ -1567,7 +1567,7 @@ private fun PlaylistDetailContent(
                         }
                         DropdownMenuItem(
                             text = { Text("Generate similar") },
-                            leadingIcon = { Icon(Icons.Rounded.Shuffle, contentDescription = null) },
+                            leadingIcon = { Icon(BitChordIcons.Shuffle, contentDescription = null) },
                             enabled = !generationState.isGenerating && playlist.songs.any { it.videoId.isNotBlank() && !it.isVideo },
                             onClick = {
                                 detailMenuExpanded = false
@@ -1663,7 +1663,7 @@ private fun PlaylistDetailContent(
                     Text("Play")
                 }
                 OutlinedButton(onClick = { onPlaySongs(playlist.songs.shuffled(), 0) }, enabled = playlist.songs.isNotEmpty()) {
-                    Icon(Icons.Rounded.Shuffle, contentDescription = null)
+                    Icon(BitChordIcons.Shuffle, contentDescription = null)
                     Spacer(Modifier.width(6.dp))
                     Text("Shuffle")
                 }
@@ -1673,7 +1673,7 @@ private fun PlaylistDetailContent(
                             val precedingItems = 1 +
                                 (if (generationState.isGenerating) 1 else 0) +
                                 (if (generationState.error != null) 1 else 0) +
-                                (if (addTracksExpanded) 1 + addTrackResults.size else 0) +
+                                (if (addTracksExpanded) 1 + addTrackResults.size else 0)
                             scope.launch {
                                 listState.animateScrollToItem(precedingItems + currentTrackDisplayIndex)
                             }
