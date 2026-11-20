@@ -1349,7 +1349,7 @@ private fun PlaylistRow(
     }
     val rowContent: @Composable () -> Unit = {
             Surface(
-                modifier = Modifier.fillMaxWidth().then(sharedBoundsModifier),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 72.dp).then(sharedBoundsModifier),
                 shape = RoundedCornerShape(18.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant,
                 contentColor = MaterialTheme.colorScheme.onSurface,
