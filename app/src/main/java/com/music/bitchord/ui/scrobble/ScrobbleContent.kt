@@ -41,20 +41,13 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.LibraryMusic
-import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Sell
-import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
-import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Sort
-import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.IosShare
 import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.DeleteOutline
@@ -63,9 +56,6 @@ import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.MyLocation
 import com.music.bitchord.ui.components.SongRow
 import com.music.bitchord.ui.icons.BitChordIcons
-import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.PushPin
-import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
@@ -770,7 +760,7 @@ private fun GeneratorSeedResult(
                 Text(song.title, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(song.artist, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            if (selected) Icon(Icons.Rounded.Check, contentDescription = "Selected", tint = scrobbleAccentColor())
+            if (selected) Icon(BitChordIcons.Check, contentDescription = "Selected", tint = scrobbleAccentColor())
         }
     }
 }
@@ -1015,7 +1005,7 @@ fun ScrobblePlaylistsContent(
                                     DropdownMenuItem(
                                         text = { Text(option.label) },
                                         leadingIcon = if (sortMode == option) {
-                                            { Icon(Icons.Rounded.Check, contentDescription = null) }
+                                            { Icon(BitChordIcons.Check, contentDescription = null) }
                                         } else null,
                                         onClick = {
                                             sortMode = option
@@ -1098,7 +1088,7 @@ fun ScrobblePlaylistsContent(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(9.dp),
                     ) {
-                        Icon(Icons.Filled.LibraryMusic, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(42.dp))
+                        Icon(BitChordIcons.Library, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(42.dp))
                         Text(if (playlists.isEmpty()) "No playlists yet" else "No matching playlists", style = MaterialTheme.typography.titleLarge)
                         Text(
                             if (playlists.isEmpty()) "Create your first mix from the Generator." else "Try another playlist name.",
