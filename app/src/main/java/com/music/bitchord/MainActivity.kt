@@ -3026,6 +3026,7 @@ private fun BitChordApp(
                         WearOsScreen(contentPadding = listPadding)
                     } else if (key == "listen_together") {
                         ListenTogetherScreen(
+                            hazeState = hazeState,
                             signedIn = signedIn,
                             inviteCode = activeJamInviteCode,
                             inviteServer = activeJamInviteServer,
@@ -3636,6 +3637,7 @@ private fun BitChordApp(
                             color = MaterialTheme.colorScheme.background,
                         ) {
                             ListenTogetherScreen(
+                                hazeState = hazeState,
                                 signedIn = signedIn,
                                 inviteCode = activeJamInviteCode,
                                 inviteServer = activeJamInviteServer,
