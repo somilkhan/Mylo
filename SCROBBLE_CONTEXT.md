@@ -3534,3 +3534,13 @@ Before making another dialog/icon change, the next agent must read this entire `
 
 ### Mandatory continuation
 - Read the full `SCROBBLE_CONTEXT.md` and canonical brief/spec/toggle docs before further UI edits. Continue on `Main-dev` only; never edit `main`. Do not treat CI compilation as device UI verification.
+
+
+### Follow-up: Mylo playlist glass and icon language (2026-11-21 03:34 IST)
+- Follow-up code commit: `90c88d5ac24b6b9ab9c03b0906af0ba80d975425` on `Main-dev`.
+- Still only `app/src/main/java/com/music/bitchord/ui/scrobble/ScrobbleContent.kt` changed in the UI polish series.
+- Gradient-ON playlist cards now use the same Mylo release-card treatment observed in `DetailScreen.kt`: subtle white veil (`0.07`) and a fine white edge (`0.08)); gradient-OFF retains the current Mylo `surfaceVariant` card unchanged. The approved gradient palette values were not edited.
+- Replaced the old custom-outline glyph references throughout the Scrobble content file with the rounded Material icon set already used by Mylo's Detail/Settings UI (rounded icons for mode rows, sort, play, overflow, pin, edit, delete, navigation and related actions). No action behavior changed.
+- This is an explicit Scrobble-only visual adaptation under the later product-owner-approved playlist treatment/icon exceptions. Do not broaden it to the FAB, bottom navigation, player or unrelated screens.
+- Exact-head CI for `90c88d5`: push run #44825834695 and PR run #44825847245 were queued/pending when this note was written. Earlier runs on `4c0c77f` (#44825462088 and #44825472508) had web checks passed; Android unit tests and desktop compile/tests had not yet completed. Recheck the exact-head runs; do not infer green from queued jobs.
+- Device screenshot review remains required for card contrast, title layout and menu opacity/placement. No physical-device verification is claimed.
