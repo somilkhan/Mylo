@@ -3375,3 +3375,40 @@ Before making another dialog/icon change, the next agent must read this entire `
 ### Continuation rule
 - Read sections 109 and 110 in full before continuing. Do not repeat the completed fixes or alter the normal-tab replacement behavior without explicit product approval.
 
+
+
+## 111. Merge-readiness review — Main-dev to main (2026-11-20 23:40 IST)
+
+### Live repository state
+- Repository: `somilkhan/Mylo`.
+- Working/integration branch: `Main-dev`, current HEAD before this log entry: `bdcab8851dcb199c246078d893d7728791b403f2`.
+- Latest application-code commit under review: `1dc31d733b0118d75d73b68f4ed466f7089a4dbf`; the later HEAD commit is the documentation-only update in section 110.
+- Stable branch: `main`, SHA `11478fde56f1817cb777b296e60907359086f383`. It remained unchanged during this review.
+- GitHub compare `main...Main-dev`: `ahead`, 322 commits ahead, 0 behind; 78 changed files in the compare response.
+- Main-dev is not protected according to the branch endpoint response; main is also reported as not protected. Do not infer that repository policy or human approval is unnecessary.
+- No open PR currently targets `main` from `Main-dev`. Existing draft PRs #4 (`feat/scrobble-nav-fab` → `main`) and #8 (`scrobble-ui` → `main`) are separate branch proposals; they are not a substitute for reviewing the current Main-dev head and may overlap the Scrobble implementation.
+
+### CI evidence
+- Workflow run: https://github.com/somilkhan/Mylo/actions/runs/44788489430
+- Run head: `1dc31d733b0118d75d73b68f4ed466f7089a4dbf` (application-code commit, not the later documentation-only HEAD).
+- At review time the run was still `in_progress`.
+- Web tests and typecheck: completed successfully.
+- Android unit tests: in progress; no result yet.
+- Desktop compile and tests: in progress; no result yet.
+- Android APK build/upload was skipped by this workflow invocation. No APK, emulator, or POCO device verification is established by this run.
+- Re-check this exact run and all jobs before any merge decision. A green web job alone is not a green workflow.
+
+### Merge-readiness assessment
+- **Not merge-ready yet.** The branch compare includes 322 commits and 78 files, not just the recent FAB corrections. The file set includes Scrobble screens/data/queue, Settings, Replay, History, player-adjacent UI, shared code, icons, localization, and CI workflow changes.
+- The open draft PRs #4 and #8 have different head branches and their own scopes. Their existing CI/device statements do not validate the current Main-dev code commit.
+- The user request was to prepare for merge; no merge, branch update, PR creation, or modification of `main` was performed.
+- Before opening a single integration PR or merging, product owner must confirm that the intended merge scope is the **entire current Main-dev branch** (322 commits / 78-file compare), rather than only the Scrobble/FAB work. Do not split, cherry-pick, or rebase without an explicit scope decision.
+- Required gates still open: exact-head CI completion; Android app assembly (not skipped); device/emulator acceptance from AGENT-BRIEF and section 110, including FAB/back/overlay/navigation paths; final diff review for unrelated or unintended changes; review of overlapping draft PRs #4/#8 and an explicit decision about their disposition.
+- Existing UX ambiguity remains: the normal-tab exit sentence is unreachable while the normal tabs are replaced. Section 110 records this; no navigation redesign was made.
+
+### Next safe actions
+1. Recheck run `44788489430` until all jobs conclude; inspect and fix any failures on `Main-dev`, then rerun exact-head CI.
+2. Run an Android APK build and the required device/emulator scenarios; record exact evidence.
+3. Review the 78-file diff against the intended merge scope and inspect PR #4/#8 for overlap before deciding whether they should remain draft, close, or be superseded.
+4. Ask the product owner to confirm whole-branch versus Scrobble-only merge scope.
+5. Only after all gates and explicit approval, prepare the appropriate PR/merge. Never push or merge to `main` as part of this preparation.
