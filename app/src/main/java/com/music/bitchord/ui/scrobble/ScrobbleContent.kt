@@ -57,7 +57,6 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -463,28 +462,21 @@ fun ScrobbleGenerateContent(
 
                     PlaylistGenerationMode.SIMILAR_ARTISTS -> {
                         GeneratorFieldLabel("Artist")
-                        OutlinedTextField(
+                        PillTextField(
                             value = artist,
                             onValueChange = { artist = it },
-                            modifier = Modifier.fillMaxWidth(),
+                            placeholder = "Artist name",
                             enabled = !uiState.isGenerating,
-                            singleLine = true,
-                            label = { Text("Artist name") },
-                            shape = RoundedCornerShape(16.dp),
                         )
                     }
 
                     PlaylistGenerationMode.TAG -> {
                         GeneratorFieldLabel("Mood or genre")
-                        OutlinedTextField(
+                        PillTextField(
                             value = tag,
                             onValueChange = { tag = it },
-                            modifier = Modifier.fillMaxWidth(),
+                            placeholder = "indie, late-night jazz, ambient…",
                             enabled = !uiState.isGenerating,
-                            singleLine = true,
-                            label = { Text("Describe the sound") },
-                            placeholder = { Text("indie, late-night jazz, ambient…") },
-                            shape = RoundedCornerShape(16.dp),
                         )
                         val genres = listOf("pop", "rock", "hip-hop", "electronic", "jazz", "lofi", "metal", "indie", "classical", "r&b", "ambient", "punk")
                         Row(
@@ -689,15 +681,11 @@ private fun GeneratorSeedPicker(
                 )
             }
         }
-        OutlinedTextField(
+        PillTextField(
             value = seedQuery,
             onValueChange = onQueryChange,
-            modifier = Modifier.fillMaxWidth(),
+            placeholder = "Search for a track",
             enabled = enabled,
-            singleLine = true,
-            label = { Text("Search for a track") },
-            leadingIcon = { Icon(BitChordIcons.Search, contentDescription = null) },
-            shape = RoundedCornerShape(16.dp),
         )
         if (allowOptional && selectedSeed == null) {
             Text(
@@ -1075,18 +1063,24 @@ fun ScrobblePlaylistsContent(
             }
             if (playlists.isNotEmpty()) {
                 item {
-                    OutlinedTextField(
-                        value = search,
-                        onValueChange = { search = it },
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        label = { Text("Find a playlist") },
-                        leadingIcon = { Icon(BitChordIcons.Search, contentDescription = null) },
-                        trailingIcon = if (search.isNotEmpty()) {
-                            { IconButton(onClick = { search = "" }) { Icon(BitChordIcons.Delete, contentDescription = "Clear search") } }
-                        } else null,
-                        shape = RoundedCornerShape(16.dp),
-                    )
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Box(Modifier.weight(1f)) {
+                            PillTextField(
+                                value = search,
+                                onValueChange = { search = it },
+                                placeholder = "Find a playlist",
+                            )
+                        }
+                        if (search.isNotEmpty()) {
+                            IconButton(onClick = { search = "" }) {
+                                Icon(BitChordIcons.Delete, contentDescription = "Clear search")
+                            }
+                        }
+                    }
                 }
             }
             if (visible.isEmpty() && storageError == null) {
@@ -1727,17 +1721,14 @@ private fun PlaylistDetailContent(
         }
         if (addTracksExpanded) {
             item(key = "add_tracks_search") {
-                OutlinedTextField(
+                PillTextField(
                     value = addTrackQuery,
                     onValueChange = {
                         addTrackQuery = it
                         addTrackError = null
                         addTrackMessage = null
                     },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    label = { Text("Search YouTube Music") },
-                    leadingIcon = { Icon(BitChordIcons.Search, contentDescription = null) },
+                    placeholder = "Search YouTube Music",
                 )
                 if (addTrackLoading) LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = scrobbleAccentColor())
                 addTrackError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
