@@ -3128,3 +3128,29 @@ All nine have now been converted to Mylo's `AlertScaffold` + `AlertRule` + `Aler
 - Source commit: `d6c3e4ba008dc8467e6c05383e5833442d20709e`.
 - Verification at this entry: source-level declaration/reference checked; CI has not yet been rerun for this fix. Android build, tests, signed APK and physical-device acceptance remain unverified.
 - Next: inspect the new commit and branch head, then run the repository CI workflow for this exact commit; address any further failures before declaring code complete.
+
+
+## 106. Exact-commit CI verification — shared left chevron fix (2026-11-20 15:20 IST)
+
+### Verified result
+- Source commit: `d6c3e4ba008dc8467e6c05383e5833442d20709e` (`fix(scrobble): add shared left chevron icon`).
+- Workflow run: [44706065888](https://github.com/somilkhan/Mylo/actions/runs/44706065888).
+- All three CI jobs completed successfully:
+  - Android unit tests: **passed**.
+  - Desktop compile and tests: **passed**.
+  - Web tests and typecheck: **passed**.
+- The Android job's APK-build step was skipped by the workflow configuration. This is a verified compile/unit-test pass, **not** a signed or installable APK.
+- The previous `ChevronLeft` unresolved-reference blocker is cleared on this CI-tested source commit.
+
+### Remaining delivery and acceptance
+1. Manually dispatch **MYLO Signed Release Builds** on `Main-dev` with `upload_apks=true`; this session cannot dispatch that workflow.
+2. Download and install the newly signed phone APK over the earlier signed build.
+3. Complete the device acceptance matrix recorded in sections 101–102, including Replay cards/story return, pull-to-refresh, all Generator modes, playlist artwork/actions/persistence, Mylo dialogs, gradient ON/OFF, font scaling and TalkBack.
+4. Record device model/OS, app version, screenshots and pass/fail outcomes here. No physical-device verification is claimed yet.
+
+### Open product questions retained
+- Playlist shelf search currently includes track title/artist although the UX spec says title-only; do not silently change it.
+- Library period filtering remains unresolved because the existing YTM library path has no reliable added-date field.
+- No new database/store, global redesign, or unrelated feature work was introduced.
+
+**Next action:** signed release workflow dispatch and physical-device acceptance. Do not call the implementation fully delivered until those checks are complete.
