@@ -1570,7 +1570,9 @@ private fun PlaylistDetailContent(
     ) {
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = onBack, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface)) { Text("Back") }
+                IconButton(onClick = onBack) {
+                    Icon(BitChordIcons.ChevronLeft, contentDescription = "Back to playlists")
+                }
                 if (currentTrackDisplayIndex >= 0) {
                     TextButton(
                         onClick = {
