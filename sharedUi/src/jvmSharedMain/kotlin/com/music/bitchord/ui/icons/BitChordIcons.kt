@@ -956,6 +956,21 @@ object BitChordIcons {
         }.build()
     }
 
+
+    /** Single profile outline for account and channel placeholders. */
+    val Person: ImageVector by lazy {
+        ImageVector.Builder(name = "bc_person", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f).apply {
+            path(stroke = stroke, strokeLineWidth = STROKE, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) {
+                moveTo(12f, 12f)
+                arcToRelative(3.75f, 3.75f, 0f, true, true, 0f, -7.5f)
+                arcToRelative(3.75f, 3.75f, 0f, true, true, 0f, 7.5f)
+                moveTo(4.5f, 20f)
+                quadTo(4.5f, 14.5f, 12f, 14.5f)
+                quadTo(19.5f, 14.5f, 19.5f, 20f)
+            }
+        }.build()
+    }
+
     /** Three-line grip for reorderable rows. */
     val DragHandle: ImageVector by lazy {
         ImageVector.Builder(name = "bc_drag_handle", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f).apply {
