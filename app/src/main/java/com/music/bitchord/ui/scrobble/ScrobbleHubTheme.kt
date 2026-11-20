@@ -2,9 +2,12 @@ package com.music.bitchord.ui.scrobble
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -49,6 +52,38 @@ private val ScrobbleGradientColors = darkColorScheme(
     surfaceContainerHigh = Color(0xC72A2730),
     surfaceContainerHighest = Color(0xC72A2730),
 )
+
+internal val LocalScrobbleGradientEnabled = staticCompositionLocalOf { false }
+
+/** Keep the existing Mylo button colors when the gradient theme is off. */
+@Composable
+internal fun scrobbleTextButtonColors(contentColor: Color) =
+    if (LocalScrobbleGradientEnabled.current) {
+        ButtonDefaults.textButtonColors(contentColor = contentColor)
+    } else {
+        ButtonDefaults.textButtonColors()
+    }
+
+/** Outlined actions need a readable foreground over the dark gradient surfaces. */
+@Composable
+internal fun scrobbleOutlinedButtonColors(contentColor: Color) =
+    if (LocalScrobbleGradientEnabled.current) {
+        ButtonDefaults.outlinedButtonColors(contentColor = contentColor)
+    } else {
+        ButtonDefaults.outlinedButtonColors()
+    }
+
+/** Use the approved pink accent for filled actions only in the gradient theme. */
+@Composable
+internal fun scrobblePrimaryButtonColors() =
+    if (LocalScrobbleGradientEnabled.current) {
+        ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.secondary,
+            contentColor = MaterialTheme.colorScheme.onSecondary,
+        )
+    } else {
+        ButtonDefaults.buttonColors()
+    }
 
 /** Applies the approved v3 palette only while the three Scrobble Hub pages are hosted. */
 @Composable
@@ -101,11 +136,13 @@ internal fun ScrobbleHubTheme(
                 }
             },
     ) {
-        MaterialTheme(
-            colorScheme = if (gradientEnabled) ScrobbleGradientColors else appColors,
-            typography = MaterialTheme.typography,
-            shapes = MaterialTheme.shapes,
-            content = content,
-        )
+        CompositionLocalProvider(LocalScrobbleGradientEnabled provides gradientEnabled) {
+            MaterialTheme(
+                colorScheme = if (gradientEnabled) ScrobbleGradientColors else appColors,
+                typography = MaterialTheme.typography,
+                shapes = MaterialTheme.shapes,
+                content = content,
+            )
+        }
     }
 }
