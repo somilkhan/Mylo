@@ -956,4 +956,111 @@ object BitChordIcons {
         }.build()
     }
 
+    /** Three-line grip for reorderable rows. */
+    val DragHandle: ImageVector by lazy {
+        ImageVector.Builder(name = "bc_drag_handle", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f).apply {
+            path(stroke = stroke, strokeLineWidth = STROKE, strokeLineCap = StrokeCap.Round) {
+                moveTo(4f, 7f); lineTo(20f, 7f)
+                moveTo(4f, 12f); lineTo(20f, 12f)
+                moveTo(4f, 17f); lineTo(20f, 17f)
+            }
+        }.build()
+    }
+
+    /** Display with a cast signal in its lower-left corner. */
+    val Cast: ImageVector by lazy {
+        ImageVector.Builder(name = "bc_cast", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f).apply {
+            path(stroke = stroke, strokeLineWidth = STROKE, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) {
+                moveTo(4f, 5f); lineTo(20f, 5f); lineTo(20f, 17f); lineTo(4f, 17f); close()
+                moveTo(4f, 20f); quadTo(4f, 16f, 8f, 16f)
+                moveTo(4f, 20f); quadTo(4f, 18f, 6f, 18f)
+                moveTo(4f, 20f); lineTo(4f, 20f)
+            }
+        }.build()
+    }
+
+    /** Cast glyph with an active receiver marker. */
+    val CastConnected: ImageVector by lazy {
+        ImageVector.Builder(name = "bc_cast_connected", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f).apply {
+            path(stroke = stroke, strokeLineWidth = STROKE, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) {
+                moveTo(4f, 5f); lineTo(20f, 5f); lineTo(20f, 17f); lineTo(4f, 17f); close()
+                moveTo(4f, 20f); quadTo(4f, 16f, 8f, 16f)
+                moveTo(4f, 20f); quadTo(4f, 18f, 6f, 18f)
+                moveTo(15.5f, 11f)
+                arcToRelative(1.5f, 1.5f, 0f, true, true, 3f, 0f)
+                arcToRelative(1.5f, 1.5f, 0f, true, true, -3f, 0f)
+            }
+        }.build()
+    }
+
+    /** File with a small audio waveform, for source metadata. */
+    val AudioFile: ImageVector by lazy {
+        ImageVector.Builder(name = "bc_audio_file", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f).apply {
+            path(stroke = stroke, strokeLineWidth = STROKE, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) {
+                moveTo(6f, 3.5f); lineTo(14.5f, 3.5f); lineTo(19f, 8f); lineTo(19f, 20.5f); lineTo(6f, 20.5f); close()
+                moveTo(14.5f, 3.5f); lineTo(14.5f, 8f); lineTo(19f, 8f)
+                moveTo(9f, 14f); lineTo(9f, 17f)
+                moveTo(12f, 12.5f); lineTo(12f, 18.5f)
+                moveTo(15f, 14f); lineTo(15f, 17f)
+            }
+        }.build()
+    }
+
+    /** Memory module with contacts, for the decoder stage. */
+    val Memory: ImageVector by lazy {
+        ImageVector.Builder(name = "bc_memory", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f).apply {
+            path(stroke = stroke, strokeLineWidth = STROKE, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) {
+                moveTo(6f, 7f); lineTo(18f, 7f); lineTo(18f, 17f); lineTo(6f, 17f); close()
+                moveTo(9f, 10f); lineTo(15f, 10f); lineTo(15f, 14f); lineTo(9f, 14f); close()
+                for (x in listOf(8f, 12f, 16f)) {
+                    moveTo(x, 4f); lineTo(x, 7f)
+                    moveTo(x, 17f); lineTo(x, 20f)
+                }
+            }
+        }.build()
+    }
+
+    /** Three adjustment tracks with round control points. */
+    val Tune: ImageVector by lazy {
+        ImageVector.Builder(name = "bc_tune", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f).apply {
+            path(stroke = stroke, strokeLineWidth = STROKE, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) {
+                moveTo(4f, 6f); lineTo(20f, 6f)
+                moveTo(4f, 12f); lineTo(20f, 12f)
+                moveTo(4f, 18f); lineTo(20f, 18f)
+            }
+            path(fill = stroke) {
+                for ((x, y) in listOf(9f to 6f, 15f to 12f, 7f to 18f)) {
+                    moveTo(x + 1.7f, y)
+                    arcToRelative(1.7f, 1.7f, 0f, true, true, -3.4f, 0f)
+                    arcToRelative(1.7f, 1.7f, 0f, true, true, 3.4f, 0f)
+                    close()
+                }
+            }
+        }.build()
+    }
+
+    /** Three signal bars for equalisation and spectrum stages. */
+    val GraphicEq: ImageVector by lazy {
+        ImageVector.Builder(name = "bc_graphic_eq", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f).apply {
+            path(stroke = stroke, strokeLineWidth = STROKE, strokeLineCap = StrokeCap.Round) {
+                moveTo(5f, 9f); lineTo(5f, 15f)
+                moveTo(9f, 5f); lineTo(9f, 19f)
+                moveTo(13f, 8f); lineTo(13f, 16f)
+                moveTo(17f, 4f); lineTo(17f, 20f)
+                moveTo(21f, 9f); lineTo(21f, 15f)
+            }
+        }.build()
+    }
+
+    /** Speaker with two outward sound waves. */
+    val VolumeUp: ImageVector by lazy {
+        ImageVector.Builder(name = "bc_volume_up", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f).apply {
+            path(stroke = stroke, strokeLineWidth = STROKE, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) {
+                moveTo(4f, 9f); lineTo(8f, 9f); lineTo(13f, 5f); lineTo(13f, 19f); lineTo(8f, 15f); lineTo(4f, 15f); close()
+                moveTo(17f, 9f); quadTo(21f, 12f, 17f, 15f)
+                moveTo(19f, 6f); quadTo(25f, 12f, 19f, 18f)
+            }
+        }.build()
+    }
+
 }
