@@ -3154,3 +3154,49 @@ All nine have now been converted to Mylo's `AlertScaffold` + `AlertRule` + `Aler
 - No new database/store, global redesign, or unrelated feature work was introduced.
 
 **Next action:** signed release workflow dispatch and physical-device acceptance. Do not call the implementation fully delivered until those checks are complete.
+
+
+## 107. Device-feedback follow-up — Statistics refresh + playlist source labels (2026-11-20 22:57 IST)
+
+### User-reported device feedback
+The user reports completing the previous device test pass and identified two remaining UI issues:
+1. Statistics pull-to-refresh still appears stuck/unreliable.
+2. Playlists list needs a small label identifying which Generator mode created each playlist.
+
+This is new device feedback, not a claim that the previous acceptance matrix is fully passed.
+
+### Changes on Main-dev
+- `MainActivity.kt`:
+  - Added a Statistics-specific `PullToRefreshState` owned at the same shell level as Home/Explore/Library.
+  - Exposed the Statistics pull state to the shared FrostedTopBar indicator through the same `currentPull` / `refreshing` wiring used by Home.
+  - Statistics refresh state is collected from `ScrobbleStatisticsViewModel`; the top-bar indicator now reflects the actual refresh lifecycle.
+- `ScrobbleStatisticsContent.kt`:
+  - Replaced its private `PullToRefreshBox` and in-content Material indicator with the existing shared `ui.components.PullToRefresh` wrapper used by Home.
+  - The drag state is now hoisted, and the shared top-bar indicator owns the visible refresh feedback, matching Home's interaction path.
+  - Refresh still calls the Statistics ViewModel's forced refresh; no polling or Home data reload was introduced.
+- `ScrobbleContent.kt`:
+  - Added a compact secondary-container badge beside the playlist title for generated playlists.
+  - Labels reuse the existing Generator mode names: Top, Recent, Similar Tracks, Similar Artists, Tag, Mix, Recommendations, Never Heard and Library.
+  - Playlists created through Generate Similar show **Similar Playlist**.
+  - Manual/imported playlists and unknown legacy values show no badge; no fake/default origin is assigned.
+- Added `ScrobblePlaylistModeLabelTest.kt` covering all nine stored modes, Generate Similar, and null/unknown origins.
+
+### Exact source commits
+- Starting HEAD: `9fccee6aa07d0b343066df00bc24a054a58b7eb1`.
+- Refresh shell wiring: `bffa770db45334002b8994d9e1b45f0d550e0478`.
+- Shared Statistics pull wrapper: `e141154cd742c46987ec840160494f7c0f5e1ef2`.
+- Playlist badge UI: `9ca4987647f1efd2bbd8cfe179c59c0c1b4ce62b`.
+- Mode-label mapping: `3a595f92486dde6cc26176c16b8e186d84f74a75`.
+- New mapping tests / latest source HEAD: `4521d30d5ee80953790d13beaafe4ca423247736`.
+- Current `Main-dev` HEAD at this documentation edit: `4521d30d5ee80953790d13beaafe4ca423247736`.
+
+### Verification status
+- Code diff reviewed against Home's existing `PullToRefresh` component and FrostedTopBar state contract.
+- Mode-label unit tests added; not yet confirmed executed.
+- Android CI run [44784307658](https://github.com/somilkhan/Mylo/actions/runs/44784307658) was **pending with no jobs listed** at the time of this entry. Do not call the changes CI-green until the run completes for exact source SHA `4521d30d5ee80953790d13beaafe4ca423247736`.
+- New device build and post-fix device verification are outstanding. In particular, verify repeated pull gestures, refresh completion/failure, indicator dismissal, and badge visibility/truncation on narrow screens and large font scale.
+
+### Scope guard
+- `main` untouched; no new branch.
+- No new refresh button, polling loop, data source, persistence, or global Home behavior change.
+- Playlist generation/storage identifiers and playlist actions remain unchanged.
