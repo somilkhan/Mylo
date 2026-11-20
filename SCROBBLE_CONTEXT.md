@@ -3412,3 +3412,39 @@ Before making another dialog/icon change, the next agent must read this entire `
 3. Review the 78-file diff against the intended merge scope and inspect PR #4/#8 for overlap before deciding whether they should remain draft, close, or be superseded.
 4. Ask the product owner to confirm whole-branch versus Scrobble-only merge scope.
 5. Only after all gates and explicit approval, prepare the appropriate PR/merge. Never push or merge to `main` as part of this preparation.
+
+
+## 112. Whole-branch integration PR opened (2026-11-20 23:42 IST)
+
+### Product-owner scope confirmation
+- Product owner explicitly confirmed: merge the **entire `Main-dev` branch**, not only Scrobble/FAB.
+- No source code was changed in this preparation step.
+
+### Draft PR created
+- PR #11: https://github.com/somilkhan/Mylo/pull/11
+- Title: `Integrate entire Main-dev branch into main`
+- State: open, draft; base `main`, head `Main-dev`.
+- PR base SHA at creation: `11478fde56f1817cb777b296e60907359086f383`.
+- PR head SHA at creation: `f8c0be0843241a6194080e5d4b765788ad95be7c`.
+- Compare: 323 commits ahead, 0 behind; 78 changed files; 12,419 additions and 596 deletions.
+- Scope includes Scrobble statistics/generation/playlists and durable Last.fm queue, FAB/navigation, Replay/History, Settings/dialogs, shared repository/icon code, translations, tests and CI workflow changes.
+- Existing draft PRs #4 and #8 remain open and separate. Their overlap/disposition must be reviewed before merging #11.
+
+### Exact validation evidence
+- Run #44788489430: https://github.com/somilkhan/Mylo/actions/runs/44788489430
+- Run head: `1dc31d733b0118d75d73b68f4ed466f7089a4dbf`; branch head later advanced only by the documentation commit recorded above.
+- Desktop compile and tests: passed.
+- Web tests and typecheck: passed.
+- Android unit-test job: failed at `:app:compileDevDebugKotlin`.
+- Compiler diagnostic: `app/src/main/java/com/music/bitchord/ui/components/LyricsSourcesDialog.kt:578:47 Unresolved reference 'Icons'`.
+- APK assembly/upload: skipped.
+- No device/emulator verification is established.
+
+### Merge gates still open
+1. Fix the exact Android compiler error on `Main-dev`; rerun exact-head CI and ensure all jobs pass.
+2. Run Android APK assembly and retain the artifact.
+3. Complete emulator/POCO checks required by the approved brief/spec; report any unverified items.
+4. Review the complete 78-file diff and reconcile overlapping draft PRs #4 and #8.
+5. Obtain final product-owner approval before merging.
+- PR #11 intentionally remains draft. Do not merge while any gate is open.
+- `main` was not changed by creating the PR.
