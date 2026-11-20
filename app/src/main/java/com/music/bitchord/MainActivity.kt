@@ -601,6 +601,12 @@ private fun BitChordApp(
         scrobbleHandoffPlaylistId = null
         scrobbleHandoffFromGenerate = false
     }
+    // Programmatic root-tab changes leave the temporary hub through one owner.
+    // This guarantees active generation and handoff state are cleared first.
+    val navigateToNormalTab: (Int) -> Unit = { tab ->
+        if (showScrobble) closeScrobble()
+        selectedTab = tab
+    }
     // A successful save is the navigation event: keep the collector active only
     // while Scrobble is open, then move to Playlists after the store commit.
     LaunchedEffect(showScrobble, scrobbleGenerateViewModel) {
@@ -1913,8 +1919,7 @@ private fun BitChordApp(
                     // found nothing to start — and the results are a better
                     // answer to a spoken request than silence is.
                     dismissPlayer()
-                    if (showScrobble) closeScrobble()
-                    selectedTab = TAB_SEARCH
+                    navigateToNormalTab(TAB_SEARCH)
                     viewModel.searchFor(request.query)
                 }
             }
@@ -2566,18 +2571,18 @@ private fun BitChordApp(
                     }
                     PlaybackSourceType.HOME -> {
                         viewModel.closeMoodGenre()
-                        selectedTab = TAB_HOME
+                        navigateToNormalTab(TAB_HOME)
                     }
                     PlaybackSourceType.SEARCH -> {
                         viewModel.closeMoodGenre()
-                        selectedTab = TAB_SEARCH
+                        navigateToNormalTab(TAB_SEARCH)
                     }
                     PlaybackSourceType.HISTORY -> showHistory = true
                     PlaybackSourceType.REPLAY -> {
                         replayLandingPage = ReplayStoryPage.INTRO
                         showReplay = true
                     }
-                    PlaybackSourceType.EXPLORE -> selectedTab = TAB_EXPLORE
+                    PlaybackSourceType.EXPLORE -> navigateToNormalTab(TAB_EXPLORE)
                     PlaybackSourceType.SHARED_LINK -> {
                         val id = sourceId ?: return@openSource
                         context.startActivity(
@@ -5293,10 +5298,7 @@ private fun BitChordApp(
                                 confirmingProfile = false
                                 if (accepted) {
                                     webSession = null
-                                    if (mode == WebSessionMode.SIGN_IN) {
-                                        if (showScrobble) closeScrobble()
-                                        selectedTab = 2
-                                    }
+                                    if (mode == WebSessionMode.SIGN_IN) navigateToNormalTab(2)
                                 } else {
                                     captureFailed = true
                                 }
