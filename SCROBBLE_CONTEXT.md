@@ -2697,3 +2697,22 @@ The product owner explicitly approved the proposed Statistics additions and inst
 - Reused existing `BitChordIcons` assets where the semantics match: Search fields, Similar Tracks, Mix, Never Heard, Library, and the mode-row chevron. Play, Shuffle and Pin were already aligned in sections 83–84.
 - Kept Material icons for modes/actions that do not have a semantically equivalent Mylo icon. No icon size, layout, action, or dependency changes.
 - This is source-level consistency work, not device visual verification. CI for this exact latest source SHA must be polled; no test result is transferred from earlier commits.
+
+## 88. Playlist detail action sizing and saved-title contrast (2026-11-20 11:15 IST)
+
+### Changes on Main-dev
+- Code commit: `3d89408fd506eb2f4ea1ec37cc84abd862e99456`.
+- File: `app/src/main/java/com/music/bitchord/ui/scrobble/ScrobbleContent.kt`.
+- The post-generation “Playlist saved” card now sets its Surface content color to `onSecondaryContainer` and explicitly applies that semantic color to the playlist title. This closes another inherited-text-color path that could render the playlist name incorrectly against the secondary-container grey surface.
+- Playlist Detail’s Play and Shuffle actions now share the available row width, retain a 50dp minimum-height treatment, and use the same 16dp rounded action shape. Locate remains compact and appears only for the current track. This avoids the unweighted action row competing for width on narrow phones.
+- Existing play/shuffle callbacks, storage, playlist state, and theme toggle behavior are unchanged. No global theme or non-Scrobble screen changes.
+
+### Verification
+- Static source review confirms the Surface foreground and saved title both use `onSecondaryContainer`, and Play/Shuffle now use weighted widths within a full-width action row.
+- This is not a compile or visual pass. No local Gradle build, APK, emulator/device run, or screenshots have been performed.
+- CI must be checked for the exact new code SHA; do not infer a result from previous commits.
+- Gradient ON/OFF screenshot checks remain outstanding, including the saved-playlist confirmation card and the detail action row.
+
+### Next
+- Continue the approved Scrobble-only visual audit. The Statistics refresh affordance currently uses a rounded Refresh glyph and calls the ViewModel's explicit refresh action; Home's refresh path is pull-to-refresh rather than a matching header icon. Do not claim exact Home icon parity unless a shared source component is found.
+- Inspect the remaining Statistics card contrast and dialog/action patterns, then update this file with exact evidence. Keep device visual verification explicitly outstanding until screenshots exist.
