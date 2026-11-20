@@ -2664,3 +2664,27 @@ The product owner explicitly approved the proposed Statistics additions and inst
 - The Generator ModalBottomSheet already has the earlier opaque surface fix (section 79).
 - CI for the newest source SHA must be polled; no result is claimed yet. Visual confirmation of all dialogs in gradient ON/OFF still requires device screenshots.
 - Next: continue the approved Scrobble icon/dialog audit and inspect old ReplayViewModel data/actions before deciding the next Statistics parity implementation. Preserve the single Statistics destination and existing player owner.
+
+
+## 86. Replay insights restored inside Statistics — implementation pass (2026-11-20 11:08 IST)
+
+### Source trace / behavior decision
+- Read the legacy `ReplayScreen.kt`, `ReplayStories` entry points, `ReplaySummary` / `RankedEntry` models, and the `MainActivity.kt` Replay navigation/playback callbacks.
+- Legacy "Play your Replay" opens the Replay INTRO story; it does not itself start playback. Tapping a top-song chart row starts radio playback via the existing `playRadio(... PlaybackSourceType.REPLAY)` owner. Tapping artist/album chart rows opens their corresponding detail page.
+- Therefore the Statistics action is wired to the existing Replay story overlay, not reinterpreted as a new playback action. It is shown only when a non-empty local Replay summary exists, so Last.fm-only history cannot open an empty story.
+- Top Artists and Top Albums are derived from the existing period-filtered local `ReplaySummary`; their rows reuse existing `RankedEntry` metadata and open the same artist/album detail flows. The combined Your Tracks list remains local + Last.fm with the established per-track max merge. Remote listening duration is not invented; the concentration footer remains explicitly labelled Mylo listening time.
+
+### Changes on Main-dev
+- `app/src/main/java/com/music/bitchord/ui/scrobble/ScrobbleStatisticsContent.kt`: added the legacy Play your Replay story action (guarded by non-empty local summary), Top Artists and Top Albums ranked rows, circular artist artwork / square album artwork, and clickable row navigation callbacks.
+- `app/src/main/java/com/music/bitchord/MainActivity.kt`: connected story launch to existing `ReplayStories` state and artist/album rows to existing `openByName` detail navigation after closing the Scrobble hub. No new player, queue, repository, or statistics model was added.
+- Code commits: `3b8198a8ef0de94508767308eab81aa3ee8c6ee1`, `671efaf33d3cdcd704b7b9d456c369196740eafd`, `85f1ec86404133e4375db4860b94a86eb02aec40`.
+- Latest code HEAD: `85f1ec86404133e4375db4860b94a86eb02aec40`.
+
+### CI / verification
+- Prior run `44681755722` for `c825de726ac3af0f7fad076c67429dd79350d373`: Android unit tests **passed**; Web tests/typecheck **passed**; Desktop compile failed during dependency resolution because Maven Central did not provide `com.squareup.okhttp3:okhttp-jvm:5.3.2`; Desktop tests were skipped as a result. APK build/upload steps were skipped by workflow configuration.
+- Latest run `44682643152` targets the new code HEAD and was **pending** at documentation time. Poll it before claiming this Replay pass compiles/tests.
+- Static source inspection confirms the new callbacks are wired and the story action is guarded. No local Gradle build, APK, device/emulator run or screenshots were performed.
+
+### Remaining
+- Review whether top artist/album insight rows should display the same duration/plays metadata and rank treatment as Replay's legacy chart; current rows show rank, artwork, title, subtitle, local duration and play count.
+- Continue the remaining approved Statistics/UI review. Do not introduce a second Replay route, player owner, source tab, or fabricated Last.fm duration.
