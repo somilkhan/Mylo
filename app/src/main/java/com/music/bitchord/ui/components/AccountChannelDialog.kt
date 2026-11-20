@@ -212,7 +212,7 @@ private fun ChannelRow(channel: AccountChannel, selected: Boolean, onClick: () -
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    BitChordIcons.People,
+                    BitChordIcons.Person,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(17.dp),
