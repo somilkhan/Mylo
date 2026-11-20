@@ -3093,3 +3093,28 @@ All nine have now been converted to Mylo's `AlertScaffold` + `AlertRule` + `Aler
 - The source changes in sections 101–102 are compiled and unit-tested on this SHA. No physical-device runtime result is claimed.
 - No application code was changed to fix the compile errors beyond the required imports.
 - Keep the full device acceptance matrix in section 101 and app-wide alert checks in section 102 open until the new APK is installed and verified.
+
+
+## 104. Final Generator / playlist shelf polish (2026-11-20 14:42 IST)
+
+### Changes after the exact-HEAD green run in section 103
+- Generator section heading now follows the approved prototype wording, **Pick a mood**.
+- Generator mode icon tiles now use the approved purple-to-lilac gradient when the Scrobble gradient theme is ON; when OFF, they use the current Mylo `primaryContainer` palette. Icon glyphs remain white in gradient mode and use `onPrimaryContainer` in OFF mode.
+- Disabled generator rows use the prototype's 45% opacity; descriptions use 13sp single-line ellipsis. The 40dp tile, 64dp minimum row, chevron and divider layout remain consistent with the approved prototype.
+- Playlist shelf search and Add tracks search now reuse the existing Mylo `SearchField` component instead of custom pill/clear-button combinations.
+- Playlist shelf rows now have a 72dp minimum height matching the prototype; cover remains 52dp and existing play/overflow actions are unchanged.
+- Local playlist detail Back action now uses the Mylo chevron glyph. The shared release header, Play/Shuffle, Locate and all local editor operations remain intact.
+- No generator mode behavior, playlist search matching semantics, ordering, persistence or playback ownership was changed.
+
+### Exact current source / verification
+- Current `Main-dev` HEAD: `2148b769193eb3e21c2e45249d7d8260a9fb69e2`.
+- Updated `ScrobbleContent.kt` blob: `363022ff3b85b17d042e7c99a54e8e9a52df0a0b`.
+- The previous exact code SHA `3c172516d4a9c22f113d73757beeb726a75f69ac` is fully CI-green in run `44703085486` (Android tests, Desktop compile/tests, Web tests/typecheck).
+- Latest run `44704249102` for this final visual-polish SHA was in progress at this entry. Web tests/typecheck had passed; Android and Desktop jobs were still running. Do not transfer the previous SHA's green result to this newer SHA.
+- No new signed APK exists for this SHA yet.
+
+### Outstanding product decision and acceptance
+- The current playlist shelf search still matches playlist title, track title and artist; the approved UX spec says title-only. This behavior was deliberately preserved because section 100 records it as a product-scope conflict; do not silently remove the broader search until the user confirms.
+- Library period semantics remain unresolved because the current YTM library data path has no trustworthy added-date field. Do not invent date filters.
+- After run `44704249102` passes, manually dispatch **MYLO Signed Release Builds** on `Main-dev` with `upload_apks=true`, install the phone APK over the previously installed signed build, and complete the device matrix in sections 101–102.
+- Device screenshots and runtime checks are still outstanding; source and CI review are not device acceptance.
