@@ -117,17 +117,23 @@ internal fun ScrobbleStatisticsContent(
                     onClick = viewModel::refresh,
                     enabled = !state.isRefreshing,
                 ) {
-                    if (state.isRefreshing) {
-                        androidx.compose.material3.CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            strokeWidth = 2.dp,
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.Rounded.Refresh,
-                            contentDescription = "Refresh statistics",
-                            tint = MaterialTheme.colorScheme.onSurface,
-                        )
+                    Box(
+                        modifier = Modifier.size(24.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (state.isRefreshing) {
+                            androidx.compose.material3.CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp,
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Rounded.Refresh,
+                                contentDescription = "Refresh statistics",
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(24.dp),
+                            )
+                        }
                     }
                 }
             }
