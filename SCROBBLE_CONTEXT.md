@@ -2451,3 +2451,39 @@ Existing files modified in the same data-layer commit:
 4. Verify Last.fm account/config restoration after process restart, pagination/rate-limit behavior, cancellation and cache concurrency before calling the remote integration production-ready.
 5. Run exact-head Android unit tests/compile, desktop tests and web checks. Request an APK only from the final exact code SHA through the supported workflow path, then verify it on device if available.
 6. Update this file again with the resulting code SHA, documentation SHA, CI run IDs/log outcomes, files changed, device evidence and remaining acceptance items.
+## 76. Statistics acceptance continuation — CI and source integration review (2026-11-20)
+
+### Exact repository and CI state
+- Refreshed `Main-dev`: documentation HEAD at start of this pass `60c33b41bdbacc8e35041c7342caa880bcf1fefe`; parent code SHA `89c98cc5ce041f78a1d83524c483192d7d188346`. The branch still points to the handover SHA; no source changes were made in this pass.
+- Polled workflow run `44540170278` against exact code SHA `89c98cc5ce041f78a1d83524c483192d7d188346`: overall conclusion `success`.
+- Job evidence: Web tests/typecheck passed; Desktop compile and tests passed; Android unit tests passed. Android APK build and artifact upload were explicitly skipped by the push workflow. This is not APK/device evidence.
+- Inspected the actual diffs for `7cd77f50`, `424d4c90`, `e83e80f1`, `4e3b0dc6`, `89c98cc5` and the documentation commit `60c33b41`. The last code diff is only the supported Compose padding overload correction.
+
+### Authoritative sources and prototype review
+- Re-read the complete uploaded `AGENT-BRIEF.md` (113 lines), `mylo-ux-spec.md` (133 lines), `CHANGE-THEME-TOGGLE.md` (60 lines), and all 758 lines of `mylo-replay-prototype-v3.html`.
+- Read the Library `Universal Agent Engineering/references/ui-ux-review.md` playbook. It requires review of whole journeys, structure, interaction states, accessibility, visual quality and runtime evidence.
+- Inspected the prototype source's Statistics, Generate, Playlists, dialogs, theme tokens, navigation and state handlers. It remains a demo reference only; sample data and simulated actions must not be copied into production.
+- Attempted a local headless Chromium render for visual inspection, but the browser process timed out before producing a screenshot. Therefore no browser-render screenshot is claimed; source inspection only.
+
+### Statistics integration findings verified from current source
+- `ScrobbleStatisticsViewModel` is wired to `LastFmStatisticsRepository`, local `ListeningStats.summary(period)`, and the merged `mergeStatisticsTracks` model. The screen has one merged list and no Last.fm source selector.
+- The merge model normalizes artist + title with `PlaylistGenerationRules.trackKey`, aggregates local duplicate identities, and applies `max(localPlays, lastFmPlays)` when connected; disconnected mode excludes remote rows. Existing model tests cover these cases.
+- The repository applies device-local calendar boundaries for week/month/year and all-time top tracks. Local `ListeningStats.summary` uses day-level filtering for weeks and month buckets for month/year/all-time. Four period values are the existing `ReplayPeriod` enum.
+- Cache TTL is five minutes; force refresh bypasses fresh cache; stale cache remains available after failure; endpoint identity is included in the cache key. Existing repository tests cover TTL, forced refresh, stale retention, endpoint isolation, pagination and timestamp filtering.
+- Last.fm configuration restoration is present: `BitChordApplication.onCreate` calls `AppSettings.init` before `initLastfm`; `initLastfm` restores endpoint, API key, secret and saved session key into `LastFM.configure`. The earlier process-restart concern is therefore addressed at source level, but still needs runtime/device confirmation.
+- Concentration uses the merged track play counts. The separate duration line is explicitly labelled `Mylo listening time` and uses local `ReplaySummary.totalMs`; remote-only tracks retain zero local duration. Do not invent Last.fm listening milliseconds.
+- Loading skeleton, empty state, pull-to-refresh, stale content, connected-only retry notice and retry action are present in the current Compose screen/ViewModel. Their full state transitions have not yet been exercised by ViewModel/UI tests.
+
+### Remaining verified gaps / next actions
+- No `ScrobbleStatisticsViewModelTest` or Compose UI acceptance test exists in the current test tree. Add focused tests for initial loading, local-only disconnected mode, empty state, connected refresh, stale data during refresh, refresh failure/retry, period changes and cancellation before claiming full Statistics acceptance.
+- Audit pagination request volume and Last.fm rate-limit behavior for long recent histories; retain cancellation safety and do not silently truncate results.
+- Continue checking theme contrast in Statistics, Generate and Playlists with gradient ON and OFF, including dialog and playlist title/secondary-label combinations. No palette or layout redesign is authorized.
+- Verify the full nine-mode Generator flow, playlist persistence/actions, queue restart recovery, both theme states, and offline scrobble recovery on device. No fresh APK, screenshot or physical-device evidence is available from this CI run.
+- The environment could not clone the repository locally because outbound DNS/network access was unavailable. CI is the exact-SHA verification source for this pass; no local Gradle command is claimed.
+- No application source files changed in this pass. Continue on `Main-dev` only; never modify `main`; `last-wave` remains reference-only.
+
+### Exact next action
+1. Add test seams only where needed to test the current Statistics ViewModel without changing product behavior or adding duplicate repositories.
+2. Implement focused ViewModel state/cancellation tests and run exact-head Android unit tests/compile through CI.
+3. Continue Generator/Playlist visual contrast review against the approved prototype and theme toggle; then obtain a fresh APK from the final exact code SHA and perform device acceptance.
+4. Update this context with resulting code/doc SHAs, test/CI outcomes, APK provenance, screenshots/device evidence and remaining defects.
