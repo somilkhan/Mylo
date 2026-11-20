@@ -2576,3 +2576,33 @@ The product owner explicitly approved the proposed Statistics additions and inst
 - This is a first functional correction, not yet a verified exact visual match to Home's top-bar icon. Further inspect the actual Home floating top bar refresh icon before declaring icon parity. Avoid replacing the Statistics force-refresh/cache semantics with Home's data refresh implementation.
 - Latest code SHA: 'eb00b2d9272d70a28484045a51a63a47ec53fc47'. CI for prior sheet-opacity SHA 'ef8fb4ae09fd8e4d30c1ca5c49a2a7369cd9e13f' remained in progress at last poll; the new commit triggers a fresh CI run, which must be checked separately. No build/APK/device verification is claimed yet.
 - Next: inspect actual Home top-bar icon and dialog conventions; improve Scrobble dialogs and icon family; trace playlist detail components; then implement Replay parity features in Statistics with real data and update tests/docs.
+
+
+## 81. Playlist UI source trace and latest CI verification (2026-11-20)
+
+### Playlist implementation trace — verified on Main-dev
+- The Scrobble Playlists route is implemented in `app/src/main/java/com/music/bitchord/ui/scrobble/ScrobbleContent.kt` by `ScrobblePlaylistsContent`, with a private `PlaylistRow` and private `PlaylistDetailContent`. It reads/writes the existing `LocalPlaylistStore`; it does not currently delegate to a shared app-wide playlist-detail composable.
+- The list row uses a 54dp cover, title/count, Play action and overflow menu. It supports pin, move up/down, rename, delete and Generate Similar. The list has custom sort, preview expansion, generated-playlist handoff and empty/error states.
+- The detail has a separate 88dp cover/title header, Play/Shuffle, Add tracks, cover change/reset, Export, Generate Similar, Rename/Delete, track rows, current-track highlighting and per-track remove/move actions.
+- This source trace does **not** establish that Mylo has a reusable local-playlist detail screen elsewhere. `DetailScreen.kt` is the generic catalog detail host and is not proven to be a drop-in owner for `LocalPlaylist`. Do not replace the Scrobble detail with an unrelated album/artist/YouTube Music detail route. Continue searching the existing Mylo shared components (especially `SongRow`, cover placeholders, header/action patterns) and reuse only components whose data contract and behavior genuinely match.
+
+### Confirmed UX-spec mismatches to resolve
+- The playlist-list filter currently matches both playlist titles and every track's title/artist, and its label says "Search playlists and tracks". The approved spec requires title-only search.
+- The detail currently exposes track-level search and track sorting (Custom order/Title/Artist). The approved spec explicitly says track-level search is out of scope and drag reorder is out of scope. Remove or hide these unapproved controls in a focused change; do not silently broaden the spec.
+- The detail's per-track Move up/Move down actions are also beyond the current spec's stated detail actions (Play, Shuffle, Export, Add track, Move Up/Down, Remove). The wording of Move Up/Down is ambiguous about whether it means playlist order or track order; preserve existing behavior until verified against current product intent rather than guessing.
+- Playlist title contrast and surfaces currently depend on `surfaceVariant/onSurface` plus a 24%-alpha track-row surface. Review both gradient ON/OFF against the actual prototype and Mylo semantic theme. Do not solve text contrast by globally changing the gradient palette.
+
+### Implementation direction
+1. Keep the existing `LocalPlaylistStore` and Scrobble route as the owner unless a genuinely matching reusable playlist-detail component is found.
+2. Align visual structure to Mylo's existing components/tokens: inspect shared song-row, cover, typography, action-button and detail-header patterns. Reuse the existing player callback; do not introduce another playback owner.
+3. First correct spec violations (title-only list search; remove unapproved track-level search/sort) in a narrow pass. Preserve required Play, Shuffle, Export, Add track, Move Up/Down and Remove behavior as the spec clarifies.
+4. Fix artwork sizing/crop, title contrast, row surface and action hierarchy for both gradient states. Keep the approved layout, icon sizes and spacing unless a concrete contrast/touch-target defect requires a listed correction.
+5. Validate list/detail, empty state, search, menu, add/remove, play, shuffle, export, back navigation and both theme states. Device screenshots are still required for visual sign-off.
+
+### CI update for the two prior code changes
+- Run `44676838572` for code SHA `eb00b2d9272d70a28484045a51a63a47ec53fc47`: Android unit tests **passed**; Desktop compile **passed** and Desktop unit tests **passed**; Web tests and typecheck **passed**. APK build step was **skipped** by workflow configuration, so this is not APK/assembleDebug evidence.
+- Earlier run `44676421950` for `ef8fb4ae09fd8e4d30c1ca5c49a2a7369cd9e13f`: Android unit tests passed, Web passed; Desktop compile passed but Desktop tests were cancelled; overall that run is not a full pass. Superseded for the later code SHA by run `44676838572`.
+- No device/emulator screenshots or runtime verification have been performed. Do not claim the generator opacity fix or Statistics refresh affordance visually verified on device.
+
+### Next
+- Continue the source trace of Mylo's reusable song-row/cover/detail primitives and inspect the approved v3 HTML for the exact playlist visual reference. Then make the smallest playlist compliance/UI-alignment changes and update this file with exact code/doc commits and test evidence.
