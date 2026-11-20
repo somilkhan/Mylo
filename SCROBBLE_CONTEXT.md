@@ -2927,3 +2927,47 @@ The product owner explicitly approved the proposed Statistics additions and inst
 ### Current decision
 - No application source change was justified by this verification pass. Do not create a new code commit just to repeat CI; the exact application-code SHA is already CI-green and a signed release APK has been built from current `Main-dev`.
 - Next action is device installation and the acceptance matrix, followed by only evidence-backed fixes or genuinely missing focused tests. Keep all work on `Main-dev`; never touch `main`.
+
+
+## 100. Post-install user-reported UX audit — findings and implementation plan (2026-11-20 13:33 IST)
+
+### User-reported issues
+- Replay statistics/cards are still missing from the Statistics destination.
+- Finishing a Replay story can return to the Replay page/library instead of consistently returning to the screen that launched it.
+- Generator mode cards need to feel more like Mylo rather than a mixed Material icon collection.
+- Opening a generated playlist creates a separate scrollable detail page instead of following the app's established playlist/detail presentation.
+- Statistics has an unnecessary refresh icon; pull-to-refresh is unreliable.
+- Some in-app dialogs look like default Android/Material dialogs rather than Mylo's frosted alert pattern.
+- Icons in scrollable Scrobble surfaces look dated/inconsistent.
+
+### Source-confirmed findings (current app-code SHA `7d7f5f4d25ff14d86d2c2659b892c50b59947a67`)
+1. **Replay card parity is incomplete.** `ScrobbleStatisticsContent.kt` currently shows Track Concentration, a Play your Replay action, Top Artists, Top Albums and merged tracks. It does not render the existing `ReplayCardRow` / four `ReplaySummary.cards()` headline cards (minutes listened, top song, top artist, top album). The approved legacy card component and real period-filtered summary already exist in `ui/replay/ReplayScreen.kt` / `ui/replay/ReplayModel.kt`; reuse them rather than inventing new statistics.
+2. **Replay launch loses origin and period.** The Statistics callback in `MainActivity.kt` sets both `showReplay = true` and `replayStory = INTRO`; `ReplayStories.onClose` only clears `replayStory`. Therefore the story reveals the standalone Replay page underneath, even when launched from Statistics. The Replay page's period is owned by `rememberReplayState` (default This Year), while Scrobble Statistics has its own period (default All Time). A story launched from Statistics can therefore show a different period from the card that launched it. Track the launch origin and period; closing the story should reveal the originating surface, and Statistics-origin stories must use the same period as the card.
+3. **Generated playlist detail is a separate implementation.** `ScrobblePlaylistsContent` switches to private `PlaylistDetailContent` in `ScrobbleContent.kt`, which owns another `LazyColumn`, a custom header/action row and local edit/export/track operations. It reuses `SongRow`, `LocalPlaylistStore` and existing playback callbacks, but does not call the app's `DetailScreen`. `DetailScreen` is built around remote `DetailPage`/YouTube browse data and app-level top-bar/navigation state, while generated playlists are `LocalPlaylist` records with extra local-only operations (rename, pin, cover, export, local add/remove/reorder). Do not blindly route a local playlist through a remote YouTube detail fetch. Audit shared release-header/list primitives and align the local page to Mylo's existing detail geometry, artwork palette, row spacing, typography and controls while retaining local-only actions. If a safe shared component extraction is not small, document why and keep the local data owner.
+4. **Refresh layout contributes to gesture discoverability.** The Statistics header and period selector currently sit outside `PullToRefreshBox`; only the lower `LazyColumn` accepts the refresh gesture. A swipe begun over the title/period area cannot trigger refresh. Remove the separate refresh IconButton and put the complete Statistics content (header, period selector and list) inside one pull-to-refresh container, keeping the visible in-content pull indicator and the existing force-refresh ViewModel action.
+5. **Period changes discard visible data.** `ScrobbleStatisticsViewModel.setPeriod` clears `localSummary` and `tracks` immediately and switches to loading. This contradicts the approved stale-content rule and makes Replay cards/insights disappear during period changes. Preserve the last rendered content while the new period loads; only replace it when the new period's local/cache data is available. Keep request-period guards so an older request cannot overwrite a newer selection.
+6. **In-app dialogs use the wrong shell.** Rename, Delete and Export currently use Material3 `AlertDialog` in the Scrobble content files. The established Mylo pattern is the full-screen scrim + frosted `AlertScaffold` from `ui/components/AccountAlerts.kt` / `UpdateAvailableDialog.kt`, with stacked `AlertAction` rows and `AlertRule` dividers. Convert these in-app dialogs to that pattern, with Scrobble-aware readable action colors. Android's system document picker (`CreateDocument`) and Android share chooser are intentionally OS-owned and cannot be made into in-app Mylo dialogs; keep those system surfaces.
+7. **Icon-family mismatch is real but not universal.** `GeneratorModeRow` uses Material Filled glyphs for Top, Recent, Similar Artists, Tag and Recommendations while other modes already use `BitChordIcons`. Playlist sorting, overflow, edit/delete, cover, locate and some menu actions also use Material Rounded glyphs. Reuse exact existing BitChord vectors wherever semantics match; do not force unrelated icons into a false mapping or change the shared app icon family globally. Add new custom vectors only if the same semantic glyph is genuinely reused across Scrobble surfaces.
+8. **Generator row parity check.** Current mode rows are separate 18dp rounded surfaces with 44dp icon tiles and one-line descriptions. Preserve the approved nine-mode order, minimum touch targets, disabled Library reason and optional Last.fm behavior. Re-check the exact note placement and text truncation against the approved spec/prototype; do not change generator semantics or add/remove modes.
+
+### Additional audit scope
+- Verify all Statistics states: initial load, empty local/remote, local-only, Last.fm connected, cached/stale while refreshing, refresh failure/retry, period changes and account changes.
+- Verify Replay cards and story pages use one matching period/summary and that Back/close returns to the actual launch origin (Statistics, Replay page, Library or Settings).
+- Verify playlist list/detail: no nested competing scroll containers, keyboard/search behavior, small-screen actions, current-track Locate index, empty/error states, menu dismissal/back priority, playlist persistence and all local-only actions.
+- Inspect Generator dialog and row touch targets, Last.fm note visibility, Library sign-in gate, count bounds, retry/cancel, keyboard overlap and reduced-motion behavior.
+- Inspect every Scrobble in-app dialog and every Material icon call. Distinguish app-rendered dialogs from Android-owned pickers/choosers.
+- Recheck gradient ON and OFF semantics; no global theme, Home, Library or Player redesign.
+
+### Implementation order
+1. Restore the existing Replay headline cards inside Statistics; keep them backed by the current period-filtered `ReplaySummary`.
+2. Fix origin-aware Replay story return and synchronize the story period to the Statistics card period.
+3. Remove the Statistics refresh icon; move the full screen under one reliable pull-to-refresh container; preserve stale data on period changes.
+4. Align generated playlist detail with Mylo's established release/detail presentation without replacing LocalPlaylistStore or losing local playlist actions.
+5. Convert Scrobble in-app AlertDialogs to Mylo's frosted AlertScaffold pattern; keep Android file pickers/share chooser OS-owned.
+6. Replace remaining mismatched icons with exact `BitChordIcons` equivalents and refine Generator mode rows only where the source/spec audit supports it.
+7. Add focused regression tests, run exact-SHA CI, then have the user verify the installed build on device. Record screenshots and exact results; do not claim device verification from source inspection.
+
+### Branch / safety
+- Latest inspected `Main-dev` HEAD before this audit append: `f085e93020ac8ea320266bc337b1290733006911`; application code remains `7d7f5f4d25ff14d86d2c2659b892c50b59947a67`.
+- Work only on `Main-dev`; `main` untouched; `last-wave` remains reference-only.
+- No application code has been changed in this audit entry. Do not repeat the previous color/contrast audit; this pass is driven by the newly reported installed-build defects.
