@@ -108,7 +108,7 @@ class HistoryParityTest {
     fun emptyResponseGivesEmptyResultFromBothParsers() {
         val root = parse(page())
 
-        assertEquals(emptyList(), InnertubeParser.parseHistoryPage(root).songs)
-        assertEquals(emptyList(), InnertubeParser.collectSongsDeep(root))
+        assertEquals(emptyList<String>(), InnertubeParser.parseHistoryPage(root).songs.map { it.videoId })
+        assertEquals(emptyList<String>(), InnertubeParser.collectSongsDeep(root).map { it.videoId })
     }
 }
