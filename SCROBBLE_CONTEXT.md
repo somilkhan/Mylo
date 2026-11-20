@@ -2487,3 +2487,41 @@ Existing files modified in the same data-layer commit:
 2. Implement focused ViewModel state/cancellation tests and run exact-head Android unit tests/compile through CI.
 3. Continue Generator/Playlist visual contrast review against the approved prototype and theme toggle; then obtain a fresh APK from the final exact code SHA and perform device acceptance.
 4. Update this context with resulting code/doc SHAs, test/CI outcomes, APK provenance, screenshots/device evidence and remaining defects.
+
+
+## 77. Product-owner-approved UI defect and consistency pass (2026-11-20)
+
+### Approval and scope update
+The product owner explicitly approved the proposed Statistics additions and instructed the agent to proceed with updating this context and continue. The product owner also reported the following defects in the latest build and approved addressing them:
+
+1. **Generator playlist dialog — gradient ON transparency/background defect.** The dialog's background/scrim/surface transparency is visibly wrong only when the Scrobble gradient theme toggle is ON, specifically around the track-count selector. Inspect the actual Compose dialog/window/surface layering, tonal elevation, alpha, and gradient backdrop. Correct the gradient-ON rendering without changing the dialog's approved structure, count range, controls, or OFF-theme behavior.
+2. **Statistics refresh icon and behavior.** The refresh icon is glitchy. Reuse the same Home refresh icon visual and refresh interaction/logic where appropriate, extracting/reusing existing shared behavior rather than inventing a second refresh implementation. Statistics must retain its product rules: pull-to-refresh forces a Last.fm fetch; no polling; stale content stays visible; retry notice only while connected. Do not change Home's appearance or behavior.
+3. **Dialogs do not feel like Mylo UI.** Review the Generator playlist dialog and any Scrobble-specific dialogs. Align their surfaces, typography, shapes, spacing, colors, buttons and state feedback with existing Mylo dialog conventions while preserving the approved dialog structure and required controls. This is an explicit narrow exception to the earlier "do not change dialog look" restriction, approved by the product owner for Scrobble dialogs only.
+4. **Outdated icons.** Audit icons used across Statistics, Generate, Playlists and their dialogs. Replace dated/inconsistent glyphs with the existing modern/aesthetic Mylo icon assets/components already used elsewhere in the app. Reuse existing assets; do not introduce an unrelated icon pack, duplicate vector set, or alter app-wide icons.
+5. **Scrobble playlist view differs from Mylo playlist UI.** The playlist detail/view opened from Scrobble must use/reuse Mylo's established playlist presentation (artwork treatment, layout, typography, actions and visual hierarchy), not a separate Scrobble-only design. Trace existing playlist UI and reuse its components/data flow where possible; do not duplicate playback ownership or break generated playlist actions/persistence.
+6. **Gradient theme consistency needs improvement.** Audit all three Scrobble screens and their dialogs in both Settings toggle states. Gradient ON should use one consistent approved gradient language, clear text/accent contrast and correctly layered surfaces; OFF should use current Mylo theme tokens. Fix color shifts, opacity mismatches, black-on-grey/low-contrast text, inconsistent card/list/chip/dialog colors and artwork clashes. Do not invent a new palette, use dynamic artwork colors, or change non-Scrobble screens.
+
+### Statistics approved additions (single merged Replay + Last.fm experience)
+- Preserve the existing four period controls: This Week, This Month, This Year, All Time.
+- Preserve and complete the **Track Concentration** card directly below the period selector, using merged Replay + Last.fm play counts: Top track, Next 2 tracks, Other tracks, Average Plays / Track and Unique Tracks.
+- Preserve/complete **Your Tracks** as one normalized merged list, one row per artist+title identity, with max(local, Last.fm) plays when connected and local-only when disconnected.
+- Review useful legacy Replay artist/album insights and integrate only genuinely useful breakdowns into the same Statistics screen; do not create a separate Replay screen or Last.fm tab/source toggle. Verify old behavior and existing implementation before deciding each item.
+- Restore the **Play Replay** action only after tracing its previous implementation and playback semantics; use Mylo's existing playback owner/player and do not add a second player. If no reliable old action exists, document the gap rather than inventing behavior.
+- Keep truthful listening-time semantics: Last.fm response data does not provide per-track listened milliseconds. Do not fabricate remote listening duration; preserve/label actual local Mylo listening time accurately.
+
+### Required implementation order
+1. Refresh Main-dev refs and inspect exact current code, caller graph and tests. Preserve user changes; do not touch main.
+2. Inspect Home's refresh icon/component and refresh logic, existing Mylo dialogs, icon assets, playlist detail UI, and all Scrobble theme token/surface paths. Search for reusable components before creating anything.
+3. Fix the gradient-ON Generator dialog transparency defect and make Scrobble dialogs consistent with Mylo conventions.
+4. Replace outdated Scrobble icons with existing Mylo icon assets; align Statistics refresh with Home's established icon and behavior while retaining Statistics-specific fetch/cache semantics.
+5. Reuse Mylo playlist detail presentation for generated/scrobble playlists.
+6. Complete the approved Statistics feature parity/additions described above.
+7. Run focused tests for refresh state/cancellation, dialog theme ON/OFF, playlist navigation/actions and Statistics merged calculations. Run full Android unit tests/build and available CI on the exact final SHA.
+8. Obtain a fresh APK from the final exact code SHA and visually verify on device in both gradient ON and OFF modes, especially the Generator count dialog, Statistics refresh, playlist artwork/detail and text contrast. If device evidence is unavailable, state this explicitly.
+9. Update this context after each meaningful implementation pass with exact changed paths, code/doc SHAs, tests/CI, APK/device evidence and outstanding issues.
+
+### Guardrails
+- This approval overrides earlier out-of-scope restrictions only for the six Scrobble-specific issue areas and Statistics additions above. It does not authorize redesign of Home, other app screens, FAB, navigation, mini-player, player, Settings layout or app-wide theme.
+- Preserve approved layout hierarchy and behavior unless a defect requires a narrowly scoped correction. Prefer reuse of Mylo components/tokens over new abstractions.
+- No placeholder data, fake counts, sample tracks, duplicate repositories, duplicate players, new icon packs or new database dependencies.
+- Do not claim any issue fixed until code change, tests and visual verification are evidenced. CI success alone does not prove gradient/dialog rendering on device.
