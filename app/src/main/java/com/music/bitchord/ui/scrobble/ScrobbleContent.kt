@@ -55,8 +55,11 @@ import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.MyLocation
 import com.music.bitchord.ui.components.SongRow
+import com.music.bitchord.ui.components.AlertAction
+import com.music.bitchord.ui.components.AlertRule
+import com.music.bitchord.ui.components.AlertScaffold
+import com.music.bitchord.ui.components.PillTextField
 import com.music.bitchord.ui.icons.BitChordIcons
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
@@ -116,6 +119,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
 
 @OptIn(ExperimentalSharedTransitionApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -902,10 +907,11 @@ private fun ReplayPeriod.label(): String = when (this) {
     else -> name.lowercase().replace('_', ' ').replaceFirstChar(Char::uppercase)
 }
 
-@OptIn(ExperimentalSharedTransitionApi::class)
+@OptIn(ExperimentalSharedTransitionApi::class, ExperimentalHazeMaterialsApi::class)
 @Composable
 fun ScrobblePlaylistsContent(
     viewModel: ScrobbleGenerateViewModel,
+    hazeState: HazeState,
     contentPadding: PaddingValues,
     highlightedPlaylistId: String?,
     sharedHandoffFromGenerate: Boolean,
@@ -945,6 +951,7 @@ fun ScrobblePlaylistsContent(
     if (selected != null) {
         PlaylistDetailContent(
             playlist = selected,
+            hazeState = hazeState,
             currentSong = currentSong,
             isPlaying = isPlaying,
             contentPadding = contentPadding,
@@ -1196,82 +1203,121 @@ fun ScrobblePlaylistsContent(
     }
 
     renameTarget?.let { target ->
-        AlertDialog(
-            onDismissRequest = { renameTarget = null },
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 1f),
-            titleContentColor = MaterialTheme.colorScheme.onSurface,
-            textContentColor = MaterialTheme.colorScheme.onSurface,
-            title = { Text("Rename playlist") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(value = renameText, onValueChange = { renameText = it; renameError = null }, singleLine = true)
-                    renameError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        val clean = renameText.trim()
-                        val duplicate = playlists.any { it.id != target.id && it.title.equals(clean, ignoreCase = true) }
-                        when {
-                            clean.isBlank() -> renameError = "Enter a playlist name"
-                            duplicate -> renameError = "A playlist with that name already exists"
-                            else -> scope.launch {
-                                if (LocalPlaylistStore.renamePlaylist(target.id, clean)) {
-                                    renameTarget = null
-                                } else {
-                                    renameError = "Couldn't save playlist name. Try again."
-                                }
+        AlertScaffold(
+            hazeState = hazeState,
+            onDismiss = { renameTarget = null },
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 19.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    "Rename playlist",
+                    style = MaterialTheme.typography.bodyLarge.copy(fontSize = 17.sp, fontWeight = FontWeight.W600),
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    "Choose a name for this playlist.",
+                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp, lineHeight = 17.sp),
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                PillTextField(
+                    value = renameText,
+                    onValueChange = { renameText = it; renameError = null },
+                    placeholder = "Playlist name",
+                )
+                renameError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+            }
+            AlertRule()
+            AlertAction(
+                label = "Save",
+                emphasised = true,
+                contentColor = scrobbleAccentColor(),
+                onClick = {
+                    val clean = renameText.trim()
+                    val duplicate = playlists.any { it.id != target.id && it.title.equals(clean, ignoreCase = true) }
+                    when {
+                        clean.isBlank() -> renameError = "Enter a playlist name"
+                        duplicate -> renameError = "A playlist with that name already exists"
+                        else -> scope.launch {
+                            if (LocalPlaylistStore.renamePlaylist(target.id, clean)) {
+                                renameTarget = null
+                            } else {
+                                renameError = "Couldn't save playlist name. Try again."
                             }
                         }
-                    },
-                    colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface),
-                ) { Text("Save") }
-            },
-            dismissButton = { TextButton(onClick = { renameTarget = null }, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface)) { Text("Cancel") } },
-        )
+                    }
+                },
+            )
+            AlertRule()
+            AlertAction(
+                label = "Cancel",
+                emphasised = false,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                onClick = { renameTarget = null },
+            )
+        }
     }
     deleteTarget?.let { target ->
-        AlertDialog(
-            onDismissRequest = { deleteTarget = null; deleteError = null },
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 1f),
-            titleContentColor = MaterialTheme.colorScheme.onSurface,
-            textContentColor = MaterialTheme.colorScheme.onSurface,
-            title = { Text("Delete playlist?") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("${target.title} will be removed from this device. Listening history is not affected.")
-                    deleteError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        scope.launch {
-                            withContext(NonCancellable) {
-                                if (LocalPlaylistStore.deletePlaylist(target.id)) {
-                                    target.customCoverUri?.let { savedUri ->
-                                        runCatching {
-                                            context.contentResolver.releasePersistableUriPermission(
-                                                Uri.parse(savedUri),
-                                                Intent.FLAG_GRANT_READ_URI_PERMISSION,
-                                            )
-                                        }
+        AlertScaffold(
+            hazeState = hazeState,
+            onDismiss = { deleteTarget = null; deleteError = null },
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 19.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    "Delete playlist?",
+                    style = MaterialTheme.typography.bodyLarge.copy(fontSize = 17.sp, fontWeight = FontWeight.W600),
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    "${target.title} will be removed from this device. Listening history is not affected.",
+                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp, lineHeight = 17.sp),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                )
+                deleteError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+            }
+            AlertRule()
+            AlertAction(
+                label = "Delete",
+                emphasised = true,
+                destructive = true,
+                contentColor = MaterialTheme.colorScheme.error,
+                onClick = {
+                    scope.launch {
+                        withContext(NonCancellable) {
+                            if (LocalPlaylistStore.deletePlaylist(target.id)) {
+                                target.customCoverUri?.let { savedUri ->
+                                    runCatching {
+                                        context.contentResolver.releasePersistableUriPermission(
+                                            Uri.parse(savedUri),
+                                            Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                                        )
                                     }
-                                    if (selectedId == target.id) selectedId = null
-                                    deleteTarget = null
-                                    deleteError = null
-                                } else {
-                                    deleteError = "Couldn't delete playlist. Check device storage and try again."
                                 }
+                                if (selectedId == target.id) selectedId = null
+                                deleteTarget = null
+                                deleteError = null
+                            } else {
+                                deleteError = "Couldn't delete playlist. Check device storage and try again."
                             }
                         }
-                    },
-                    colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.error),
-                ) { Text("Delete", color = MaterialTheme.colorScheme.error) }
-            },
-            dismissButton = { TextButton(onClick = { deleteTarget = null; deleteError = null }, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface)) { Text("Cancel") } },
-        )
+                    }
+                },
+            )
+            AlertRule()
+            AlertAction(
+                label = "Cancel",
+                emphasised = false,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                onClick = { deleteTarget = null; deleteError = null },
+            )
+        }
     }
 }
 
@@ -1401,6 +1447,7 @@ private fun PlaylistRow(
 @Composable
 private fun PlaylistDetailContent(
     playlist: LocalPlaylist,
+    hazeState: HazeState,
     currentSong: Song?,
     isPlaying: Boolean,
     contentPadding: PaddingValues,
@@ -1878,6 +1925,7 @@ private fun PlaylistDetailContent(
     if (exportDialogVisible) {
         ScrobblePlaylistExportDialog(
             playlist = playlist,
+            hazeState = hazeState,
             onDismiss = { exportDialogVisible = false },
             onMessage = { exportMessage = it },
         )
