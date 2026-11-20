@@ -44,7 +44,8 @@ import com.music.bitchord.ui.components.AlertRule
 import com.music.bitchord.ui.components.AlertScaffold
 import com.music.bitchord.ui.components.PillTextField
 import com.music.bitchord.ui.components.SearchField
-import com.music.bitchord.ui.icons.BitChordIcons
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.*
 import com.music.bitchord.ui.screens.LocalPlaylistReleaseHeader
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
@@ -317,7 +318,7 @@ fun ScrobbleGenerateContent(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
-                            Icon(BitChordIcons.Error, contentDescription = null, tint = MaterialTheme.colorScheme.onErrorContainer)
+                            Icon(Icons.Rounded.ErrorOutline, contentDescription = null, tint = MaterialTheme.colorScheme.onErrorContainer)
                             Text(error, modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onErrorContainer)
                             val retryRequest = uiState.activeRequest
                             if (retryRequest != null) {
@@ -601,7 +602,7 @@ fun ScrobbleGenerateContent(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
-                            Icon(BitChordIcons.Error, contentDescription = null, tint = MaterialTheme.colorScheme.onErrorContainer)
+                            Icon(Icons.Rounded.ErrorOutline, contentDescription = null, tint = MaterialTheme.colorScheme.onErrorContainer)
                             Text(error, modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onErrorContainer)
                         }
                     }
@@ -753,7 +754,7 @@ private fun GeneratorSeedResult(
                 Text(song.title, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(song.artist, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            if (selected) Icon(BitChordIcons.Check, contentDescription = "Selected", tint = scrobbleAccentColor())
+            if (selected) Icon(Icons.Rounded.Check, contentDescription = "Selected", tint = scrobbleAccentColor())
         }
     }
 }
@@ -805,15 +806,15 @@ private fun GeneratorModeRow(
     onClick: () -> Unit,
 ) {
     val icon = when (mode) {
-        PlaylistGenerationMode.TOP -> BitChordIcons.Heart
-        PlaylistGenerationMode.RECENT -> BitChordIcons.Clock
-        PlaylistGenerationMode.SIMILAR_TRACKS -> BitChordIcons.MusicNote
-        PlaylistGenerationMode.SIMILAR_ARTISTS -> BitChordIcons.People
-        PlaylistGenerationMode.TAG -> BitChordIcons.Tag
-        PlaylistGenerationMode.MIX -> BitChordIcons.Shuffle
-        PlaylistGenerationMode.RECOMMENDATIONS -> BitChordIcons.Sparkles
-        PlaylistGenerationMode.NEVER_HEARD -> BitChordIcons.Explore
-        PlaylistGenerationMode.LIBRARY -> BitChordIcons.Library
+        PlaylistGenerationMode.TOP -> Icons.Rounded.Favorite
+        PlaylistGenerationMode.RECENT -> Icons.Rounded.Schedule
+        PlaylistGenerationMode.SIMILAR_TRACKS -> Icons.Rounded.MusicNote
+        PlaylistGenerationMode.SIMILAR_ARTISTS -> Icons.Rounded.PeopleAlt
+        PlaylistGenerationMode.TAG -> Icons.Rounded.LocalOffer
+        PlaylistGenerationMode.MIX -> Icons.Rounded.Shuffle
+        PlaylistGenerationMode.RECOMMENDATIONS -> Icons.Rounded.AutoAwesome
+        PlaylistGenerationMode.NEVER_HEARD -> Icons.Rounded.Explore
+        PlaylistGenerationMode.LIBRARY -> Icons.Rounded.LibraryMusic
     }
     val gradientEnabled = LocalScrobbleGradientEnabled.current
     val iconTileBrush = if (gradientEnabled) {
@@ -864,7 +865,7 @@ private fun GeneratorModeRow(
                 )
             }
             Icon(
-                BitChordIcons.ChevronRight,
+                Icons.Rounded.ChevronRight,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(18.dp),
@@ -1008,13 +1009,13 @@ fun ScrobblePlaylistsContent(
                             )
                         }
                         TextButton(onClick = onOpenGenerator, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface)) {
-                            Icon(BitChordIcons.Sparkles, contentDescription = null, modifier = Modifier.size(17.dp))
+                            Icon(Icons.Rounded.AutoAwesome, contentDescription = null, modifier = Modifier.size(17.dp))
                             Spacer(Modifier.width(6.dp))
                             Text("Generate")
                         }
                         Box {
                             IconButton(onClick = { sortMenuExpanded = true }) {
-                                Icon(BitChordIcons.Sort, contentDescription = "Sort playlists")
+                                Icon(Icons.Rounded.Sort, contentDescription = "Sort playlists")
                             }
                             DropdownMenu(
                                 expanded = sortMenuExpanded,
@@ -1025,7 +1026,7 @@ fun ScrobblePlaylistsContent(
                                     DropdownMenuItem(
                                         text = { Text(option.label) },
                                         leadingIcon = if (sortMode == option) {
-                                            { Icon(BitChordIcons.Check, contentDescription = null) }
+                                            { Icon(Icons.Rounded.Check, contentDescription = null) }
                                         } else null,
                                         onClick = {
                                             sortMode = option
@@ -1102,7 +1103,7 @@ fun ScrobblePlaylistsContent(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(9.dp),
                     ) {
-                        Icon(BitChordIcons.Library, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(42.dp))
+                        Icon(Icons.Rounded.LibraryMusic, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(42.dp))
                         Text(if (playlists.isEmpty()) "No playlists yet" else "No matching playlists", style = MaterialTheme.typography.titleLarge)
                         Text(
                             if (playlists.isEmpty()) "Create your first mix from the Generator." else "Try another playlist name.",
@@ -1111,7 +1112,7 @@ fun ScrobblePlaylistsContent(
                         )
                         if (playlists.isEmpty()) {
                             Button(onClick = onOpenGenerator, colors = scrobblePrimaryButtonColors(), shape = RoundedCornerShape(16.dp)) {
-                                Icon(BitChordIcons.Sparkles, contentDescription = null)
+                                Icon(Icons.Rounded.AutoAwesome, contentDescription = null)
                                 Spacer(Modifier.width(8.dp))
                                 Text("Open Generator")
                             }
@@ -1362,11 +1363,23 @@ private fun PlaylistRow(
     } else {
         Modifier
     }
+    val rowShape = RoundedCornerShape(18.dp)
+    val gradientEnabled = LocalScrobbleGradientEnabled.current
     val rowContent: @Composable () -> Unit = {
             Surface(
-                modifier = Modifier.fillMaxWidth().heightIn(min = 72.dp).then(sharedBoundsModifier),
-                shape = RoundedCornerShape(18.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 72.dp)
+                    .then(sharedBoundsModifier)
+                    .then(
+                        if (gradientEnabled) {
+                            Modifier.border(1.dp, Color.White.copy(alpha = 0.08f), rowShape)
+                        } else {
+                            Modifier
+                        },
+                    ),
+                shape = rowShape,
+                color = if (gradientEnabled) Color.White.copy(alpha = 0.07f) else MaterialTheme.colorScheme.surfaceVariant,
                 contentColor = MaterialTheme.colorScheme.onSurface,
             ) {
             Row(
@@ -1420,11 +1433,11 @@ private fun PlaylistRow(
                     }
                 }
                 IconButton(onClick = onPlay, enabled = playlist.songs.isNotEmpty()) {
-                    Icon(BitChordIcons.Play, contentDescription = "Play playlist")
+                    Icon(Icons.Rounded.PlayArrow, contentDescription = "Play playlist")
                 }
                 Box {
                     IconButton(onClick = { menuExpanded = true }) {
-                        Icon(BitChordIcons.More, contentDescription = "Playlist actions")
+                        Icon(Icons.Rounded.MoreVert, contentDescription = "Playlist actions")
                     }
                     DropdownMenu(
                         expanded = menuExpanded,
@@ -1433,37 +1446,37 @@ private fun PlaylistRow(
                     ) {
                         DropdownMenuItem(
                             text = { Text(if (playlist.isPinned) "Unpin" else "Pin") },
-                            leadingIcon = { Icon(BitChordIcons.Pin, contentDescription = null) },
+                            leadingIcon = { Icon(Icons.Rounded.PushPin, contentDescription = null) },
                             onClick = { menuExpanded = false; onPin() },
                         )
                         DropdownMenuItem(
                             text = { Text("Generate similar") },
-                            leadingIcon = { Icon(BitChordIcons.Shuffle, contentDescription = null) },
+                            leadingIcon = { Icon(Icons.Rounded.Shuffle, contentDescription = null) },
                             enabled = canGenerateSimilar,
                             onClick = { menuExpanded = false; onGenerateSimilar() },
                         )
                         if (showReorder) {
                             DropdownMenuItem(
                                 text = { Text("Move up") },
-                                leadingIcon = { Icon(BitChordIcons.ArrowUp, contentDescription = null) },
+                                leadingIcon = { Icon(Icons.Rounded.ArrowUpward, contentDescription = null) },
                                 enabled = index > 0,
                                 onClick = { menuExpanded = false; onMoveUp() },
                             )
                             DropdownMenuItem(
                                 text = { Text("Move down") },
-                                leadingIcon = { Icon(BitChordIcons.ArrowDown, contentDescription = null) },
+                                leadingIcon = { Icon(Icons.Rounded.ArrowDownward, contentDescription = null) },
                                 enabled = index < lastIndex,
                                 onClick = { menuExpanded = false; onMoveDown() },
                             )
                         }
                         DropdownMenuItem(
                             text = { Text("Rename") },
-                            leadingIcon = { Icon(BitChordIcons.Edit, contentDescription = null) },
+                            leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null) },
                             onClick = { menuExpanded = false; onRename() },
                         )
                         DropdownMenuItem(
                             text = { Text("Delete") },
-                            leadingIcon = { Icon(BitChordIcons.Delete, contentDescription = null) },
+                            leadingIcon = { Icon(Icons.Rounded.Delete, contentDescription = null) },
                             onClick = { menuExpanded = false; onDelete() },
                         )
                     }
@@ -1623,7 +1636,7 @@ private fun PlaylistDetailContent(
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) {
-                    Icon(BitChordIcons.ChevronLeft, contentDescription = "Back to playlists")
+                    Icon(Icons.Rounded.ChevronLeft, contentDescription = "Back to playlists")
                 }
                 if (currentTrackDisplayIndex >= 0) {
                     TextButton(
@@ -1638,7 +1651,7 @@ private fun PlaylistDetailContent(
                         },
                         colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface),
                     ) {
-                        Icon(BitChordIcons.Locate, contentDescription = null)
+                        Icon(Icons.Rounded.MyLocation, contentDescription = null)
                         Spacer(Modifier.width(4.dp))
                         Text("Locate")
                     }
@@ -1657,7 +1670,7 @@ private fun PlaylistDetailContent(
                 ) { Text(if (addTracksExpanded) "Done" else "Add tracks") }
                 Box {
                     IconButton(onClick = { detailMenuExpanded = true }) {
-                        Icon(BitChordIcons.More, contentDescription = "Playlist actions")
+                        Icon(Icons.Rounded.MoreVert, contentDescription = "Playlist actions")
                     }
                     DropdownMenu(
                         expanded = detailMenuExpanded,
@@ -1666,7 +1679,7 @@ private fun PlaylistDetailContent(
                     ) {
                         DropdownMenuItem(
                             text = { Text("Change cover") },
-                            leadingIcon = { Icon(BitChordIcons.Image, contentDescription = null) },
+                            leadingIcon = { Icon(Icons.Rounded.Image, contentDescription = null) },
                             onClick = {
                                 detailMenuExpanded = false
                                 coverPicker.launch(arrayOf("image/*"))
@@ -1675,7 +1688,7 @@ private fun PlaylistDetailContent(
                         if (playlist.customCoverUri != null) {
                             DropdownMenuItem(
                                 text = { Text("Reset cover") },
-                                leadingIcon = { Icon(BitChordIcons.Delete, contentDescription = null) },
+                                leadingIcon = { Icon(Icons.Rounded.Delete, contentDescription = null) },
                                 onClick = {
                                     detailMenuExpanded = false
                                     val oldUri = playlist.customCoverUri
@@ -1701,7 +1714,7 @@ private fun PlaylistDetailContent(
                         }
                         DropdownMenuItem(
                             text = { Text("Generate similar") },
-                            leadingIcon = { Icon(BitChordIcons.Shuffle, contentDescription = null) },
+                            leadingIcon = { Icon(Icons.Rounded.Shuffle, contentDescription = null) },
                             enabled = !generationState.isGenerating && playlist.songs.any { it.videoId.isNotBlank() && !it.isVideo },
                             onClick = {
                                 detailMenuExpanded = false
@@ -1710,7 +1723,7 @@ private fun PlaylistDetailContent(
                         )
                         DropdownMenuItem(
                             text = { Text("Export playlist") },
-                            leadingIcon = { Icon(BitChordIcons.Share, contentDescription = null) },
+                            leadingIcon = { Icon(Icons.Rounded.Share, contentDescription = null) },
                             onClick = {
                                 detailMenuExpanded = false
                                 exportDialogVisible = true
@@ -1718,12 +1731,12 @@ private fun PlaylistDetailContent(
                         )
                         DropdownMenuItem(
                             text = { Text("Rename") },
-                            leadingIcon = { Icon(BitChordIcons.Edit, contentDescription = null) },
+                            leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null) },
                             onClick = { detailMenuExpanded = false; onRename() },
                         )
                         DropdownMenuItem(
                             text = { Text("Delete") },
-                            leadingIcon = { Icon(BitChordIcons.Delete, contentDescription = null) },
+                            leadingIcon = { Icon(Icons.Rounded.Delete, contentDescription = null) },
                             onClick = { detailMenuExpanded = false; onDelete() },
                         )
                     }
@@ -1871,7 +1884,7 @@ private fun PlaylistDetailContent(
                 ) {
                     DropdownMenuItem(
                         text = { Text("Move up") },
-                        leadingIcon = { Icon(BitChordIcons.ArrowUp, contentDescription = null) },
+                        leadingIcon = { Icon(Icons.Rounded.ArrowUpward, contentDescription = null) },
                         enabled = index > 0,
                         onClick = {
                             trackMenuExpanded = false
@@ -1883,7 +1896,7 @@ private fun PlaylistDetailContent(
                     )
                     DropdownMenuItem(
                         text = { Text("Move down") },
-                        leadingIcon = { Icon(BitChordIcons.ArrowDown, contentDescription = null) },
+                        leadingIcon = { Icon(Icons.Rounded.ArrowDownward, contentDescription = null) },
                         enabled = index < playlist.songs.lastIndex,
                         onClick = {
                             trackMenuExpanded = false
@@ -1895,7 +1908,7 @@ private fun PlaylistDetailContent(
                     )
                     DropdownMenuItem(
                         text = { Text("Remove from playlist") },
-                        leadingIcon = { Icon(BitChordIcons.Delete, contentDescription = null) },
+                        leadingIcon = { Icon(Icons.Rounded.Delete, contentDescription = null) },
                         onClick = {
                             trackMenuExpanded = false
                             scope.launch {
