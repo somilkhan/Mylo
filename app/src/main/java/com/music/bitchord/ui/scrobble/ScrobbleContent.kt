@@ -1673,7 +1673,6 @@ private fun PlaylistDetailContent(
                                 (if (generationState.isGenerating) 1 else 0) +
                                 (if (generationState.error != null) 1 else 0) +
                                 (if (addTracksExpanded) 1 + addTrackResults.size else 0) +
-                                (if (trackSearchVisible) 1 else 0)
                             scope.launch {
                                 listState.animateScrollToItem(precedingItems + currentTrackDisplayIndex)
                             }
