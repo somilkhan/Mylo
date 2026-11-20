@@ -231,6 +231,7 @@ internal fun ScrobbleStatisticsContent(
                             item(key = "replay-action") {
                                 TextButton(
                                     onClick = onOpenReplay,
+                                    colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface),
                                     modifier = Modifier.padding(horizontal = 20.dp),
                                 ) {
                                     Icon(
@@ -403,7 +404,7 @@ private fun StatisticsRetryNotice(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(message, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
-            TextButton(onClick = onRetry) {
+            TextButton(onClick = onRetry, colors = scrobbleTextButtonColors(colors.onErrorContainer)) {
                 Text("Retry", color = colors.onErrorContainer)
             }
         }
@@ -434,7 +435,7 @@ private fun StatisticsEmptyState(
             textAlign = TextAlign.Center,
         )
         if (!lastFmConnected) {
-            Button(onClick = onOpenSettings) {
+            Button(onClick = onOpenSettings, colors = scrobblePrimaryButtonColors()) {
                 Text("Open Settings")
             }
         }
@@ -631,16 +632,16 @@ internal fun ScrobblePlaylistExportDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("Choose a format for ${playlist.title}.")
-                TextButton(onClick = { csvSaveLauncher.launch(LocalPlaylistExport.fileName(playlist.title, "csv")) }) {
+                TextButton(onClick = { csvSaveLauncher.launch(LocalPlaylistExport.fileName(playlist.title, "csv")) }, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface)) {
                     Text("Save CSV")
                 }
-                TextButton(onClick = { share(true); onDismiss() }) { Text("Share CSV") }
-                TextButton(onClick = { m3uSaveLauncher.launch(LocalPlaylistExport.fileName(playlist.title, "m3u")) }) {
+                TextButton(onClick = { share(true); onDismiss() }, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface)) { Text("Share CSV") }
+                TextButton(onClick = { m3uSaveLauncher.launch(LocalPlaylistExport.fileName(playlist.title, "m3u")) }, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface)) {
                     Text("Save M3U")
                 }
-                TextButton(onClick = { share(false); onDismiss() }) { Text("Share M3U") }
+                TextButton(onClick = { share(false); onDismiss() }, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface)) { Text("Share M3U") }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
+        confirmButton = { TextButton(onClick = onDismiss, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface)) { Text("Done") } },
     )
 }
