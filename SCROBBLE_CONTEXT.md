@@ -2810,3 +2810,14 @@ The product owner explicitly approved the proposed Statistics additions and inst
 - Confirmed `MainActivity` passes the live StateFlow value into `ScrobbleHubTheme(gradientEnabled = scrobbleGradientTheme)` around the three Scrobble destinations.
 - The new `LocalScrobbleGradientEnabled` is scoped inside that theme wrapper. Therefore the button/checkbox helpers use the approved accent only while the gradient is ON and return normal Material 3 defaults when OFF. No Settings row or non-Scrobble screen was changed.
 - Verification is source-level only. Persistence, live toggle recomposition and both visual states still need runtime/device confirmation.
+
+## 94. Final matching Mylo icon reuse pass (2026-11-20 11:35 IST)
+
+- Code commit: `7d7f5f4d25ff14d86d2c2659b892c50b59947a67`.
+- File: `app/src/main/java/com/music/bitchord/ui/scrobble/ScrobbleContent.kt`.
+- Replaced the remaining Material rounded check glyphs in selected seed and playlist sort states with `BitChordIcons.Check`.
+- Replaced the playlist empty-state Library Music glyph with `BitChordIcons.Library`.
+- Removed now-unused Material icon imports left behind by the earlier Mylo icon-family migration. Material icons remain only for actions/modes where the shared Mylo icon set has no semantically equivalent glyph (e.g. History, People, Tag, Sort, Edit, Delete, Share, More, Locate and Error).
+- No layout, action, state, or dependency changes. Static import/use scan confirms all remaining Material icon imports in this file are used.
+- No local build or device visual verification has been performed. CI for the exact code SHA remains unconfirmed; do not infer a pass from earlier runs.
+- Next: finish a final source-only audit for low-contrast foregrounds and touch targets, then record the exact current code/doc SHAs and outstanding device checks.
