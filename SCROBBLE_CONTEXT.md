@@ -2841,3 +2841,10 @@ The product owner explicitly approved the proposed Statistics additions and inst
 
 ### Next
 - Do not start a broad redesign. First obtain/inspect a current build and device screenshots; use those to target any remaining concrete visual defects. Preserve the existing Mylo UI language, three Scrobble destinations, playback owner, LocalPlaylistStore and theme-toggle OFF behavior.
+
+## 96. Local build availability check (2026-11-20 11:39 IST)
+
+- Attempted a shallow clone of `somilkhan/Mylo` branch `Main-dev` into a temporary local path so the latest Kotlin changes could be compiled independently.
+- The clone could not start because this runtime could not resolve `github.com` (`Could not resolve host: github.com`). The checkout and Gradle wrapper are therefore unavailable in this environment; no local Gradle test/build was run.
+- Do not describe this as a code failure or as a passing build. Latest code SHA remains `7d7f5f4d25ff14d86d2c2659b892c50b59947a67`; latest documentation update is this file.
+- A CI run for the exact latest code SHA or a build from the user's connected development environment is still required.
