@@ -3039,3 +3039,38 @@ The product owner explicitly approved the proposed Statistics additions and inst
 ### Branch and scope
 - Work remains on `Main-dev`; `main` untouched; `last-wave` remains reference-only.
 - No Library integration, new database, second playlist store, duplicate player, global theme redesign or global icon redesign was introduced.
+
+
+## 102. App-wide in-app alert consistency audit (2026-11-20 14:02 IST)
+
+### Additional dialogs found and fixed
+The post-install review was extended beyond the Scrobble hub. A source scan of the app's screen/component dialog surfaces found default Material3 `AlertDialog` usage in:
+- `SettingsSheet.kt`: seven in-app alerts — automatic sync policy, clear cache, import backup confirmation, performance warning, performance confirmation, ListenBrainz token, Last.fm login.
+- `HistoryScreen.kt`: clear device history confirmation.
+- `ListenTogetherScreen.kt`: consent before switching Listen Together servers from an invite.
+
+All nine have now been converted to Mylo's `AlertScaffold` + `AlertRule` + `AlertAction` pattern. Settings token/login fields now use `PillTextField`, including password masking for secrets. The sync policy retains all three modes and their explanations; destructive clear actions use semantic error color; Last.fm login retains loading/error/disabled-dismiss behavior; Listen Together still requires explicit consent before switching servers.
+- MainActivity passes the existing shared HazeState to these screens; no second haze host was created.
+- Existing custom `Dialog` implementations (AccountChannel, App Language, Audio Pipeline, Cast, Lyrics Sources, Translation Language and Discord) were reviewed and retained; they are not stock AlertDialogs.
+- Compose `ModalBottomSheet` surfaces remain app-rendered sheets and were not misclassified as Android OS dialogs.
+- Android-owned file pickers and share chooser remain system UI by design.
+
+### Exact source state
+- Current `Main-dev` HEAD: `b525eb975900247d24aa9569e5bb7c1a47158d6c`.
+- Current key blobs:
+  - `MainActivity.kt`: `487ed55b3ea006bdeb89bea34051de9669c67f01`
+  - `SettingsSheet.kt`: `82156c691fa9d7cfcf4a34be4b0e8669b3cedaf6`
+  - `HistoryScreen.kt`: `4ddd2749e583e18fa252466ac906b809bbc9bb7d`
+  - `ListenTogetherScreen.kt`: `78293884248f773064c75d35f11d9eed4a318f81`
+  - `ScrobbleStatisticsContent.kt`: `c43debcb5411980be39f99d474f9cc4898f01355`
+  - `DetailScreen.kt`: `bb88eb9221d4772757e0fd521300f6671b7bfea2`
+- No `AlertDialog(` remains in the audited Scrobble, Settings, History or Listen Together screens. Custom dialogs in the reviewed components were retained.
+- Exact-HEAD Android CI run `44702837053` for `b525eb975900247d24aa9569e5bb7c1a47158d6c` was queued/pending at this entry. Do not treat cancelled intermediate runs as verification.
+- The new installed-build fixes remain source-only until this exact run passes and a fresh signed phone APK is produced.
+
+### Remaining verification
+1. Inspect run `44702837053` Android unit tests, Desktop compile/tests and Web tests/typecheck. Fix only actual failures and re-run exact latest HEAD.
+2. Trigger the signed release workflow for `Main-dev` after CI is green; install that new APK, not the earlier APK.
+3. Verify all changed surfaces on device: Statistics cards/periods/story return, pull refresh and indicator visibility below the glass bar, Generator rows/fields, generated playlist release header/local actions, Settings alerts, clear-history alert and Listen Together server-switch alert.
+4. Verify all alerts at increased font scale and keyboard-open states; specifically check Last.fm login error/loading and Settings token editing.
+5. Record screenshots, build/version and pass/fail results in the next context entry. Do not mark the audit complete before device acceptance.
