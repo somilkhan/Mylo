@@ -30,6 +30,17 @@ The supplied `mylo-replay-prototype-v3.html` is the visual and interaction refer
 - Do not add a mini-player close button. FAB Close remains the hub exit.
 - Preserve the existing four normal tabs and all current Mylo shell behavior unless the product owner explicitly changes the spec.
 
+### Later product-owner-approved Scrobble UI exceptions (2026-11-20)
+The product owner explicitly approved the following narrow corrections after the original AGENT-BRIEF / theme-toggle constraints were written. These are the only exceptions; they do **not** authorize a global redesign or changes to other app screens:
+1. Fix the Generator playlist dialog/sheet background transparency when the gradient theme is ON.
+2. Correct the Statistics refresh affordance/glitch, reusing Home behavior only where a real shared equivalent exists.
+3. Align Scrobble dialogs with existing Mylo dialog/surface patterns and correct contrast.
+4. Reuse the modern shared Mylo icon family wherever a semantically equivalent icon exists; keep other existing icons where no equivalent exists.
+5. Align Scrobble playlist artwork, list/detail treatment and actions with Mylo's existing playlist UI language.
+6. Correct Scrobble gradient-theme accent, foreground, surface and contrast inconsistencies, including generator, playlist and Statistics states.
+- These approvals allow **small, evidence-based Scrobble-only fixes** to the older “out of scope” items for dialogs, icons and gradient contrast. Keep the approved gradient palette values unchanged. When gradient is OFF, preserve the existing Mylo theme colors/default component colors; the toggle must not alter screen structure.
+- Statistics Replay parity additions were also explicitly approved: one merged Statistics destination, Replay story action only when local Replay data exists, and Top Artists / Top Albums insights derived from existing local Replay summaries. Do not add a separate Replay tab or Last.fm source tab.
+
 ### Hard implementation constraints
 - Use existing storage. No Room dependency, new database or new competing repository/store without written product-owner approval.
 - Playlist persistence remains `LocalPlaylistStore` (SharedPreferences JSON); local stats remain the existing `ListeningStats` month JSON.
