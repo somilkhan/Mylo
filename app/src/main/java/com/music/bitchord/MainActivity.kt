@@ -2909,6 +2909,19 @@ private fun BitChordApp(
                                     closeScrobble()
                                     showSettings = true
                                 },
+                                onOpenReplay = {
+                                    replayLandingPage = ReplayStoryPage.INTRO
+                                    showReplay = true
+                                    replayStory = ReplayStoryPage.INTRO
+                                },
+                                onOpenArtist = { id, name ->
+                                    closeScrobble()
+                                    openByName(id, name, null, BrowseType.ARTIST)
+                                },
+                                onOpenAlbum = { id, title, artist, art ->
+                                    closeScrobble()
+                                    openByName(id, title, artist, BrowseType.ALBUM, art)
+                                },
                                 contentPadding = listPadding,
                             )
                             1 -> ScrobbleGenerateContent(
