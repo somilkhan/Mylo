@@ -1216,19 +1216,19 @@ fun ScrobblePlaylistsContent(
             confirmButton = {
                 TextButton(
                     onClick = {
-                    val clean = renameText.trim()
-                    val duplicate = playlists.any { it.id != target.id && it.title.equals(clean, ignoreCase = true) }
-                    when {
-                        clean.isBlank() -> renameError = "Enter a playlist name"
-                        duplicate -> renameError = "A playlist with that name already exists"
-                        else -> scope.launch {
-                            if (LocalPlaylistStore.renamePlaylist(target.id, clean)) {
-                                renameTarget = null
-                            } else {
-                                renameError = "Couldn't save playlist name. Try again."
+                        val clean = renameText.trim()
+                        val duplicate = playlists.any { it.id != target.id && it.title.equals(clean, ignoreCase = true) }
+                        when {
+                            clean.isBlank() -> renameError = "Enter a playlist name"
+                            duplicate -> renameError = "A playlist with that name already exists"
+                            else -> scope.launch {
+                                if (LocalPlaylistStore.renamePlaylist(target.id, clean)) {
+                                    renameTarget = null
+                                } else {
+                                    renameError = "Couldn't save playlist name. Try again."
+                                }
                             }
                         }
-                    }
                     },
                     colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface),
                 ) { Text("Save") }
@@ -1252,25 +1252,25 @@ fun ScrobblePlaylistsContent(
             confirmButton = {
                 TextButton(
                     onClick = {
-                    scope.launch {
-                        withContext(NonCancellable) {
-                            if (LocalPlaylistStore.deletePlaylist(target.id)) {
-                                target.customCoverUri?.let { savedUri ->
-                                    runCatching {
-                                        context.contentResolver.releasePersistableUriPermission(
-                                            Uri.parse(savedUri),
-                                            Intent.FLAG_GRANT_READ_URI_PERMISSION,
-                                        )
+                        scope.launch {
+                            withContext(NonCancellable) {
+                                if (LocalPlaylistStore.deletePlaylist(target.id)) {
+                                    target.customCoverUri?.let { savedUri ->
+                                        runCatching {
+                                            context.contentResolver.releasePersistableUriPermission(
+                                                Uri.parse(savedUri),
+                                                Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                                            )
+                                        }
                                     }
+                                    if (selectedId == target.id) selectedId = null
+                                    deleteTarget = null
+                                    deleteError = null
+                                } else {
+                                    deleteError = "Couldn't delete playlist. Check device storage and try again."
                                 }
-                                if (selectedId == target.id) selectedId = null
-                                deleteTarget = null
-                                deleteError = null
-                            } else {
-                                deleteError = "Couldn't delete playlist. Check device storage and try again."
                             }
                         }
-                    }
                     },
                     colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.error),
                 ) { Text("Delete", color = MaterialTheme.colorScheme.error) }
