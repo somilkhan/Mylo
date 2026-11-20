@@ -124,6 +124,7 @@ internal fun ScrobbleStatisticsContent(
                         if (state.isRefreshing) {
                             androidx.compose.material3.CircularProgressIndicator(
                                 modifier = Modifier.size(20.dp),
+                                color = scrobbleAccentColor(),
                                 strokeWidth = 2.dp,
                             )
                         } else {
