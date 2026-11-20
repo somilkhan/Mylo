@@ -4296,6 +4296,7 @@ private fun BitChordApp(
                     overlayOpen = scrobbleOverlayOpen,
                     playerOpen = showNowPlaying,
                     keyboardVisible = keyboardVisible,
+                    hubOpen = showScrobble,
                 )
                 val fabSurface = if (glassActive) {
                     Modifier.liquidGlass(shape = CircleShape)
