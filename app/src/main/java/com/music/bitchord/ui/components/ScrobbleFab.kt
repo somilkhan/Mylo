@@ -43,7 +43,8 @@ internal fun scrobbleFabVisible(
     overlayOpen: Boolean,
     playerOpen: Boolean = false,
     keyboardVisible: Boolean = false,
-): Boolean = selectedTab == homeTab &&
+    hubOpen: Boolean = false,
+): Boolean = (hubOpen || selectedTab == homeTab) &&
     !overlayOpen &&
     !playerOpen &&
     !keyboardVisible
