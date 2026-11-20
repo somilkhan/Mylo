@@ -24,13 +24,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -59,6 +55,9 @@ import com.music.bitchord.data.spotify.LocalPlaylist
 import com.music.bitchord.data.spotify.LocalPlaylistExport
 import com.music.bitchord.data.stats.RankedEntry
 import com.music.bitchord.data.stats.ReplayPeriod
+import com.music.bitchord.ui.replay.ReplayCardRow
+import com.music.bitchord.ui.replay.ReplayStoryPage
+import com.music.bitchord.ui.replay.cards
 import java.io.File
 import java.text.NumberFormat
 
@@ -69,12 +68,15 @@ internal fun ScrobbleStatisticsContent(
     reduceMotion: Boolean,
     onPlaySong: (Song) -> Unit,
     onOpenSettings: () -> Unit,
-    onOpenReplay: () -> Unit,
+    holder: String,
+    memberSince: String?,
+    onOpenReplay: (ReplayStoryPage, ReplayPeriod) -> Unit,
     onOpenArtist: (String?, String) -> Unit,
     onOpenAlbum: (String?, String, String?, String?) -> Unit,
     contentPadding: PaddingValues,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     val lastFmEnabled by AppSettings.lastfmEnabled.collectAsStateWithLifecycle()
     val lastFmUsername by AppSettings.lastfmUsername.collectAsStateWithLifecycle()
     val lastFmApiKey by AppSettings.lastfmApiKey.collectAsStateWithLifecycle()
@@ -93,212 +95,227 @@ internal fun ScrobbleStatisticsContent(
         color = MaterialTheme.colorScheme.background,
         contentColor = MaterialTheme.colorScheme.onBackground,
     ) {
-        Column(Modifier.fillMaxSize()) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(
-                        start = 20.dp,
-                        end = 12.dp,
-                        top = contentPadding.calculateTopPadding() + 8.dp,
-                        bottom = 4.dp,
-                    ),
-                verticalAlignment = Alignment.CenterVertically,
+        PullToRefreshBox(
+            isRefreshing = state.isRefreshing,
+            onRefresh = viewModel::refresh,
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(
+                    bottom = contentPadding.calculateBottomPadding() + 24.dp,
+                ),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        state.period.chip,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text("Statistics", style = MaterialTheme.typography.displayLarge, fontWeight = FontWeight.SemiBold)
-                }
-                IconButton(
-                    onClick = viewModel::refresh,
-                    enabled = !state.isRefreshing,
-                ) {
-                    Box(
-                        modifier = Modifier.size(24.dp),
-                        contentAlignment = Alignment.Center,
+                item(key = "statistics-header") {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(
+                                start = 20.dp,
+                                end = 20.dp,
+                                top = contentPadding.calculateTopPadding() + 8.dp,
+                                bottom = 4.dp,
+                            ),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        if (state.isRefreshing) {
-                            androidx.compose.material3.CircularProgressIndicator(
-                                modifier = Modifier.size(20.dp),
-                                color = scrobbleAccentColor(),
-                                strokeWidth = 2.dp,
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                state.period.chip,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
-                        } else {
-                            Icon(
-                                imageVector = Icons.Rounded.Refresh,
-                                contentDescription = "Refresh statistics",
-                                tint = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.size(24.dp),
+                            Text(
+                                "Statistics",
+                                style = MaterialTheme.typography.displayLarge,
+                                fontWeight = FontWeight.SemiBold,
                             )
                         }
                     }
                 }
-            }
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 20.dp, end = 20.dp, top = 12.dp)
-                    .clip(RoundedCornerShape(50))
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                    .border(
-                        width = 1.dp,
-                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.18f),
-                        shape = RoundedCornerShape(50),
-                    )
-                    .padding(4.dp),
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                ReplayPeriod.entries.forEach { period ->
-                    val selected = state.period == period
-                    Box(
+                item(key = "statistics-periods") {
+                    Row(
                         modifier = Modifier
-                            .weight(1f)
-                            .height(48.dp)
+                            .fillMaxWidth()
+                            .padding(start = 20.dp, end = 20.dp, top = 8.dp)
                             .clip(RoundedCornerShape(50))
-                            .background(
-                                if (selected) MaterialTheme.colorScheme.tertiary
-                                else MaterialTheme.colorScheme.surfaceContainerHigh,
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                            .border(
+                                width = 1.dp,
+                                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.18f),
+                                shape = RoundedCornerShape(50),
                             )
-                            .selectable(
-                                selected = selected,
-                                role = Role.RadioButton,
-                                onClick = { viewModel.setPeriod(period) },
-                            )
-                            .padding(horizontal = 4.dp),
-                        contentAlignment = Alignment.Center,
+                            .padding(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(
-                            text = period.chip,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = if (selected) MaterialTheme.colorScheme.onTertiary
-                            else MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
+                        ReplayPeriod.entries.forEach { period ->
+                            val selected = state.period == period
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(48.dp)
+                                    .clip(RoundedCornerShape(50))
+                                    .background(
+                                        if (selected) MaterialTheme.colorScheme.tertiary
+                                        else MaterialTheme.colorScheme.surfaceContainerHigh,
+                                    )
+                                    .selectable(
+                                        selected = selected,
+                                        role = Role.RadioButton,
+                                        onClick = { viewModel.setPeriod(period) },
+                                    )
+                                    .padding(horizontal = 4.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    text = period.chip,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = if (selected) MaterialTheme.colorScheme.onTertiary
+                                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                )
+                            }
+                        }
+                    }
+                }
+
+                if (state.loadedPeriod != null && state.loadedPeriod != state.period) {
+                    item(key = "statistics-period-loading") {
+                        androidx.compose.material3.LinearProgressIndicator(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                            color = scrobbleAccentColor(),
                         )
                     }
                 }
-            }
 
-            PullToRefreshBox(
-                isRefreshing = state.isRefreshing,
-                onRefresh = viewModel::refresh,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-            ) {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(
-                        top = 12.dp,
-                        bottom = contentPadding.calculateBottomPadding() + 24.dp,
-                    ),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    if (state.error != null && state.lastFmConnected) {
-                        item(key = "lastfm-retry") {
-                            StatisticsRetryNotice(
-                                message = state.error.orEmpty(),
-                                onRetry = viewModel::refresh,
-                            )
-                        }
+                if (state.error != null && state.lastFmConnected) {
+                    item(key = "lastfm-retry") {
+                        StatisticsRetryNotice(
+                            message = state.error.orEmpty(),
+                            onRetry = viewModel::refresh,
+                        )
                     }
+                }
 
-                    if (state.isLoading) {
-                        items(5, key = { "skeleton-$it" }) {
-                            StatisticsTrackSkeletonRow()
-                        }
-                    } else if (state.tracks.isEmpty()) {
-                        item(key = "empty") {
-                            StatisticsEmptyState(
-                                lastFmConnected = state.lastFmConnected,
-                                onOpenSettings = onOpenSettings,
-                            )
-                        }
-                    } else {
-                        item(key = "concentration") {
-                            TrackConcentrationCard(
-                                trackPlays = state.tracks.map { it.plays },
-                                localListeningMs = state.localSummary?.totalMs ?: 0L,
-                                reduceMotion = reduceMotion,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                        }
-                        if (state.localSummary?.isEmpty == false) {
-                            item(key = "replay-action") {
-                                TextButton(
-                                    onClick = onOpenReplay,
-                                    colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface),
-                                    modifier = Modifier.padding(horizontal = 20.dp),
-                                ) {
-                                    Icon(
-                                        imageVector = com.music.bitchord.ui.icons.BitChordIcons.Play,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(18.dp),
-                                    )
-                                    Spacer(Modifier.width(8.dp))
-                                    Text("Play your Replay")
-                                }
-                            }
-                        }
-                        state.localSummary?.artists?.take(10)?.forEachIndexed { index, artist ->
-                            if (index == 0) {
-                                item(key = "top-artists-heading") {
-                                    Text(
-                                        "Top artists",
-                                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.SemiBold,
-                                    )
-                                }
-                            }
-                            item(key = "top-artist-${artist.title.lowercase()}-${artist.browseId.orEmpty()}") {
-                                ReplayInsightRow(
-                                    rank = index + 1,
-                                    entry = artist,
-                                    circular = true,
-                                    onClick = { onOpenArtist(artist.browseId, artist.title) },
-                                )
-                            }
-                        }
-                        state.localSummary?.albums?.take(10)?.forEachIndexed { index, album ->
-                            if (index == 0) {
-                                item(key = "top-albums-heading") {
-                                    Text(
-                                        "Top albums",
-                                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.SemiBold,
-                                    )
-                                }
-                            }
-                            item(key = "top-album-${album.title.lowercase()}-${album.subtitle.orEmpty().lowercase()}-${album.browseId.orEmpty()}") {
-                                ReplayInsightRow(
-                                    rank = index + 1,
-                                    entry = album,
-                                    circular = false,
-                                    onClick = { onOpenAlbum(album.browseId, album.title, album.subtitle, album.artworkUrl) },
-                                )
-                            }
-                        }
-                        item(key = "tracks-heading") {
+                if (state.isLoading) {
+                    items(5, key = { "skeleton-$it" }) {
+                        StatisticsTrackSkeletonRow()
+                    }
+                } else if (state.tracks.isEmpty()) {
+                    item(key = "empty") {
+                        StatisticsEmptyState(
+                            lastFmConnected = state.lastFmConnected,
+                            onOpenSettings = onOpenSettings,
+                        )
+                    }
+                } else {
+                    val localSummary = state.localSummary
+                    if (localSummary?.isEmpty == false) {
+                        item(key = "replay-cards-heading") {
                             Text(
-                                "Your tracks",
+                                "Your Replay",
                                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.SemiBold,
                             )
                         }
-                        items(state.tracks, key = { it.identity }) { track ->
-                            MergedStatisticsTrackRow(
-                                track = track,
-                                onPlaySong = onPlaySong,
+                        item(key = "replay-cards") {
+                            ReplayCardRow(
+                                cards = localSummary.cards(context),
+                                holder = holder,
+                                memberSince = memberSince,
+                                onCardClick = { page ->
+                                    onOpenReplay(page, state.loadedPeriod ?: state.period)
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                contentPadding = PaddingValues(horizontal = 20.dp),
+                                animateSummary = localSummary,
+                                reduceMotion = reduceMotion,
                             )
                         }
+                        item(key = "replay-action") {
+                            TextButton(
+                                onClick = {
+                                    onOpenReplay(ReplayStoryPage.INTRO, state.loadedPeriod ?: state.period)
+                                },
+                                colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface),
+                                modifier = Modifier.padding(horizontal = 20.dp),
+                            ) {
+                                Icon(
+                                    imageVector = com.music.bitchord.ui.icons.BitChordIcons.Play,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text("Play your Replay")
+                            }
+                        }
+                    }
+
+                    item(key = "concentration") {
+                        TrackConcentrationCard(
+                            trackPlays = state.tracks.map { it.plays },
+                            localListeningMs = localSummary?.totalMs ?: 0L,
+                            reduceMotion = reduceMotion,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+
+                    localSummary?.artists?.take(10)?.forEachIndexed { index, artist ->
+                        if (index == 0) {
+                            item(key = "top-artists-heading") {
+                                Text(
+                                    "Top artists",
+                                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                            }
+                        }
+                        item(key = "top-artist-${artist.title.lowercase()}-${artist.browseId.orEmpty()}") {
+                            ReplayInsightRow(
+                                rank = index + 1,
+                                entry = artist,
+                                circular = true,
+                                onClick = { onOpenArtist(artist.browseId, artist.title) },
+                            )
+                        }
+                    }
+                    localSummary?.albums?.take(10)?.forEachIndexed { index, album ->
+                        if (index == 0) {
+                            item(key = "top-albums-heading") {
+                                Text(
+                                    "Top albums",
+                                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                            }
+                        }
+                        item(key = "top-album-${album.title.lowercase()}-${album.subtitle.orEmpty().lowercase()}-${album.browseId.orEmpty()}") {
+                            ReplayInsightRow(
+                                rank = index + 1,
+                                entry = album,
+                                circular = false,
+                                onClick = { onOpenAlbum(album.browseId, album.title, album.subtitle, album.artworkUrl) },
+                            )
+                        }
+                    }
+                    item(key = "tracks-heading") {
+                        Text(
+                            "Your tracks",
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                    items(state.tracks, key = { it.identity }) { track ->
+                        MergedStatisticsTrackRow(
+                            track = track,
+                            onPlaySong = onPlaySong,
+                        )
                     }
                 }
             }
