@@ -3500,3 +3500,37 @@ Before making another dialog/icon change, the next agent must read this entire `
 - No application source code changed in this pass; this is a documentation-only record.
 - `main` remains at `11478fde56f1817cb777b296e60907359086f383`.
 - Next agent must read the entire current `SCROBBLE_CONTEXT.md` and the four canonical Library docs before any implementation; continue from run #44793924245 rather than repeating the completed CI investigation.
+
+
+## 115. Playlist UI screenshot review and focused polish pass (2026-11-21 03:28 IST)
+
+### Evidence reviewed
+- Product owner supplied three runtime screenshots of the Scrobble Playlists list, overflow menu and Tag generator sheet.
+- Read the current canonical `AGENT-BRIEF.md`, `mylo-ux-spec.md`, `CHANGE-THEME-TOGGLE.md`, and inspected `mylo-replay-prototype-v3.html` CSS/markup.
+- Current `Main-dev` before this pass: `bea911e957a51c439430c4e303e13a8b6a84479b`; stable `main` remains untouched.
+
+### Confirmed visual causes
+- `ScrobbleContent.kt` playlist row placed the title and generation-mode badge in one horizontal `Row`; the badge reduced the title's available width and caused premature ellipsis.
+- Four Scrobble playlist-related Material3 `DropdownMenu` surfaces (sort, playlist actions, detail actions, track actions) inherited `surfaceContainer` from the gradient theme. The approved gradient surface token has alpha 0xC7 (78%), so the page underneath remained visible through the menu. This explains the screenshot's text bleeding through the menu.
+- Playlist row cards use `surfaceVariant`, which matches the prototype's `--card: rgba(42,39,48,.78)`. No palette change was made because the screenshot's card fill is the approved v3 token; changing it would be a new visual decision, not a correction to implementation drift.
+- Playlist actions already import and use the shared Mylo `BitChordIcons` family (Play, More, Pin, Shuffle, Edit, Delete, Sort, Sparkles). The screenshot's icon concern is therefore about glyph styling/selection, not a stale Material-icon import. Do not replace these with a different icon family without a specific product-owner direction and comparison against the rest of Mylo.
+
+### Focused code change
+- Commit: `4c0c77f605d188870de11e8ec7a663df75a9b15c` on `Main-dev`.
+- Changed only `app/src/main/java/com/music/bitchord/ui/scrobble/ScrobbleContent.kt`.
+- Moved the generation-mode badge to the metadata line beside track count; playlist title now receives the full text column width and ellipsizes only against the row's actual available width.
+- Set all four Scrobble `DropdownMenu` containers to opaque `surfaceContainer.copy(alpha = 1f)`. RGB token remains unchanged; the menu no longer reveals neighbouring card text through its background. Non-gradient mode continues using the app's normal `surfaceContainer` value.
+- No playlist data, action semantics, ordering, artwork, gradient palette, FAB, navigation, or Settings behavior changed.
+
+### Verification status at handoff
+- GitHub compare from previous HEAD to code commit shows exactly one changed file: `ScrobbleContent.kt` (+25/-8).
+- CI runs for exact code commit `4c0c77f605d188870de11e8ec7a663df75a9b15c` were started by push and PR synchronization: #44825462088 and #44825472508. Web tests/typecheck had passed in both observed runs; Android unit tests and desktop compile/tests were still in progress at the time of this entry. Recheck both runs before claiming green.
+- No local build, emulator, or physical POCO screenshot verification was performed in this pass.
+
+### Remaining visual decisions
+- Card fill matches approved prototype; product owner has flagged it as inconsistent with Mylo's wider UI. Before changing it, compare the existing Mylo playlist/release surface treatment and make a narrowly scoped Scrobble-only adaptation without changing the approved gradient palette.
+- Product owner says icons still look old. Current screen already uses shared `BitChordIcons`; review glyphs against current Mylo app icon language and ask for direction if the desired replacement family cannot be established from existing app usage.
+- Re-open the supplied runtime screenshots after installing the new build to verify title width and menu opacity/placement, and capture before/after evidence.
+
+### Mandatory continuation
+- Read the full `SCROBBLE_CONTEXT.md` and canonical brief/spec/toggle docs before further UI edits. Continue on `Main-dev` only; never edit `main`. Do not treat CI compilation as device UI verification.
