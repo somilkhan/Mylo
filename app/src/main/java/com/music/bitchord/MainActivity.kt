@@ -787,6 +787,7 @@ private fun BitChordApp(
     // doesn't bring it back — only a fresh launch does.
     var updateDialogShown by rememberSaveable { mutableStateOf(false) }
     var showUpdateDialog by remember { mutableStateOf(false) }
+    val uploadConflict by com.music.bitchord.data.webdav.WebDavUploads.conflict.collectAsStateWithLifecycle()
     val updateAvailable by viewModel.updateAvailable.collectAsStateWithLifecycle()
 
     /**
@@ -1912,6 +1913,7 @@ private fun BitChordApp(
                     // found nothing to start — and the results are a better
                     // answer to a spoken request than silence is.
                     dismissPlayer()
+                    if (showScrobble) closeScrobble()
                     selectedTab = TAB_SEARCH
                     viewModel.searchFor(request.query)
                 }
@@ -2539,6 +2541,8 @@ private fun BitChordApp(
 
                 // A context link is navigation, not another page stacked over
                 // Now Playing. Clear the current route before restoring it.
+                // Route through the hub owner so generation is cancelled before leaving.
+                if (showScrobble) closeScrobble()
                 dismissPlayer()
                 viewModel.clearDetail()
                 showSettings = false
@@ -2640,7 +2644,7 @@ private fun BitChordApp(
         ) { closeScrobble() }
         BackHandler(
             enabled = detail != null && !showSettings && !showAccountScrobbling && !showSources && !showListenTogether && !showWearOs &&
-                !showEqualizer && !showReplay,
+                !showEqualizer && !showReplay && !showScrobble,
         ) { viewModel.closeDetail() }
         BackHandler(enabled = selectedMoodGenre != null && detail == null && !showSettings && !showReplay) {
             viewModel.closeMoodGenre()
@@ -2674,7 +2678,7 @@ private fun BitChordApp(
         // One back step out of Settings, or out of any tab but Home, lands on
         // Home rather than exiting — only Home itself hands back to the system,
         // which is what actually closes/minimizes the app.
-        BackHandler(enabled = showSettings && !showSpotify && !showAccountScrobbling && !showSources && !showListenTogether && !showWearOs && !showEqualizer && !showReplay) {
+        BackHandler(enabled = showSettings && !showSpotify && !showAccountScrobbling && !showSources && !showListenTogether && !showWearOs && !showEqualizer && !showReplay && !showScrobble) {
             showSettings = false
             // Only when Settings was the whole of what was on screen. Opened
             // over Replay or over a release page, closing it reveals that again
@@ -2683,8 +2687,8 @@ private fun BitChordApp(
         }
         BackHandler(
             enabled = detail == null && !showSettings && !showAccountScrobbling && !showSpotify &&
-                !showSources && !showListenTogether && !showWearOs && !showEqualizer && !showReplay && selectedMoodGenre == null &&
-                selectedTab != TAB_HOME,
+                !showSources && !showListenTogether && !showWearOs && !showEqualizer && !showReplay && !showScrobble &&
+                selectedMoodGenre == null && selectedTab != TAB_HOME,
         ) {
             selectedTab = TAB_HOME
         }
@@ -3838,6 +3842,7 @@ private fun BitChordApp(
                             replayStoryPeriod = null
                         })
                         showReplay -> ({ showReplay = false })
+                        showScrobble -> closeScrobble
                         detailActiveShelf != null -> ({ detailActiveShelf = null })
                         detail != null -> ({ viewModel.closeDetail(); Unit })
                         selectedMoodGenre != null -> ({ viewModel.closeMoodGenre(); Unit })
@@ -4284,7 +4289,7 @@ private fun BitChordApp(
                     showDownloadManager || songActions != null || browseActions != null ||
                     playlistTarget != null || creatingPlaylist || showSpotifyImportDialog ||
                     showLyricsOffset || showAccountSelector || showLastfmLogin || showListenBrainzLogin ||
-                    onboardingVisible
+                    showUpdateDialog || uploadConflict != null || onboardingVisible
                 val showScrobbleFab = scrobbleFabVisible(
                     selectedTab = selectedTab,
                     homeTab = TAB_HOME,
@@ -5590,7 +5595,6 @@ private fun BitChordApp(
         // and mini player like every other alert. Backing out is a skip —
         // leaving the batch suspended on a dismissed dialog would hang the
         // upload with no way to reach the question again.
-        val uploadConflict by com.music.bitchord.data.webdav.WebDavUploads.conflict.collectAsStateWithLifecycle()
         uploadConflict?.let { req ->
             var applyToAll by remember(req) { mutableStateOf(false) }
             val answer: (com.music.bitchord.data.webdav.WebDavUploads.Choice) -> Unit = { choice ->
