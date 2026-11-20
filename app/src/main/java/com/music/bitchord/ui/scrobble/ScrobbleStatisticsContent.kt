@@ -478,6 +478,9 @@ internal fun ScrobblePlaylistExportDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 1f),
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        textContentColor = MaterialTheme.colorScheme.onSurface,
         title = { Text("Export playlist") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
