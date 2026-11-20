@@ -1368,7 +1368,33 @@ private fun PlaylistRow(
                     Modifier.weight(1f).clickable(onClick = onOpen).padding(horizontal = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(3.dp),
                 ) {
-                    Text(playlist.title, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(7.dp),
+                    ) {
+                        Text(
+                            playlist.title,
+                            modifier = Modifier.weight(1f),
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        playlistGenerationModeLabel(playlist.generationMode)?.let { modeLabel ->
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = MaterialTheme.colorScheme.secondaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                            ) {
+                                Text(
+                                    modeLabel,
+                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    maxLines = 1,
+                                )
+                            }
+                        }
+                    }
                     Text("${playlist.songs.size} tracks${if (playlist.isPinned) " · Pinned" else ""}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 IconButton(onClick = onPlay, enabled = playlist.songs.isNotEmpty()) {
