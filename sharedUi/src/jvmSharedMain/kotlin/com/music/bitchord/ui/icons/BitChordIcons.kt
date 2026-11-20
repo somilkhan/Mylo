@@ -415,6 +415,27 @@ object BitChordIcons {
         }.build()
     }
 
+
+    val ChevronLeft: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "bc_chevron_left",
+            defaultWidth = 24.dp, defaultHeight = 24.dp,
+            viewportWidth = 24f, viewportHeight = 24f,
+        ).apply {
+            path(
+                stroke = stroke,
+                strokeLineWidth = STROKE,
+                strokeLineCap = StrokeCap.Round,
+                strokeLineJoin = StrokeJoin.Round,
+            ) {
+                moveTo(14.5f, 6.2f)
+                lineTo(8.7f, 12f)
+                lineTo(14.5f, 17.8f)
+            }
+        }.build()
+    }
+
+
     /**
      * The player's like control, in two weights.
      *
