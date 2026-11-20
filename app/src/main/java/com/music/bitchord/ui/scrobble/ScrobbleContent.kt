@@ -44,6 +44,7 @@ import com.music.bitchord.ui.components.AlertRule
 import com.music.bitchord.ui.components.AlertScaffold
 import com.music.bitchord.ui.components.PillTextField
 import com.music.bitchord.ui.icons.BitChordIcons
+import com.music.bitchord.ui.screens.LocalPlaylistReleaseHeader
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
@@ -1579,6 +1580,24 @@ private fun PlaylistDetailContent(
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = onBack, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface)) { Text("Back") }
+                if (currentTrackDisplayIndex >= 0) {
+                    TextButton(
+                        onClick = {
+                            val precedingItems = 1 +
+                                (if (generationState.isGenerating) 1 else 0) +
+                                (if (generationState.error != null) 1 else 0) +
+                                (if (addTracksExpanded) 1 + addTrackResults.size else 0)
+                            scope.launch {
+                                listState.animateScrollToItem(precedingItems + currentTrackDisplayIndex)
+                            }
+                        },
+                        colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface),
+                    ) {
+                        Icon(BitChordIcons.Locate, contentDescription = null)
+                        Spacer(Modifier.width(4.dp))
+                        Text("Locate")
+                    }
+                }
                 Spacer(Modifier.weight(1f))
                 TextButton(
                     onClick = {
@@ -1665,43 +1684,14 @@ private fun PlaylistDetailContent(
                 }
             }
 
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 8.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                AsyncImage(
-                    model = playlist.customCoverUri ?: playlist.songs.firstOrNull()?.thumbnailUrl,
-                    contentDescription = "Playlist cover",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .size(220.dp)
-                        .clip(RoundedCornerShape(16.dp)),
-                )
-                Text(
-                    playlist.title,
-                    modifier = Modifier.fillMaxWidth(),
-                    style = MaterialTheme.typography.headlineLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    "Playlist · ${playlist.songs.size} tracks",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                )
-                if (currentTrackDisplayIndex >= 0) {
-                    Text(
-                        "NOW PLAYING",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = scrobbleAccentColor(),
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
-            }
+            LocalPlaylistReleaseHeader(
+                playlistId = playlist.id,
+                title = playlist.title,
+                thumbnailUrl = playlist.customCoverUri ?: playlist.songs.firstOrNull()?.thumbnailUrl,
+                songs = playlist.songs,
+                onPlay = { onPlaySongs(playlist.songs, 0) },
+                onShuffle = { onPlaySongs(playlist.songs.shuffled(), 0) },
+            )
 
             coverMessage?.let {
                 Text(
@@ -1718,52 +1708,7 @@ private fun PlaylistDetailContent(
                 Text(it, style = MaterialTheme.typography.bodySmall, color = if (it.startsWith("Couldn't")) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
             }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Button(
-                    onClick = { onPlaySongs(playlist.songs, 0) },
-                    colors = scrobblePrimaryButtonColors(),
-                    enabled = playlist.songs.isNotEmpty(),
-                    modifier = Modifier.weight(1f).height(50.dp),
-                    shape = RoundedCornerShape(16.dp),
-                ) {
-                    Icon(BitChordIcons.Play, contentDescription = null)
-                    Spacer(Modifier.width(6.dp))
-                    Text("Play")
-                }
-                OutlinedButton(
-                    onClick = { onPlaySongs(playlist.songs.shuffled(), 0) },
-                    colors = scrobbleOutlinedButtonColors(MaterialTheme.colorScheme.onSurface),
-                    enabled = playlist.songs.isNotEmpty(),
-                    modifier = Modifier.weight(1f).height(50.dp),
-                    shape = RoundedCornerShape(16.dp),
-                ) {
-                    Icon(BitChordIcons.Shuffle, contentDescription = null)
-                    Spacer(Modifier.width(6.dp))
-                    Text("Shuffle")
-                }
-                if (currentTrackDisplayIndex >= 0) {
-                    TextButton(
-                        onClick = {
-                            val precedingItems = 1 +
-                                (if (generationState.isGenerating) 1 else 0) +
-                                (if (generationState.error != null) 1 else 0) +
-                                (if (addTracksExpanded) 1 + addTrackResults.size else 0)
-                            scope.launch {
-                                listState.animateScrollToItem(precedingItems + currentTrackDisplayIndex)
-                            }
-                        },
-                        colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface),
-                    ) {
-                        Icon(BitChordIcons.Locate, contentDescription = null)
-                        Spacer(Modifier.width(4.dp))
-                        Text("Locate")
-                    }
-                }
-            }
+
 
 
         }
