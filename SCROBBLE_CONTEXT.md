@@ -2801,3 +2801,12 @@ The product owner explicitly approved the proposed Statistics additions and inst
 
 ### Next
 - Re-read the current Scrobble source and this context before any further changes. Check whether any remaining Scrobble icons or non-button controls still use low-contrast `primary` foregrounds. Keep all changes inside the hub and preserve OFF-mode defaults.
+
+## 93. Gradient toggle scope and persistence re-check (2026-11-20 11:32 IST)
+
+- Re-read the current `AppSettings.kt`, `SettingsSheet.kt` and `MainActivity.kt` wiring after introducing the gradient-aware button helpers.
+- Confirmed the Appearance row remains labelled **Scrobble gradient theme**, describes Statistics / Generate / Playlists, and writes through `AppSettings.setScrobbleGradientTheme`.
+- Confirmed the preference key remains `scrobble_gradient_theme`, defaults to `true` on first read, and falls back to `true` if reading fails. Writes use `SharedPreferences.commit()`; the StateFlow updates only after a successful durable write. No activity restart is requested.
+- Confirmed `MainActivity` passes the live StateFlow value into `ScrobbleHubTheme(gradientEnabled = scrobbleGradientTheme)` around the three Scrobble destinations.
+- The new `LocalScrobbleGradientEnabled` is scoped inside that theme wrapper. Therefore the button/checkbox helpers use the approved accent only while the gradient is ON and return normal Material 3 defaults when OFF. No Settings row or non-Scrobble screen was changed.
+- Verification is source-level only. Persistence, live toggle recomposition and both visual states still need runtime/device confirmation.
