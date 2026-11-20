@@ -2901,3 +2901,29 @@ The product owner explicitly approved the proposed Statistics additions and inst
 - The application source is still unchanged at code SHA `7d7f5f4d25ff14d86d2c2659b892c50b59947a67`; all four Scrobble source blobs listed in section 97 remain unchanged.
 - Combined status and the available PR-workflow lookup for the new documentation HEAD are both empty. This documentation-only commit is excluded by the workflow's `paths-ignore` rule and is not a build result.
 - For build acceptance, CI must check out current `Main-dev` HEAD `c65568b775378dec518f200bb5af41ba237e43db` (whose application source is identical to `7d7f5f4`). The manual workflow dispatch must target `Main-dev`; enable APK packaging only if APK artifacts are needed. This session still lacks a workflow-dispatch action.
+
+
+## 99. Exact-SHA CI and signed APK verification (2026-11-20 07:26 UTC)
+
+### Verified workflow results
+- Refreshed live `Main-dev`: HEAD `70a3612e0a0ffb25fe63b10e4231cd471a5e15d8`; this remains a documentation-only commit on top of application-code commit `7d7f5f4d25ff14d86d2c2659b892c50b59947a67`.
+- Android CI run `44684183024` checked out exact application-code SHA `7d7f5f4d25ff14d86d2c2659b892c50b59947a67`. All three jobs completed successfully:
+  - Android unit tests: success.
+  - Desktop compile and tests: success.
+  - Web tests and typecheck: success.
+  - Android APK build step was skipped by this push-triggered workflow configuration; do not describe this run as an APK build.
+- Signed release workflow run `44693388316` checked out exact current branch HEAD `70a3612e0a0ffb25fe63b10e4231cd471a5e15d8`. The phone, TV and Wear OS release APK build and APK signature-verification steps both succeeded. The workflow uploaded artifact `mylo-signed-release-apks` (artifact ID `14610152944`, 348,078,654 bytes), expiring `2026-11-23T07:26:20Z`.
+- These results close the earlier CI/build uncertainty. The CI test run is on the exact app-code SHA; the signed APK run is on the current branch HEAD, whose only difference from that app-code SHA is documentation.
+- No APK was installed or launched in an emulator or physical device during this pass. Successful compilation/signature verification is not runtime acceptance.
+
+### Remaining acceptance work — do not repeat completed UI audits
+1. Install the signed phone APK on the user's device and capture screenshots for Scrobble gradient ON and OFF. Verify default ON, preference persistence after force-stop/relaunch, OFF fallback to current Mylo theme, and corrupt-preference fallback to ON.
+2. Run the device interaction matrix: FAB Home-only visibility and suppression under player/sheet/keyboard; hub tab swap and all exit/back paths; all nine generator modes; Last.fm disconnected behavior; YouTube Music signed-out Library gate; generation cancel/retry/success; playlist search/actions/detail/persistence after relaunch; Statistics periods/empty/loading/stale refresh/error/retry; Replay story and Top Artists/Albums navigation.
+3. Verify durable scrobble recovery on device: airplane-mode scrobble, force-stop/process death, restore network, confirm FIFO replay and no duplicate beyond the documented at-least-once limitation; verify permanent errors are dropped/logged.
+4. Add or confirm focused regression tests for Statistics merge (max, not sum; local-only disconnected), period boundaries/cache freshness, generator count clamp and unique title suffix, and durable queue FIFO/cap-oldest-drop/restart/permanent-error handling. The existing test-coverage audit records missing app-side coverage; re-check current tests before adding anything to avoid duplicates.
+5. Resolve or explicitly defer the two product-spec discrepancies already recorded: Library period semantics where no truthful added-date field exists, and existing playlist search/detail extras versus the approved title-only/no-track-search spec. Do not silently remove existing behavior or invent dates. Library integration itself remains out of scope.
+6. Update this file with exact device model/OS, installed APK artifact/version, screenshots, scenarios passed/failed, and any focused test commits after acceptance. Do not claim complete until evidence is recorded.
+
+### Current decision
+- No application source change was justified by this verification pass. Do not create a new code commit just to repeat CI; the exact application-code SHA is already CI-green and a signed release APK has been built from current `Main-dev`.
+- Next action is device installation and the acceptance matrix, followed by only evidence-backed fixes or genuinely missing focused tests. Keep all work on `Main-dev`; never touch `main`.
