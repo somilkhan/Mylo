@@ -2821,3 +2821,23 @@ The product owner explicitly approved the proposed Statistics additions and inst
 - No layout, action, state, or dependency changes. Static import/use scan confirms all remaining Material icon imports in this file are used.
 - No local build or device visual verification has been performed. CI for the exact code SHA remains unconfirmed; do not infer a pass from earlier runs.
 - Next: finish a final source-only audit for low-contrast foregrounds and touch targets, then record the exact current code/doc SHAs and outstanding device checks.
+
+## 95. Final source-only color and touch-target audit (2026-11-20 11:37 IST)
+
+### Findings
+- Re-scanned the three Scrobble UI source files: `ScrobbleContent.kt`, `ScrobbleStatisticsContent.kt` and `TrackConcentration.kt`.
+- No hard-coded black/white foregrounds or direct dark `colorScheme.primary` foregrounds remain in the Scrobble content. The only remaining `primary` use in the Scrobble theme is the intentional token/default branch inside the gradient-aware helper; `primaryContainer/onPrimaryContainer` remains a matched icon/container pair.
+- Statistics cards use `onSurface` / `onSurfaceVariant`; error notices use `onErrorContainer`; modal sheets and AlertDialogs use opaque active-theme surfaces and semantic text colors.
+- Track Concentration uses white, pink and the muted on-surface variant for its three segments; the third segment no longer disappears into the dark card.
+- Main interactive controls retain Material 3 minimum touch targets; explicit fixed controls include 48dp period/count controls, 50dp playlist Play/Shuffle actions, 52dp generator actions, 52dp playlist artwork and 48dp icon-button targets. Shared `SongRow` remains the track interaction owner.
+- Gradient-specific button, checkbox and progress colors are scoped through `ScrobbleHubTheme`; OFF returns default Mylo Material 3 colors. Settings persistence and the three-screen scope were rechecked in section 93.
+
+### Verification / current state
+- Latest Scrobble UI code commit: `7d7f5f4d25ff14d86d2c2659b892c50b59947a67` (`ScrobbleContent.kt`); other latest UI commits are recorded in sections 91–94.
+- This context update is the latest documentation pass; retain this file as the handoff source and read it fully before any further edits.
+- Combined status for the latest code commit returned `statuses=[]`; commit workflow lookup returned no PR-triggered runs. No passing CI is claimed.
+- No local Gradle build, APK packaging, emulator/device testing, or screenshots have been performed.
+- Still required: a current CI run for the latest combined code, gradient ON/OFF screenshots on device, and interaction checks for generator, playlist dialogs/actions, Statistics refresh and Replay insight navigation.
+
+### Next
+- Do not start a broad redesign. First obtain/inspect a current build and device screenshots; use those to target any remaining concrete visual defects. Preserve the existing Mylo UI language, three Scrobble destinations, playback owner, LocalPlaylistStore and theme-toggle OFF behavior.
