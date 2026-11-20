@@ -3,6 +3,7 @@ package com.music.bitchord.ui.scrobble
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
@@ -71,6 +72,28 @@ internal fun scrobbleOutlinedButtonColors(contentColor: Color) =
         ButtonDefaults.outlinedButtonColors(contentColor = contentColor)
     } else {
         ButtonDefaults.outlinedButtonColors()
+    }
+
+/** A readable accent for foregrounds and progress indicators on the dark gradient. */
+@Composable
+internal fun scrobbleAccentColor() =
+    if (LocalScrobbleGradientEnabled.current) {
+        MaterialTheme.colorScheme.secondary
+    } else {
+        MaterialTheme.colorScheme.primary
+    }
+
+/** Keep checkbox colors unchanged when the gradient theme is off. */
+@Composable
+internal fun scrobbleCheckboxColors() =
+    if (LocalScrobbleGradientEnabled.current) {
+        CheckboxDefaults.colors(
+            checkedColor = MaterialTheme.colorScheme.secondary,
+            checkmarkColor = MaterialTheme.colorScheme.onSecondary,
+            uncheckedColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    } else {
+        CheckboxDefaults.colors()
     }
 
 /** Use the approved pink accent for filled actions only in the gradient theme. */
