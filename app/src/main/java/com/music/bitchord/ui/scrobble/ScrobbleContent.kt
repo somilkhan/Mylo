@@ -378,7 +378,7 @@ fun ScrobbleGenerateContent(
         ModalBottomSheet(
             onDismissRequest = { if (!uiState.isGenerating) showGeneratorDialog = false },
             sheetState = sheetState,
-            containerColor = MaterialTheme.colorScheme.surface,
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 1f),
             contentColor = MaterialTheme.colorScheme.onSurface,
         ) {
             Column(
