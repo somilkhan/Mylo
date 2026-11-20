@@ -3044,6 +3044,7 @@ private fun BitChordApp(
                         EqualizerScreen(contentPadding = listPadding)
                     } else if (key == "settings") {
                         SettingsScreen(
+                            hazeState = hazeState,
                             windowWidth = windowWidth,
                             signedIn = signedIn,
                             account = account,
