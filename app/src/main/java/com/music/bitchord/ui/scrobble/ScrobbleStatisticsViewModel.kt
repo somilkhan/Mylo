@@ -27,6 +27,7 @@ internal data class ScrobbleStatisticsUiState(
     val isRefreshing: Boolean = false,
     val error: String? = null,
     val showingStaleLastFmData: Boolean = false,
+    val loadedPeriod: ReplayPeriod? = null,
 )
 
 class ScrobbleStatisticsViewModel : ViewModel() {
@@ -56,10 +57,8 @@ class ScrobbleStatisticsViewModel : ViewModel() {
         _state.update {
             it.copy(
                 period = period,
-                localSummary = null,
-                tracks = emptyList(),
-                isLoading = true,
-                isRefreshing = false,
+                isLoading = it.tracks.isEmpty() && it.localSummary == null,
+                isRefreshing = it.tracks.isNotEmpty() || it.localSummary != null,
                 error = null,
                 showingStaleLastFmData = false,
             )
@@ -92,11 +91,16 @@ class ScrobbleStatisticsViewModel : ViewModel() {
 
         if (!force && loadJob?.isActive == true && activeRequestKey == requestKey) return
 
-        val existingTracks = mergeStatisticsTracks(
-            snapshot.localSummary?.songs.orEmpty(),
-            cachedTracks,
-            connected,
-        )
+        val samePeriodData = snapshot.loadedPeriod == period
+        val existingTracks = when {
+            samePeriodData -> mergeStatisticsTracks(
+                snapshot.localSummary?.songs.orEmpty(),
+                cachedTracks,
+                connected,
+            )
+            cachedTracks.isNotEmpty() -> mergeStatisticsTracks(emptyList(), cachedTracks, connected)
+            else -> snapshot.tracks
+        }
         val hasExistingData = existingTracks.isNotEmpty()
 
         loadJob?.cancel()
@@ -105,8 +109,9 @@ class ScrobbleStatisticsViewModel : ViewModel() {
             it.copy(
                 lastFmConnected = connected,
                 tracks = existingTracks,
-                isLoading = existingTracks.isEmpty() && (snapshot.localSummary == null || remotePending),
-                isRefreshing = force || (remotePending && hasExistingData),
+                isLoading = existingTracks.isEmpty() && !samePeriodData,
+                isRefreshing = force || (remotePending && hasExistingData) ||
+                    (!samePeriodData && hasExistingData),
                 error = null,
                 showingStaleLastFmData = false,
             )
@@ -124,6 +129,7 @@ class ScrobbleStatisticsViewModel : ViewModel() {
                 _state.update {
                     if (it.period != period) it else it.copy(
                         localSummary = local,
+                        loadedPeriod = period,
                         tracks = mergedWithCache,
                         isLoading = remotePending && !hasData,
                         isRefreshing = force || (remotePending && hasData),
