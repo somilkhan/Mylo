@@ -53,6 +53,11 @@ import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.data.spotify.LocalPlaylist
 import com.music.bitchord.data.spotify.LocalPlaylistExport
+import com.music.bitchord.ui.components.AlertAction
+import com.music.bitchord.ui.components.AlertRule
+import com.music.bitchord.ui.components.AlertScaffold
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
 import com.music.bitchord.data.stats.RankedEntry
 import com.music.bitchord.data.stats.ReplayPeriod
 import com.music.bitchord.ui.replay.ReplayCardRow
@@ -587,8 +592,10 @@ private fun MergedStatisticsTrackRow(
 
 
 @Composable
+@OptIn(ExperimentalHazeMaterialsApi::class)
 internal fun ScrobblePlaylistExportDialog(
     playlist: LocalPlaylist,
+    hazeState: HazeState,
     onDismiss: () -> Unit,
     onMessage: (String) -> Unit,
 ) {
@@ -641,25 +648,58 @@ internal fun ScrobblePlaylistExportDialog(
             .onFailure { onMessage(it.message ?: "Couldn't share playlist") }
     }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 1f),
-        titleContentColor = MaterialTheme.colorScheme.onSurface,
-        textContentColor = MaterialTheme.colorScheme.onSurface,
-        title = { Text("Export playlist") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("Choose a format for ${playlist.title}.")
-                TextButton(onClick = { csvSaveLauncher.launch(LocalPlaylistExport.fileName(playlist.title, "csv")) }, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface)) {
-                    Text("Save CSV")
-                }
-                TextButton(onClick = { share(true); onDismiss() }, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface)) { Text("Share CSV") }
-                TextButton(onClick = { m3uSaveLauncher.launch(LocalPlaylistExport.fileName(playlist.title, "m3u")) }, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface)) {
-                    Text("Save M3U")
-                }
-                TextButton(onClick = { share(false); onDismiss() }, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface)) { Text("Share M3U") }
-            }
-        },
-        confirmButton = { TextButton(onClick = onDismiss, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface)) { Text("Done") } },
-    )
+    AlertScaffold(hazeState = hazeState, onDismiss = onDismiss) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 19.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(5.dp),
+        ) {
+            Text(
+                "Export playlist",
+                style = MaterialTheme.typography.bodyLarge.copy(fontSize = 17.sp, fontWeight = FontWeight.W600),
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                "Choose a format for ${playlist.title}.",
+                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp, lineHeight = 17.sp),
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center,
+            )
+        }
+        AlertRule()
+        AlertAction(
+            label = "Save CSV",
+            emphasised = true,
+            contentColor = scrobbleAccentColor(),
+            onClick = { csvSaveLauncher.launch(LocalPlaylistExport.fileName(playlist.title, "csv")) },
+        )
+        AlertRule()
+        AlertAction(
+            label = "Share CSV",
+            emphasised = false,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            onClick = { share(true); onDismiss() },
+        )
+        AlertRule()
+        AlertAction(
+            label = "Save M3U",
+            emphasised = true,
+            contentColor = scrobbleAccentColor(),
+            onClick = { m3uSaveLauncher.launch(LocalPlaylistExport.fileName(playlist.title, "m3u")) },
+        )
+        AlertRule()
+        AlertAction(
+            label = "Share M3U",
+            emphasised = false,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            onClick = { share(false); onDismiss() },
+        )
+        AlertRule()
+        AlertAction(
+            label = "Done",
+            emphasised = false,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            onClick = onDismiss,
+        )
+    }
 }
