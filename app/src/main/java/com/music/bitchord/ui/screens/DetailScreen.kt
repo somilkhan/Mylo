@@ -1088,7 +1088,11 @@ internal fun LocalPlaylistReleaseHeader(
             type = BrowseType.PLAYLIST,
         )
     }
-    val palette = rememberArtworkPalette(imageUrl = page.thumbnailUrl)
+    val palette = rememberArtworkPalette(imageUrl = page.thumbnailUrl).copy(
+        elevated = MaterialTheme.colorScheme.surfaceVariant,
+        onBackground = MaterialTheme.colorScheme.onSurface,
+        onBackgroundVariant = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val sleeveSize = (maxWidth * SLEEVE_FRACTION)
             .coerceAtMost(maxHeight * SLEEVE_MAX_HEIGHT)
