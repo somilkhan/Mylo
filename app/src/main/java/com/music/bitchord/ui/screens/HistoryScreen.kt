@@ -4,6 +4,7 @@ import com.music.bitchord.R
 import com.music.bitchord.data.ListeningHistory
 
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
