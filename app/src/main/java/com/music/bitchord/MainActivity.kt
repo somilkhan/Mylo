@@ -5292,7 +5292,10 @@ private fun BitChordApp(
                                 confirmingProfile = false
                                 if (accepted) {
                                     webSession = null
-                                    if (mode == WebSessionMode.SIGN_IN) selectedTab = 2
+                                    if (mode == WebSessionMode.SIGN_IN) {
+                                        if (showScrobble) closeScrobble()
+                                        selectedTab = 2
+                                    }
                                 } else {
                                     captureFailed = true
                                 }
