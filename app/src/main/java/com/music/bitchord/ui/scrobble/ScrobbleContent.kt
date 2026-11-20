@@ -301,7 +301,7 @@ fun ScrobbleGenerateContent(
                             Spacer(Modifier.weight(1f))
                             TextButton(onClick = viewModel::cancelGeneration, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSecondaryContainer)) { Text("Cancel") }
                         }
-                        LinearProgressIndicator(Modifier.fillMaxWidth())
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = scrobbleAccentColor())
                         Text(
                             uiState.progress.ifBlank { "Finding tracks that fit…" },
                             style = MaterialTheme.typography.bodyMedium,
@@ -576,7 +576,7 @@ fun ScrobbleGenerateContent(
                             Text(
                                 count.toString(),
                                 style = MaterialTheme.typography.headlineSmall,
-                                color = MaterialTheme.colorScheme.primary,
+                                color = scrobbleAccentColor(),
                                 fontWeight = FontWeight.Bold,
                             )
                             Text("tracks · steps of 5", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -596,7 +596,7 @@ fun ScrobbleGenerateContent(
                 }
 
                 if (uiState.isGenerating) {
-                    LinearProgressIndicator(Modifier.fillMaxWidth())
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = scrobbleAccentColor())
                     Text(
                         uiState.progress.ifBlank { "Finding tracks that fit…" },
                         style = MaterialTheme.typography.bodyMedium,
@@ -716,7 +716,7 @@ private fun GeneratorSeedPicker(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        if (seedSearching) LinearProgressIndicator(Modifier.fillMaxWidth())
+        if (seedSearching) LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = scrobbleAccentColor())
         seedSearchError?.let {
             Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
         }
@@ -735,7 +735,7 @@ private fun GeneratorSeedPicker(
             Text(
                 "Selected · " + it.title + " — " + it.artist,
                 style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
+                color = scrobbleAccentColor(),
             )
         }
     }
@@ -770,7 +770,7 @@ private fun GeneratorSeedResult(
                 Text(song.title, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(song.artist, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            if (selected) Icon(Icons.Rounded.Check, contentDescription = "Selected", tint = MaterialTheme.colorScheme.primary)
+            if (selected) Icon(Icons.Rounded.Check, contentDescription = "Selected", tint = scrobbleAccentColor())
         }
     }
 }
@@ -791,7 +791,12 @@ private fun GeneratorExclusionToggle(
             .padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Checkbox(checked = checked, onCheckedChange = onCheckedChange, enabled = enabled)
+        Checkbox(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            enabled = enabled,
+            colors = scrobbleCheckboxColors(),
+        )
         Text(
             label,
             color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
@@ -1052,7 +1057,7 @@ fun ScrobblePlaylistsContent(
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            LinearProgressIndicator(Modifier.fillMaxWidth())
+                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = scrobbleAccentColor())
                             Text(generationState.progress, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             TextButton(onClick = viewModel::cancelGeneration, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSecondaryContainer)) { Text("Cancel") }
                         }
@@ -1660,7 +1665,7 @@ private fun PlaylistDetailContent(
                             Text(
                                 "NOW PLAYING",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary,
+                                color = scrobbleAccentColor(),
                                 fontWeight = FontWeight.Bold,
                             )
                         }
@@ -1677,7 +1682,7 @@ private fun PlaylistDetailContent(
             }
             trackActionMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
             generationState.savedPlaylist?.takeIf { it.generationMode == "similar-playlist" }?.let {
-                Text("Created ${it.title}. Go back to view it.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                Text("Created ${it.title}. Go back to view it.", style = MaterialTheme.typography.bodySmall, color = scrobbleAccentColor())
             }
             exportMessage?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall, color = if (it.startsWith("Couldn't")) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
@@ -1736,7 +1741,7 @@ private fun PlaylistDetailContent(
         if (generationState.isGenerating) {
             item(key = "similar_generation_progress") {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    LinearProgressIndicator(Modifier.fillMaxWidth())
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = scrobbleAccentColor())
                     Text(generationState.progress, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     TextButton(onClick = viewModel::cancelGeneration, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSecondaryContainer)) { Text("Cancel") }
                 }
@@ -1759,13 +1764,13 @@ private fun PlaylistDetailContent(
                     label = { Text("Search YouTube Music") },
                     leadingIcon = { Icon(BitChordIcons.Search, contentDescription = null) },
                 )
-                if (addTrackLoading) LinearProgressIndicator(Modifier.fillMaxWidth())
+                if (addTrackLoading) LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = scrobbleAccentColor())
                 addTrackError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                 addTrackMessage?.let {
                     Text(
                         it,
                         color = if (it.startsWith("Couldn't") || it.contains("no longer")) MaterialTheme.colorScheme.error
-                        else MaterialTheme.colorScheme.primary,
+                        else scrobbleAccentColor(),
                     )
                 }
                 if (!addTrackLoading && addTrackError == null && addTrackQuery.trim().length >= 2 && addTrackResults.isEmpty()) {
@@ -1838,7 +1843,7 @@ private fun PlaylistDetailContent(
                     onMore = { trackMenuExpanded = true },
                     isCurrent = isCurrentTrack,
                     isPlaying = isCurrentTrack && isPlaying,
-                    activeTint = MaterialTheme.colorScheme.primary,
+                    activeTint = scrobbleAccentColor(),
                 )
                 DropdownMenu(expanded = trackMenuExpanded, onDismissRequest = { trackMenuExpanded = false }) {
                     DropdownMenuItem(
