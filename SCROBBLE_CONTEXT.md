@@ -3074,3 +3074,22 @@ All nine have now been converted to Mylo's `AlertScaffold` + `AlertRule` + `Aler
 3. Verify all changed surfaces on device: Statistics cards/periods/story return, pull refresh and indicator visibility below the glass bar, Generator rows/fields, generated playlist release header/local actions, Settings alerts, clear-history alert and Listen Together server-switch alert.
 4. Verify all alerts at increased font scale and keyboard-open states; specifically check Last.fm login error/loading and Settings token editing.
 5. Record screenshots, build/version and pass/fail results in the next context entry. Do not mark the audit complete before device acceptance.
+
+
+## 103. Exact-HEAD CI verification after UI/import fixes (2026-11-20 14:36 IST)
+
+### Verified run
+- Latest source-code HEAD at verification: `3c172516d4a9c22f113d73757beeb726a75f69ac`.
+- Android CI run `44703085486`: **all three jobs passed** for that exact SHA:
+  - Android unit tests: success (includes the new period-transition regression tests).
+  - Desktop compile and tests: success.
+  - Web tests and typecheck: success.
+- The earlier failed run `44702557499` / `44702837053` reported only missing imports introduced by the UI changes: `Color` and `sp` in Scrobble files. These were added in `f4991cd2`, `539bbc8b` and `3c172516`; the exact latest run above passes.
+- The push-triggered Android CI workflow skips APK assembly by configuration. This run is a compile/test pass, not an APK artifact.
+- The signed release workflow is `.github/workflows/release-signing.yml`, named **MYLO Signed Release Builds**. To produce an installable artifact, manually dispatch it on `Main-dev` with `upload_apks=true`; it builds and signature-verifies phone, TV and Wear OS release APKs, then uploads `mylo-signed-release-apks` (3-day retention). This session has no workflow-dispatch action, so the user must start it.
+- The APK previously installed by the user predates all section 101–103 UI fixes. It must be replaced with the new signed artifact before device acceptance.
+
+### Exact-HEAD scope
+- The source changes in sections 101–102 are compiled and unit-tested on this SHA. No physical-device runtime result is claimed.
+- No application code was changed to fix the compile errors beyond the required imports.
+- Keep the full device acceptance matrix in section 101 and app-wide alert checks in section 102 open until the new APK is installed and verified.
