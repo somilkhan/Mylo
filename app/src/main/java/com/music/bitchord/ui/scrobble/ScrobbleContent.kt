@@ -1189,6 +1189,9 @@ fun ScrobblePlaylistsContent(
     renameTarget?.let { target ->
         AlertDialog(
             onDismissRequest = { renameTarget = null },
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 1f),
+            titleContentColor = MaterialTheme.colorScheme.onSurface,
+            textContentColor = MaterialTheme.colorScheme.onSurface,
             title = { Text("Rename playlist") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1219,6 +1222,9 @@ fun ScrobblePlaylistsContent(
     deleteTarget?.let { target ->
         AlertDialog(
             onDismissRequest = { deleteTarget = null; deleteError = null },
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 1f),
+            titleContentColor = MaterialTheme.colorScheme.onSurface,
+            textContentColor = MaterialTheme.colorScheme.onSurface,
             title = { Text("Delete playlist?") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
