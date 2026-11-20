@@ -3118,3 +3118,13 @@ All nine have now been converted to Mylo's `AlertScaffold` + `AlertRule` + `Aler
 - Library period semantics remain unresolved because the current YTM library data path has no trustworthy added-date field. Do not invent date filters.
 - After run `44704249102` passes, manually dispatch **MYLO Signed Release Builds** on `Main-dev` with `upload_apks=true`, install the phone APK over the previously installed signed build, and complete the device matrix in sections 101–102.
 - Device screenshots and runtime checks are still outstanding; source and CI review are not device acceptance.
+
+
+## 105. Android CI compile fix — shared left chevron (2026-11-20T08:52:55.974Z)
+
+- Re-checked live `Main-dev` before editing; starting HEAD: `8a7c805b12125624c4d7ebabe172c0391b932cad`.
+- Confirmed Android compile error from workflow run `44704249102`: `ScrobbleContent.kt:1574` referenced `BitChordIcons.ChevronLeft`, which was not declared.
+- Added `ChevronLeft` to the existing shared `BitChordIcons` family in `sharedUi/src/jvmSharedMain/kotlin/com/music/bitchord/ui/icons/BitChordIcons.kt`, mirroring the existing 24dp round-capped `ChevronRight` geometry in the opposite direction. No Material icon substitution or new icon system.
+- Source commit: `d6c3e4ba008dc8467e6c05383e5833442d20709e`.
+- Verification at this entry: source-level declaration/reference checked; CI has not yet been rerun for this fix. Android build, tests, signed APK and physical-device acceptance remain unverified.
+- Next: inspect the new commit and branch head, then run the repository CI workflow for this exact commit; address any further failures before declaring code complete.
