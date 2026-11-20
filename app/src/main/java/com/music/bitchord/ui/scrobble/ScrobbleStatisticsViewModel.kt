@@ -98,8 +98,8 @@ class ScrobbleStatisticsViewModel : ViewModel() {
                 cachedTracks,
                 connected,
             )
-            cachedTracks.isNotEmpty() -> mergeStatisticsTracks(emptyList(), cachedTracks, connected)
-            else -> snapshot.tracks
+            snapshot.loadedPeriod != null -> snapshot.tracks
+            else -> mergeStatisticsTracks(emptyList(), cachedTracks, connected)
         }
         val hasExistingData = existingTracks.isNotEmpty()
 
