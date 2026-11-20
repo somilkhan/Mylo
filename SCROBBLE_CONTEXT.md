@@ -2738,3 +2738,21 @@ The product owner explicitly approved the proposed Statistics additions and inst
 
 ### Next
 - Continue the Scrobble-only audit across Statistics cards, Generator and playlist surfaces. Check semantic foregrounds against each actual container color, especially gradient ON/OFF; do not change global theme tokens or other screens.
+
+## 90. Generator and Statistics semantic foreground audit (2026-11-20 11:21 IST)
+
+### Source review and changes
+- Reviewed all `Surface`, `ModalBottomSheet` and `AlertDialog` containers in `ScrobbleContent.kt` and `ScrobbleStatisticsContent.kt`, plus the Home pull-to-refresh implementation.
+- Code commit: `00315187a4279a18ca1d6e1955959d1a85b85858` on `Main-dev`.
+- File: `app/src/main/java/com/music/bitchord/ui/scrobble/ScrobbleContent.kt`.
+- Generator progress cards using `secondaryContainer` now explicitly set `onSecondaryContainer` as their content color. The selected seed-result row now explicitly chooses `onSecondaryContainer` when selected and `onSurface` otherwise. Generator mode rows explicitly use `onSurface` against the standard surface.
+- This removes reliance on implicit foreground inheritance for the main generator surfaces while preserving the existing palette, opacity, layout, interaction and disabled-state treatment.
+- Statistics' ranked rows, error notice, track rows, export dialog and page background already pair their container colors with the corresponding semantic foregrounds. Skeleton rows contain no text. No broad palette changes were needed.
+
+### Verification
+- Static source review only. No local Gradle build, APK, emulator/device run, or screenshots have been performed.
+- No CI result is available for code SHA `00315187a4279a18ca1d6e1955959d1a85b85858`; do not infer success from older runs.
+- Gradient ON/OFF screenshots remain required to confirm actual rendered contrast, including selected seed rows, generator progress, saved-playlist card, playlist detail and dialogs.
+
+### Next
+- Continue checking the Scrobble-only icon and action affordances for contrast and touch-target consistency, then check current CI evidence. Keep the standard theme's layout and non-Scrobble screens unchanged.
