@@ -251,19 +251,29 @@ fun ScrobbleGenerateContent(
                 )
             }
 
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 GeneratorSectionTitle("Choose a mix")
-                PlaylistGenerationMode.entries.forEach { option ->
-                    GeneratorModeRow(
-                        mode = option,
-                        enabled = !uiState.isGenerating && (option != PlaylistGenerationMode.LIBRARY || ytmSignedIn),
-                        disabledReason = if (option == PlaylistGenerationMode.LIBRARY && !ytmSignedIn) {
-                            "Sign in to YouTube Music to use this"
-                        } else {
-                            null
-                        },
-                        onClick = { openMode(option) },
+                Column {
+                    Box(
+                        Modifier.fillMaxWidth().height(0.5.dp)
+                            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f)),
                     )
+                    PlaylistGenerationMode.entries.forEach { option ->
+                        GeneratorModeRow(
+                            mode = option,
+                            enabled = !uiState.isGenerating && (option != PlaylistGenerationMode.LIBRARY || ytmSignedIn),
+                            disabledReason = if (option == PlaylistGenerationMode.LIBRARY && !ytmSignedIn) {
+                                "Sign in to YouTube Music to use this"
+                            } else {
+                                null
+                            },
+                            onClick = { openMode(option) },
+                        )
+                        Box(
+                            Modifier.fillMaxWidth().height(0.5.dp)
+                                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f)),
+                        )
+                    }
                 }
             }
 
@@ -814,18 +824,18 @@ private fun GeneratorModeRow(
     androidx.compose.material3.Surface(
         onClick = onClick,
         enabled = enabled,
-        shape = RoundedCornerShape(18.dp),
-        color = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(12.dp),
+        color = Color.Transparent,
         contentColor = MaterialTheme.colorScheme.onSurface,
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
-            Modifier.padding(horizontal = 14.dp, vertical = 13.dp),
+            Modifier.heightIn(min = 64.dp).padding(horizontal = 4.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Box(
-                Modifier.size(44.dp).clip(RoundedCornerShape(14.dp))
+                Modifier.size(40.dp).clip(RoundedCornerShape(12.dp))
                     .background(
                         if (enabled) MaterialTheme.colorScheme.primaryContainer
                         else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
@@ -837,13 +847,14 @@ private fun GeneratorModeRow(
                     contentDescription = null,
                     tint = if (enabled) MaterialTheme.colorScheme.onPrimaryContainer
                     else MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.55f),
+                    modifier = Modifier.size(21.dp),
                 )
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
                     mode.label(),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
                     color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
                 )
                 Text(
@@ -854,7 +865,12 @@ private fun GeneratorModeRow(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            Icon(BitChordIcons.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Icon(
+                BitChordIcons.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp),
+            )
         }
     }
 }
@@ -1649,48 +1665,41 @@ private fun PlaylistDetailContent(
                 }
             }
 
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(22.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                contentColor = MaterialTheme.colorScheme.onSurface,
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Row(
-                    Modifier.fillMaxWidth().padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
-                ) {
-                    AsyncImage(
-                        model = playlist.customCoverUri ?: playlist.songs.firstOrNull()?.thumbnailUrl,
-                        contentDescription = "Playlist cover",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.size(88.dp).clip(RoundedCornerShape(14.dp)),
+                AsyncImage(
+                    model = playlist.customCoverUri ?: playlist.songs.firstOrNull()?.thumbnailUrl,
+                    contentDescription = "Playlist cover",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(220.dp)
+                        .clip(RoundedCornerShape(16.dp)),
+                )
+                Text(
+                    playlist.title,
+                    modifier = Modifier.fillMaxWidth(),
+                    style = MaterialTheme.typography.headlineLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    "Playlist · ${playlist.songs.size} tracks",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                )
+                if (currentTrackDisplayIndex >= 0) {
+                    Text(
+                        "NOW PLAYING",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = scrobbleAccentColor(),
+                        fontWeight = FontWeight.Bold,
                     )
-                    Column(
-                        Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(5.dp),
-                    ) {
-                        Text(
-                            playlist.title,
-                            style = MaterialTheme.typography.headlineMedium,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Text(
-                            "${playlist.songs.size} tracks",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        if (currentTrackDisplayIndex >= 0) {
-                            Text(
-                                "NOW PLAYING",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = scrobbleAccentColor(),
-                                fontWeight = FontWeight.Bold,
-                            )
-                        }
-                    }
                 }
             }
 
