@@ -30,6 +30,27 @@ internal data class ScrobbleStatisticsUiState(
     val loadedPeriod: ReplayPeriod? = null,
 )
 
+/**
+ * Selects only data that belongs to the requested period. During a period
+ * transition the last completed period remains visible as stale content; its
+ * local rows must not be merged with a new period's remote cache.
+ */
+internal fun existingStatisticsTracksForPeriod(
+    snapshot: ScrobbleStatisticsUiState,
+    period: ReplayPeriod,
+    cachedTracks: List<LastFM.RankedTrack>,
+    connected: Boolean,
+): List<MergedStatisticsTrack> = when {
+    snapshot.loadedPeriod == period -> mergeStatisticsTracks(
+        snapshot.localSummary?.songs.orEmpty(),
+        cachedTracks,
+        connected,
+    )
+    snapshot.loadedPeriod != null -> snapshot.tracks
+    else -> mergeStatisticsTracks(emptyList(), cachedTracks, connected)
+}
+
+
 class ScrobbleStatisticsViewModel : ViewModel() {
     private val repository = LastFmStatisticsRepository()
     private val _state = MutableStateFlow(ScrobbleStatisticsUiState())
@@ -92,15 +113,12 @@ class ScrobbleStatisticsViewModel : ViewModel() {
         if (!force && loadJob?.isActive == true && activeRequestKey == requestKey) return
 
         val samePeriodData = snapshot.loadedPeriod == period
-        val existingTracks = when {
-            samePeriodData -> mergeStatisticsTracks(
-                snapshot.localSummary?.songs.orEmpty(),
-                cachedTracks,
-                connected,
-            )
-            snapshot.loadedPeriod != null -> snapshot.tracks
-            else -> mergeStatisticsTracks(emptyList(), cachedTracks, connected)
-        }
+        val existingTracks = existingStatisticsTracksForPeriod(
+            snapshot = snapshot,
+            period = period,
+            cachedTracks = cachedTracks,
+            connected = connected,
+        )
         val hasExistingData = existingTracks.isNotEmpty()
 
         loadJob?.cancel()
