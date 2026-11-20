@@ -11,8 +11,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
@@ -33,6 +31,11 @@ import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.model.UiState
 import com.music.bitchord.data.model.playingRowMatcher
 import com.music.bitchord.ui.components.MessageState
+import com.music.bitchord.ui.components.AlertAction
+import com.music.bitchord.ui.components.AlertRule
+import com.music.bitchord.ui.components.AlertScaffold
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
 import com.music.bitchord.ui.components.PlayingAccent
 import com.music.bitchord.ui.components.ROW_DIVIDER_INSET
 import com.music.bitchord.ui.components.SongRow
@@ -49,6 +52,7 @@ import com.music.bitchord.ui.components.songListSkeleton
  * doubles as a queue that has already been approved once. That is the useful
  * reading of a history: not a receipt, but everything worth playing again.
  */
+@OptIn(ExperimentalHazeMaterialsApi::class)
 @Composable
 fun HistoryScreen(
     state: UiState<List<Song>>,
@@ -67,6 +71,7 @@ fun HistoryScreen(
     loadingMore: Boolean,
     loadMoreFailed: Boolean,
     contentPadding: PaddingValues,
+    hazeState: HazeState,
     currentSong: Song? = null,
     isPlaying: Boolean = false,
     modifier: Modifier = Modifier,
@@ -231,22 +236,46 @@ fun HistoryScreen(
     }
 
     if (confirmClear) {
-        AlertDialog(
-            onDismissRequest = { confirmClear = false },
-            title = { androidx.compose.material3.Text("Clear device history?") },
-            text = { androidx.compose.material3.Text("This removes listening history stored on this device. Your YouTube Music history is not changed.") },
-            confirmButton = {
-                TextButton(onClick = {
+        AlertScaffold(
+            hazeState = hazeState,
+            onDismiss = { confirmClear = false },
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 18.dp),
+                horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
+                verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
+            ) {
+                androidx.compose.material3.Text(
+                    "Clear device history?",
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                androidx.compose.material3.Text(
+                    "This removes listening history stored on this device. Your YouTube Music history is not changed.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                )
+            }
+            AlertRule()
+            AlertAction(
+                label = "Clear",
+                emphasised = true,
+                destructive = true,
+                contentColor = MaterialTheme.colorScheme.error,
+                onClick = {
                     confirmClear = false
                     onClearLocalHistory()
-                }) { androidx.compose.material3.Text("Clear") }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmClear = false }) {
-                    androidx.compose.material3.Text("Cancel")
-                }
-            },
-        )
+                },
+            )
+            AlertRule()
+            AlertAction(
+                label = "Cancel",
+                emphasised = false,
+                onClick = { confirmClear = false },
+            )
+        }
     }
 }
 
