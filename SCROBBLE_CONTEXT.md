@@ -3448,3 +3448,13 @@ Before making another dialog/icon change, the next agent must read this entire `
 5. Obtain final product-owner approval before merging.
 - PR #11 intentionally remains draft. Do not merge while any gate is open.
 - `main` was not changed by creating the PR.
+
+
+## 113. Android CI compile fix on whole-branch PR (2026-11-20 23:44 IST)
+
+- Investigated the exact compiler diagnostic from run `44788489430`: `LyricsSourcesDialog.kt:578:47 Unresolved reference 'Icons'`.
+- Inspected the file imports and the failing usage: `Icons.Rounded.Check` was referenced but the file did not import `androidx.compose.material.icons.Icons` or `androidx.compose.material.icons.rounded.Check`.
+- Added only those two explicit imports to `app/src/main/java/com/music/bitchord/ui/components/LyricsSourcesDialog.kt`; no UI or behavior change.
+- Fix commit: `eadda3b9540071ee59e20662ce7c3eb2f3ed0d29`.
+- The fix is on `Main-dev`, so it is included automatically in draft PR #11. No changes to `main`.
+- This is a source-level correction only. Do not call it verified until a new CI run for the updated head completes successfully. Android APK assembly and emulator/POCO checks remain outstanding.
