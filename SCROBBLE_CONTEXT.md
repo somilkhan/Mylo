@@ -2655,3 +2655,12 @@ The product owner explicitly approved the proposed Statistics additions and inst
 - Corrected the malformed expression and completed replacing the remaining playlist-detail Shuffle glyph with `BitChordIcons.Shuffle`.
 - Corrective code commit: `2ed0f38c650844887324716bbfa8bd3711e2f73c` (Main-dev).
 - A new CI run is required for this exact code SHA; do not claim it passes until checked. No local Gradle build or device verification is available.
+
+
+## 85. Scrobble playlist dialog contrast pass (2026-11-20 11:03 IST)
+
+- Code commits: `eb5d586e6851bc06b0037354c553700a44ad4212` (playlist rename/delete dialogs) and `c825de726ac3af0f7fad076c67429dd79350d373` (playlist export dialog).
+- Rename, delete and export AlertDialogs now explicitly use an opaque active theme surface and semantic `onSurface` title/text colors. This prevents the translucent Scrobble gradient surface from bleeding through modal dialog content and keeps text contrast tied to the active theme. Dialog actions, validation, storage and export behavior are unchanged.
+- The Generator ModalBottomSheet already has the earlier opaque surface fix (section 79).
+- CI for the newest source SHA must be polled; no result is claimed yet. Visual confirmation of all dialogs in gradient ON/OFF still requires device screenshots.
+- Next: continue the approved Scrobble icon/dialog audit and inspect old ReplayViewModel data/actions before deciding the next Statistics parity implementation. Preserve the single Statistics destination and existing player owner.
