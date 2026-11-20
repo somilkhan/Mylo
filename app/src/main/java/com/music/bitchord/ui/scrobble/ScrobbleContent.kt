@@ -62,6 +62,7 @@ import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.MyLocation
 import com.music.bitchord.ui.components.SongRow
+import com.music.bitchord.ui.icons.BitChordIcons
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.Shuffle
@@ -1308,11 +1309,11 @@ private fun PlaylistRow(
                     Modifier.weight(1f).clickable(onClick = onOpen).padding(horizontal = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(3.dp),
                 ) {
-                    Text(playlist.title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(playlist.title, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text("${playlist.songs.size} tracks${if (playlist.isPinned) " · Pinned" else ""}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 IconButton(onClick = onPlay, enabled = playlist.songs.isNotEmpty()) {
-                    Icon(Icons.Rounded.PlayArrow, contentDescription = "Play playlist")
+                    Icon(BitChordIcons.Play, contentDescription = "Play playlist")
                 }
                 Box {
                     IconButton(onClick = { menuExpanded = true }) {
@@ -1321,12 +1322,12 @@ private fun PlaylistRow(
                     DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
                         DropdownMenuItem(
                             text = { Text(if (playlist.isPinned) "Unpin" else "Pin") },
-                            leadingIcon = { Icon(Icons.Rounded.PushPin, contentDescription = null) },
+                            leadingIcon = { Icon(BitChordIcons.Pin, contentDescription = null) },
                             onClick = { menuExpanded = false; onPin() },
                         )
                         DropdownMenuItem(
                             text = { Text("Generate similar") },
-                            leadingIcon = { Icon(Icons.Rounded.Shuffle, contentDescription = null) },
+                            leadingIcon = { Icon(BitChordIcons.Shuffle, contentDescription = null) },
                             enabled = canGenerateSimilar,
                             onClick = { menuExpanded = false; onGenerateSimilar() },
                         )
@@ -1657,7 +1658,7 @@ private fun PlaylistDetailContent(
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = { onPlaySongs(playlist.songs, 0) }, enabled = playlist.songs.isNotEmpty()) {
-                    Icon(Icons.Rounded.PlayArrow, contentDescription = null)
+                    Icon(BitChordIcons.Play, contentDescription = null)
                     Spacer(Modifier.width(6.dp))
                     Text("Play")
                 }
