@@ -2756,3 +2756,16 @@ The product owner explicitly approved the proposed Statistics additions and inst
 
 ### Next
 - Continue checking the Scrobble-only icon and action affordances for contrast and touch-target consistency, then check current CI evidence. Keep the standard theme's layout and non-Scrobble screens unchanged.
+
+## 91. Track Concentration chart contrast correction (2026-11-20 11:24 IST)
+
+- Code commit: `229c6038362b154436ed5b5d011bf47a6b03461b` on `Main-dev`.
+- File: `app/src/main/java/com/music/bitchord/ui/scrobble/TrackConcentration.kt`.
+- The “Other tracks” chart segment and its matching legend dot now use `onSurfaceVariant` rather than `outline`. In the approved gradient palette, `outline` was a very dark grey against the translucent dark card, so the third segment could lose separation. The muted foreground token keeps it distinct from the white top-track and pink next-two segments without changing the overall palette or card layout.
+- The card surface, labels, metric values and listening-time note already use the correct semantic foreground tokens; no further color changes were made in this file.
+- Static source review only. No local Gradle build, APK, device/emulator test or screenshots have been performed.
+- CI check status returned `statuses=[]`, and the commit-to-workflow-run lookup returned no PR-triggered runs. This is **not** evidence of a passing build; check CI again if a run is started.
+- Gradient ON/OFF screenshots are still required to confirm the chart's rendered segment separation and the rest of Statistics.
+
+### Next
+- Continue the approved UI review through the remaining Generator, playlist and Statistics action surfaces. Keep changes local to the Scrobble hub and preserve the standard theme's layout.
