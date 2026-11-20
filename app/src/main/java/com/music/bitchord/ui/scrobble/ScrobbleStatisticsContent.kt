@@ -25,7 +25,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -103,6 +107,23 @@ internal fun ScrobbleStatisticsContent(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text("Statistics", style = MaterialTheme.typography.displayLarge, fontWeight = FontWeight.SemiBold)
+                }
+                IconButton(
+                    onClick = viewModel::refresh,
+                    enabled = !state.isRefreshing,
+                ) {
+                    if (state.isRefreshing) {
+                        androidx.compose.material3.CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Rounded.Refresh,
+                            contentDescription = "Refresh statistics",
+                            tint = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
                 }
             }
 
