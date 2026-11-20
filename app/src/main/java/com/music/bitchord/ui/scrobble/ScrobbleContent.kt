@@ -1019,6 +1019,7 @@ fun ScrobblePlaylistsContent(
                             DropdownMenu(
                                 expanded = sortMenuExpanded,
                                 onDismissRequest = { sortMenuExpanded = false },
+                                containerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 1f),
                             ) {
                                 LocalPlaylistSortMode.entries.forEach { option ->
                                     DropdownMenuItem(
@@ -1382,17 +1383,25 @@ private fun PlaylistRow(
                     Modifier.weight(1f).clickable(onClick = onOpen).padding(horizontal = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(3.dp),
                 ) {
+                    // Keep the title on its own line: the mode badge must never
+                    // consume the width needed to identify a long playlist.
+                    Text(
+                        playlist.title,
+                        modifier = Modifier.fillMaxWidth(),
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(7.dp),
                     ) {
                         Text(
-                            playlist.title,
-                            modifier = Modifier.weight(1f),
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface,
+                            "${playlist.songs.size} tracks${if (playlist.isPinned) " · Pinned" else ""}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
                         )
                         playlistGenerationModeLabel(playlist.generationMode)?.let { modeLabel ->
                             Surface(
@@ -1409,7 +1418,6 @@ private fun PlaylistRow(
                             }
                         }
                     }
-                    Text("${playlist.songs.size} tracks${if (playlist.isPinned) " · Pinned" else ""}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 IconButton(onClick = onPlay, enabled = playlist.songs.isNotEmpty()) {
                     Icon(BitChordIcons.Play, contentDescription = "Play playlist")
@@ -1418,7 +1426,11 @@ private fun PlaylistRow(
                     IconButton(onClick = { menuExpanded = true }) {
                         Icon(BitChordIcons.More, contentDescription = "Playlist actions")
                     }
-                    DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                    DropdownMenu(
+                        expanded = menuExpanded,
+                        onDismissRequest = { menuExpanded = false },
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 1f),
+                    ) {
                         DropdownMenuItem(
                             text = { Text(if (playlist.isPinned) "Unpin" else "Pin") },
                             leadingIcon = { Icon(BitChordIcons.Pin, contentDescription = null) },
@@ -1650,6 +1662,7 @@ private fun PlaylistDetailContent(
                     DropdownMenu(
                         expanded = detailMenuExpanded,
                         onDismissRequest = { detailMenuExpanded = false },
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 1f),
                     ) {
                         DropdownMenuItem(
                             text = { Text("Change cover") },
@@ -1851,7 +1864,11 @@ private fun PlaylistDetailContent(
                     isPlaying = isCurrentTrack && isPlaying,
                     activeTint = scrobbleAccentColor(),
                 )
-                DropdownMenu(expanded = trackMenuExpanded, onDismissRequest = { trackMenuExpanded = false }) {
+                DropdownMenu(
+                    expanded = trackMenuExpanded,
+                    onDismissRequest = { trackMenuExpanded = false },
+                    containerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 1f),
+                ) {
                     DropdownMenuItem(
                         text = { Text("Move up") },
                         leadingIcon = { Icon(BitChordIcons.ArrowUp, contentDescription = null) },
