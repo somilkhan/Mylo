@@ -299,7 +299,7 @@ fun ScrobbleGenerateContent(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("Building your mix", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                             Spacer(Modifier.weight(1f))
-                            TextButton(onClick = viewModel::cancelGeneration) { Text("Cancel") }
+                            TextButton(onClick = viewModel::cancelGeneration, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSecondaryContainer)) { Text("Cancel") }
                         }
                         LinearProgressIndicator(Modifier.fillMaxWidth())
                         Text(
@@ -327,9 +327,9 @@ fun ScrobbleGenerateContent(
                             Text(error, modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onErrorContainer)
                             val retryRequest = uiState.activeRequest
                             if (retryRequest != null) {
-                                TextButton(onClick = { viewModel.generate(retryRequest) }) { Text("Retry") }
+                                TextButton(onClick = { viewModel.generate(retryRequest) }, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onErrorContainer)) { Text("Retry") }
                             } else {
-                                TextButton(onClick = viewModel::dismissError) { Text("Dismiss") }
+                                TextButton(onClick = viewModel::dismissError, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onErrorContainer)) { Text("Dismiss") }
                             }
                         }
                     }
@@ -376,7 +376,7 @@ fun ScrobbleGenerateContent(
                             )
                             Text("${playlist.songs.size} tracks", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        TextButton(onClick = onOpenPlaylists) { Text("Open") }
+                        TextButton(onClick = onOpenPlaylists, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSecondaryContainer)) { Text("Open") }
                     }
                 }
             }
@@ -634,6 +634,7 @@ fun ScrobbleGenerateContent(
                             }
                         },
                         modifier = Modifier.weight(1f).height(52.dp),
+                        colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface),
                     ) {
                         Text("Cancel")
                     }
@@ -641,6 +642,7 @@ fun ScrobbleGenerateContent(
                         onClick = {
                             viewModel.generate(generationRequest)
                         },
+                        colors = scrobblePrimaryButtonColors(),
                         enabled = canGenerate,
                         modifier = Modifier.weight(1.45f).height(52.dp),
                         shape = RoundedCornerShape(18.dp),
@@ -683,6 +685,7 @@ private fun GeneratorSeedPicker(
                 },
                 enabled = enabled,
                 modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                colors = scrobbleOutlinedButtonColors(MaterialTheme.colorScheme.onSurface),
             ) {
                 Text(
                     when {
@@ -990,7 +993,7 @@ fun ScrobblePlaylistsContent(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        TextButton(onClick = onOpenGenerator) {
+                        TextButton(onClick = onOpenGenerator, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface)) {
                             Icon(Icons.Filled.AutoAwesome, contentDescription = null, modifier = Modifier.size(17.dp))
                             Spacer(Modifier.width(6.dp))
                             Text("Generate")
@@ -1025,7 +1028,7 @@ fun ScrobblePlaylistsContent(
                 item(key = "playlist_storage_error") {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(error, color = MaterialTheme.colorScheme.error)
-                        TextButton(onClick = { scope.launch { LocalPlaylistStore.reload() } }) { Text("Retry") }
+                        TextButton(onClick = { scope.launch { LocalPlaylistStore.reload() } }, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface)) { Text("Retry") }
                     }
                 }
             }
@@ -1036,7 +1039,7 @@ fun ScrobblePlaylistsContent(
                 item(key = "similar_playlist_saved") {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("Created ${saved.title}", modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.primary)
-                        TextButton(onClick = { selectedId = saved.id }) { Text("Open") }
+                        TextButton(onClick = { selectedId = saved.id }, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface)) { Text("Open") }
                     }
                 }
             }
@@ -1154,6 +1157,7 @@ fun ScrobblePlaylistsContent(
                         if (playlist.songs.isNotEmpty()) {
                             TextButton(
                                 onClick = { expandedPlaylistId = if (expandedPlaylistId == playlist.id) null else playlist.id },
+                                colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface),
                                 modifier = Modifier.align(Alignment.End),
                             ) {
                                 Text(if (expandedPlaylistId == playlist.id) "Hide preview" else "Preview tracks")
@@ -1183,7 +1187,7 @@ fun ScrobblePlaylistsContent(
                                             Text((trackIndex + 1).toString(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                         }
                                     }
-                                    TextButton(onClick = { selectedId = playlist.id }) {
+                                    TextButton(onClick = { selectedId = playlist.id }, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface)) {
                                         Text("View all ${playlist.songs.size} tracks")
                                     }
                                 }
@@ -1210,7 +1214,8 @@ fun ScrobblePlaylistsContent(
                 }
             },
             confirmButton = {
-                TextButton(onClick = {
+                TextButton(
+                    onClick = {
                     val clean = renameText.trim()
                     val duplicate = playlists.any { it.id != target.id && it.title.equals(clean, ignoreCase = true) }
                     when {
@@ -1224,9 +1229,11 @@ fun ScrobblePlaylistsContent(
                             }
                         }
                     }
-                }) { Text("Save") }
+                    },
+                    colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface),
+                ) { Text("Save") }
             },
-            dismissButton = { TextButton(onClick = { renameTarget = null }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { renameTarget = null }, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface)) { Text("Cancel") } },
         )
     }
     deleteTarget?.let { target ->
@@ -1243,7 +1250,8 @@ fun ScrobblePlaylistsContent(
                 }
             },
             confirmButton = {
-                TextButton(onClick = {
+                TextButton(
+                    onClick = {
                     scope.launch {
                         withContext(NonCancellable) {
                             if (LocalPlaylistStore.deletePlaylist(target.id)) {
@@ -1263,9 +1271,11 @@ fun ScrobblePlaylistsContent(
                             }
                         }
                     }
-                }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+                    },
+                    colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.error),
+                ) { Text("Delete", color = MaterialTheme.colorScheme.error) }
             },
-            dismissButton = { TextButton(onClick = { deleteTarget = null; deleteError = null }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { deleteTarget = null; deleteError = null }, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface)) { Text("Cancel") } },
         )
     }
 }
@@ -1526,7 +1536,7 @@ private fun PlaylistDetailContent(
     ) {
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = onBack) { Text("Back") }
+                TextButton(onClick = onBack, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface)) { Text("Back") }
                 Spacer(Modifier.weight(1f))
                 TextButton(
                     onClick = {
@@ -1537,6 +1547,7 @@ private fun PlaylistDetailContent(
                             addTrackMessage = null
                         }
                     },
+                    colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface),
                 ) { Text(if (addTracksExpanded) "Done" else "Add tracks") }
                 Box {
                     IconButton(onClick = { detailMenuExpanded = true }) {
@@ -1679,6 +1690,7 @@ private fun PlaylistDetailContent(
             ) {
                 Button(
                     onClick = { onPlaySongs(playlist.songs, 0) },
+                    colors = scrobblePrimaryButtonColors(),
                     enabled = playlist.songs.isNotEmpty(),
                     modifier = Modifier.weight(1f).height(50.dp),
                     shape = RoundedCornerShape(16.dp),
@@ -1689,6 +1701,7 @@ private fun PlaylistDetailContent(
                 }
                 OutlinedButton(
                     onClick = { onPlaySongs(playlist.songs.shuffled(), 0) },
+                    colors = scrobbleOutlinedButtonColors(MaterialTheme.colorScheme.onSurface),
                     enabled = playlist.songs.isNotEmpty(),
                     modifier = Modifier.weight(1f).height(50.dp),
                     shape = RoundedCornerShape(16.dp),
@@ -1708,6 +1721,7 @@ private fun PlaylistDetailContent(
                                 listState.animateScrollToItem(precedingItems + currentTrackDisplayIndex)
                             }
                         },
+                        colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface),
                     ) {
                         Icon(Icons.Rounded.MyLocation, contentDescription = null)
                         Spacer(Modifier.width(4.dp))
@@ -1785,6 +1799,7 @@ private fun PlaylistDetailContent(
                     val alreadyAdded = song.videoId in existingVideoIds
                     TextButton(
                         enabled = !alreadyAdded,
+                        colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface),
                         onClick = {
                             scope.launch {
                                 val added = LocalPlaylistStore.addSongIfAbsent(playlist.id, song)
