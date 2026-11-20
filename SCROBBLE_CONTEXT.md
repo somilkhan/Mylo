@@ -3234,3 +3234,84 @@ The user reported that dialog icons and dialog UI did not feel consistent with M
 ### Continuation gate
 Before making another dialog/icon change, the next agent must read this entire `SCROBBLE_CONTEXT.md` and the approved `mylo-ux-spec.md`, then inspect current `Main-dev` HEAD and exact changed files. Do not repeat this pass or overwrite newer work based on an earlier SHA.
 
+## 109. FAB, dismiss, navigation and visibility audit (2026-11-20 23:23 IST)
+
+### Scope and evidence
+- User requested a senior-level audit of FAB placement/visibility, hub entry/exit, navigation and incorrect appearances/behavior. This is an audit pass only; no application code was changed.
+- Read the complete current `SCROBBLE_CONTEXT.md`, the supplied `AGENT-BRIEF.md`, `mylo-ux-spec.md`, `CHANGE-THEME-TOGGLE.md`, and inspected the relevant FAB/nav interaction code in `mylo-replay-prototype-v3.html`.
+- Applied the UI/UX review playbook: whole journey, predictable Back/navigation, interaction states, semantics, keyboard/focus, reduced motion and runtime evidence.
+- Repository: `somilkhan/Mylo`; branch: `Main-dev`; exact HEAD: `26028f028cf714a9e2cf12fbf11875bbdc60affe`.
+- Source blobs inspected:
+  - `MainActivity.kt`: `c66a019f70c6546f973a2271b8b0a43c7aed8a9f`
+  - `ScrobbleFab.kt`: `c70fd7c0840da6a13bac59497f24053a7c17084d`
+  - `FrostedTopBar.kt`: `45745303d8cb33e21373fed8cf0381c339cd0096`
+  - `ScrobbleFabTest.kt`: `cdcf606df05c0b0cee03e20e1a5db2702ef2eead`
+- Key source ranges: MainActivity lines 590–603, 2638–2690, 3808–3845, 4155–4193 and 4279–4325; FrostedTopBar lines 281–299; ScrobbleFab lines 20–112; test file is 17 lines.
+- Prototype HTML was inspected at source level (FAB CSS/JS and navigation logic); no browser-rendered screenshot or device runtime session was available.
+
+### Approved baseline
+- FAB visual size is 62dp, right aligned above the mini-player/navigation stack; GraphicEq when closed and Close while hub is open.
+- Visible on Home as the entry point and remains visible as the hub's Close action while the hub is open.
+- Hidden on other normal tabs, while a blocking sheet/dialog/overlay is active, while the full player is open, and while the keyboard is visible.
+- Hub replaces Home/Explore/Library/Search with Statistics/Generate/Playlists.
+- Exit paths named by the approved UX spec: FAB Close, system Back, top-bar Back and tapping a normal tab. Closing the hub cancels active generation.
+- The supplied prototype implements the same Home-or-hub FAB rule, hides it for player/keyboard/dialog, replaces the normal nav with hub tabs, and makes normal-tab selection close the hub in its state handler.
+
+### Findings — confirmed source defects / mismatches
+
+#### P2 — Top-bar Back is not wired for the Scrobble hub
+- MainActivity's `FrostedTopBar(onBack = when { ... })` chain has no `showScrobble` branch (lines 3808–3845).
+- `FrostedTopBar` only renders its back control when `onBack != null` (lines 281–299). Therefore no top-bar Back control is rendered while the hub is the active destination.
+- A system `BackHandler` does close the hub (MainActivity lines 2638–2640), and the FAB's Close state also works by source wiring. The approved top-bar Back exit path is nevertheless missing.
+- Previous integration audit section 44 recorded top-bar Back as implemented; current source does not match that recorded state.
+
+#### P2 — Normal-tab exit rule is unreachable through the visible hub navigation
+- While `showScrobble` is true, `displayedTabs` is the three Scrobble tabs and `displayedTabClick` only updates `selectedScrobbleTab` (MainActivity lines 4180–4193).
+- The normal-tab callback `onTabSelected` does call `closeScrobble()` before selecting a normal tab (lines 4155–4178), but the normal four-tab bar is not rendered while the hub is open.
+- Thus the UX spec's “tap any normal tab to exit” path cannot be performed by a user in the current replacement-nav design. This is a product-spec contradiction, not a reason to show a second navigation bar without approval. Resolve the wording/intent before implementation; retain the existing three-tab replacement unless the owner explicitly changes it.
+
+#### P2 — FAB visibility can become inconsistent with an open hub after a normal-tab state mutation
+- The visibility helper requires `selectedTab == TAB_HOME`; the hub state is held separately in `showScrobble`.
+- The normal navigation click path is safe because `onTabSelected` closes the hub first. However, other host paths mutate `selectedTab` directly without closing the hub:
+  - A live `LinkRequest.Search` sets `selectedTab = TAB_SEARCH` (MainActivity line 1915).
+  - The Now Playing “open playback source” callback dismisses the player and may set `selectedTab = TAB_SEARCH` or `TAB_EXPLORE` (lines 2533–2577), without calling `closeScrobble()`.
+- If either route is delivered while Scrobble is open (the player route is reachable by opening Now Playing over the hub), `showScrobble` can remain true while `selectedTab != TAB_HOME`. The hub still wins the content destination, but `scrobbleFabVisible` returns false, removing the only visible hub Close affordance. System Back still works, but the UI state is inconsistent and the user loses the obvious exit.
+- Enforce the invariant that any navigation to a normal tab closes Scrobble first. Route all normal-tab mutations through one helper rather than setting `selectedTab` directly.
+
+#### P2 — Blocking overlay visibility inputs are incomplete
+- The explicit `scrobbleOverlayOpen` expression at MainActivity lines 4280–4287 includes the major page/sheet states, account selectors, player-adjacent menus, IME-related routes and onboarding.
+- It omits at least two independently hosted root-level alerts:
+  - `showUpdateDialog`: can be raised automatically by the update-availability effect (lines 797–804) and is rendered at lines 5301–5334. It is not included in the FAB visibility expression.
+  - `uploadConflict`: the global WebDAV conflict alert is rendered at lines 5593–5612 and has its own BackHandler, but is not included in the FAB visibility expression.
+- Several other dialog flags (language, lyrics sources, server editors, Discord/Spotify login and similar) are currently covered by their parent page flags such as `showSettings`, `showSources`, `showDiscord`, `showSpotify` or `showListenTogether`; do not add every child flag blindly if its parent already guarantees suppression.
+- The two independent alerts above should be included in a single auditable blocking-surface calculation and covered by regression tests. Their modal scrims may visually obscure the FAB, but the FAB is not explicitly transitioned to hidden/non-interactive by its visibility state while they are active.
+
+### Correct behavior already present
+- `ScrobbleFab.kt` retains the approved 62dp target, GraphicEq/Close state glyph, button role and action label; hidden state removes click behavior and clears accessibility semantics.
+- `closeScrobble()` cancels generation, expands the Scrobble nav scroll, closes the hub, resets the selected hub tab to Statistics and clears playlist handoff state (lines 596–603).
+- FAB click opens at Statistics and closes through `closeScrobble()` (lines 4311–4320).
+- System Back has a dedicated hub handler (lines 2638–2640). Later modal-specific handlers are composed for nested dialogs/sheets, so nested dismissals must continue to take priority over exiting the hub.
+- Standard and Glass navigation both receive the same displayed tab list/callback. Glass passes `standaloneIndexOverride = -1` for Scrobble so Playlists is not detached into the Search-style standalone circle.
+- FAB position is derived from the measured bottom-bar stack height, with a 12dp gap and 8dp end inset (lines 4300–4325), rather than a fixed screen offset. This is a sound basis for both mini-player-present and mini-player-absent layouts; exact spacing still requires screenshots/device verification.
+- `scrobbleFabVisible` unit coverage currently checks Home vs another tab, generic overlay, player and keyboard. It does not exercise the host's full overlay aggregation or any navigation/Back behavior.
+
+### Risk and verification gaps
+- No Compose host/UI test covers hub open/close, selected-tab invariant, nested Back precedence, top-bar Back, update/WebDAV modal visibility, normal-tab replacement, process recreation, or Glass/Standard parity.
+- No physical-device or emulator screenshots were captured. Verify the FAB position with/without mini-player, Glass enabled/disabled, expanded/inline nav, transient queue notice, landscape/tablet width and gesture navigation.
+- Verify IME suppression with normal, floating/split keyboard, keyboard dismissal followed by hub Back, and focus changes. Source currently uses `WindowInsets.ime.getBottom(LocalDensity.current) > 0`.
+- `reduceMotion` is passed from the app's `reduceAnimation` setting. Confirm system animator scale zero and the app preference independently; the current unit test does not exercise animation interruption/reversal or reduced-motion semantics.
+- The prototype was inspected as source, not browser-rendered. No pixel-position claim is made.
+
+### Recommended minimal correction plan (not implemented in this audit)
+1. Add the approved Scrobble Back action to the top-bar `onBack` chain, with nested destinations retaining priority.
+2. Create one normal-tab navigation function that closes/cancels Scrobble before changing `selectedTab`; route deep-link and playback-source tab mutations through it.
+3. Centralize the blocking-surface predicate and include independent root alerts (`showUpdateDialog`, WebDAV upload conflict); retain parent-state coverage for nested dialogs.
+4. Add pure visibility tests for every blocking surface and a small Compose host test for hub open/close, Back priority, tab replacement and the selectedTab/showScrobble invariant.
+5. Clarify the UX rule about tapping a normal tab while normal tabs are replaced by Scrobble tabs. Do not add a second nav row without product approval.
+6. Only after source/tests are green, verify actual placement, accessibility and motion on the phone in Glass and Standard modes.
+
+### Scope and branch safety
+- No application source files changed in this pass.
+- `main` untouched. No new branch. Working branch remains `Main-dev`.
+- Next agent must read this entire `SCROBBLE_CONTEXT.md` plus the four current Library/source documents before implementing any correction; do not repeat the audit or overwrite newer work from an earlier SHA.
+
