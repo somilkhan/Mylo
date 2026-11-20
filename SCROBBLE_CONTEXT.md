@@ -2859,3 +2859,36 @@ The product owner explicitly approved the proposed Statistics additions and inst
 - The clone could not start because this runtime could not resolve `github.com` (`Could not resolve host: github.com`). The checkout and Gradle wrapper are therefore unavailable in this environment; no local Gradle test/build was run.
 - Do not describe this as a code failure or as a passing build. Latest code SHA remains `7d7f5f4d25ff14d86d2c2659b892c50b59947a67`; latest documentation update is this file.
 - A CI run for the exact latest code SHA or a build from the user's connected development environment is still required.
+
+
+## 97. Current ref and CI/build verification re-check (2026-11-20 12:25 IST)
+
+### Ref verification
+- Refreshed live branch names: `Main-dev`, `main` and `last-wave` all exist.
+- Compared `Main-dev` against the last application-code commit `7d7f5f4d25ff14d86d2c2659b892c50b59947a67`: exactly four commits ahead, zero behind. The compare reports only `SCROBBLE_CONTEXT.md` changed across those four commits.
+- Compared `Main-dev` against documentation commit `6e25dd572b8b94dc4cac51a59e12ed7527cac85e`: identical; this is the current `Main-dev` HEAD.
+- Compared `main` against `Main-dev`: Main-dev is 246 commits ahead and zero behind. No write was made to `main`.
+- Current source blob SHAs remain:
+  - `ScrobbleContent.kt`: `1537cde8128501ce71fe9e2fbb0254d5f2d95cb5`
+  - `ScrobbleHubTheme.kt`: `422a813b4c26ee0f4358a95e4604827ffa423d5b`
+  - `ScrobbleStatisticsContent.kt`: `6b4b58cee92da5e75384dfc2a2178e5743556500`
+  - `SCROBBLE_CONTEXT.md` before this append: `722c7c9c96fa38af7634923e095906e7fa6bc49c`
+
+### CI investigation
+- Re-checked combined GitHub status for both the latest application-code SHA `7d7f5f4d25ff14d86d2c2659b892c50b59947a67` and current branch HEAD `6e25dd572b8b94dc4cac51a59e12ed7527cac85e`: both returned `statuses=[]`. This is no status evidence, not a pass.
+- The commit-workflow lookup returned `workflow_runs=[]`; that connector endpoint is documented to return only PR-triggered runs, so it cannot prove that no push-triggered run exists.
+- Inspected `.github/workflows/android-ci.yml` (blob `7347921c5d04bf8e1ec4d35206f401057cd6395c`). It runs Android CI on pushes to `main` / `Main-dev` except Markdown/docs-only changes, on PRs targeting `main`, and by manual `workflow_dispatch`. APK packaging is opt-in; Android tests run on the CI job. Desktop and Web jobs run for push/PR/dispatch events but are skipped for issue-comment events.
+- The `/build-apk` issue-comment route requires a PR and the exact repository-owner comment. PR #9, which introduced that route, is closed and is not a suitable build target. A search found no open PRs in this repository.
+- The available GitHub connector exposes status/run inspection and reruns, but no workflow-dispatch action. No suitable PR exists to trigger the comment route. Therefore this session could not safely start the supported workflow for the current `Main-dev` HEAD. Do not create a throwaway PR, branch or source change just to force CI.
+- No CI/build/test/APK success is claimed. The prior local clone failure due unavailable DNS remains the local-build limitation.
+
+### Prototype review
+- Re-opened `mylo-replay-prototype-v3.html` and inspected its CSS, hub markup and interaction JavaScript. Confirmed its approved gradient tokens, 48dp period/count controls, three hub destinations, 62dp FAB, FAB/overlay/player/keyboard visibility logic, mode dialog/count/cancel flow, playlist-title search, and success handoff to Playlists.
+- The prototype explicitly labels its track names and numbers as sample data. Those values and simulated network/generation outcomes remain demo-only and must not enter the app.
+- A headless Chromium screenshot attempt did not complete within the available execution window. This is not a device screenshot and no visual acceptance claim is made.
+
+### Decision / next action
+- No application source changes were justified by this verification pass. The four commits after the last code commit are documentation-only.
+- Do not repeat the completed contrast/icon pass without a newly evidenced defect.
+- Next required action: run `.github/workflows/android-ci.yml` for exact HEAD `6e25dd572b8b94dc4cac51a59e12ed7527cac85e` using repository-owner GitHub Actions access (manual dispatch with APK build enabled, or an authorized push/PR workflow). Then inspect Android, Desktop and Web job results and obtain APK artifacts only if the Android build succeeds.
+- Device visual and functional acceptance remains outstanding: gradient ON/OFF screenshots, all nine generator modes, Statistics/Replay navigation, playlist actions/persistence, FAB/back/overlay behavior, and offline queue restart/network recovery.
