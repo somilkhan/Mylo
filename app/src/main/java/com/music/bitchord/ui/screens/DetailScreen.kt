@@ -2344,7 +2344,7 @@ private fun DetailPage.headerLines(trackCount: Int, playtime: String? = null): P
 private fun DetailPage.placeholderIcon(): ImageVector = deviceFolderIcon(browseId) ?: when {
     LocalGroups.isArtist(browseId) -> Icons.Rounded.Person
     type == BrowseType.ALBUM -> Icons.Rounded.Album
-    type == BrowseType.PLAYLIST -> Icons.AutoMirrored.Rounded.QueueMusic
+    type == BrowseType.PLAYLIST -> BitChordIcons.Queue
     else -> BitChordIcons.MusicNote
 }
 
