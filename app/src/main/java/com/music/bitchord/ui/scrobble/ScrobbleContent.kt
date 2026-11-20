@@ -1038,7 +1038,7 @@ fun ScrobblePlaylistsContent(
             generationState.savedPlaylist?.takeIf { it.generationMode == "similar-playlist" }?.let { saved ->
                 item(key = "similar_playlist_saved") {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Created ${saved.title}", modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.primary)
+                        Text("Created ${saved.title}", modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurface)
                         TextButton(onClick = { selectedId = saved.id }, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface)) { Text("Open") }
                     }
                 }
@@ -1054,7 +1054,7 @@ fun ScrobblePlaylistsContent(
                         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             LinearProgressIndicator(Modifier.fillMaxWidth())
                             Text(generationState.progress, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            TextButton(onClick = viewModel::cancelGeneration) { Text("Cancel") }
+                            TextButton(onClick = viewModel::cancelGeneration, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSecondaryContainer)) { Text("Cancel") }
                         }
                     }
                 }
@@ -1101,7 +1101,7 @@ fun ScrobblePlaylistsContent(
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                         )
                         if (playlists.isEmpty()) {
-                            Button(onClick = onOpenGenerator, shape = RoundedCornerShape(16.dp)) {
+                            Button(onClick = onOpenGenerator, colors = scrobblePrimaryButtonColors(), shape = RoundedCornerShape(16.dp)) {
                                 Icon(Icons.Filled.AutoAwesome, contentDescription = null)
                                 Spacer(Modifier.width(8.dp))
                                 Text("Open Generator")
@@ -1738,7 +1738,7 @@ private fun PlaylistDetailContent(
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     LinearProgressIndicator(Modifier.fillMaxWidth())
                     Text(generationState.progress, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    TextButton(onClick = viewModel::cancelGeneration) { Text("Cancel") }
+                    TextButton(onClick = viewModel::cancelGeneration, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSecondaryContainer)) { Text("Cancel") }
                 }
             }
         }
