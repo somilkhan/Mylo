@@ -351,6 +351,7 @@ fun ScrobbleGenerateContent(
                 Surface(
                     shape = RoundedCornerShape(20.dp),
                     color = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
                     modifier = Modifier.fillMaxWidth().then(sharedBoundsModifier),
                 ) {
                     Row(
@@ -366,7 +367,12 @@ fun ScrobbleGenerateContent(
                         )
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                             Text("Playlist saved", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                            Text(playlist.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(
+                                playlist.title,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
                             Text("${playlist.songs.size} tracks", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         TextButton(onClick = onOpenPlaylists) { Text("Open") }
@@ -1662,13 +1668,27 @@ private fun PlaylistDetailContent(
                 Text(it, style = MaterialTheme.typography.bodySmall, color = if (it.startsWith("Couldn't")) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
             }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { onPlaySongs(playlist.songs, 0) }, enabled = playlist.songs.isNotEmpty()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Button(
+                    onClick = { onPlaySongs(playlist.songs, 0) },
+                    enabled = playlist.songs.isNotEmpty(),
+                    modifier = Modifier.weight(1f).height(50.dp),
+                    shape = RoundedCornerShape(16.dp),
+                ) {
                     Icon(BitChordIcons.Play, contentDescription = null)
                     Spacer(Modifier.width(6.dp))
                     Text("Play")
                 }
-                OutlinedButton(onClick = { onPlaySongs(playlist.songs.shuffled(), 0) }, enabled = playlist.songs.isNotEmpty()) {
+                OutlinedButton(
+                    onClick = { onPlaySongs(playlist.songs.shuffled(), 0) },
+                    enabled = playlist.songs.isNotEmpty(),
+                    modifier = Modifier.weight(1f).height(50.dp),
+                    shape = RoundedCornerShape(16.dp),
+                ) {
                     Icon(BitChordIcons.Shuffle, contentDescription = null)
                     Spacer(Modifier.width(6.dp))
                     Text("Shuffle")
