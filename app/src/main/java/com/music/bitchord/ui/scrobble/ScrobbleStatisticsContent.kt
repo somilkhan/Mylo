@@ -221,18 +221,20 @@ internal fun ScrobbleStatisticsContent(
                                 modifier = Modifier.fillMaxWidth(),
                             )
                         }
-                        item(key = "replay-action") {
-                            TextButton(
-                                onClick = onOpenReplay,
-                                modifier = Modifier.padding(horizontal = 20.dp),
-                            ) {
-                                Icon(
-                                    imageVector = com.music.bitchord.ui.icons.BitChordIcons.Play,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp),
-                                )
-                                Spacer(Modifier.width(8.dp))
-                                Text("Play your Replay")
+                        if (state.localSummary?.isEmpty == false) {
+                            item(key = "replay-action") {
+                                TextButton(
+                                    onClick = onOpenReplay,
+                                    modifier = Modifier.padding(horizontal = 20.dp),
+                                ) {
+                                    Icon(
+                                        imageVector = com.music.bitchord.ui.icons.BitChordIcons.Play,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp),
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Play your Replay")
+                                }
                             }
                         }
                         state.localSummary?.artists?.take(10)?.forEachIndexed { index, artist ->
