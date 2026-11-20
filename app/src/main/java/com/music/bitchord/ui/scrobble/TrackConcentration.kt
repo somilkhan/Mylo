@@ -122,12 +122,12 @@ internal fun TrackConcentrationCard(
                     Box(Modifier.weight(next.coerceAtLeast(0.001f)).height(10.dp).background(colors.secondary))
                 }
                 if (data.otherTracksPercent > 0) {
-                    Box(Modifier.weight(others.coerceAtLeast(0.001f)).height(10.dp).background(colors.outline))
+                    Box(Modifier.weight(others.coerceAtLeast(0.001f)).height(10.dp).background(colors.onSurfaceVariant))
                 }
             }
             ConcentrationBreakdownRow("Top track", data.topTrackPercent, data.topTrackPlays, colors.tertiary)
             ConcentrationBreakdownRow("Next 2 tracks", data.nextTwoPercent, data.nextTwoPlays, colors.secondary)
-            ConcentrationBreakdownRow("Other tracks", data.otherTracksPercent, data.otherTracksPlays, colors.outline)
+            ConcentrationBreakdownRow("Other tracks", data.otherTracksPercent, data.otherTracksPlays, colors.onSurfaceVariant)
             Spacer(Modifier.height(2.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
