@@ -696,7 +696,7 @@ private fun GeneratorSeedPicker(
             enabled = enabled,
             singleLine = true,
             label = { Text("Search for a track") },
-            leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
+            leadingIcon = { Icon(BitChordIcons.Search, contentDescription = null) },
             shape = RoundedCornerShape(16.dp),
         )
         if (allowOptional && selectedSeed == null) {
@@ -808,13 +808,13 @@ private fun GeneratorModeRow(
     val icon = when (mode) {
         PlaylistGenerationMode.TOP -> Icons.Filled.ThumbUp
         PlaylistGenerationMode.RECENT -> Icons.Filled.History
-        PlaylistGenerationMode.SIMILAR_TRACKS -> Icons.Filled.MusicNote
+        PlaylistGenerationMode.SIMILAR_TRACKS -> BitChordIcons.MusicNote
         PlaylistGenerationMode.SIMILAR_ARTISTS -> Icons.Filled.People
         PlaylistGenerationMode.TAG -> Icons.Filled.Sell
-        PlaylistGenerationMode.MIX -> Icons.Filled.Shuffle
+        PlaylistGenerationMode.MIX -> BitChordIcons.Shuffle
         PlaylistGenerationMode.RECOMMENDATIONS -> Icons.Filled.AutoAwesome
-        PlaylistGenerationMode.NEVER_HEARD -> Icons.Filled.Explore
-        PlaylistGenerationMode.LIBRARY -> Icons.Filled.LibraryMusic
+        PlaylistGenerationMode.NEVER_HEARD -> BitChordIcons.Explore
+        PlaylistGenerationMode.LIBRARY -> BitChordIcons.Library
     }
     androidx.compose.material3.Surface(
         onClick = onClick,
@@ -858,7 +858,7 @@ private fun GeneratorModeRow(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Icon(BitChordIcons.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -1065,7 +1065,7 @@ fun ScrobblePlaylistsContent(
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         label = { Text("Find a playlist") },
-                        leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
+                        leadingIcon = { Icon(BitChordIcons.Search, contentDescription = null) },
                         trailingIcon = if (search.isNotEmpty()) {
                             { IconButton(onClick = { search = "" }) { Icon(Icons.Rounded.DeleteOutline, contentDescription = "Clear search") } }
                         } else null,
@@ -1719,7 +1719,7 @@ private fun PlaylistDetailContent(
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     label = { Text("Search YouTube Music") },
-                    leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
+                    leadingIcon = { Icon(BitChordIcons.Search, contentDescription = null) },
                 )
                 if (addTrackLoading) LinearProgressIndicator(Modifier.fillMaxWidth())
                 addTrackError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
