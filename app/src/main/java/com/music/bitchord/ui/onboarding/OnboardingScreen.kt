@@ -61,9 +61,6 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -242,12 +239,7 @@ private fun ColumnScope.NamePage(
         modifier = Modifier.padding(start = 4.dp),
     )
     Spacer(Modifier.height(12.dp))
-    NameField(
-        value = name,
-        label = stringResource(R.string.onboarding_name_prompt),
-        onValueChange = onNameChange,
-        onDone = onNext,
-    )
+    NameField(value = name, onValueChange = onNameChange, onDone = onNext)
     Spacer(Modifier.height(10.dp))
     Text(
         text = stringResource(R.string.onboarding_name_footer),
@@ -326,12 +318,7 @@ private fun Title(text: String) {
  * as part of the page rather than a form on top of it.
  */
 @Composable
-private fun NameField(
-    value: String,
-    label: String,
-    onValueChange: (String) -> Unit,
-    onDone: () -> Unit,
-) {
+private fun NameField(value: String, onValueChange: (String) -> Unit, onDone: () -> Unit) {
     val style = MaterialTheme.typography.displayLarge.copy(
         fontSize = 26.sp,
         lineHeight = 30.sp,
@@ -367,9 +354,7 @@ private fun NameField(
                 imeAction = ImeAction.Next,
             ),
             keyboardActions = KeyboardActions(onNext = { onDone() }),
-            modifier = Modifier
-                .fillMaxWidth()
-                .semantics { contentDescription = label },
+            modifier = Modifier.fillMaxWidth(),
         )
     }
 }
@@ -406,7 +391,6 @@ private fun PillButton(
                 interactionSource = interaction,
                 indication = null,
                 enabled = enabled,
-                role = Role.Button,
                 onClick = onClick,
             ),
         horizontalArrangement = Arrangement.Center,

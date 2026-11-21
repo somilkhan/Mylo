@@ -20,6 +20,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -45,7 +48,6 @@ import com.music.bitchord.R
 import com.music.bitchord.data.lyrics.TRANSLATION_LANGUAGES
 import com.music.bitchord.data.lyrics.translationLanguageName
 import com.music.bitchord.data.settings.AppSettings
-import com.music.bitchord.ui.icons.BitChordIcons
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
 import dev.chrisbanes.haze.materials.HazeMaterials
@@ -234,7 +236,7 @@ private fun SearchField(query: String, onQueryChange: (String) -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
-            imageVector = BitChordIcons.Search,
+            imageVector = Icons.Rounded.Search,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
             modifier = Modifier.size(16.dp),
@@ -308,7 +310,7 @@ private fun LanguageChoiceRow(
         Spacer(Modifier.width(10.dp))
         if (selected) {
             Icon(
-                imageVector = BitChordIcons.Check,
+                imageVector = Icons.Rounded.Check,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(19.dp),

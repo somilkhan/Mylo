@@ -329,8 +329,13 @@ object TvThemeColors {
 // Font family
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Use the platform sans-serif; do not redistribute Apple's proprietary font. */
-val TvSFProDisplay = FontFamily.SansSerif
+val TvSFProDisplay = FontFamily(
+    Font(R.font.sf_pro_display_regular, FontWeight.W400),
+    Font(R.font.sf_pro_display_medium, FontWeight.W500),
+    Font(R.font.sf_pro_display_semibold, FontWeight.W600),
+    Font(R.font.sf_pro_display_bold, FontWeight.W700),
+    Font(R.font.sf_pro_display_heavy, FontWeight.W800),
+)
 
 val TvGoogleSans = FontFamily(
     Font(R.font.google_sans_regular, FontWeight.W400),
@@ -516,7 +521,7 @@ object TvType {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Font family & CompositionLocal — platform sans-serif typography
+// Font Customization & CompositionLocal — Unified Apple SF Pro Display typography
 // ─────────────────────────────────────────────────────────────────────────────
 
 val LocalTvFontFamily = compositionLocalOf { TvSFProDisplay }

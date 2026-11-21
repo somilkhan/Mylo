@@ -12,97 +12,102 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import com.music.bitchord.R
+import com.music.bitchord.data.settings.AppFont
 
 // Apple Music's signature red. No longer the primary accent, but kept for the
 // spots (Replay's rank badge) that want that specific red regardless of theme.
 val AccentRed = Color(0xFFFA2D48)
 
 private val DarkColors = darkColorScheme(
-    primary = Color(0xFFFFFFFF),
-    onPrimary = Color(0xFF000000),
-    primaryContainer = Color(0xFF2A2A2E),
-    onPrimaryContainer = Color(0xFFF5F5F7),
-    inversePrimary = Color(0xFFC7C7CC),
-    secondary = Color(0xFFC7C7CC),
-    onSecondary = Color(0xFF1C1C1E),
-    secondaryContainer = Color(0xFF29292D),
-    onSecondaryContainer = Color(0xFFF5F5F7),
-    tertiary = Color(0xFFA1A1AA),
-    onTertiary = Color(0xFF18181A),
-    tertiaryContainer = Color(0xFF38383D),
-    onTertiaryContainer = Color(0xFFF5F5F7),
-    background = Color(0xFF000000),
-    onBackground = Color(0xFFFFFFFF),
+    primary = Color.White,
+    onPrimary = Color.Black,
+    background = Color.Black,
+    onBackground = Color.White,
     surface = Color(0xFF0D0D0F),
-    onSurface = Color(0xFFFFFFFF),
+    onSurface = Color.White,
     surfaceVariant = Color(0xFF1C1C1E),
-    onSurfaceVariant = Color(0xFFB8B8BE),
-    surfaceTint = Color(0xFFFFFFFF),
-    inverseSurface = Color(0xFFEAEAEE),
-    inverseOnSurface = Color(0xFF1C1C1E),
-    error = Color(0xFFFF6B63),
-    onError = Color(0xFF300806),
-    errorContainer = Color(0xFF4A1715),
-    onErrorContainer = Color(0xFFFFDAD6),
-    outline = Color(0xFF66666D),
-    outlineVariant = Color(0xFF38383D),
-    scrim = Color(0xFF000000),
-    surfaceDim = Color(0xFF0D0D0F),
-    surfaceBright = Color(0xFF303034),
-    surfaceContainerLowest = Color(0xFF000000),
-    surfaceContainerLow = Color(0xFF141416),
-    surfaceContainer = Color(0xFF1C1C1E),
-    surfaceContainerHigh = Color(0xFF252529),
-    surfaceContainerHighest = Color(0xFF303034),
+    onSurfaceVariant = Color(0xFF8E8E93),
+    outline = Color(0xFF2C2C2E),
 )
 
 private val LightColors = lightColorScheme(
-    primary = Color(0xFF000000),
-    onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFFE5E5EA),
-    onPrimaryContainer = Color(0xFF1C1C1E),
-    inversePrimary = Color(0xFF5E5E63),
-    secondary = Color(0xFF5E5E63),
-    onSecondary = Color(0xFFFFFFFF),
-    secondaryContainer = Color(0xFFEAEAEE),
-    onSecondaryContainer = Color(0xFF1C1C1E),
-    tertiary = Color(0xFF63636A),
-    onTertiary = Color(0xFFFFFFFF),
-    tertiaryContainer = Color(0xFFF0F0F3),
-    onTertiaryContainer = Color(0xFF242428),
-    background = Color(0xFFFFFFFF),
-    onBackground = Color(0xFF000000),
+    primary = Color.Black,
+    onPrimary = Color.White,
+    background = Color.White,
+    onBackground = Color.Black,
     surface = Color(0xFFF7F7F9),
-    onSurface = Color(0xFF1C1C1E),
-    surfaceVariant = Color(0xFFF0F0F4),
-    onSurfaceVariant = Color(0xFF55555B),
-    surfaceTint = Color(0xFF000000),
-    inverseSurface = Color(0xFF2C2C2E),
-    inverseOnSurface = Color(0xFFF2F2F7),
-    error = Color(0xFFBA1A1A),
-    onError = Color(0xFFFFFFFF),
-    errorContainer = Color(0xFFFFDAD6),
-    onErrorContainer = Color(0xFF410002),
-    outline = Color(0xFF77777C),
-    outlineVariant = Color(0xFFD1D1D6),
-    scrim = Color(0xFF000000),
-    surfaceDim = Color(0xFFDADAE0),
-    surfaceBright = Color(0xFFFFFFFF),
-    surfaceContainerLowest = Color(0xFFFFFFFF),
-    surfaceContainerLow = Color(0xFFF7F7F9),
-    surfaceContainer = Color(0xFFF2F2F7),
-    surfaceContainerHigh = Color(0xFFEAEAEE),
-    surfaceContainerHighest = Color(0xFFE0E0E5),
+    onSurface = Color.Black,
+    surfaceVariant = Color(0xFFF2F2F7),
+    onSurfaceVariant = Color(0xFF6E6E73),
+    outline = Color(0xFFE5E5EA),
 )
 
-/** Use the platform sans-serif to avoid bundling a proprietary system font. */
-val SFProDisplay = FontFamily.SansSerif
+/**
+ * SF Pro Display, the face Apple Music itself is set in, drawn one weight
+ * lighter than it is asked for.
+ *
+ * Measured against Apple Music's own screens, every weight here came out a
+ * cut heavier than the same text there: its titles are Semibold where these
+ * asked for Bold, its metadata Medium where these asked for Semibold. The
+ * shift is made once, in the family, so it reaches the type scale and every
+ * weight set in place alike and keeps the steps between them: Heavy draws
+ * Bold, Bold draws Semibold, Semibold draws Medium, Medium draws Regular.
+ * Regular stays Regular — no lighter cut is bundled, and Apple's body text is
+ * Regular too. A FontWeight in this app therefore names the step it sits at in
+ * the scale, not the cut it draws.
+ *
+ * Compose synthesises nothing, so a weight outside these falls back to the
+ * nearest one listed.
+ */
+val SFProDisplay = FontFamily(
+    Font(R.font.sf_pro_display_regular, FontWeight.W400),
+    Font(R.font.sf_pro_display_regular, FontWeight.W500),
+    Font(R.font.sf_pro_display_medium, FontWeight.W600),
+    Font(R.font.sf_pro_display_semibold, FontWeight.W700),
+    Font(R.font.sf_pro_display_bold, FontWeight.W800),
+)
 
-// Heavy, tight typography — the backbone of the MYLO look.
-private val MyloTypography = Typography(
+/*
+ * Letter spacing measured off Apple Music's own screens: the spacing the
+ * bundled Display cut needs, at the weight it draws, to set a line to the
+ * width Apple sets it. Apple sets text under 20pt in SF Pro Text, which is
+ * spaced looser than Display, so the small sizes open up — about +0.25 to
+ * +0.4 at 12 to 14 — and the spacing closes as the size grows, to just under
+ * nothing for semibold titles at 18 to 24. The large titles had nothing to
+ * measure against and follow the same trend.
+ */
+private val BitChordTypography = Typography(
+    displayLarge = TextStyle(fontWeight = FontWeight.W800, fontSize = 34.sp, letterSpacing = (-0.5).sp),
+    headlineLarge = TextStyle(fontWeight = FontWeight.W800, fontSize = 30.sp, letterSpacing = (-0.4).sp),
+    headlineMedium = TextStyle(fontWeight = FontWeight.W700, fontSize = 22.sp, letterSpacing = (-0.25).sp),
+    titleLarge = TextStyle(fontWeight = FontWeight.W700, fontSize = 20.sp, letterSpacing = (-0.2).sp),
+    titleMedium = TextStyle(fontWeight = FontWeight.W600, fontSize = 16.sp, letterSpacing = 0.05.sp),
+    bodyLarge = TextStyle(fontWeight = FontWeight.W400, fontSize = 16.sp, letterSpacing = 0.2.sp),
+    bodyMedium = TextStyle(fontWeight = FontWeight.W400, fontSize = 14.sp, letterSpacing = 0.3.sp),
+    labelMedium = TextStyle(fontWeight = FontWeight.W600, fontSize = 12.sp, letterSpacing = 0.25.sp),
+    labelSmall = TextStyle(fontWeight = FontWeight.W600, fontSize = 11.sp, letterSpacing = 0.3.sp),
+).withFamily(SFProDisplay)
+
+/**
+ * SF Pro Display as the app first shipped it, before [SFProDisplay] moved every
+ * weight a cut lighter: each weight draws its own cut, Heavy included. Kept for
+ * [AppFont.LEGACY].
+ */
+val SFProDisplayLegacy = FontFamily(
+    Font(R.font.sf_pro_display_regular, FontWeight.W400),
+    Font(R.font.sf_pro_display_medium, FontWeight.W500),
+    Font(R.font.sf_pro_display_semibold, FontWeight.W600),
+    Font(R.font.sf_pro_display_bold, FontWeight.W700),
+    Font(R.font.sf_pro_display_heavy, FontWeight.W800),
+)
+
+// Heavy, tight typography — the original scale [AppFont.LEGACY] restores.
+private val LegacyTypography = Typography(
     displayLarge = TextStyle(fontWeight = FontWeight.W800, fontSize = 34.sp, letterSpacing = (-0.8).sp),
     headlineLarge = TextStyle(fontWeight = FontWeight.W800, fontSize = 30.sp, letterSpacing = (-0.7).sp),
     headlineMedium = TextStyle(fontWeight = FontWeight.W700, fontSize = 22.sp, letterSpacing = (-0.4).sp),
@@ -112,7 +117,7 @@ private val MyloTypography = Typography(
     bodyMedium = TextStyle(fontWeight = FontWeight.W400, fontSize = 14.sp),
     labelMedium = TextStyle(fontWeight = FontWeight.W600, fontSize = 12.sp),
     labelSmall = TextStyle(fontWeight = FontWeight.W600, fontSize = 11.sp),
-).withFamily(SFProDisplay)
+).withFamily(SFProDisplayLegacy)
 
 /** Applies [family] to every style in the scale, so nothing is left on Roboto. */
 private fun Typography.withFamily(family: FontFamily) = Typography(
@@ -136,11 +141,15 @@ private fun Typography.withFamily(family: FontFamily) = Typography(
 @Composable
 fun BitChordTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
+    font: AppFont = AppFont.DEFAULT,
     content: @Composable () -> Unit,
 ) {
     MaterialTheme(
         colorScheme = if (darkTheme) DarkColors else LightColors,
-        typography = MyloTypography,
+        typography = when (font) {
+            AppFont.DEFAULT -> BitChordTypography
+            AppFont.LEGACY -> LegacyTypography
+        },
         content = content,
     )
 }

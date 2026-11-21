@@ -139,13 +139,13 @@ function StartOrJoin({ signedIn }: { signedIn: boolean }) {
           <span>Party server</span>
           <input
             className={settingsUi.input}
-            placeholder={new URL(DEFAULT_SERVER).host}
+            placeholder={DEFAULT_SERVER ? new URL(DEFAULT_SERVER).host : 'party.example.com'}
             value={settings.customServer}
             onChange={(e) => update({ customServer: e.currentTarget.value })}
           />
         </label>
       </section>
-      <p className={settingsUi.footer}>Leave the server empty to use MYLO’s default. Anyone joining your party uses the server it’s on.</p>
+      <p className={settingsUi.footer}>Leave the server empty to use BitChord’s. Anyone joining your party uses the server it’s on.</p>
     </>
   );
 }

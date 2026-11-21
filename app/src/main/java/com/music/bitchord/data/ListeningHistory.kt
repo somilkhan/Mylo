@@ -19,6 +19,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
+/** A titled group of listening-log songs, shown as one section of the history screen. */
+data class HistorySection(val title: String, val songs: List<Song>)
+
 /** Device-local listening log, separate from YouTube's account history. */
 object ListeningHistory {
     data class Entry(val song: Song, val startedAt: Long)
@@ -166,7 +169,7 @@ object ListeningHistory {
         }
     }
 
-    fun sections(entries: List<Entry>, now: LocalDate = LocalDate.now()): List<com.music.bitchord.data.innertube.InnertubeParser.HistorySection> {
+    fun sections(entries: List<Entry>, now: LocalDate = LocalDate.now()): List<HistorySection> {
         val zone = ZoneId.systemDefault()
         return entries.groupBy { Instant.ofEpochMilli(it.startedAt).atZone(zone).toLocalDate() }
             .map { (date, rows) ->
@@ -180,7 +183,7 @@ object ListeningHistory {
                         ),
                     )
                 }
-                com.music.bitchord.data.innertube.InnertubeParser.HistorySection(title, rows.map { it.song })
+                HistorySection(title, rows.map { it.song })
             }
     }
 }

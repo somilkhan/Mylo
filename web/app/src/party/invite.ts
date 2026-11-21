@@ -1,8 +1,7 @@
 /**
- * Party invites: `https://bitchord.kushagrasingh.in/invite/<CODE>`,
- * optionally `?server=<custom server>`, and `mylo://party/<CODE>` (legacy
- * `bitchord://party/<CODE>` remains accepted). On the web the HTTPS URL is a
- * route of this app (`/invite/:code`).
+ * Party invites (JamInviteLink.kt): `https://bitchord.kushagrasingh.in/invite/<CODE>`,
+ * optionally `?server=<custom server>`, and `bitchord://party/<CODE>`. On the
+ * web the first is a route of this app (`/invite/:code`).
  */
 
 export const INVITE_ORIGIN = 'https://bitchord.kushagrasingh.in';
@@ -14,53 +13,12 @@ export function cleanCode(raw: string): string | null {
   return cleaned.length === CODE_LENGTH ? cleaned : null;
 }
 
-/**
- * Reject traversal segments before and after URL normalization. URL and reverse
- * proxies can interpret percent-encoded dots or slashes as path separators, and
- * some proxy stacks decode a path more than once.
- */
-function hasDotSegments(path: string): boolean {
-  let candidate = path;
-  for (let depth = 0; depth < 4; depth += 1) {
-    if (candidate.split('/').some((segment) => segment === '.' || segment === '..')) return true;
-    try {
-      const decoded = decodeURIComponent(candidate);
-      if (decoded === candidate) return false;
-      candidate = decoded;
-    } catch {
-      // Malformed escapes are not safe to forward to an arbitrary proxy.
-      return true;
-    }
-  }
-  return candidate.split('/').some((segment) => segment === '.' || segment === '..');
-}
-
 export function sanitizeServerUrl(raw: string | null | undefined): string | null {
   const trimmed = raw?.trim().replace(/\/+$/, '');
   if (!trimmed) return null;
-  const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : 'https://' + trimmed;
-  // URL normalizes literal dot segments before exposing pathname, so inspect
-  // the supplied path first to keep validation consistent with Android.
-  const rawPath = withScheme.match(/^https?:\/\/[^/?#]*(\/[^?#]*)?/i)?.[1] ?? '';
-  if (hasDotSegments(rawPath)) return null;
+  const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
   try {
-    const url = new URL(withScheme);
-    // Server URLs may include a reverse-proxy path, but never credentials or
-    // query/fragment data. Those parts are not part of the server origin and
-    // can make shared invite links ambiguous or leak secrets.
-    if (!['http:', 'https:'].includes(url.protocol) || !url.hostname) return null;
-    if (url.username || url.password || url.search || url.hash) return null;
-    const hostname = url.hostname.toLowerCase();
-    // Match Android's server validator: localhost is useful for development,
-    // IPv6 literals are valid, and other hosts must be dotted DNS/IP names.
-    if (
-      !hostname.startsWith('[') &&
-      hostname !== 'localhost' &&
-      !hostname.includes('.')
-    ) return null;
-    const path = url.pathname.replace(/\/+$/, '');
-    if (hasDotSegments(path)) return null;
-    return url.origin + path;
+    return new URL(withScheme).host ? withScheme : null;
   } catch {
     return null;
   }
@@ -74,7 +32,7 @@ export function parseInvite(value: string): { code: string; serverUrl: string | 
     return null;
   }
   const server = sanitizeServerUrl(url.searchParams.get('server'));
-  if ((url.protocol === 'mylo:' || url.protocol === 'bitchord:') && url.host.toLowerCase() === 'party') {
+  if (url.protocol === 'bitchord:' && url.host.toLowerCase() === 'party') {
     const code = cleanCode(url.pathname.replace(/^\/+|\/+$/g, '') || url.searchParams.get('code') || '');
     return code ? { code, serverUrl: server } : null;
   }
