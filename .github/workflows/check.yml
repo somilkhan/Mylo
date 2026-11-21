@@ -48,8 +48,9 @@ jobs:
       - name: Tests
         run: ./gradlew testDevDebugUnitTest
 
-      # TEMPORARY debug step: posts the Kotlin compile errors to the PR as a
-      # comment, since the job logs can't be read from outside. Remove once fixed.
+      # TEMPORARY debug step: posts the Kotlin compile errors and the unit test
+      # failures to the PR as a comment, since the job logs can't be read from
+      # outside. Remove once fixed.
       - name: Post Gradle errors to the PR
         if: always()
         env:
@@ -58,12 +59,17 @@ jobs:
           set +e
           ./gradlew :app:compileDevDebugKotlin --continue > build.log 2>&1
           code=$?
+          ./gradlew testDevDebugUnitTest --continue > tests.log 2>&1
+          tcode=$?
           {
-            echo "## Android debug: compile exit code $code"
+            echo "## Android debug: compile exit code $code, unit tests exit code $tcode"
             echo '```'
+            echo '----- compile errors -----'
             grep -E '^e: |What went wrong|FAILURE|Could not' build.log | head -40
-            echo '----- tail -----'
-            tail -60 build.log
+            echo '----- test failures -----'
+            grep -E 'FAILED|tests completed|What went wrong|Exception|Caused by' tests.log | head -60
+            echo '----- tests tail -----'
+            tail -40 tests.log
             echo '```'
           } > errors.md
           gh pr comment "${{ github.event.pull_request.number }}" --body-file errors.md || echo "comment failed"
