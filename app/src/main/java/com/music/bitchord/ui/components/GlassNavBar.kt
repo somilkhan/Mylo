@@ -49,6 +49,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -211,15 +212,6 @@ fun GlassNavBar(
         sizes = FloatingTabBarDefaults.sizes(
             tabBarContentPadding = PaddingValues(PILL_INSET),
             tabExpandedContentPadding = PaddingValues(vertical = TAB_VERTICAL_PADDING),
-            // Collapsed, Apple's row is narrower and more spaced: 48pt circles
-            // 28pt in from the screen's sides, 14pt apart, centred on the line
-            // the expanded bar's middle runs along.
-            inlineComponentSpacing = INLINE_SPACING,
-            inlineBarPadding = PaddingValues(
-                start = INLINE_GUTTER - NAV_BAR_GUTTER,
-                end = INLINE_GUTTER - NAV_BAR_GUTTER,
-                bottom = INLINE_LIFT,
-            ),
         ),
         // Held too: this is declared `Any?`, so a fresh list every pass is a
         // changed argument by identity and defeats skipping on its own.
@@ -518,3 +510,12 @@ private val ACCESSORY_ART_CORNER = 5.7.dp
 
 /** The expanded play glyph: its triangle about Apple's 15pt tall. */
 private val EXPANDED_GLYPH_SIZE = 29.dp
+
+// Mylo's glass bar: the gutter and lift the tab pill sits at, and the tab glyph
+// and label metrics. Kept here rather than in FloatingBottomBar so the glass
+// bar's measurements stay with the bar that uses them.
+private val NAV_BAR_GUTTER = 19.dp
+private val NAV_BAR_LIFT = 6.dp
+private val TAB_ICON_SIZE = 25.dp
+
+private fun tabLabelStyle(): TextStyle = MaterialTheme.typography.labelSmall
