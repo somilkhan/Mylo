@@ -130,7 +130,7 @@ object YtMusicRepository {
      */
     private suspend fun recentlyPlayed(): HomeShelf? {
         val ytSongs = if (Innertube.cookie != null) {
-            runCatching { fetchHistory() }.getOrDefault(emptyList())
+            attempt { fetchHistory() }.getOrDefault(emptyList())
         } else {
             emptyList()
         }
@@ -187,7 +187,7 @@ object YtMusicRepository {
     /** Account listening history for the Recents feed. */
     suspend fun recents(): Result<List<Song>> = call("recents") {
         if (Innertube.cookie != null) {
-            val history = runCatching { fetchHistory() }.getOrDefault(emptyList())
+            val history = attempt { fetchHistory() }.getOrDefault(emptyList())
             if (history.isNotEmpty()) return@call history
         }
         emptyList()
@@ -197,7 +197,7 @@ object YtMusicRepository {
      * Recommended discovery tracks for Quick Picks, strictly excluding listening history and recents.
      */
     suspend fun quickPicks(excludeSongIds: Set<String> = emptySet()): Result<List<Song>> = call("quickPicks") {
-        val homeRaw = runCatching { Innertube.browse("FEmusic_home") }.getOrNull()
+        val homeRaw = attempt { Innertube.browse("FEmusic_home") }.getOrNull()
         val shelves = if (homeRaw != null) InnertubeParser.parseHome(homeRaw) else emptyList()
 
         // 1. Direct "Quick picks" or "Mix" or "Recommendations" shelf
@@ -261,7 +261,7 @@ object YtMusicRepository {
         if (uniqueAllHome.isNotEmpty()) return@call uniqueAllHome
 
         // 4. Explore / New releases
-        val explore = runCatching { shelvesOf("FEmusic_new_releases") }.getOrDefault(emptyList())
+        val explore = attempt { shelvesOf("FEmusic_new_releases") }.getOrDefault(emptyList())
         val exploreSongs = explore.flatMap { shelf ->
             shelf.items.mapNotNull { item ->
                 item.videoId?.takeUnless { it in excludeSongIds }?.let { vid ->
@@ -493,7 +493,7 @@ object YtMusicRepository {
      * treated the same as a failure and the other route is tried.
      */
     suspend fun accountChannels(): Result<List<AccountChannel>> = call("channels") {
-        val viaInnertube = runCatching {
+        val viaInnertube = attempt {
             InnertubeParser.parseAccountChannels(Innertube.accountsList())
         }.onFailure { Log.w(TAG, "accounts_list unavailable: ${it.message}") }
             .getOrNull()
@@ -522,14 +522,14 @@ object YtMusicRepository {
             val liked = async { browseSongs(LIKED_MUSIC).getOrNull() }
             val added = async {
                 (listOf(LIBRARY_SONGS, PRIVATE_LIBRARY_SONGS).flatMap { browseId ->
-                    runCatching { songsPaged(browseId) }.getOrDefault(emptyList())
+                    attempt { songsPaged(browseId) }.getOrDefault(emptyList())
                 }).distinctBy { it.videoId }
             }
             val shelves = LIBRARY_FEEDS
                 .map { feed ->
                     async {
                         HomeShelf(feed.title, feed.browseIds.flatMap { browseId ->
-                            runCatching { libraryItemsPaged(browseId) }.getOrDefault(emptyList())
+                            attempt { libraryItemsPaged(browseId) }.getOrDefault(emptyList())
                         }.distinctBy { it.browseId ?: it.videoId ?: "${it.title}\\n${it.subtitle}" })
                     }
                 }
@@ -942,7 +942,7 @@ object YtMusicRepository {
             (shelf?.songs ?: InnertubeParser.collectSongsDeep(response)).forEach { out[it.videoId] = it }
             val token = shelf?.continuation ?: InnertubeParser.continuationToken(response)
             if (token == null || page++ >= MAX_PAGES) break
-            response = runCatching { Innertube.browseContinuation(token) }.getOrNull() ?: break
+            response = attempt { Innertube.browseContinuation(token) }.getOrNull() ?: break
         }
         return out.values.toList()
     }
@@ -968,7 +968,7 @@ object YtMusicRepository {
             }
             val token = parsed.continuation ?: break
             if (page++ >= MAX_PAGES) break
-            response = runCatching { Innertube.browseContinuation(token) }.getOrNull() ?: break
+            response = attempt { Innertube.browseContinuation(token) }.getOrNull() ?: break
         }
         return out.values.toList()
     }
@@ -1187,14 +1187,14 @@ object YtMusicRepository {
         coroutineScope {
             val fullSongsDeferred = async {
                 page.moreSongsBrowseId?.let { playlistId ->
-                    runCatching { songsPaged(playlistId) }.getOrNull()
+                    attempt { songsPaged(playlistId) }.getOrNull()
                 }
             }
             val shelvesDeferred = page.sections.map { shelf ->
                 async {
                     val moreBrowseId = shelf.moreBrowseId
                     if (moreBrowseId != null) {
-                        val fullItems = runCatching {
+                        val fullItems = attempt {
                             itemsPaged(moreBrowseId, shelf.moreParams)
                         }.getOrNull()
                         if (!fullItems.isNullOrEmpty()) {
@@ -1214,25 +1214,39 @@ object YtMusicRepository {
         }
     }
 
+    private suspend fun <T> attempt(block: suspend () -> T): Result<T> =
+        try {
+            Result.success(block())
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (error: Exception) {
+            Result.failure(error)
+        }
+
     private suspend fun <T> call(label: String, block: suspend () -> T): Result<T> =
         withContext(Dispatchers.IO) {
-            runCatching { block() }.recoverCatching { failure ->
-                // Context cookies can rotate while a process is alive. Refresh
-                // once and retry; never loop or silently sign the listener out.
-                val rejected = failure.message?.contains("401") == true ||
-                    failure.message?.contains("403") == true ||
-                    failure.message?.contains("rejected", true) == true
-                if (!rejected || Innertube.cookie == null) throw failure
-                Log.w(TAG, "$label rejected; refreshing active session context once")
-                Innertube.refreshSessionScope()
-                block()
+            try {
+                val value = try {
+                    block()
+                } catch (failure: Exception) {
+                    if (failure is CancellationException) throw failure
+                    // Context cookies can rotate while a process is alive. Refresh
+                    // once and retry; never loop or silently sign the listener out.
+                    val rejected = failure.message?.contains("401") == true ||
+                        failure.message?.contains("403") == true ||
+                        failure.message?.contains("rejected", true) == true
+                    if (!rejected || Innertube.cookie == null) throw failure
+                    Log.w(TAG, "$label rejected; refreshing active session context once")
+                    Innertube.refreshSessionScope()
+                    block()
+                }
+                Log.d(TAG, "$label ok")
+                Result.success(value)
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (error: Exception) {
+                Log.w(TAG, "$label failed: ${error.message}")
+                Result.failure(error)
             }
-                // runCatching catches Throwable, cancellation included, which
-                // would turn "the user typed another letter" into a failed
-                // Result and put the abandoned request's error on screen.
-                // Cancellation isn't this call's to answer for.
-                .onFailure { if (it is CancellationException) throw it }
-                .onSuccess { Log.d(TAG, "$label ok") }
-                .onFailure { Log.w(TAG, "$label failed: ${it.message}") }
         }
 }

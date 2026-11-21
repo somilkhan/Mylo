@@ -415,6 +415,27 @@ object BitChordIcons {
         }.build()
     }
 
+
+    val ChevronLeft: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "bc_chevron_left",
+            defaultWidth = 24.dp, defaultHeight = 24.dp,
+            viewportWidth = 24f, viewportHeight = 24f,
+        ).apply {
+            path(
+                stroke = stroke,
+                strokeLineWidth = STROKE,
+                strokeLineCap = StrokeCap.Round,
+                strokeLineJoin = StrokeJoin.Round,
+            ) {
+                moveTo(14.5f, 6.2f)
+                lineTo(8.7f, 12f)
+                lineTo(14.5f, 17.8f)
+            }
+        }.build()
+    }
+
+
     /**
      * The player's like control, in two weights.
      *
@@ -732,4 +753,329 @@ object BitChordIcons {
             }
         }.build()
     }
+    /** Two listener silhouettes, used for artist-based discovery. */
+    val People: ImageVector by lazy {
+        ImageVector.Builder(name = "bc_people", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f).apply {
+            path(stroke = stroke, strokeLineWidth = STROKE, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) {
+                moveTo(9.2f, 10.8f)
+                arcToRelative(2.8f, 2.8f, 0f, true, true, 5.6f, 0f)
+                arcToRelative(2.8f, 2.8f, 0f, true, true, -5.6f, 0f)
+                moveTo(4f, 19.2f)
+                quadTo(4f, 15.4f, 8f, 15.4f)
+                lineTo(16f, 15.4f)
+                quadTo(20f, 15.4f, 20f, 19.2f)
+                moveTo(16.3f, 5.4f)
+                arcToRelative(2.4f, 2.4f, 0f, true, true, 0f, 4.8f)
+                moveTo(18f, 14.5f)
+                quadTo(20.5f, 15.2f, 20.5f, 18f)
+            }
+        }.build()
+    }
+
+    /** A tag outline, for mood and genre discovery. */
+    val Tag: ImageVector by lazy {
+        ImageVector.Builder(name = "bc_tag", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f).apply {
+            path(stroke = stroke, strokeLineWidth = STROKE, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) {
+                moveTo(3.8f, 5.2f)
+                lineTo(12.5f, 5.2f)
+                lineTo(20.2f, 12.9f)
+                lineTo(12.9f, 20.2f)
+                lineTo(5.2f, 12.5f)
+                close()
+                moveTo(8.2f, 8.3f)
+                arcToRelative(1.1f, 1.1f, 0f, true, true, 2.2f, 0f)
+                arcToRelative(1.1f, 1.1f, 0f, true, true, -2.2f, 0f)
+            }
+        }.build()
+    }
+
+    /** A restrained sparkle mark for recommendations. */
+    val Sparkles: ImageVector by lazy {
+        ImageVector.Builder(name = "bc_sparkles", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f).apply {
+            path(stroke = stroke, strokeLineWidth = STROKE, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) {
+                moveTo(11.5f, 3.5f)
+                lineTo(13.1f, 9.7f)
+                lineTo(19.3f, 11.3f)
+                lineTo(13.1f, 12.9f)
+                lineTo(11.5f, 19.1f)
+                lineTo(9.9f, 12.9f)
+                lineTo(3.7f, 11.3f)
+                lineTo(9.9f, 9.7f)
+                close()
+                moveTo(19f, 16f)
+                lineTo(19.6f, 18.4f)
+                lineTo(22f, 19f)
+                lineTo(19.6f, 19.6f)
+                lineTo(19f, 22f)
+                lineTo(18.4f, 19.6f)
+                lineTo(16f, 19f)
+                lineTo(18.4f, 18.4f)
+                close()
+            }
+        }.build()
+    }
+
+    /** Sort order: three descending rules and a direction arrow. */
+    val Sort: ImageVector by lazy {
+        ImageVector.Builder(name = "bc_sort", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f).apply {
+            path(stroke = stroke, strokeLineWidth = STROKE, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) {
+                moveTo(4f, 6f); lineTo(13f, 6f)
+                moveTo(4f, 12f); lineTo(10f, 12f)
+                moveTo(4f, 18f); lineTo(7f, 18f)
+                moveTo(18f, 4f); lineTo(18f, 20f)
+                moveTo(15f, 17f); lineTo(18f, 20f); lineTo(21f, 17f)
+            }
+        }.build()
+    }
+
+    /** Three quiet dots for a contextual menu. */
+    val More: ImageVector by lazy {
+        ImageVector.Builder(name = "bc_more", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f).apply {
+            path(stroke = stroke, strokeLineWidth = STROKE, strokeLineCap = StrokeCap.Round) {
+                for (y in listOf(5f, 12f, 19f)) {
+                    moveTo(12f, y)
+                    arcToRelative(0.8f, 0.8f, 0f, true, true, 1.6f, 0f)
+                    arcToRelative(0.8f, 0.8f, 0f, true, true, -1.6f, 0f)
+                }
+            }
+        }.build()
+    }
+
+    /** Pencil for renaming and editing. */
+    val Edit: ImageVector by lazy {
+        ImageVector.Builder(name = "bc_edit", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f).apply {
+            path(stroke = stroke, strokeLineWidth = STROKE, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) {
+                moveTo(4f, 16.8f); lineTo(4f, 20f); lineTo(7.2f, 20f); lineTo(19.3f, 7.9f)
+                arcToRelative(2.1f, 2.1f, 0f, true, false, -3f, -3f)
+                lineTo(4f, 17.2f)
+                moveTo(14.8f, 6.4f); lineTo(17.8f, 9.4f)
+            }
+        }.build()
+    }
+
+    /** Bin outline for destructive playlist actions. */
+    val Delete: ImageVector by lazy {
+        ImageVector.Builder(name = "bc_delete", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f).apply {
+            path(stroke = stroke, strokeLineWidth = STROKE, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) {
+                moveTo(4.5f, 7f); lineTo(19.5f, 7f)
+                moveTo(9f, 7f); lineTo(9f, 4.5f); lineTo(15f, 4.5f); lineTo(15f, 7f)
+                moveTo(6.5f, 7f); lineTo(7.5f, 19.5f); lineTo(16.5f, 19.5f); lineTo(17.5f, 7f)
+                moveTo(10f, 10.5f); lineTo(10f, 16.5f)
+                moveTo(14f, 10.5f); lineTo(14f, 16.5f)
+            }
+        }.build()
+    }
+
+    /** Image frame for a custom playlist cover. */
+    val Image: ImageVector by lazy {
+        ImageVector.Builder(name = "bc_image", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f).apply {
+            path(stroke = stroke, strokeLineWidth = STROKE, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) {
+                moveTo(4f, 5f); lineTo(20f, 5f); lineTo(20f, 19f); lineTo(4f, 19f); close()
+                moveTo(6.5f, 15.5f); lineTo(10f, 11.5f); lineTo(12.5f, 14f); lineTo(15f, 10.5f); lineTo(18f, 15.5f)
+                moveTo(7.5f, 8.5f)
+                arcToRelative(1f, 1f, 0f, true, true, 2f, 0f)
+                arcToRelative(1f, 1f, 0f, true, true, -2f, 0f)
+            }
+        }.build()
+    }
+
+    /** Share nodes connected by one continuous line. */
+    val Share: ImageVector by lazy {
+        ImageVector.Builder(name = "bc_share", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f).apply {
+            path(stroke = stroke, strokeLineWidth = STROKE, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) {
+                moveTo(7f, 12f); lineTo(17f, 6f)
+                moveTo(7f, 12f); lineTo(17f, 18f)
+                moveTo(4f, 12f)
+                arcToRelative(2f, 2f, 0f, true, true, 4f, 0f)
+                arcToRelative(2f, 2f, 0f, true, true, -4f, 0f)
+                moveTo(16f, 5f)
+                arcToRelative(2f, 2f, 0f, true, true, 4f, 0f)
+                arcToRelative(2f, 2f, 0f, true, true, -4f, 0f)
+                moveTo(16f, 19f)
+                arcToRelative(2f, 2f, 0f, true, true, 4f, 0f)
+                arcToRelative(2f, 2f, 0f, true, true, -4f, 0f)
+            }
+        }.build()
+    }
+
+    /** Crosshair around a point, for locating the current track. */
+    val Locate: ImageVector by lazy {
+        ImageVector.Builder(name = "bc_locate", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f).apply {
+            path(stroke = stroke, strokeLineWidth = STROKE, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) {
+                moveTo(12f, 3f); lineTo(12f, 6f)
+                moveTo(12f, 18f); lineTo(12f, 21f)
+                moveTo(3f, 12f); lineTo(6f, 12f)
+                moveTo(18f, 12f); lineTo(21f, 12f)
+                moveTo(8f, 12f)
+                arcToRelative(4f, 4f, 0f, true, true, 8f, 0f)
+                arcToRelative(4f, 4f, 0f, true, true, -8f, 0f)
+            }
+        }.build()
+    }
+
+    /** Up and down arrows for playlist ordering. */
+    val ArrowUp: ImageVector by lazy {
+        ImageVector.Builder(name = "bc_arrow_up", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f).apply {
+            path(stroke = stroke, strokeLineWidth = STROKE, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) {
+                moveTo(12f, 20f); lineTo(12f, 4f)
+                moveTo(6f, 10f); lineTo(12f, 4f); lineTo(18f, 10f)
+            }
+        }.build()
+    }
+    val ArrowDown: ImageVector by lazy {
+        ImageVector.Builder(name = "bc_arrow_down", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f).apply {
+            path(stroke = stroke, strokeLineWidth = STROKE, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) {
+                moveTo(12f, 4f); lineTo(12f, 20f)
+                moveTo(6f, 14f); lineTo(12f, 20f); lineTo(18f, 14f)
+            }
+        }.build()
+    }
+
+    /** Error mark for non-blocking failure notices. */
+    val Error: ImageVector by lazy {
+        ImageVector.Builder(name = "bc_error", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f).apply {
+            path(stroke = stroke, strokeLineWidth = STROKE, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) {
+                moveTo(12f, 3.5f)
+                arcToRelative(8.5f, 8.5f, 0f, true, true, 0f, 17f)
+                arcToRelative(8.5f, 8.5f, 0f, true, true, 0f, -17f)
+                moveTo(12f, 8f); lineTo(12f, 13f)
+                moveTo(12f, 16.5f)
+                arcToRelative(0.6f, 0.6f, 0f, true, true, 1.2f, 0f)
+                arcToRelative(0.6f, 0.6f, 0f, true, true, -1.2f, 0f)
+            }
+        }.build()
+    }
+
+    /** Compact close mark, matched to the outline family. */
+    val Close: ImageVector by lazy {
+        ImageVector.Builder(name = "bc_close", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f).apply {
+            path(stroke = stroke, strokeLineWidth = STROKE, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) {
+                moveTo(6f, 6f); lineTo(18f, 18f)
+                moveTo(18f, 6f); lineTo(6f, 18f)
+            }
+        }.build()
+    }
+
+
+    /** Single profile outline for account and channel placeholders. */
+    val Person: ImageVector by lazy {
+        ImageVector.Builder(name = "bc_person", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f).apply {
+            path(stroke = stroke, strokeLineWidth = STROKE, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) {
+                moveTo(12f, 12f)
+                arcToRelative(3.75f, 3.75f, 0f, true, true, 0f, -7.5f)
+                arcToRelative(3.75f, 3.75f, 0f, true, true, 0f, 7.5f)
+                moveTo(4.5f, 20f)
+                quadTo(4.5f, 14.5f, 12f, 14.5f)
+                quadTo(19.5f, 14.5f, 19.5f, 20f)
+            }
+        }.build()
+    }
+
+    /** Three-line grip for reorderable rows. */
+    val DragHandle: ImageVector by lazy {
+        ImageVector.Builder(name = "bc_drag_handle", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f).apply {
+            path(stroke = stroke, strokeLineWidth = STROKE, strokeLineCap = StrokeCap.Round) {
+                moveTo(4f, 7f); lineTo(20f, 7f)
+                moveTo(4f, 12f); lineTo(20f, 12f)
+                moveTo(4f, 17f); lineTo(20f, 17f)
+            }
+        }.build()
+    }
+
+    /** Display with a cast signal in its lower-left corner. */
+    val Cast: ImageVector by lazy {
+        ImageVector.Builder(name = "bc_cast", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f).apply {
+            path(stroke = stroke, strokeLineWidth = STROKE, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) {
+                moveTo(4f, 5f); lineTo(20f, 5f); lineTo(20f, 17f); lineTo(4f, 17f); close()
+                moveTo(4f, 20f); quadTo(4f, 16f, 8f, 16f)
+                moveTo(4f, 20f); quadTo(4f, 18f, 6f, 18f)
+                moveTo(4f, 20f); lineTo(4f, 20f)
+            }
+        }.build()
+    }
+
+    /** Cast glyph with an active receiver marker. */
+    val CastConnected: ImageVector by lazy {
+        ImageVector.Builder(name = "bc_cast_connected", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f).apply {
+            path(stroke = stroke, strokeLineWidth = STROKE, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) {
+                moveTo(4f, 5f); lineTo(20f, 5f); lineTo(20f, 17f); lineTo(4f, 17f); close()
+                moveTo(4f, 20f); quadTo(4f, 16f, 8f, 16f)
+                moveTo(4f, 20f); quadTo(4f, 18f, 6f, 18f)
+                moveTo(15.5f, 11f)
+                arcToRelative(1.5f, 1.5f, 0f, true, true, 3f, 0f)
+                arcToRelative(1.5f, 1.5f, 0f, true, true, -3f, 0f)
+            }
+        }.build()
+    }
+
+    /** File with a small audio waveform, for source metadata. */
+    val AudioFile: ImageVector by lazy {
+        ImageVector.Builder(name = "bc_audio_file", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f).apply {
+            path(stroke = stroke, strokeLineWidth = STROKE, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) {
+                moveTo(6f, 3.5f); lineTo(14.5f, 3.5f); lineTo(19f, 8f); lineTo(19f, 20.5f); lineTo(6f, 20.5f); close()
+                moveTo(14.5f, 3.5f); lineTo(14.5f, 8f); lineTo(19f, 8f)
+                moveTo(9f, 14f); lineTo(9f, 17f)
+                moveTo(12f, 12.5f); lineTo(12f, 18.5f)
+                moveTo(15f, 14f); lineTo(15f, 17f)
+            }
+        }.build()
+    }
+
+    /** Memory module with contacts, for the decoder stage. */
+    val Memory: ImageVector by lazy {
+        ImageVector.Builder(name = "bc_memory", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f).apply {
+            path(stroke = stroke, strokeLineWidth = STROKE, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) {
+                moveTo(6f, 7f); lineTo(18f, 7f); lineTo(18f, 17f); lineTo(6f, 17f); close()
+                moveTo(9f, 10f); lineTo(15f, 10f); lineTo(15f, 14f); lineTo(9f, 14f); close()
+                for (x in listOf(8f, 12f, 16f)) {
+                    moveTo(x, 4f); lineTo(x, 7f)
+                    moveTo(x, 17f); lineTo(x, 20f)
+                }
+            }
+        }.build()
+    }
+
+    /** Three adjustment tracks with round control points. */
+    val Tune: ImageVector by lazy {
+        ImageVector.Builder(name = "bc_tune", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f).apply {
+            path(stroke = stroke, strokeLineWidth = STROKE, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) {
+                moveTo(4f, 6f); lineTo(20f, 6f)
+                moveTo(4f, 12f); lineTo(20f, 12f)
+                moveTo(4f, 18f); lineTo(20f, 18f)
+            }
+            path(fill = stroke) {
+                for ((x, y) in listOf(9f to 6f, 15f to 12f, 7f to 18f)) {
+                    moveTo(x + 1.7f, y)
+                    arcToRelative(1.7f, 1.7f, 0f, true, true, -3.4f, 0f)
+                    arcToRelative(1.7f, 1.7f, 0f, true, true, 3.4f, 0f)
+                    close()
+                }
+            }
+        }.build()
+    }
+
+    /** Three signal bars for equalisation and spectrum stages. */
+    val GraphicEq: ImageVector by lazy {
+        ImageVector.Builder(name = "bc_graphic_eq", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f).apply {
+            path(stroke = stroke, strokeLineWidth = STROKE, strokeLineCap = StrokeCap.Round) {
+                moveTo(5f, 9f); lineTo(5f, 15f)
+                moveTo(9f, 5f); lineTo(9f, 19f)
+                moveTo(13f, 8f); lineTo(13f, 16f)
+                moveTo(17f, 4f); lineTo(17f, 20f)
+                moveTo(21f, 9f); lineTo(21f, 15f)
+            }
+        }.build()
+    }
+
+    /** Speaker with two outward sound waves. */
+    val VolumeUp: ImageVector by lazy {
+        ImageVector.Builder(name = "bc_volume_up", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f).apply {
+            path(stroke = stroke, strokeLineWidth = STROKE, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) {
+                moveTo(4f, 9f); lineTo(8f, 9f); lineTo(13f, 5f); lineTo(13f, 19f); lineTo(8f, 15f); lineTo(4f, 15f); close()
+                moveTo(17f, 9f); quadTo(21f, 12f, 17f, 15f)
+                moveTo(19f, 6f); quadTo(25f, 12f, 19f, 18f)
+            }
+        }.build()
+    }
+
 }

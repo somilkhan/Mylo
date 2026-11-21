@@ -1386,4 +1386,5 @@
     <string name="wear_os_code_hint">Код подключения</string>
     <string name="wear_os_done">Готово</string>
     <string name="signed_by">Подпись: %1$s</string>
+    <string name="start_mix_with_song">Начать микс с этой песней</string>
 </resources>

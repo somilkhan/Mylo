@@ -6,6 +6,7 @@ import android.content.SharedPreferences
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
+import android.util.Log
 import androidx.media3.common.Player
 import com.music.bitchord.BuildConfig
 import com.music.bitchord.auth.AuthStore
@@ -346,6 +347,9 @@ object AppSettings {
 
     val playbackSpeed = MutableStateFlow(1.0f)
     val themeMode = MutableStateFlow(ThemeMode.DARK)
+
+    /** Approved gradient is the default for the Scrobble Hub only. */
+    val scrobbleGradientTheme = MutableStateFlow(true)
 
     /** Keep playing similar music once the queue runs out. */
     val autoplay = MutableStateFlow(true)
@@ -868,6 +872,12 @@ object AppSettings {
         themeMode.value = runCatching {
             ThemeMode.valueOf(prefs.getString(KEY_THEME, null) ?: "DARK")
         }.getOrDefault(ThemeMode.DARK)
+        scrobbleGradientTheme.value = try {
+            prefs.getBoolean(KEY_SCROBBLE_GRADIENT_THEME, true)
+        } catch (error: Exception) {
+            Log.w("AppSettings", "Couldn't read Scrobble gradient theme; using the approved default", error)
+            true
+        }
         autoplay.value = prefs.getBoolean(KEY_AUTOPLAY, true)
         autoAccountSync.value = prefs.getBoolean(KEY_AUTO_ACCOUNT_SYNC, true)
         accountSyncBatteryMode.value = runCatching {
@@ -1302,6 +1312,18 @@ object AppSettings {
     fun setThemeMode(value: ThemeMode) {
         themeMode.value = value
         prefs.edit().putString(KEY_THEME, value.name).apply()
+    }
+
+    fun setScrobbleGradientTheme(value: Boolean) {
+        try {
+            if (prefs.edit().putBoolean(KEY_SCROBBLE_GRADIENT_THEME, value).commit()) {
+                scrobbleGradientTheme.value = value
+            } else {
+                Log.w("AppSettings", "Couldn't persist Scrobble gradient theme")
+            }
+        } catch (error: Exception) {
+            Log.w("AppSettings", "Couldn't persist Scrobble gradient theme", error)
+        }
     }
 
     fun setReduceAnimation(value: Boolean) {
@@ -2100,6 +2122,7 @@ object AppSettings {
     private const val KEY_EQ_BANDS = "equalizer_bands"
     private const val KEY_SPEED = "playback_speed"
     private const val KEY_THEME = "theme_mode"
+    private const val KEY_SCROBBLE_GRADIENT_THEME = "scrobble_gradient_theme"
     private const val KEY_AUTOPLAY = "autoplay"
     private const val KEY_AUTO_ACCOUNT_SYNC = "auto_account_sync"
     private const val KEY_ACCOUNT_SYNC_BATTERY_MODE = "account_sync_battery_mode"

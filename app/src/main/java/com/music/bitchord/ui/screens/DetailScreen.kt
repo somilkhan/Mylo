@@ -118,7 +118,6 @@ import androidx.compose.runtime.mutableIntStateOf
 import kotlinx.coroutines.delay
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Constraints
-import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.Album
 import com.music.bitchord.data.LocalGroups
 import com.music.bitchord.data.matchesSearch
@@ -880,6 +879,7 @@ private fun ReleaseHeader(
     onShuffle: () -> Unit,
     onArtistClick: ((String, String) -> Unit)?,
     onToggleLibrary: (() -> Unit)?,
+    topPadding: Dp = topBarContentPadding(),
 ) {
     val (credit, meta) = page.headerLines(songs.size, songs.playtime())
     // Every row on a release carries the same credit — see [pageCredit] — so
@@ -891,7 +891,7 @@ private fun ReleaseHeader(
         modifier = Modifier
             .fillMaxWidth()
             // Clear of the floating bar, which the sleeve no longer runs under.
-            .padding(top = topBarContentPadding(), bottom = 18.dp),
+            .padding(top = topPadding, bottom = 18.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(
@@ -1062,6 +1062,55 @@ private fun ReleaseHeader(
         }
     }
 }
+
+/**
+ * The exact release header used by [DetailScreen], adapted for a generated
+ * local playlist. The playlist editor keeps its own list because it owns
+ * local-only add/remove/reorder/export actions, but the visible release
+ * presentation must not fork from the app's normal playlist page.
+ */
+@Composable
+internal fun LocalPlaylistReleaseHeader(
+    playlistId: String,
+    title: String,
+    thumbnailUrl: String?,
+    songs: List<Song>,
+    onPlay: () -> Unit,
+    onShuffle: () -> Unit,
+) {
+    val page = remember(playlistId, title, thumbnailUrl, songs) {
+        DetailPage(
+            browseId = "local:playlist:$playlistId",
+            title = title,
+            subtitle = "Playlist",
+            thumbnailUrl = thumbnailUrl,
+            songs = UiState.Success(songs),
+            type = BrowseType.PLAYLIST,
+        )
+    }
+    val palette = rememberArtworkPalette(imageUrl = page.thumbnailUrl).copy(
+        elevated = MaterialTheme.colorScheme.surfaceVariant,
+        onBackground = MaterialTheme.colorScheme.onSurface,
+        onBackgroundVariant = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val sleeveSize = (maxWidth * SLEEVE_FRACTION)
+            .coerceAtMost(maxHeight * SLEEVE_MAX_HEIGHT)
+        ReleaseHeader(
+            page = page,
+            palette = palette,
+            sleeveSize = sleeveSize,
+            canvas = null,
+            songs = songs,
+            onPlay = onPlay,
+            onShuffle = onShuffle,
+            onArtistClick = null,
+            onToggleLibrary = null,
+            topPadding = 0.dp,
+        )
+    }
+}
+
 
 /**
  * The filter box, shown under the header while the top bar's search button is on.
@@ -2298,7 +2347,7 @@ private fun DetailPage.headerLines(trackCount: Int, playtime: String? = null): P
 private fun DetailPage.placeholderIcon(): ImageVector = deviceFolderIcon(browseId) ?: when {
     LocalGroups.isArtist(browseId) -> Icons.Rounded.Person
     type == BrowseType.ALBUM -> Icons.Rounded.Album
-    type == BrowseType.PLAYLIST -> Icons.AutoMirrored.Rounded.QueueMusic
+    type == BrowseType.PLAYLIST -> BitChordIcons.Queue
     else -> BitChordIcons.MusicNote
 }
 
