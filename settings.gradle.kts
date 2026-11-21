@@ -18,6 +18,9 @@ dependencyResolutionManagement {
 rootProject.name = "BitChord"
 include(":shared")
 include(":sharedUi")
+// Desktop modules are JVM-only and need no Android SDK, so they are always included.
+include(":desktopUi")
+include(":desktopApp")
 
 // The Android module only when there is an SDK to build it against. A machine
 // set up for the desktop alone has none, and including it there fails at
