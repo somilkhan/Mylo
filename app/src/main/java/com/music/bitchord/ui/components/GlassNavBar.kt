@@ -518,4 +518,5 @@ private val NAV_BAR_GUTTER = 19.dp
 private val NAV_BAR_LIFT = 6.dp
 private val TAB_ICON_SIZE = 25.dp
 
+@Composable
 private fun tabLabelStyle(): TextStyle = MaterialTheme.typography.labelSmall
