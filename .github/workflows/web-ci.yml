@@ -50,11 +50,37 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # TEMPORARY debug: job logs can't be read from outside, so the failing step's
+      # output is posted to the PR. Remove once the web build is green.
       - name: Typecheck all web workspaces
-        run: pnpm typecheck
+        run: |
+          set -o pipefail
+          pnpm typecheck 2>&1 | tee ../web-typecheck.log
 
       - name: Run web unit tests
-        run: pnpm test
+        run: |
+          set -o pipefail
+          pnpm test 2>&1 | tee ../web-test.log
 
       - name: Build web app and extension
-        run: pnpm build
+        run: |
+          set -o pipefail
+          pnpm build 2>&1 | tee ../web-build.log
+
+      - name: Post web failure output to the PR
+        if: failure() && github.event.pull_request.number != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        working-directory: .
+        run: |
+          {
+            echo "## Web CI failure output"
+            for f in web-typecheck.log web-test.log web-build.log; do
+              [ -f "$f" ] || continue
+              echo "### $f (tail)"
+              echo '```'
+              tail -n 80 "$f"
+              echo '```'
+            done
+          } > web-errors.md
+          gh pr comment "${{ github.event.pull_request.number }}" --body-file web-errors.md || echo "comment failed"
