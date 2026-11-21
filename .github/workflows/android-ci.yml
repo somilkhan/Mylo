@@ -152,8 +152,29 @@ jobs:
           } > desktop-errors.md
           gh pr comment "${{ github.event.pull_request.number }}" --body-file desktop-errors.md || echo "comment failed"
 
+      # TEMPORARY debug: unit test output is captured and posted to the PR on
+      # failure, same reason as above. Remove once the desktop tests are green.
       - name: Run desktop unit tests
-        run: ./gradlew --no-daemon --stacktrace :desktopApp:test
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --stacktrace :desktopApp:test 2>&1 | tee desktop-test.log
+
+      - name: Post desktop test failures to the PR
+        if: failure() && github.event.pull_request.number != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "## Desktop test failures"
+            echo '```'
+            grep -E -B2 -A8 'FAILED|AssertionError|Exception|What went wrong|e: ' desktop-test.log | head -150
+            echo '```'
+            echo "### Log tail"
+            echo '```'
+            tail -n 80 desktop-test.log
+            echo '```'
+          } > desktop-test-errors.md
+          gh pr comment "${{ github.event.pull_request.number }}" --body-file desktop-test-errors.md || echo "comment failed"
 
   web:
     if: github.event_name != 'issue_comment'
