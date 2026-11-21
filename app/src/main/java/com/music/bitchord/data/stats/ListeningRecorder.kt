@@ -4,6 +4,8 @@ import com.music.bitchord.data.YtMusicRepository
 import com.music.bitchord.data.ListeningHistory
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.model.durationMillis
+import com.music.bitchord.data.innertube.Innertube
+import com.music.bitchord.data.innertube.PlaybackTracker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -154,7 +156,12 @@ object ListeningRecorder {
         } else {
             PLAY_FLOOR_MS
         }
-        val counts = !playCounted && playedThisTrack >= threshold
+        // A signed-in play counts for Replay only once YouTube has accepted it, so
+        // the count matches YouTube's history. Until then the minutes still
+        // accrue; playCounted stays false, so the check runs again on the next step.
+        val awaitingRegistration = Innertube.cookie != null &&
+            !PlaybackTracker.isRegistered(song.videoId)
+        val counts = !playCounted && !awaitingRegistration && playedThisTrack >= threshold
         if (counts) playCounted = true
         // History is a listening log, not a play-count list: a two-second skip
         // belongs here even though it is too short to count toward Replay stats.

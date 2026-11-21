@@ -101,6 +101,12 @@ object PlaybackTracker {
     @Volatile
     private var session: Session? = null
 
+    /** Plays YouTube accepted. Replay counts a play only once its id is in here. */
+    private val registered = RegisteredVideoIds()
+
+    /** True once YouTube has accepted the start-of-play ping for [videoId]. */
+    fun isRegistered(videoId: String): Boolean = registered.contains(videoId)
+
     /** The track a session is being opened for, so repeat calls don't stack up. */
     @Volatile
     private var opening: String? = null
@@ -252,6 +258,7 @@ object PlaybackTracker {
         }
         val fresh = Session(videoId, Innertube.newCpn(), tracking)
         val status = Innertube.pingPlayback(tracking.playbackUrl, fresh.cpn)
+        if (status in 200..299) registered.add(videoId)
         session = fresh
         _registeredPlays.value++
         TrackLog.d(TAG, "history entry created for $videoId (HTTP $status)")
