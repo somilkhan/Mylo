@@ -84,20 +84,17 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatDelegate
 import com.music.bitchord.data.lyrics.translationLanguageName
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -141,6 +138,12 @@ import com.music.bitchord.ui.components.isGlassSupported
 import com.music.bitchord.ui.components.languageDisplayNameRes
 import com.music.bitchord.ui.components.MessageState
 import com.music.bitchord.ui.components.SearchField
+import com.music.bitchord.ui.components.AlertAction
+import com.music.bitchord.ui.components.AlertRule
+import com.music.bitchord.ui.components.AlertScaffold
+import com.music.bitchord.ui.components.PillTextField
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
 import com.music.bitchord.ui.components.thumbnailBorder
 import com.music.bitchord.ui.icons.BitChordIcons
 import com.music.bitchord.ui.performance.resolvePerformanceRefreshRate
@@ -177,7 +180,7 @@ import java.util.Locale
  * title. Anything with more than two choices opens a sheet rather than pushing
  * a row of chips into the layout.
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalHazeMaterialsApi::class)
 @Composable
 fun SettingsScreen(
     /** The window's width, for the gates that depend on it. */
@@ -203,6 +206,7 @@ fun SettingsScreen(
     accountSyncStatus: String,
     accountSyncCategoriesInProgress: Set<LibrarySyncCategory>,
     contentPadding: PaddingValues,
+    hazeState: HazeState,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -241,6 +245,7 @@ fun SettingsScreen(
     val lyricsSources by AppSettings.lyricsSources.collectAsStateWithLifecycle()
     val translationLanguage by AppSettings.translationLanguage.collectAsStateWithLifecycle()
     val theme by AppSettings.themeMode.collectAsStateWithLifecycle()
+    val scrobbleGradientTheme by AppSettings.scrobbleGradientTheme.collectAsStateWithLifecycle()
     val sessionId by AppSettings.audioSessionId.collectAsStateWithLifecycle()
     val outputPcmMode by AppSettings.outputPcmMode.collectAsStateWithLifecycle()
     val preferUsbDac by AppSettings.preferUsbDac.collectAsStateWithLifecycle()
@@ -466,44 +471,50 @@ fun SettingsScreen(
                         onClick = { showBatteryModeDialog = true },
                     )
                     if (showBatteryModeDialog) {
-                        AlertDialog(
-                            onDismissRequest = { showBatteryModeDialog = false },
-                            title = { Text("Automatic sync policy") },
-                            text = {
-                                Column {
-                                    listOf(
-                                        Triple(AutomaticSyncMode.FULL, "Full", "Allow automatic sync on metered networks, regardless of Battery Saver."),
-                                        Triple(AutomaticSyncMode.BALANCED, "Balanced", "Follow Android Battery Saver. This keeps Mylo's current behaviour."),
-                                        Triple(AutomaticSyncMode.SAVER, "Saver", "Wait for a known-unmetered network, even when Battery Saver is off."),
-                                    ).forEach { (choice, label, detail) ->
-                                        TextButton(
-                                            onClick = {
-                                                AppSettings.setAccountSyncBatteryMode(choice)
-                                                showBatteryModeDialog = false
-                                            },
-                                            modifier = Modifier.fillMaxWidth(),
-                                        ) {
-                                            Column(Modifier.fillMaxWidth()) {
-                                                Text(
-                                                    text = label + if (choice == accountSyncBatteryMode) "  ✓" else "",
-                                                    color = MaterialTheme.colorScheme.onSurface,
-                                                )
-                                                Text(
-                                                    text = detail,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            },
-                            confirmButton = {
-                                TextButton(onClick = { showBatteryModeDialog = false }) {
-                                    Text("Close")
-                                }
-                            },
-                        )
+                        AlertScaffold(
+                            hazeState = hazeState,
+                            onDismiss = { showBatteryModeDialog = false },
+                        ) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 18.dp),
+                                verticalArrangement = Arrangement.spacedBy(5.dp),
+                            ) {
+                                Text(
+                                    "Automatic sync policy",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                                Text(
+                                    "Choose how automatic sync behaves on metered networks and in Battery Saver.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            AlertRule()
+                            listOf(
+                                Triple(AutomaticSyncMode.FULL, "Full", "Allow metered sync, even in Battery Saver."),
+                                Triple(AutomaticSyncMode.BALANCED, "Balanced", "Follow Android Battery Saver."),
+                                Triple(AutomaticSyncMode.SAVER, "Saver", "Sync automatically only on unmetered networks."),
+                            ).forEachIndexed { index, (choice, label, detail) ->
+                                SettingsAlertChoice(
+                                    title = label,
+                                    detail = detail,
+                                    selected = choice == accountSyncBatteryMode,
+                                    onClick = {
+                                        AppSettings.setAccountSyncBatteryMode(choice)
+                                        showBatteryModeDialog = false
+                                    },
+                                )
+                                if (index < 2) AlertRule()
+                            }
+                            AlertRule()
+                            AlertAction(
+                                label = "Close",
+                                emphasised = false,
+                                onClick = { showBatteryModeDialog = false },
+                            )
+                        }
                     }
                 }
                 val syncTitle = "Sync YouTube Music"
@@ -926,6 +937,25 @@ fun SettingsScreen(
                     selectedIndex = ThemeMode.entries.indexOf(theme),
                     onSelect = { AppSettings.setThemeMode(ThemeMode.entries[it]) },
                     modifier = Modifier.padding(start = ROW_INSET, end = ROW_INSET, bottom = 14.dp),
+                )
+            }
+            val scrobbleGradientThemeTitle = "Scrobble gradient theme"
+            row(scrobbleGradientThemeTitle, "statistics", "generate", "playlists", "gradient") {
+                SettingsRow(
+                    icon = Icons.Rounded.Gradient,
+                    title = scrobbleGradientThemeTitle,
+                    subtitle = "Use the approved gradient on Statistics, Generate and Playlists",
+                    trailing = {
+                        Switch(
+                            checked = scrobbleGradientTheme,
+                            onCheckedChange = AppSettings::setScrobbleGradientTheme,
+                            colors = SwitchDefaults.colors(
+                                checkedTrackColor = MaterialTheme.colorScheme.primary,
+                                checkedBorderColor = MaterialTheme.colorScheme.primary,
+                            ),
+                        )
+                    },
+                    onClick = { AppSettings.setScrobbleGradientTheme(!scrobbleGradientTheme) },
                 )
             }
             val reduceAnimationTitle = stringResource(R.string.reduce_animation)
@@ -1811,134 +1841,223 @@ fun SettingsScreen(
 
     // Everything in the Cached songs folder goes with it, so say so first.
     if (confirmClearSongCache) {
-        AlertDialog(
-            onDismissRequest = { confirmClearSongCache = false },
-            title = { Text(stringResource(R.string.clear_song_cache_title)) },
-            text = { Text(stringResource(R.string.clear_song_cache_warning)) },
-            confirmButton = {
-                TextButton(onClick = {
+        AlertScaffold(
+            hazeState = hazeState,
+            onDismiss = { confirmClearSongCache = false },
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 18.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    stringResource(R.string.clear_song_cache_title),
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    stringResource(R.string.clear_song_cache_warning),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+            }
+            AlertRule()
+            AlertAction(
+                label = stringResource(R.string.clear),
+                emphasised = true,
+                destructive = true,
+                contentColor = MaterialTheme.colorScheme.error,
+                onClick = {
                     confirmClearSongCache = false
                     AudioCache.clear {
                         Toast.makeText(context, context.getString(R.string.song_cache_cleared), Toast.LENGTH_SHORT).show()
                     }
-                }) {
-                    Text(stringResource(R.string.clear))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmClearSongCache = false }) {
-                    Text(stringResource(R.string.cancel))
-                }
-            },
-        )
+                },
+            )
+            AlertRule()
+            AlertAction(
+                label = stringResource(R.string.cancel),
+                emphasised = false,
+                onClick = { confirmClearSongCache = false },
+            )
+        }
     }
 
     // Asked before the picker opens rather than after a file is chosen: the
     // thing being confirmed is that this device's own history is about to be
     // thrown away, and that is true whichever file gets picked.
     if (confirmImport) {
-        AlertDialog(
-            onDismissRequest = { confirmImport = false },
-            title = { Text(stringResource(R.string.import_backup_title)) },
-            text = {
-                Text(stringResource(R.string.import_backup_warning))
-            },
-            confirmButton = {
-                TextButton(onClick = {
+        AlertScaffold(
+            hazeState = hazeState,
+            onDismiss = { confirmImport = false },
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 18.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    stringResource(R.string.import_backup_title),
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    stringResource(R.string.import_backup_warning),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+            }
+            AlertRule()
+            AlertAction(
+                label = stringResource(R.string.choose_file),
+                emphasised = true,
+                onClick = {
                     confirmImport = false
                     importPicker.launch(arrayOf("application/json", "text/plain", "*/*"))
-                }) {
-                    Text(stringResource(R.string.choose_file))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmImport = false }) {
-                    Text(stringResource(R.string.cancel))
-                }
-            },
-        )
+                },
+            )
+            AlertRule()
+            AlertAction(
+                label = stringResource(R.string.cancel),
+                emphasised = false,
+                onClick = { confirmImport = false },
+            )
+        }
     }
 
     if (showPerformanceWarning) {
-        AlertDialog(
-            onDismissRequest = { showPerformanceWarning = false },
-            title = { Text(stringResource(R.string.high_performance_before_enabling)) },
-            text = { Text(stringResource(R.string.high_performance_battery_warning)) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showPerformanceWarning = false
-                        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                            data = Uri.fromParts("package", context.packageName, null)
-                        }
-                        val settingsIntent = intent.takeIf {
-                            it.resolveActivity(context.packageManager) != null
-                        } ?: Intent(Settings.ACTION_SETTINGS)
-                        batterySettingsLauncher.launch(settingsIntent)
-                    },
-                ) {
-                    Text(stringResource(R.string.open_battery_settings))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showPerformanceWarning = false }) {
-                    Text(stringResource(R.string.cancel))
-                }
-            },
-        )
+        AlertScaffold(
+            hazeState = hazeState,
+            onDismiss = { showPerformanceWarning = false },
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 18.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    stringResource(R.string.high_performance_before_enabling),
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    stringResource(R.string.high_performance_battery_warning),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+            }
+            AlertRule()
+            AlertAction(
+                label = stringResource(R.string.open_battery_settings),
+                emphasised = true,
+                onClick = {
+                    showPerformanceWarning = false
+                    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                        data = Uri.fromParts("package", context.packageName, null)
+                    }
+                    val settingsIntent = intent.takeIf {
+                        it.resolveActivity(context.packageManager) != null
+                    } ?: Intent(Settings.ACTION_SETTINGS)
+                    batterySettingsLauncher.launch(settingsIntent)
+                },
+            )
+            AlertRule()
+            AlertAction(
+                label = stringResource(R.string.cancel),
+                emphasised = false,
+                onClick = { showPerformanceWarning = false },
+            )
+        }
     }
 
     if (showPerformanceConfirmation) {
-        AlertDialog(
-            onDismissRequest = { showPerformanceConfirmation = false },
-            title = { Text(stringResource(R.string.enable_high_performance_title)) },
-            text = { Text(stringResource(R.string.enable_high_performance_confirmation)) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showPerformanceConfirmation = false
-                        AppSettings.setHighPerformanceMode(true)
-                    },
-                ) {
-                    Text(stringResource(R.string.enable))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showPerformanceConfirmation = false }) {
-                    Text(stringResource(R.string.not_yet))
-                }
-            },
-        )
+        AlertScaffold(
+            hazeState = hazeState,
+            onDismiss = { showPerformanceConfirmation = false },
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 18.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    stringResource(R.string.enable_high_performance_title),
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    stringResource(R.string.enable_high_performance_confirmation),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+            }
+            AlertRule()
+            AlertAction(
+                label = stringResource(R.string.enable),
+                emphasised = true,
+                onClick = {
+                    showPerformanceConfirmation = false
+                    AppSettings.setHighPerformanceMode(true)
+                },
+            )
+            AlertRule()
+            AlertAction(
+                label = stringResource(R.string.not_yet),
+                emphasised = false,
+                onClick = { showPerformanceConfirmation = false },
+            )
+        }
     }
 
     if (showListenBrainzTokenDialog) {
         var tokenInput by remember { mutableStateOf(listenBrainzToken) }
-        AlertDialog(
-            onDismissRequest = { showListenBrainzTokenDialog = false },
-            title = { Text(stringResource(R.string.listenbrainz_token)) },
-            text = {
-                OutlinedTextField(
+        AlertScaffold(
+            hazeState = hazeState,
+            onDismiss = { showListenBrainzTokenDialog = false },
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 18.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text(
+                    stringResource(R.string.listenbrainz_token),
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                PillTextField(
                     value = tokenInput,
                     onValueChange = { tokenInput = it },
-                    label = { Text(stringResource(R.string.api_token)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = stringResource(R.string.api_token),
+                    isPassword = true,
                 )
-            },
-            confirmButton = {
-                TextButton(onClick = {
+            }
+            AlertRule()
+            AlertAction(
+                label = stringResource(R.string.save),
+                emphasised = true,
+                enabled = tokenInput.isNotBlank(),
+                onClick = {
                     AppSettings.setListenBrainzToken(tokenInput.trim())
                     showListenBrainzTokenDialog = false
-                }) {
-                    Text(stringResource(R.string.save))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showListenBrainzTokenDialog = false }) {
-                    Text(stringResource(R.string.cancel))
-                }
-            },
-        )
+                },
+            )
+            AlertRule()
+            AlertAction(
+                label = stringResource(R.string.cancel),
+                emphasised = false,
+                onClick = { showListenBrainzTokenDialog = false },
+            )
+        }
     }
 
     if (showLastfmLoginDialog) {
@@ -1946,79 +2065,133 @@ fun SettingsScreen(
         var passwordInput by remember { mutableStateOf("") }
         var lastfmError by remember { mutableStateOf<String?>(null) }
         var lastfmLoading by remember { mutableStateOf(false) }
-        AlertDialog(
-            onDismissRequest = { if (!lastfmLoading) showLastfmLoginDialog = false },
-            title = { Text(stringResource(R.string.lastfm_login)) },
-            text = {
-                Column {
-                    if (lastfmError != null) {
-                        Text(
-                            text = lastfmError!!,
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.padding(bottom = 8.dp),
-                        )
-                    }
-                    OutlinedTextField(
-                        value = usernameInput,
-                        onValueChange = { usernameInput = it },
-                        label = { Text(stringResource(R.string.username)) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = passwordInput,
-                        onValueChange = { passwordInput = it },
-                        label = { Text(stringResource(R.string.password)) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
+        AlertScaffold(
+            hazeState = hazeState,
+            onDismiss = { if (!lastfmLoading) showLastfmLoginDialog = false },
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 18.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(9.dp),
+            ) {
+                Text(
+                    stringResource(R.string.lastfm_login),
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                lastfmError?.let {
+                    Text(
+                        text = it,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        textAlign = TextAlign.Center,
                     )
                 }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        lastfmLoading = true
-                        lastfmError = null
-                        scrobbleScope.launch {
-                            try {
-                                // Use the credentials supplied for this build.
-                                LastFM.initialize(
-                                    apiKey = AppSettings.lastfmApiKey.value,
-                                    secret = AppSettings.lastfmSecret.value,
-                                )
-                                LastFM.getMobileSession(usernameInput.trim(), passwordInput)
-                                    .onSuccess { auth ->
-                                        AppSettings.setLastfmSessionKey(auth.session.key)
-                                        AppSettings.setLastfmUsername(auth.session.name)
-                                        AppSettings.setLastfmEnabled(true)
-                                        showLastfmLoginDialog = false
-                                    }
-                                    .onFailure { e ->
-                                        lastfmError = e.message ?: context.getString(R.string.login_failed)
-                                    }
-                            } catch (e: Exception) {
-                                lastfmError = e.message ?: context.getString(R.string.login_failed)
-                            } finally {
-                                lastfmLoading = false
-                            }
+                PillTextField(
+                    value = usernameInput,
+                    onValueChange = { usernameInput = it },
+                    placeholder = stringResource(R.string.username),
+                    enabled = !lastfmLoading,
+                )
+                PillTextField(
+                    value = passwordInput,
+                    onValueChange = { passwordInput = it },
+                    placeholder = stringResource(R.string.password),
+                    enabled = !lastfmLoading,
+                    isPassword = true,
+                )
+                if (lastfmLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        strokeWidth = 2.dp,
+                    )
+                }
+            }
+            AlertRule()
+            AlertAction(
+                label = stringResource(if (lastfmLoading) R.string.signing_in else R.string.sign_in),
+                emphasised = true,
+                enabled = !lastfmLoading && usernameInput.isNotBlank() && passwordInput.isNotBlank(),
+                onClick = {
+                    lastfmLoading = true
+                    lastfmError = null
+                    scrobbleScope.launch {
+                        try {
+                            LastFM.initialize(
+                                apiKey = AppSettings.lastfmApiKey.value,
+                                secret = AppSettings.lastfmSecret.value,
+                            )
+                            LastFM.getMobileSession(usernameInput.trim(), passwordInput)
+                                .onSuccess { auth ->
+                                    AppSettings.setLastfmSessionKey(auth.session.key)
+                                    AppSettings.setLastfmUsername(auth.session.name)
+                                    AppSettings.setLastfmEnabled(true)
+                                    showLastfmLoginDialog = false
+                                }
+                                .onFailure { e ->
+                                    lastfmError = e.message ?: context.getString(R.string.login_failed)
+                                }
+                        } catch (e: Exception) {
+                            lastfmError = e.message ?: context.getString(R.string.login_failed)
+                        } finally {
+                            lastfmLoading = false
                         }
-                    },
-                    enabled = !lastfmLoading && usernameInput.isNotBlank() && passwordInput.isNotBlank(),
-                ) {
-                    Text(stringResource(if (lastfmLoading) R.string.signing_in else R.string.sign_in))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showLastfmLoginDialog = false }, enabled = !lastfmLoading) {
-                    Text(stringResource(R.string.cancel))
-                }
-            },
-        )
+                    }
+                },
+            )
+            AlertRule()
+            AlertAction(
+                label = stringResource(R.string.cancel),
+                emphasised = false,
+                enabled = !lastfmLoading,
+                onClick = { showLastfmLoginDialog = false },
+            )
+        }
     }
-
 }
+
+@Composable
+private fun SettingsAlertChoice(
+    title: String,
+    detail: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                title,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                detail,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (selected) {
+            Icon(
+                BitChordIcons.Check,
+                contentDescription = "Selected",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+    }
+}
+
 
 /** "3 months of listening" — the unit a backup is actually measured in. */
 private fun Context.countOfMonths(months: Int): String = if (months == 0) {

@@ -4,14 +4,24 @@ import android.content.Context
 import android.content.SharedPreferences
 import com.music.bitchord.data.model.Song
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.asStateFlow
-import org.json.JSONArray
-import org.json.JSONObject
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.withContext
+import java.util.UUID
 
 data class LocalPlaylist(
     val id: String,
     val title: String,
     val songs: List<Song>,
+    /** Creation time for generated/local playlists; zero means legacy data. */
+    val createdAtEpochMillis: Long = 0L,
+    /** Stable generator mode identifier, null for imported/manual playlists. */
+    val generationMode: String? = null,
+    val isPinned: Boolean = false,
+    /** Persisted content URI chosen by the user; null uses the first track's artwork. */
+    val customCoverUri: String? = null,
 ) {
     val browseId: String get() = "local:playlist:$id"
 }
@@ -21,105 +31,304 @@ object LocalPlaylistStore {
     private const val KEY_PLAYLISTS = "playlists_json"
 
     private lateinit var prefs: SharedPreferences
+    private val mutationMutex = Mutex()
 
     private val _playlists = MutableStateFlow<List<LocalPlaylist>>(emptyList())
     val playlists = _playlists.asStateFlow()
+    private val _loadError = MutableStateFlow<String?>(null)
+    val loadError = _loadError.asStateFlow()
 
     fun init(context: Context) {
         prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
         load()
     }
 
+    suspend fun reload() {
+        mutationMutex.lock()
+        try {
+            withContext(Dispatchers.IO) { load() }
+        } finally {
+            mutationMutex.unlock()
+        }
+    }
+
     private fun load() {
-        if (!this::prefs.isInitialized) return
-        val raw = prefs.getString(KEY_PLAYLISTS, null) ?: return
-        runCatching {
-            val list = mutableListOf<LocalPlaylist>()
-            val jsonArray = JSONArray(raw)
-            for (i in 0 until jsonArray.length()) {
-                val obj = jsonArray.getJSONObject(i)
-                val id = obj.getString("id")
-                val title = obj.getString("title")
-                val songsArray = obj.getJSONArray("songs")
-                val songs = mutableListOf<Song>()
-                for (j in 0 until songsArray.length()) {
-                    val sObj = songsArray.getJSONObject(j)
-                    val song = Song(
-                        videoId = sObj.optString("videoId", ""),
-                        title = sObj.optString("title", ""),
-                        artist = sObj.optString("artist", ""),
-                        thumbnailUrl = sObj.optString("thumbnailUrl", null).takeIf { !it.isNullOrBlank() && it != "null" },
-                        durationText = sObj.optString("durationText", null).takeIf { !it.isNullOrBlank() && it != "null" },
-                        artistId = sObj.optString("artistId", null).takeIf { !it.isNullOrBlank() && it != "null" },
-                        albumId = sObj.optString("albumId", null).takeIf { !it.isNullOrBlank() && it != "null" },
-                        albumName = sObj.optString("albumName", null).takeIf { !it.isNullOrBlank() && it != "null" },
-                        isVideo = sObj.optBoolean("isVideo", false),
-                    )
-                    songs.add(song)
-                }
-                list.add(LocalPlaylist(id, title, songs))
-            }
-            _playlists.value = list
+        if (!this::prefs.isInitialized) {
+            _loadError.value = "Local playlist storage is not initialized"
+            return
+        }
+        try {
+            val raw = prefs.getString(KEY_PLAYLISTS, null)
+            _playlists.value = if (raw.isNullOrBlank()) emptyList() else LocalPlaylistCodec.decode(raw)
+            _loadError.value = null
+        } catch (error: Exception) {
+            _loadError.value = error.message ?: "Couldn't load local playlists"
         }
     }
 
-    fun savePlaylist(title: String, songs: List<Song>): LocalPlaylist {
-        val id = "sp_local_" + System.currentTimeMillis()
-        val playlist = LocalPlaylist(id = id, title = title, songs = songs)
-        val updated = listOf(playlist) + _playlists.value.filterNot { it.id == id }
+    suspend fun savePlaylist(
+        title: String,
+        songs: List<Song>,
+        generationMode: String? = null,
+    ): LocalPlaylist = mutate {
+        val playlist = LocalPlaylist(
+            id = "sp_local_" + UUID.randomUUID(),
+            title = title,
+            songs = songs.toList(),
+            createdAtEpochMillis = System.currentTimeMillis(),
+            generationMode = generationMode,
+        )
+        val updated = listOf(playlist) + _playlists.value
+        check(persist(updated)) { "Couldn't save playlist to device storage." }
         _playlists.value = updated
-        persist(updated)
-        return playlist
+        playlist
     }
 
-    fun deletePlaylist(id: String) {
-        val updated = _playlists.value.filterNot { it.id == id || it.browseId == id || it.id == id.removePrefix("local:playlist:") }
+    suspend fun deletePlaylist(id: String): Boolean = mutate {
+        val current = _playlists.value
+        val updated = current.filterNot { it.id == id || it.browseId == id || it.id == id.removePrefix("local:playlist:") }
+        if (updated.size == current.size || !persist(updated)) return@mutate false
         _playlists.value = updated
-        persist(updated)
+        true
     }
 
-    fun renamePlaylist(id: String, newTitle: String) {
+    suspend fun renamePlaylist(id: String, newTitle: String): Boolean = mutate {
         val cleanId = id.removePrefix("local:playlist:").removePrefix("VL")
-        val updated = _playlists.value.map {
-            if (it.id == cleanId || it.id == id || it.browseId == id) {
-                it.copy(title = newTitle)
-            } else it
+        val current = _playlists.value
+        val index = current.indexOfFirst { it.id == cleanId || it.id == id || it.browseId == id }
+        if (index < 0) return@mutate false
+        val updated = current.toMutableList().apply {
+            this[index] = this[index].copy(title = newTitle)
         }
+        if (!persist(updated)) return@mutate false
         _playlists.value = updated
-        persist(updated)
+        true
+    }
+
+    /** Replaces tracks without changing playlist identity or metadata. */
+    suspend fun updatePlaylistSongs(id: String, songs: List<Song>): Boolean = mutate {
+        val cleanId = normalizeId(id)
+        val current = _playlists.value
+        val index = current.indexOfFirst { it.id == cleanId || it.browseId == id }
+        if (index < 0) return@mutate false
+        val updated = current.toMutableList().apply {
+            this[index] = this[index].copy(songs = songs.toList())
+        }
+        if (!persist(updated)) return@mutate false
+        _playlists.value = updated
+        true
+    }
+
+    /** Adds one catalogue track, rejecting invalid ids and duplicate YouTube identities. */
+    suspend fun addSongIfAbsent(id: String, song: Song): Boolean = mutate {
+        val cleanId = normalizeId(id)
+        val current = _playlists.value
+        val index = current.indexOfFirst { it.id == cleanId || it.browseId == id }
+        if (index < 0) return@mutate false
+        val existing = current[index]
+        val updatedSongs = appendUniquePlaylistSong(existing.songs, song) ?: return@mutate false
+        val updated = current.toMutableList().apply {
+            this[index] = existing.copy(songs = updatedSongs)
+        }
+        if (!persist(updated)) return@mutate false
+        _playlists.value = updated
+        true
+    }
+
+    suspend fun setPinned(id: String, pinned: Boolean): Boolean = mutate {
+        val cleanId = normalizeId(id)
+        val current = _playlists.value
+        val index = current.indexOfFirst { it.id == cleanId || it.browseId == id }
+        if (index < 0) return@mutate false
+        val updated = current.toMutableList().apply {
+            this[index] = this[index].copy(isPinned = pinned)
+        }
+        if (!persist(updated)) return@mutate false
+        _playlists.value = updated
+        true
+    }
+
+    suspend fun setCustomCover(id: String, uri: String?): Boolean = mutate {
+        val cleanId = normalizeId(id)
+        val current = _playlists.value
+        val index = current.indexOfFirst { it.id == cleanId || it.browseId == id }
+        if (index < 0) return@mutate false
+        val updated = current.toMutableList().apply {
+            this[index] = this[index].copy(customCoverUri = uri)
+        }
+        if (!persist(updated)) return@mutate false
+        _playlists.value = updated
+        true
+    }
+
+    suspend fun movePlaylist(id: String, destinationIndex: Int): Boolean = mutate {
+        val cleanId = normalizeId(id)
+        val current = _playlists.value
+        val from = current.indexOfFirst { it.id == cleanId || it.browseId == id }
+        if (from < 0 || current.isEmpty()) return@mutate false
+        val to = destinationIndex.coerceIn(0, current.lastIndex)
+        if (from == to) return@mutate true
+        val updated = current.toMutableList()
+        val moved = updated.removeAt(from)
+        updated.add(to, moved)
+        if (!persist(updated)) return@mutate false
+        _playlists.value = updated
+        true
+    }
+
+    suspend fun moveSong(id: String, sourceIndex: Int, expectedVideoId: String, direction: Int): Boolean = mutate {
+        val cleanId = normalizeId(id)
+        val current = _playlists.value
+        val index = current.indexOfFirst { it.id == cleanId || it.browseId == id }
+        if (index < 0) return@mutate false
+        val playlist = current[index]
+        val songs = movePlaylistSong(playlist.songs, sourceIndex, expectedVideoId, direction) ?: return@mutate false
+        if (songs == playlist.songs) return@mutate true
+        val updated = current.toMutableList().apply {
+            this[index] = playlist.copy(songs = songs)
+        }
+        if (!persist(updated)) return@mutate false
+        _playlists.value = updated
+        true
+    }
+
+    suspend fun removeSong(id: String, sourceIndex: Int, expectedVideoId: String): Boolean = mutate {
+        val cleanId = normalizeId(id)
+        val current = _playlists.value
+        val index = current.indexOfFirst { it.id == cleanId || it.browseId == id }
+        if (index < 0) return@mutate false
+        val playlist = current[index]
+        val songs = removePlaylistSong(playlist.songs, sourceIndex, expectedVideoId) ?: return@mutate false
+        val updated = current.toMutableList().apply {
+            this[index] = playlist.copy(songs = songs)
+        }
+        if (!persist(updated)) return@mutate false
+        _playlists.value = updated
+        true
     }
 
     fun getPlaylist(id: String): LocalPlaylist? {
-        val cleanId = id.removePrefix("local:playlist:").removePrefix("VL")
+        val cleanId = normalizeId(id)
         return _playlists.value.firstOrNull { it.id == cleanId || it.id == id || it.browseId == id }
     }
 
-    private fun persist(list: List<LocalPlaylist>) {
-        if (!this::prefs.isInitialized) return
-        runCatching {
-            val jsonArray = JSONArray()
-            for (playlist in list) {
-                val pObj = JSONObject()
-                pObj.put("id", playlist.id)
-                pObj.put("title", playlist.title)
-                val songsArray = JSONArray()
-                for (song in playlist.songs) {
-                    val sObj = JSONObject()
-                    sObj.put("videoId", song.videoId)
-                    sObj.put("title", song.title)
-                    sObj.put("artist", song.artist)
-                    sObj.put("thumbnailUrl", song.thumbnailUrl)
-                    sObj.put("durationText", song.durationText)
-                    sObj.put("artistId", song.artistId)
-                    sObj.put("albumId", song.albumId)
-                    sObj.put("albumName", song.albumName)
-                    sObj.put("isVideo", song.isVideo)
-                    songsArray.put(sObj)
-                }
-                pObj.put("songs", songsArray)
-                jsonArray.put(pObj)
-            }
-            prefs.edit().putString(KEY_PLAYLISTS, jsonArray.toString()).apply()
+    private fun normalizeId(id: String): String =
+        id.removePrefix("local:playlist:").removePrefix("VL")
+
+    private suspend fun <T> mutate(block: suspend () -> T): T {
+        mutationMutex.lock()
+        return try {
+            withContext(NonCancellable) { block() }
+        } finally {
+            mutationMutex.unlock()
         }
+    }
+
+    private suspend fun persist(list: List<LocalPlaylist>): Boolean = withContext(Dispatchers.IO) {
+        if (!this@LocalPlaylistStore::prefs.isInitialized) return@withContext false
+        val saved = runCatching {
+            prefs.edit().putString(KEY_PLAYLISTS, LocalPlaylistCodec.encode(list)).commit()
+        }.getOrDefault(false)
+        if (saved) _loadError.value = null
+        saved
+    }
+}
+
+
+/** Moves one playlist row by its stable video identity without replacing a stale snapshot. */
+internal fun movePlaylistSong(
+    songs: List<Song>,
+    sourceIndex: Int,
+    expectedVideoId: String,
+    direction: Int,
+): List<Song>? {
+    val from = if (songs.getOrNull(sourceIndex)?.videoId == expectedVideoId) {
+        sourceIndex
+    } else {
+        songs.indexOfFirst { it.videoId == expectedVideoId }
+    }
+    if (from < 0) return null
+    val to = (from + direction).coerceIn(0, songs.lastIndex)
+    if (from == to) return songs
+    return songs.toMutableList().apply { add(to, removeAt(from)) }
+}
+
+/** Removes one playlist row by its stable video identity. */
+internal fun removePlaylistSong(
+    songs: List<Song>,
+    sourceIndex: Int,
+    expectedVideoId: String,
+): List<Song>? {
+    val index = if (songs.getOrNull(sourceIndex)?.videoId == expectedVideoId) {
+        sourceIndex
+    } else {
+        songs.indexOfFirst { it.videoId == expectedVideoId }
+    }
+    if (index < 0) return null
+    return songs.toMutableList().apply { removeAt(index) }
+}
+
+/**
+ * Appends a catalogue track to a local playlist, rejecting empty ids, video
+ * uploads and duplicate YouTube identities while preserving existing order.
+ */
+internal fun appendUniquePlaylistSong(existing: List<Song>, candidate: Song): List<Song>? {
+    val videoId = candidate.videoId.trim()
+    if (videoId.isEmpty() || candidate.isVideo || existing.any { it.videoId == videoId }) return null
+    return existing + candidate
+}
+
+
+/** CSV/M3U serializers for a local playlist; kept pure for unit testing. */
+internal object LocalPlaylistExport {
+    fun csv(playlist: LocalPlaylist): String = buildString {
+        appendLine(csvRow(listOf("title", "artist", "video_id", "duration", "video_url")))
+        playlist.songs.forEach { song ->
+            appendLine(
+                csvRow(
+                    listOf(
+                        song.title,
+                        song.artist,
+                        song.videoId,
+                        song.durationText.orEmpty(),
+                        "https://music.youtube.com/watch?v=${song.videoId}",
+                    ),
+                ),
+            )
+        }
+    }
+
+    fun m3u(playlist: LocalPlaylist): String = buildString {
+        appendLine("#EXTM3U")
+        playlist.songs.filter { it.videoId.isNotBlank() && !it.isVideo }.forEach { song ->
+            val duration = song.durationText?.split(':')?.map { it.toLongOrNull() }
+                ?.takeIf { values -> values.isNotEmpty() && values.all { it != null } }
+                ?.let { values ->
+                    when (values.size) {
+                        2 -> values[0]!! * 60 + values[1]!!
+                        3 -> values[0]!! * 3_600 + values[1]!! * 60 + values[2]!!
+                        else -> -1L
+                    }
+                } ?: -1L
+            val label = "${song.artist} - ${song.title}".replace('\r', ' ').replace('\n', ' ')
+            appendLine("#EXTINF:$duration,$label")
+            appendLine("https://music.youtube.com/watch?v=${song.videoId}")
+        }
+    }
+
+    fun fileName(title: String, extension: String): String {
+        val ext = when (extension.lowercase(java.util.Locale.ROOT).removePrefix(".")) {
+            "csv" -> "csv"
+            "m3u" -> "m3u"
+            else -> "txt"
+        }
+        val invalid = setOf('/', '\\', ':', '*', '?', '"', '<', '>', '|')
+        val safeTitle = title.map { if (it in invalid) '_' else it }
+            .joinToString("").trim().trim('.').take(80).ifBlank { "Playlist" }
+        return "$safeTitle.$ext"
+    }
+
+    private fun csvRow(values: List<String>): String = values.joinToString(",") { value ->
+        "\"" + value.replace("\"", "\"\"") + "\""
     }
 }

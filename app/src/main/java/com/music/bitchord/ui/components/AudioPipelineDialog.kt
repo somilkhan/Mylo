@@ -21,12 +21,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.InsertDriveFile
-import androidx.compose.material.icons.automirrored.rounded.VolumeUp
-import androidx.compose.material.icons.rounded.GraphicEq
-import androidx.compose.material.icons.rounded.Memory
-import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -64,6 +58,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.music.bitchord.R
 import com.music.bitchord.data.NerdStats
 import com.music.bitchord.data.settings.AppSettings
+import com.music.bitchord.ui.icons.BitChordIcons
 import com.music.bitchord.playback.AudioOutputStatus
 import com.music.bitchord.playback.dsd.DsdFilter
 import com.music.bitchord.playback.dsd.DsdFormat
@@ -269,7 +264,7 @@ fun AudioPipelineDialog(
             PipelineRule()
             PipelineSection(
                 stageIndex = 0,
-                icon = Icons.AutoMirrored.Rounded.InsertDriveFile,
+                icon = BitChordIcons.AudioFile,
                 title = stringResource(R.string.pipeline_track_info),
                 columnCoordinates = columnCoordinates,
                 stageActivationProvider = stageActivation,
@@ -294,7 +289,7 @@ fun AudioPipelineDialog(
             PipelineRule()
             PipelineSection(
                 stageIndex = 1,
-                icon = Icons.Rounded.Memory,
+                icon = BitChordIcons.Memory,
                 title = stringResource(R.string.pipeline_decoder),
                 columnCoordinates = columnCoordinates,
                 stageActivationProvider = stageActivation,
@@ -342,7 +337,7 @@ fun AudioPipelineDialog(
             PipelineRule()
             PipelineSection(
                 stageIndex = 2,
-                icon = Icons.Rounded.Tune,
+                icon = BitChordIcons.Tune,
                 title = if (dsdRateHz != null) "DSD to PCM" else stringResource(R.string.pipeline_resampler),
                 columnCoordinates = columnCoordinates,
                 stageActivationProvider = stageActivation,
@@ -400,7 +395,7 @@ fun AudioPipelineDialog(
             PipelineRule()
             PipelineSection(
                 stageIndex = 3,
-                icon = Icons.Rounded.GraphicEq,
+                icon = BitChordIcons.GraphicEq,
                 title = stringResource(R.string.pipeline_dsp),
                 columnCoordinates = columnCoordinates,
                 stageActivationProvider = stageActivation,
@@ -453,7 +448,7 @@ fun AudioPipelineDialog(
             PipelineRule()
             PipelineSection(
                 stageIndex = 4,
-                icon = Icons.AutoMirrored.Rounded.VolumeUp,
+                icon = BitChordIcons.VolumeUp,
                 title = stringResource(R.string.pipeline_output_device),
                 columnCoordinates = columnCoordinates,
                 stageActivationProvider = stageActivation,

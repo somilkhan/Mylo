@@ -43,7 +43,6 @@ import androidx.compose.material.icons.rounded.Logout
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Share
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -95,6 +94,11 @@ import com.music.bitchord.data.listentogether.PartyActivity
 import com.music.bitchord.data.listentogether.PartyMember
 import com.music.bitchord.data.listentogether.ServerConnectionState
 import com.music.bitchord.data.listentogether.ServerUrlError
+import com.music.bitchord.ui.components.AlertAction
+import com.music.bitchord.ui.components.AlertRule
+import com.music.bitchord.ui.components.AlertScaffold
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -126,7 +130,7 @@ internal fun ServerUrlError.toMessageRes(): Int = when (this) {
  * [ListenTogether.partyPositionMs][com.music.bitchord.data.listentogether.ListenTogether.partyPositionMs]
  * exists.
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalHazeMaterialsApi::class)
 @Composable
 fun ListenTogetherScreen(
     signedIn: Boolean,
@@ -135,6 +139,7 @@ fun ListenTogetherScreen(
     onInviteHandled: () -> Unit = {},
     onSignIn: () -> Unit,
     contentPadding: PaddingValues,
+    hazeState: HazeState,
     /**
      * Opens the server editor, which is mounted at the root rather than here.
      *
@@ -278,12 +283,18 @@ fun ListenTogetherScreen(
 
     pendingServerSwitchInvite?.let { (codeToJoin, serverToSet) ->
         val isSwitchToOfficial = serverToSet.isBlank()
-        AlertDialog(
-            onDismissRequest = {
+        AlertScaffold(
+            hazeState = hazeState,
+            onDismiss = {
                 pendingServerSwitchInvite = null
                 onInviteHandled()
             },
-            title = {
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 18.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 Text(
                     stringResource(
                         if (isSwitchToOfficial) {
@@ -292,10 +303,11 @@ fun ListenTogetherScreen(
                             R.string.listen_together_custom_server_dialog_title
                         }
                     ),
-                    style = MaterialTheme.typography.titleLarge,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.Center,
                 )
-            },
-            text = {
                 Text(
                     if (isSwitchToOfficial) {
                         stringResource(R.string.listen_together_official_server_dialog_message, codeToJoin)
@@ -306,41 +318,33 @@ fun ListenTogetherScreen(
                             codeToJoin,
                         )
                     },
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
                 )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        val toJoin = codeToJoin
-                        val toSet = serverToSet
-                        pendingServerSwitchInvite = null
-                        // Same next step as any other invite: the confirm
-                        // sheet, not an immediate join. This dialog is only
-                        // consent to talk to a different server at all.
-                        openPartyPreview(toJoin, toSet.ifBlank { null })
-                        onInviteHandled()
-                    },
-                ) {
-                    Text(
-                        stringResource(R.string.listen_together_custom_server_switch_and_join),
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        pendingServerSwitchInvite = null
-                        onInviteHandled()
-                    },
-                ) {
-                    Text(stringResource(R.string.cancel))
-                }
-            },
-            containerColor = MaterialTheme.colorScheme.surface,
-        )
+            }
+            AlertRule()
+            AlertAction(
+                label = stringResource(R.string.listen_together_custom_server_switch_and_join),
+                emphasised = true,
+                onClick = {
+                    val toJoin = codeToJoin
+                    val toSet = serverToSet
+                    pendingServerSwitchInvite = null
+                    openPartyPreview(toJoin, toSet.ifBlank { null })
+                    onInviteHandled()
+                },
+            )
+            AlertRule()
+            AlertAction(
+                label = stringResource(R.string.cancel),
+                emphasised = false,
+                onClick = {
+                    pendingServerSwitchInvite = null
+                    onInviteHandled()
+                },
+            )
+        }
     }
 
     sheet?.let { open ->

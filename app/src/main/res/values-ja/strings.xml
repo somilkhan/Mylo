@@ -1332,4 +1332,5 @@
     <string name="wear_os_code_hint">ペア設定コード</string>
     <string name="wear_os_done">完了</string>
     <string name="signed_by">%1$s のサイン</string>
+    <string name="start_mix_with_song">この曲でミックスを開始</string>
 </resources>

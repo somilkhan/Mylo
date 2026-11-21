@@ -47,6 +47,8 @@ class ReplayState(
      * chips were switched to This month.
      */
     val memberSince: String?,
+    /** Period represented by [summary]; may lag [period] while a new read is in flight. */
+    val summaryPeriod: ReplayPeriod?,
 )
 
 /**
@@ -63,6 +65,7 @@ fun rememberReplayState(active: Boolean): Pair<ReplayState, (ReplayPeriod) -> Un
     var summary by remember { mutableStateOf<ReplaySummary?>(null) }
     var loading by remember { mutableStateOf(true) }
     var memberSince by remember { mutableStateOf<String?>(null) }
+    var summaryPeriod by remember { mutableStateOf<ReplayPeriod?>(null) }
 
     LaunchedEffect(active) {
         if (!active) return@LaunchedEffect
@@ -80,6 +83,7 @@ fun rememberReplayState(active: Boolean): Pair<ReplayState, (ReplayPeriod) -> Un
         // the page breaking rather than as it answering a different question.
         loading = summary == null
         summary = ListeningStats.summary(period)
+        summaryPeriod = period
         loading = false
 
         // Artist pictures and pages arrive after the page has been built — see
@@ -94,9 +98,10 @@ fun rememberReplayState(active: Boolean): Pair<ReplayState, (ReplayPeriod) -> Un
         ArtistFacts.revision.drop(1).collectLatest {
             delay(SETTLE_MILLIS)
             summary = ListeningStats.summary(period)
+            summaryPeriod = period
         }
     }
-    return ReplayState(period, summary, loading, memberSince) to
+    return ReplayState(period, summary, loading, memberSince, summaryPeriod) to
         { next: ReplayPeriod -> period = next }
 }
 

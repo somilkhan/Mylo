@@ -1331,4 +1331,5 @@
     <string name="artist_signatures_unconfigured">尚未配置 — 点按以设置 API 网址</string>
     <string name="artist_signatures_test_failed">无法访问该网址的 API</string>
     <string name="signed_by">签名者：%1$s</string>
+    <string name="start_mix_with_song">从这首歌曲开始混音</string>
 </resources>

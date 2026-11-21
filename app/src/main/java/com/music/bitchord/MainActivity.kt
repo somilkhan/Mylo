@@ -18,9 +18,12 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
@@ -45,6 +48,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -69,6 +73,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.IosShare
@@ -98,6 +103,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -143,6 +149,7 @@ import com.music.bitchord.data.model.SearchFilter
 import com.music.bitchord.data.model.SearchResult
 import com.music.bitchord.data.model.ShelfItem
 import com.music.bitchord.data.model.Song
+import com.music.bitchord.data.stats.ReplayPeriod
 import com.music.bitchord.data.model.isUnresolvedSpotify
 import com.music.bitchord.data.model.UiState
 import com.music.bitchord.data.model.UserPlaylist
@@ -239,6 +246,9 @@ import com.music.bitchord.ui.components.BottomTab
 import com.music.bitchord.ui.components.FLOATING_BAR_MAX_WIDTH
 import com.music.bitchord.ui.components.FloatingBottomBar
 import com.music.bitchord.ui.components.GlassNavBar
+import com.music.bitchord.ui.components.ScrobbleFab
+import com.music.bitchord.ui.components.scrobbleFabVisible
+import com.music.bitchord.ui.components.liquidGlass
 import com.music.bitchord.ui.components.floatingtabbar.rememberFloatingTabBarScrollConnection
 import com.music.bitchord.ui.components.FrostedTopBar
 import com.music.bitchord.ui.components.LastfmLoginAlert
@@ -317,6 +327,12 @@ import com.music.bitchord.ui.screens.SearchScreen
 import com.music.bitchord.data.settings.SongSort
 import com.music.bitchord.ui.onboarding.OnboardingScreen
 import com.music.bitchord.ui.replay.ReplayScreen
+import com.music.bitchord.ui.scrobble.ScrobbleGenerateContent
+import com.music.bitchord.ui.scrobble.ScrobbleGenerateViewModel
+import com.music.bitchord.ui.scrobble.ScrobblePlaylistsContent
+import com.music.bitchord.ui.scrobble.ScrobbleStatisticsContent
+import com.music.bitchord.ui.scrobble.ScrobbleStatisticsViewModel
+import com.music.bitchord.ui.scrobble.ScrobbleHubTheme
 import com.music.bitchord.ui.replay.cards
 import com.music.bitchord.ui.replay.ReplayShareSheet
 import com.music.bitchord.ui.replay.ReplayStories
@@ -336,6 +352,7 @@ import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
 import dev.chrisbanes.haze.materials.HazeMaterials
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collect
 import java.util.Locale
 
 /** A full first screen of a native YouTube Music radio before AutoPlay tops it up. */
@@ -466,7 +483,7 @@ class MainActivity : AppCompatActivity() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
 private fun BitChordApp(
     darkTheme: Boolean,
@@ -485,6 +502,9 @@ private fun BitChordApp(
     viewModel: MainViewModel = viewModel(),
 ) {
     val context = LocalContext.current
+    val scrobbleGenerateViewModel: ScrobbleGenerateViewModel = viewModel()
+    val scrobbleStatisticsViewModel: ScrobbleStatisticsViewModel = viewModel()
+    val scrobbleStatisticsState by scrobbleStatisticsViewModel.state.collectAsStateWithLifecycle()
     val clipboard = LocalClipboardManager.current
     val hazeState = remember { HazeState() }
     // Recording the backdrop layer costs a draw pass, so it only runs when a
@@ -502,6 +522,7 @@ private fun BitChordApp(
     // rather than inside the bar because the page's scroll is what drives it,
     // and the page is a sibling of the bar rather than a child.
     val navBarScroll = rememberFloatingTabBarScrollConnection()
+    val scrobbleNavBarScroll = rememberFloatingTabBarScrollConnection()
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     /**
      * Whether the player's sheet is up. The player is always a full-screen
@@ -533,6 +554,7 @@ private fun BitChordApp(
     // takes part in the docking asks for [activeDock] / this, never for the
     // dock or the motion directly.
     val reducePlayerMotion by AppSettings.reduceAnimation.collectAsStateWithLifecycle()
+    val scrobbleGradientTheme by AppSettings.scrobbleGradientTheme.collectAsStateWithLifecycle()
     val activeDock = playerDock.takeIf { !reducePlayerMotion }
     playerSheetMotion.flingVelocity = with(LocalDensity.current) { PLAYER_PULL_FLING_VELOCITY.toPx() }
     // How the app takes the player down, whatever for: a back press, or a page
@@ -565,10 +587,55 @@ private fun BitChordApp(
     // opened from the page and the share sheet from either, and closing one
     // has to reveal what it was opened from.
     var showReplay by rememberSaveable { mutableStateOf(false) }
+    var showScrobble by rememberSaveable { mutableStateOf(false) }
+    var selectedScrobbleTab by rememberSaveable { mutableIntStateOf(0) }
+    var scrobbleHandoffPlaylistId by remember { mutableStateOf<String?>(null) }
+    var scrobbleHandoffFromGenerate by remember { mutableStateOf(false) }
+    var handledScrobblePlaylistId by rememberSaveable { mutableStateOf<String?>(null) }
+    val currentScrobbleTab by rememberUpdatedState(selectedScrobbleTab)
+    val closeScrobble: () -> Unit = {
+        scrobbleGenerateViewModel.cancelGeneration()
+        scrobbleNavBarScroll.expand()
+        showScrobble = false
+        selectedScrobbleTab = 0
+        scrobbleHandoffPlaylistId = null
+        scrobbleHandoffFromGenerate = false
+    }
+    // Programmatic root-tab changes leave the temporary hub through one owner.
+    // This guarantees active generation and handoff state are cleared first.
+    val navigateToNormalTab: (Int) -> Unit = { tab ->
+        if (showScrobble) closeScrobble()
+        selectedTab = tab
+    }
+    // A successful save is the navigation event: keep the collector active only
+    // while Scrobble is open, then move to Playlists after the store commit.
+    LaunchedEffect(showScrobble, scrobbleGenerateViewModel) {
+        if (showScrobble) {
+            scrobbleGenerateViewModel.savedPlaylistEvents.collect { playlist ->
+                if (handledScrobblePlaylistId != playlist.id) {
+                    handledScrobblePlaylistId = playlist.id
+                    scrobbleHandoffFromGenerate = currentScrobbleTab == 1
+                    scrobbleHandoffPlaylistId = playlist.id
+                    selectedScrobbleTab = 2
+                }
+            }
+        }
+    }
+    // Clear the target after the shared/arrival motion so revisiting Playlists
+    // does not replay the animation for an older save.
+    LaunchedEffect(scrobbleHandoffPlaylistId) {
+        val playlistId = scrobbleHandoffPlaylistId ?: return@LaunchedEffect
+        delay(1_600)
+        if (scrobbleHandoffPlaylistId == playlistId) {
+            scrobbleHandoffPlaylistId = null
+            scrobbleHandoffFromGenerate = false
+        }
+    }
     // Library cards use the same Replay page as every other entry point, but
     // category cards ask it to start at their matching ranked section.
     var replayLandingPage by rememberSaveable { mutableStateOf(ReplayStoryPage.INTRO) }
     var replayStory by rememberSaveable { mutableStateOf<ReplayStoryPage?>(null) }
+    var replayStoryPeriod by rememberSaveable { mutableStateOf<ReplayPeriod?>(null) }
     var showReplayShare by rememberSaveable { mutableStateOf(false) }
     /** Which story card the share sheet is for, or null for the whole Replay. */
     var replaySharePage by rememberSaveable { mutableStateOf<ReplayStoryPage?>(null) }
@@ -726,6 +793,7 @@ private fun BitChordApp(
     // doesn't bring it back — only a fresh launch does.
     var updateDialogShown by rememberSaveable { mutableStateOf(false) }
     var showUpdateDialog by remember { mutableStateOf(false) }
+    val uploadConflict by com.music.bitchord.data.webdav.WebDavUploads.conflict.collectAsStateWithLifecycle()
     val updateAvailable by viewModel.updateAvailable.collectAsStateWithLifecycle()
 
     /**
@@ -764,8 +832,10 @@ private fun BitChordApp(
         activeJamInviteCode = invite.code
         activeJamInviteServer = invite.serverUrl
         dismissPlayer()
+        closeScrobble()
         showReplay = false
         replayStory = null
+        replayStoryPeriod = null
         showReplayShare = false
         showAccountScrobbling = false
         showSources = false
@@ -1075,6 +1145,7 @@ private fun BitChordApp(
     val homePull = rememberPullToRefreshState()
     val explorePull = rememberPullToRefreshState()
     val libraryPull = rememberPullToRefreshState()
+    val scrobbleStatisticsPull = rememberPullToRefreshState()
     val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
     val currentFeed = when {
         showSettings || showAccountScrobbling || detail != null -> null
@@ -1092,11 +1163,14 @@ private fun BitChordApp(
         if (currentFeed == MainViewModel.Feed.LIBRARY) viewModel.onLibraryShown()
     }
 
-    val currentPull = when (currentFeed) {
-        MainViewModel.Feed.HOME -> homePull
-        MainViewModel.Feed.EXPLORE -> explorePull
-        MainViewModel.Feed.LIBRARY -> libraryPull
-        null -> null
+    val currentPull = when {
+        showScrobble && selectedScrobbleTab == 0 -> scrobbleStatisticsPull
+        else -> when (currentFeed) {
+            MainViewModel.Feed.HOME -> homePull
+            MainViewModel.Feed.EXPLORE -> explorePull
+            MainViewModel.Feed.LIBRARY -> libraryPull
+            null -> null
+        }
     }
     val scrolled by remember(currentListState) {
         derivedStateOf {
@@ -1719,17 +1793,15 @@ private fun BitChordApp(
      * shut, the current track carries on — so the count is said out loud, the
      * same way a batch download is.
      */
-    val queueSongs: (List<Song>, Boolean) -> Unit = { songs, next ->
+    val queueSongs: (List<Song>, Boolean, Boolean) -> Unit = { songs, next, startIfIdle ->
         if (songs.isNotEmpty()) {
             scope.launch {
                 if (refusedByHost()) return@launch
                 val c = controller
                 if (c == null || c.mediaItemCount == 0) {
-                    // Nothing to queue behind. "Add to queue" on a silent
-                    // player can only mean start here — and adding without
-                    // preparing would leave the list sitting in a player that
-                    // never gets round to it.
-                    play(songs, 0)
+                    // Explicit startIfIdle callers may start an empty local player.
+                    // In a party, playFrom routes through the server-owned queue.
+                    if (startIfIdle) play(songs, 0)
                 } else {
                     val toAdd = if (ListenTogether.state.value.inParty) {
                         val upcoming = (c.mediaItemCount - (c.currentMediaItemIndex + 1)).coerceAtLeast(0)
@@ -1772,8 +1844,24 @@ private fun BitChordApp(
             }
         }
     }
-    val addSongsToQueue: (List<Song>) -> Unit = { songs -> queueSongs(songs, false) }
-    val playSongsNext: (List<Song>) -> Unit = { songs -> queueSongs(songs, true) }
+    val addSongsToQueue: (List<Song>) -> Unit = { songs -> queueSongs(songs, false, true) }
+    val playSongsNext: (List<Song>) -> Unit = { songs -> queueSongs(songs, true, true) }
+
+    // Consume the one-shot queue handoff after the playlist has been persisted.
+    // With an existing timeline, the shared queue helper inserts after USER_QUEUE
+    // and before CONTEXT/AutoPlay. An empty timeline follows the normal play path;
+    // Listen Together then applies its server-owned queue semantics.
+    val currentQueueSongs by rememberUpdatedState(queueSongs)
+    LaunchedEffect(scrobbleGenerateViewModel, controller) {
+        scrobbleGenerateViewModel.pendingStartMixQueue.collect { playlist ->
+            // Keep the durable handoff pending until the playback controller
+            // exists; the StateFlow replays it when the controller attaches.
+            if (playlist != null && controller != null) {
+                scrobbleGenerateViewModel.consumeStartMixQueue(playlist.id)
+                currentQueueSongs(playlist.songs, false, true)
+            }
+        }
+    }
 
     // ---- Links from outside the app ----
 
@@ -1831,7 +1919,7 @@ private fun BitChordApp(
                     // found nothing to start — and the results are a better
                     // answer to a spoken request than silence is.
                     dismissPlayer()
-                    selectedTab = TAB_SEARCH
+                    navigateToNormalTab(TAB_SEARCH)
                     viewModel.searchFor(request.query)
                 }
             }
@@ -2207,6 +2295,7 @@ private fun BitChordApp(
     // which includes the Library tab, since the cards live at the top of it.
     // See [rememberReplayState].
     val replayOpen = showReplay || replayStory != null || showReplayShare ||
+        (showScrobble && selectedScrobbleTab == 0) ||
         (selectedTab == TAB_LIBRARY && detail == null && !showSettings)
     val (replay, setReplayPeriod) = rememberReplayState(replayOpen)
     val replayCards = remember(replay.summary) {
@@ -2457,6 +2546,8 @@ private fun BitChordApp(
 
                 // A context link is navigation, not another page stacked over
                 // Now Playing. Clear the current route before restoring it.
+                // Route through the hub owner so generation is cancelled before leaving.
+                if (showScrobble) closeScrobble()
                 dismissPlayer()
                 viewModel.clearDetail()
                 showSettings = false
@@ -2480,18 +2571,18 @@ private fun BitChordApp(
                     }
                     PlaybackSourceType.HOME -> {
                         viewModel.closeMoodGenre()
-                        selectedTab = TAB_HOME
+                        navigateToNormalTab(TAB_HOME)
                     }
                     PlaybackSourceType.SEARCH -> {
                         viewModel.closeMoodGenre()
-                        selectedTab = TAB_SEARCH
+                        navigateToNormalTab(TAB_SEARCH)
                     }
                     PlaybackSourceType.HISTORY -> showHistory = true
                     PlaybackSourceType.REPLAY -> {
                         replayLandingPage = ReplayStoryPage.INTRO
                         showReplay = true
                     }
-                    PlaybackSourceType.EXPLORE -> selectedTab = TAB_EXPLORE
+                    PlaybackSourceType.EXPLORE -> navigateToNormalTab(TAB_EXPLORE)
                     PlaybackSourceType.SHARED_LINK -> {
                         val id = sourceId ?: return@openSource
                         context.startActivity(
@@ -2538,7 +2629,10 @@ private fun BitChordApp(
         // Replay's three layers unwind in the order they were opened. Ahead of
         // every other handler because they are drawn over everything else.
         BackHandler(enabled = showReplayShare) { showReplayShare = false }
-        BackHandler(enabled = replayStory != null && !showReplayShare) { replayStory = null }
+        BackHandler(enabled = replayStory != null && !showReplayShare) {
+            replayStory = null
+            replayStoryPeriod = null
+        }
         BackHandler(
             enabled = showReplay && replayStory == null && !showReplayShare,
         ) {
@@ -2551,8 +2645,11 @@ private fun BitChordApp(
             }
         }
         BackHandler(
+            enabled = showScrobble && !showReplay && replayStory == null && !showReplayShare,
+        ) { closeScrobble() }
+        BackHandler(
             enabled = detail != null && !showSettings && !showAccountScrobbling && !showSources && !showListenTogether && !showWearOs &&
-                !showEqualizer && !showReplay,
+                !showEqualizer && !showReplay && !showScrobble,
         ) { viewModel.closeDetail() }
         BackHandler(enabled = selectedMoodGenre != null && detail == null && !showSettings && !showReplay) {
             viewModel.closeMoodGenre()
@@ -2586,7 +2683,7 @@ private fun BitChordApp(
         // One back step out of Settings, or out of any tab but Home, lands on
         // Home rather than exiting — only Home itself hands back to the system,
         // which is what actually closes/minimizes the app.
-        BackHandler(enabled = showSettings && !showSpotify && !showAccountScrobbling && !showSources && !showListenTogether && !showWearOs && !showEqualizer && !showReplay) {
+        BackHandler(enabled = showSettings && !showSpotify && !showAccountScrobbling && !showSources && !showListenTogether && !showWearOs && !showEqualizer && !showReplay && !showScrobble) {
             showSettings = false
             // Only when Settings was the whole of what was on screen. Opened
             // over Replay or over a release page, closing it reveals that again
@@ -2595,8 +2692,8 @@ private fun BitChordApp(
         }
         BackHandler(
             enabled = detail == null && !showSettings && !showAccountScrobbling && !showSpotify &&
-                !showSources && !showListenTogether && !showWearOs && !showEqualizer && !showReplay && selectedMoodGenre == null &&
-                selectedTab != TAB_HOME,
+                !showSources && !showListenTogether && !showWearOs && !showEqualizer && !showReplay && !showScrobble &&
+                selectedMoodGenre == null && selectedTab != TAB_HOME,
         ) {
             selectedTab = TAB_HOME
         }
@@ -2621,7 +2718,9 @@ private fun BitChordApp(
         // one child it always had and changes nothing.
         Row(Modifier.fillMaxSize()) {
             Box(Modifier.weight(1f).fillMaxHeight()) {
-                AnimatedContent(
+                SharedTransitionLayout(Modifier.fillMaxSize()) {
+                    val scrobbleSharedTransitionScope = this
+                    AnimatedContent(
                     targetState = when {
                         showSpotify && detail == null -> "spotify"
                         showDiscord -> "discord"
@@ -2648,6 +2747,7 @@ private fun BitChordApp(
                         // was live, hit, and changed nothing on screen.
                         showSettings -> "settings"
                         showReplay -> "replay"
+                        showScrobble -> "scrobble-$selectedScrobbleTab"
                         detail != null -> detail.browseId
                         else -> "$TAB_KEY$selectedTab"
                     },
@@ -2675,10 +2775,22 @@ private fun BitChordApp(
                         val libraryTabKey = "$TAB_KEY$TAB_LIBRARY"
                         val libraryShowAllSwap = (initialState == "library_show_all" && targetState == libraryTabKey) ||
                             (targetState == "library_show_all" && initialState == libraryTabKey)
-                        if (tabSwap || libraryShowAllSwap) {
-                            EnterTransition.None togetherWith ExitTransition.None
-                        } else {
-                            fadeIn(tween(180)) togetherWith fadeOut(tween(180))
+                        val enteringScrobble = targetState.startsWith("scrobble-") && !initialState.startsWith("scrobble-")
+                        val leavingScrobble = initialState.startsWith("scrobble-") && !targetState.startsWith("scrobble-")
+                        val scrobbleTabSwap = initialState.startsWith("scrobble-") && targetState.startsWith("scrobble-")
+                        when {
+                            tabSwap || libraryShowAllSwap -> EnterTransition.None togetherWith ExitTransition.None
+                            scrobbleTabSwap && reducePlayerMotion ->
+                                EnterTransition.None togetherWith ExitTransition.None
+                            (enteringScrobble || leavingScrobble) && reducePlayerMotion ->
+                                EnterTransition.None togetherWith ExitTransition.None
+                            enteringScrobble ->
+                                (slideInVertically(tween(260)) { -it / 8 } + fadeIn(tween(180))) togetherWith
+                                    fadeOut(tween(140))
+                            leavingScrobble ->
+                                fadeIn(tween(160)) togetherWith
+                                    (slideOutVertically(tween(220)) { -it / 8 } + fadeOut(tween(180)))
+                            else -> fadeIn(tween(180)) togetherWith fadeOut(tween(180))
                         }
                     },
                     modifier = Modifier
@@ -2700,13 +2812,14 @@ private fun BitChordApp(
                                     // Every page's scroll passes through here, so
                                     // the glass bar collapses on all of them
                                     // without each one having to know about it.
-                                    .nestedScroll(navBarScroll)
+                                    .nestedScroll(if (showScrobble) scrobbleNavBarScroll else navBarScroll)
                             } else {
                                 Modifier
                             },
                         ),
                     label = "content",
                 ) { key ->
+                    val scrobbleAnimatedVisibilityScope = this
                     // Every branch below reads `key` rather than the state that
                     // produced it. The two are the same thing only for the page
                     // being entered: the one on its way out is still composed,
@@ -2715,7 +2828,7 @@ private fun BitChordApp(
                     // the identical copy fading in behind it.
                     val live = detailStack.lastOrNull()?.takeIf {
                         it.browseId == key && key != "settings" && key != "account_scrobbling" &&
-                            key != "discord" && key != "replay" && key != "history" &&
+                            key != "discord" && key != "replay" && !key.startsWith("scrobble-") && key != "history" &&
                             key != "library_show_all"
                     }
                     // Held for the same reason, one step further on: a popped
@@ -2734,6 +2847,7 @@ private fun BitChordApp(
                     }
                     if (key == "history") {
                         HistoryScreen(
+                            hazeState = hazeState,
                             state = historyState,
                             sections = historySections,
                             isLocal = historyIsLocal,
@@ -2776,8 +2890,12 @@ private fun BitChordApp(
                         ReplayScreen(
                             state = replay,
                             holder = account?.name.orEmpty(),
+                            reduceMotion = reducePlayerMotion,
                             onPeriodChange = setReplayPeriod,
-                            onOpenStory = { replayStory = it },
+                            onOpenStory = {
+                                replayStoryPeriod = replay.period
+                                replayStory = it
+                            },
                             // A track tapped on a chart is one the user already
                             // knows they like, so it starts a station off itself
                             // rather than queueing the chart it was on — the
@@ -2801,6 +2919,73 @@ private fun BitChordApp(
                             listState = replayListState,
                             landingPage = replayLandingPage,
                         )
+                    } else if (key.startsWith("scrobble-")) {
+                        val scrobbleTab = key.removePrefix("scrobble-").toIntOrNull() ?: 0
+                        ScrobbleHubTheme(gradientEnabled = scrobbleGradientTheme) {
+                            when (scrobbleTab) {
+                            0 -> ScrobbleStatisticsContent(
+                                viewModel = scrobbleStatisticsViewModel,
+                                reduceMotion = reducePlayerMotion,
+                                refreshing = scrobbleStatisticsState.isRefreshing,
+                                onRefresh = scrobbleStatisticsViewModel::refresh,
+                                pullState = scrobbleStatisticsPull,
+                                onPlaySong = { song ->
+                                    playRadio(song, QueueSource(replayLabel, PlaybackSourceType.REPLAY))
+                                },
+                                onOpenSettings = {
+                                    closeScrobble()
+                                    showSettings = true
+                                },
+                                holder = account?.name.orEmpty(),
+                                memberSince = replay.memberSince,
+                                onOpenReplay = { page, period ->
+                                    replayStoryPeriod = period
+                                    setReplayPeriod(period)
+                                    replayStory = page
+                                },
+                                onOpenArtist = { id, name ->
+                                    closeScrobble()
+                                    openByName(id, name, null, BrowseType.ARTIST)
+                                },
+                                onOpenAlbum = { id, title, artist, art ->
+                                    closeScrobble()
+                                    openByName(id, title, artist, BrowseType.ALBUM, art)
+                                },
+                                contentPadding = listPadding,
+                            )
+                            1 -> ScrobbleGenerateContent(
+                                viewModel = scrobbleGenerateViewModel,
+                                currentSong = player.song,
+                                contentPadding = listPadding,
+                                highlightedPlaylistId = scrobbleHandoffPlaylistId,
+                                sharedHandoffFromGenerate = scrobbleHandoffFromGenerate,
+                                reduceMotion = reducePlayerMotion,
+                                sharedTransitionScope = scrobbleSharedTransitionScope,
+                                animatedVisibilityScope = scrobbleAnimatedVisibilityScope,
+                                onOpenPlaylists = { selectedScrobbleTab = 2 },
+                            )
+                            else -> ScrobblePlaylistsContent(
+                                viewModel = scrobbleGenerateViewModel,
+                                hazeState = hazeState,
+                                currentSong = player.song,
+                                isPlaying = player.isPlaying,
+                                contentPadding = listPadding,
+                                highlightedPlaylistId = scrobbleHandoffPlaylistId,
+                                sharedHandoffFromGenerate = scrobbleHandoffFromGenerate,
+                                reduceMotion = reducePlayerMotion,
+                                sharedTransitionScope = scrobbleSharedTransitionScope,
+                                animatedVisibilityScope = scrobbleAnimatedVisibilityScope,
+                                onPlaySongs = { songs, index ->
+                                    playFrom(
+                                        songs,
+                                        index,
+                                        QueueSource("Scrobble Playlist", PlaybackSourceType.QUEUE),
+                                    )
+                                },
+                                onOpenGenerator = { selectedScrobbleTab = 1 },
+                            )
+                            }
+                        }
                     } else if (key == "spotify") {
                         SpotifyLibraryScreen(
                             onOpenPlaylist = { playlist ->
@@ -2858,6 +3043,7 @@ private fun BitChordApp(
                         WearOsScreen(contentPadding = listPadding)
                     } else if (key == "listen_together") {
                         ListenTogetherScreen(
+                            hazeState = hazeState,
                             signedIn = signedIn,
                             inviteCode = activeJamInviteCode,
                             inviteServer = activeJamInviteServer,
@@ -2877,6 +3063,7 @@ private fun BitChordApp(
                         EqualizerScreen(contentPadding = listPadding)
                     } else if (key == "settings") {
                         SettingsScreen(
+                            hazeState = hazeState,
                             windowWidth = windowWidth,
                             signedIn = signedIn,
                             account = account,
@@ -3397,6 +3584,7 @@ private fun BitChordApp(
                         )
                     }
                 }
+                }
 
                 // ---- Settings sub-screen overlays ----
                 // When a sub-screen is opened from Settings, AnimatedContent keeps
@@ -3466,6 +3654,7 @@ private fun BitChordApp(
                             color = MaterialTheme.colorScheme.background,
                         ) {
                             ListenTogetherScreen(
+                                hazeState = hazeState,
                                 signedIn = signedIn,
                                 inviteCode = activeJamInviteCode,
                                 inviteServer = activeJamInviteServer,
@@ -3501,7 +3690,10 @@ private fun BitChordApp(
                                     state = replay,
                                     holder = account?.name.orEmpty(),
                                     onPeriodChange = setReplayPeriod,
-                                    onOpenStory = { replayStory = it },
+                                    onOpenStory = {
+                                        replayStoryPeriod = replay.period
+                                        replayStory = it
+                                    },
                                     onPlaySong = { song ->
                                         playRadio(song, QueueSource(replayLabel, PlaybackSourceType.REPLAY))
                                     },
@@ -3585,6 +3777,11 @@ private fun BitChordApp(
                         showEqualizer -> stringResource(R.string.equalizer)
                         showSettings -> stringResource(R.string.settings)
                         showReplay -> stringResource(R.string.replay)
+                        showScrobble -> when (selectedScrobbleTab) {
+                            0 -> "Statistics"
+                            1 -> "Generate"
+                            else -> "Playlists"
+                        }
                         detail != null && detailActiveShelf != null -> detailActiveShelf?.title.orEmpty()
                         detail != null -> detail.title
                         selectedMoodGenre != null -> selectedMoodGenre?.title.orEmpty()
@@ -3610,10 +3807,12 @@ private fun BitChordApp(
                         // The page leads with its own large "Replay", so the bar
                         // stays out of the way until that has been scrolled off.
                         showReplay -> replayScrolled
+                        showScrobble -> scrobbleNavBarScroll.isInline
                         detail != null -> detailScrolled
                         else -> scrolled || selectedTab == TAB_SEARCH
                     },
-                    refreshing = currentFeed != null && currentFeed in refreshing,
+                    refreshing = (currentFeed != null && currentFeed in refreshing) ||
+                        (showScrobble && selectedScrobbleTab == 0 && scrobbleStatisticsState.isRefreshing),
                     pullFraction = { currentPull?.distanceFraction ?: 0f },
                     onBack = when {
                         showSpotify && detail == null -> ({ showSpotify = false })
@@ -3642,7 +3841,13 @@ private fun BitChordApp(
                         })
                         settingsSubScreen != null -> ({ settingsSubScreen = null })
                         showSettings -> ({ showSettings = false })
+                        showReplayShare -> ({ showReplayShare = false })
+                        replayStory != null -> ({
+                            replayStory = null
+                            replayStoryPeriod = null
+                        })
                         showReplay -> ({ showReplay = false })
+                        showScrobble -> closeScrobble
                         detailActiveShelf != null -> ({ detailActiveShelf = null })
                         detail != null -> ({ viewModel.closeDetail(); Unit })
                         selectedMoodGenre != null -> ({ viewModel.closeMoodGenre(); Unit })
@@ -3959,6 +4164,7 @@ private fun BitChordApp(
 
                 // One tab handler, whichever bar is drawing it.
                 val onTabSelected: (Int) -> Unit = { index ->
+                    if (showScrobble) closeScrobble()
                     viewModel.clearDetail()
                     viewModel.closeMoodGenre()
                     showSettings = false
@@ -3981,6 +4187,21 @@ private fun BitChordApp(
                     }
                 }
 
+                val scrobbleTabs = remember {
+                    listOf(
+                        BottomTab("Stats", BitChordIcons.Clock),
+                        BottomTab("Generate", Icons.Rounded.GraphicEq),
+                        BottomTab("Playlists", BitChordIcons.TabLibrary),
+                    )
+                }
+                val displayedTabs = if (showScrobble) scrobbleTabs else tabs
+                val displayedSelectedIndex = if (showScrobble) selectedScrobbleTab else selectedTab
+                val displayedTabClick: (Int) -> Unit = if (showScrobble) {
+                    { selectedScrobbleTab = it.coerceIn(0, 2) }
+                } else {
+                    onTabSelected
+                }
+
                 if (glassActive) Column(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
@@ -3994,10 +4215,11 @@ private fun BitChordApp(
                     // controls dock into the tab bar rather than riding above it,
                     // and the pair folds together on scroll. See [GlassNavBar].
                     GlassNavBar(
-                        tabs = tabs,
-                        selectedIndex = selectedTab,
-                        onTabSelected = onTabSelected,
-                        scrollConnection = navBarScroll,
+                        tabs = displayedTabs,
+                        selectedIndex = displayedSelectedIndex,
+                        onTabSelected = displayedTabClick,
+                        scrollConnection = if (showScrobble) scrobbleNavBarScroll else navBarScroll,
+                        standaloneIndexOverride = if (showScrobble) -1 else null,
                         song = player.song,
                         isPlaying = player.isPlaying,
                         isLoading = playPauseBusy,
@@ -4057,10 +4279,60 @@ private fun BitChordApp(
                         Spacer(Modifier.height(8.dp))
                     }
                     FloatingBottomBar(
-                        tabs = tabs,
-                        selectedIndex = selectedTab,
+                        tabs = displayedTabs,
+                        selectedIndex = displayedSelectedIndex,
                         hazeState = hazeState,
-                        onTabSelected = onTabSelected,
+                        onTabSelected = displayedTabClick,
+                    )
+                }
+
+                val keyboardVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+                val scrobbleOverlayOpen = detail != null || showSettings || showAccountScrobbling ||
+                    showSources || showListenTogether || showWearOs || showEqualizer || showHistory ||
+                    showDiscord || showSpotify || showReplay || replayStory != null || showReplayShare ||
+                    selectedMoodGenre != null || libraryShowAll != null || webSession != null ||
+                    showDownloadManager || songActions != null || browseActions != null ||
+                    playlistTarget != null || creatingPlaylist || showSpotifyImportDialog ||
+                    showLyricsOffset || showAccountSelector || showLastfmLogin || showListenBrainzLogin ||
+                    showUpdateDialog || uploadConflict != null || onboardingVisible
+                val showScrobbleFab = scrobbleFabVisible(
+                    selectedTab = selectedTab,
+                    homeTab = TAB_HOME,
+                    overlayOpen = scrobbleOverlayOpen,
+                    playerOpen = showNowPlaying,
+                    keyboardVisible = keyboardVisible,
+                    hubOpen = showScrobble,
+                )
+                val fabSurface = if (glassActive) {
+                    Modifier.liquidGlass(shape = CircleShape)
+                } else {
+                    Modifier.clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant)
+                }
+                val barHeight = with(LocalDensity.current) {
+                    floatingBarsHeight.intValue.toDp()
+                }.coerceAtLeast(88.dp)
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .widthIn(max = FLOATING_BAR_MAX_WIDTH)
+                        .fillMaxWidth()
+                        .padding(bottom = barHeight + 12.dp),
+                    contentAlignment = Alignment.CenterEnd,
+                ) {
+                    ScrobbleFab(
+                        visible = showScrobbleFab,
+                        open = showScrobble,
+                        onClick = {
+                            if (showScrobble) closeScrobble() else {
+                                scrobbleNavBarScroll.expand()
+                                selectedScrobbleTab = 0
+                                showScrobble = true
+                            }
+                        },
+                        surface = fabSurface,
+                        reduceMotion = reducePlayerMotion,
+                        folded = glassActive && (if (showScrobble) scrobbleNavBarScroll.isInline else navBarScroll.isInline),
+                        modifier = Modifier.padding(end = 8.dp),
                     )
                 }
             }
@@ -4200,17 +4472,23 @@ private fun BitChordApp(
         // row, and a story laid out inside it would run alongside the player
         // instead of over it.
         replayStory?.let { start ->
-            replay.summary?.takeUnless { it.isEmpty }?.let { summary ->
-                ReplayStories(
+            val requestedPeriod = replayStoryPeriod
+            if (requestedPeriod == null || replay.summaryPeriod == requestedPeriod) {
+                replay.summary?.takeUnless { it.isEmpty }?.let { summary ->
+                    ReplayStories(
                     summary = summary,
                     start = start,
-                    onClose = { replayStory = null },
+                    onClose = {
+                        replayStory = null
+                        replayStoryPeriod = null
+                    },
                     onShare = { card ->
                         replaySharePage = card
                         showReplayShare = true
                     },
                     paused = showReplayShare,
-                )
+                    )
+                }
             }
         }
 
@@ -4378,6 +4656,12 @@ private fun BitChordApp(
                 onPlayNext = { playNext(song); songActions = null },
                 onAddToQueue = { addToQueue(song); songActions = null },
                 onStartRadio = { startRadio(song); songActions = null },
+                onStartMix = {
+                    songActions = null
+                    showScrobble = true
+                    selectedScrobbleTab = 1
+                    scrobbleGenerateViewModel.startMixWithSong(song)
+                },
                 // Stays open: the row it replaces itself with is the
                 // progress, and closing the sheet would hide the only
                 // answer to "did that work?".
@@ -4649,6 +4933,7 @@ private fun BitChordApp(
                         privacy,
                         songs.map { it.videoId },
                         songs,
+                        onError = { showQueueNotice(it) },
                     ) { browseId, pTitle, savedLocally ->
                         showQueueNotice(
                             context.getString(
@@ -5013,7 +5298,7 @@ private fun BitChordApp(
                                 confirmingProfile = false
                                 if (accepted) {
                                     webSession = null
-                                    if (mode == WebSessionMode.SIGN_IN) selectedTab = 2
+                                    if (mode == WebSessionMode.SIGN_IN) navigateToNormalTab(2)
                                 } else {
                                     captureFailed = true
                                 }
@@ -5199,6 +5484,7 @@ private fun BitChordApp(
                                     AppSettings.setLastfmSessionKey(auth.session.key)
                                     AppSettings.setLastfmUsername(auth.session.name)
                                     AppSettings.setLastfmEnabled(true)
+                                    scrobbleStatisticsViewModel.onLastFmConnected()
                                     showLastfmLogin = false
                                 }
                                 .onFailure { e ->
@@ -5315,7 +5601,6 @@ private fun BitChordApp(
         // and mini player like every other alert. Backing out is a skip —
         // leaving the batch suspended on a dismissed dialog would hang the
         // upload with no way to reach the question again.
-        val uploadConflict by com.music.bitchord.data.webdav.WebDavUploads.conflict.collectAsStateWithLifecycle()
         uploadConflict?.let { req ->
             var applyToAll by remember(req) { mutableStateOf(false) }
             val answer: (com.music.bitchord.data.webdav.WebDavUploads.Choice) -> Unit = { choice ->

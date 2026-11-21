@@ -1354,4 +1354,5 @@
     <string name="wear_os_code_hint">पेयरिंग कोड</string>
     <string name="wear_os_done">हो गया</string>
     <string name="signed_by">%1$s द्वारा हस्ताक्षरित</string>
+    <string name="start_mix_with_song">इस गाने के साथ मिक्स शुरू करें</string>
 </resources>
