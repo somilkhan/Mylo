@@ -2,6 +2,7 @@ package com.music.bitchord.ui.replay
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -22,6 +23,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.remember
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -354,7 +358,40 @@ internal fun ReplayCardRow(
     onCardClick: (ReplayStoryPage) -> Unit,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(horizontal = PAGE_GUTTER + 4.dp),
+    animateSummary: ReplaySummary? = null,
+    reduceMotion: Boolean = false,
 ) {
+    val context = LocalContext.current
+    val animatedPlays = remember(animateSummary?.period) { Animatable(0f) }
+    val animatedMinutes = remember(animateSummary?.period) { Animatable(0f) }
+    LaunchedEffect(
+        animateSummary?.period,
+        animateSummary?.totalPlays,
+        animateSummary?.totalMs,
+        reduceMotion,
+    ) {
+        val current = animateSummary ?: return@LaunchedEffect
+        val targetMinutes = (current.totalMs / 60_000L).toFloat()
+        if (reduceMotion) {
+            animatedPlays.snapTo(current.totalPlays.toFloat())
+            animatedMinutes.snapTo(targetMinutes)
+        } else {
+            animatedPlays.snapTo(0f)
+            animatedMinutes.snapTo(0f)
+            coroutineScope {
+                launch { animatedPlays.animateTo(current.totalPlays.toFloat(), tween(900)) }
+                launch { animatedMinutes.animateTo(targetMinutes, tween(900)) }
+            }
+        }
+    }
+    val visibleCards = if (animateSummary != null && !reduceMotion) {
+        animateSummary.copy(
+            totalPlays = animatedPlays.value.toInt(),
+            totalMs = animatedMinutes.value.toLong() * 60_000L,
+        ).cards(context)
+    } else {
+        cards
+    }
     val rowState = rememberLazyListState()
     LazyRow(
         modifier = modifier,
@@ -363,7 +400,7 @@ internal fun ReplayCardRow(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         flingBehavior = rememberSnapFlingBehavior(lazyListState = rowState),
     ) {
-        items(cards, key = { it.label }) { card ->
+        items(visibleCards, key = { it.label }) { card ->
             ReplayCreditCard(
                 label = card.label,
                 value = card.value,
