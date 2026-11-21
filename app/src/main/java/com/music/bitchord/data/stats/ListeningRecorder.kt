@@ -68,7 +68,7 @@ object ListeningRecorder {
             playCounted = false
             return
         }
-        val step = (now - lastSampleAt).coerceIn(0L, MAX_STEP_MS)
+        val step = trailingSampleMs(lastSampleAt, now)
         lastSampleAt = now
         if (step <= 0L) return
         playedThisTrack += step
@@ -164,6 +164,14 @@ object ListeningRecorder {
         }
         return song
     }
+
+    /**
+     * How much listening a tick at [nowMs] adds, given the previous tick at
+     * [lastSampleMs]: the gap between them, capped at [MAX_STEP_MS] and never
+     * negative.
+     */
+    fun trailingSampleMs(lastSampleMs: Long, nowMs: Long): Long =
+        (nowMs - lastSampleMs).coerceIn(0L, MAX_STEP_MS)
 
     /**
      * The most a single tick may contribute.
