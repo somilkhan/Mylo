@@ -13,6 +13,9 @@ jobs:
   android:
     name: Android
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
 
@@ -45,15 +48,25 @@ jobs:
       - name: Tests
         run: ./gradlew testDevDebugUnitTest
 
-      # TEMPORARY debug step: prints the Gradle error output as annotations so
-      # it can be read from the check run without logs. Remove once fixed.
-      - name: Show Gradle errors as annotations
+      # TEMPORARY debug step: posts the Kotlin compile errors to the PR as a
+      # comment, since the job logs can't be read from outside. Remove once fixed.
+      - name: Post Gradle errors to the PR
         if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set +e
           ./gradlew :app:compileDevDebugKotlin --continue > build.log 2>&1
-          echo "::error::compile task exit code $?"
-          { grep -E '^e: |What went wrong|Could not|FAILURE' build.log; tail -40 build.log; } | head -60 | while IFS= read -r line; do echo "::error::${line}"; done
+          code=$?
+          {
+            echo "## Android debug: compile exit code $code"
+            echo '```'
+            grep -E '^e: |What went wrong|FAILURE|Could not' build.log | head -40
+            echo '----- tail -----'
+            tail -60 build.log
+            echo '```'
+          } > errors.md
+          gh pr comment "${{ github.event.pull_request.number }}" --body-file errors.md || echo "comment failed"
 
       - name: Build the dev APK
         run: ./gradlew assembleDevDebug
