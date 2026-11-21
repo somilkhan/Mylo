@@ -115,22 +115,14 @@ class ScrobbleManager(
     }
 
     private fun scrobbleSong(song: Song, durationSeconds: Int) {
-        val scrobbleArtist = song.artist.forScrobble()
-        scope.launch {
-            LastFM
-                .scrobble(
-                    artist = scrobbleArtist,
-                    track = song.title,
-                    duration = durationSeconds,
-                    timestamp = songStartedAt,
-                    album = song.albumName,
-                ).onSuccess {
-                    Log.d(TAG, "Scrobbled: ${song.title} by ${song.artist}")
-                }.onFailure { throwable ->
-                    if (throwable is CancellationException) throw throwable
-                    Log.e(TAG, "Failed to scrobble: ${song.title}", throwable)
-                }
-        }
+        val entry = LastFmScrobbleEntry(
+            artist = song.artist.forScrobble(),
+            track = song.title,
+            timestamp = songStartedAt,
+            album = song.albumName,
+            duration = durationSeconds.takeIf { it > 0 },
+        )
+        LastFmScrobbleQueue.submit(entry)
     }
 
     private fun updateNowPlaying(song: Song) {
