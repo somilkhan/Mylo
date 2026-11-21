@@ -143,7 +143,11 @@ jobs:
           {
             echo "## Desktop compile errors"
             echo '```'
-            grep -E '^e: |What went wrong|FAILURE|Could not|Caused by' desktop-compile.log | head -80
+            grep -E -A6 '^e: |What went wrong|Could not|Caused by|error:' desktop-compile.log | head -120
+            echo '```'
+            echo "### Log tail"
+            echo '```'
+            tail -n 60 desktop-compile.log
             echo '```'
           } > desktop-errors.md
           gh pr comment "${{ github.event.pull_request.number }}" --body-file desktop-errors.md || echo "comment failed"
