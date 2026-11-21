@@ -8,8 +8,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -48,10 +47,11 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.ui.haptics.Haptic
@@ -70,14 +70,25 @@ data class BottomTab(
 /**
  * The gap between the pill's glass edge and the tabs inside it.
  *
- * Tighter than the 8 it was, which shows up as a selection indicator reaching
- * closer to the edge on all four sides rather than floating in the middle of a
- * wide margin.
+ * Apple's selection sits about 4pt in from its tab bar's edge, measured off
+ * the WWDC Liquid Glass frames; it was 8 here, then 6.
  *
  * Shared with [GlassNavBar], which is meant to measure the same as this bar
  * rather than merely near it.
  */
-internal val PILL_INSET = 6.dp
+internal val PILL_INSET = 4.dp
+
+/**
+ * The tab bar's margin at either side of the screen: Apple's is 19pt, wider
+ * than the page's own [BAR_GUTTER].
+ */
+internal val NAV_BAR_GUTTER = 19.dp
+
+/**
+ * How far above [floatingBarInsets] the bar sits: on a gesture inset of 15dp
+ * this puts its foot 21dp off the screen's edge, where Apple's is.
+ */
+internal val NAV_BAR_LIFT = 6.dp
 
 /**
  * How far the floating bars stand off the bottom edge: the system navigation
@@ -104,10 +115,22 @@ private val GESTURE_BAR_FLOOR = 15.dp
  * numbers are a pair: change one and the bar's height moves unless the other
  * moves against it.
  */
-internal val TAB_VERTICAL_PADDING = 9.dp
+internal val TAB_VERTICAL_PADDING = 6.5.dp
 
 /** The gap between a tab's glyph and its label, in both bars. */
-internal val TAB_ICON_LABEL_GAP = 2.dp
+internal val TAB_ICON_LABEL_GAP = 1.dp
+
+/**
+ * A tab's glyph box. Apple's glyphs stand 21 to 24pt in a bar 61pt tall, a
+ * larger share of it than these had at 25dp in 70; at 28 they come out at
+ * Apple's sizes, and with the padding above the bar is 62dp.
+ */
+internal val TAB_ICON_SIZE = 28.dp
+
+/** A tab's label: Apple's 10pt, letter-spaced as SF Pro Text sets it. */
+@Composable
+internal fun tabLabelStyle(): TextStyle =
+    MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, letterSpacing = 0.5.sp)
 
 /**
  * The spring the selection indicator and the tab glyphs both travel on.
@@ -188,6 +211,13 @@ fun FloatingBottomBar(
         (rowSize.width + gapPx) / n
     } else 0f
 
+    // The drag below runs in one coroutine for the life of the bar, so it
+    // reads everything that can change under it through these. Read plainly,
+    // each would stay what it was on the first touch.
+    val currentTabStepPx by rememberUpdatedState(tabStepPx)
+    val currentLastIndex by rememberUpdatedState(tabs.lastIndex)
+    val currentOnTabSelected by rememberUpdatedState(onTabSelected)
+
     val pillTargetPx = if (tabStepPx > 0f) {
         selectedIndex * tabStepPx + dragOffset
     } else 0f
@@ -211,13 +241,16 @@ fun FloatingBottomBar(
 
     var lastHapticTab by remember { mutableIntStateOf(selectedIndex) }
 
-    LaunchedEffect(selectedIndex) { dragOffset = 0f }
+    LaunchedEffect(selectedIndex) {
+        dragOffset = 0f
+        lastHapticTab = selectedIndex
+    }
 
     Box(
         modifier = modifier
             .windowInsetsPadding(floatingBarInsets)
-            .padding(horizontal = BAR_GUTTER)
-            .padding(bottom = 2.dp)
+            .padding(horizontal = NAV_BAR_GUTTER)
+            .padding(bottom = NAV_BAR_LIFT)
             .fillMaxWidth()
             .clip(pillShape)
             .then(
@@ -258,33 +291,39 @@ fun FloatingBottomBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .selectableGroup()
                 .onSizeChanged { rowSize = it }
                 .pointerInput(Unit) {
+                    // Every drag measures from the tab selected when it starts.
+                    // A stale index here measured them all from the tab the bar
+                    // first opened on: a drag right of it still landed, while
+                    // one to the left clamped back onto it and read as no change.
                     var totalDrag = 0f
-                    var dragStartIndex = selectedIndex
+                    var dragStartIndex = currentSelectedIndex
                     detectHorizontalDragGestures(
                         onDragStart = {
                             totalDrag = 0f
-                            dragStartIndex = selectedIndex
+                            dragStartIndex = currentSelectedIndex
                         },
                         onDragCancel = { dragOffset = 0f },
                         onDragEnd = {
-                            if (tabStepPx > 0f) {
-                                val absoluteIndexFloat = (dragStartIndex + totalDrag / tabStepPx)
-                                    .coerceIn(0f, tabs.lastIndex.toFloat())
+                            val step = currentTabStepPx
+                            if (step > 0f) {
+                                val absoluteIndexFloat = (dragStartIndex + totalDrag / step)
+                                    .coerceIn(0f, currentLastIndex.toFloat())
                                 val newIndex = absoluteIndexFloat.roundToInt()
-                                if (newIndex != selectedIndex) {
-                                    onTabSelected(newIndex)
+                                if (newIndex != currentSelectedIndex) {
+                                    currentOnTabSelected(newIndex)
                                 }
                             }
                             dragOffset = 0f
                         },
                         onHorizontalDrag = { _, delta ->
+                            val step = currentTabStepPx
+                            if (step <= 0f) return@detectHorizontalDragGestures
                             totalDrag += delta
-                            val absoluteIndexFloat = (dragStartIndex + totalDrag / tabStepPx)
-                                .coerceIn(0f, tabs.lastIndex.toFloat())
-                            dragOffset = absoluteIndexFloat * tabStepPx - selectedIndex * tabStepPx
+                            val absoluteIndexFloat = (dragStartIndex + totalDrag / step)
+                                .coerceIn(0f, currentLastIndex.toFloat())
+                            dragOffset = absoluteIndexFloat * step - currentSelectedIndex * step
 
                             val approxTab = absoluteIndexFloat.roundToInt()
                             if (approxTab != lastHapticTab) {
@@ -309,7 +348,6 @@ fun FloatingBottomBar(
                     tab = tab,
                     selected = index == selectedIndex,
                     glassSpec = glassSpec,
-                    reduceMotion = reduceAnimation,
                     selectedTint = adaptiveTint,
                     unselectedTint = adaptiveTint?.copy(alpha = 0.65f),
                     onClick = { onTabSelected(index) },
@@ -325,7 +363,6 @@ private fun BottomBarItem(
     tab: BottomTab,
     selected: Boolean,
     glassSpec: AnimationSpec<Float>,
-    reduceMotion: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     /** Overrides the theme's primary/onSurfaceVariant tint — see the glass branch above. */
@@ -346,7 +383,7 @@ private fun BottomBarItem(
         } else {
             unselectedTint ?: MaterialTheme.colorScheme.onSurfaceVariant
         },
-        animationSpec = if (reduceMotion) snap() else tween(200),
+        animationSpec = tween(200),
         label = "tabTint",
     )
 
@@ -354,9 +391,7 @@ private fun BottomBarItem(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
             .clip(RoundedCornerShape(percent = 50))
-            .selectable(
-                selected = selected,
-                role = Role.Tab,
+            .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
             ) {
@@ -367,10 +402,10 @@ private fun BottomBarItem(
     ) {
         Icon(
             imageVector = tab.icon,
-            contentDescription = null,
+            contentDescription = tab.label,
             tint = tint,
             modifier = Modifier
-                .size(25.dp)
+                .size(TAB_ICON_SIZE)
                 .graphicsLayer {
                     scaleX = scale
                     scaleY = scale
@@ -379,7 +414,7 @@ private fun BottomBarItem(
         Spacer(Modifier.height(TAB_ICON_LABEL_GAP))
         Text(
             text = tab.label,
-            style = MaterialTheme.typography.labelSmall,
+            style = tabLabelStyle(),
             color = tint,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,

@@ -48,6 +48,7 @@ import com.google.android.gms.wearable.ChannelClient
 import com.music.bitchord.data.settings.AudioQuality
 import com.music.bitchord.playback.AudioCache
 import com.music.bitchord.playback.AudioRouting
+import com.music.bitchord.playback.DirectSourceGate
 import com.music.bitchord.playback.toMediaItem
 import com.music.bitchord.playback.toSong
 import android.os.SystemClock
@@ -85,7 +86,7 @@ import com.music.bitchord.wear.WearProtocol as P
  *
  * Costs nothing on a phone without a watch. State is always remembered, but it
  * is only encoded, given artwork and handed to Play services once a watch with
- * the MYLO app on it is known to be reachable — and a phone with no Wear OS
+ * the BitChord app on it is known to be reachable — and a phone with no Wear OS
  * app at all answers that with an error, once, and is left alone after it.
  *
  * TV builds from these sources too, and carries a no-op file at this same path
@@ -94,7 +95,7 @@ import com.music.bitchord.wear.WearProtocol as P
  */
 object WearBridge {
 
-    private const val TAG = "MYLOWear"
+    private const val TAG = "BitChordWear"
 
     /** Coalesces the bursts the player reports in — play is two or three callbacks in a row. */
     private const val COALESCE_MS = 120L
@@ -400,7 +401,10 @@ object WearBridge {
                 val opened = factory?.let { f ->
                     val ds = f.createDataSource().also { source = it }
                     runCatching {
-                        ds.open(
+                        // The watch reads what *it* is playing, which the
+                        // phone's paused player knows nothing about; holding it
+                        // for the phone's read-ahead window would stall it.
+                        DirectSourceGate.ungated { ds.open(
                             DataSpec.Builder()
                                 .setUri(
                                     // An addon track's cache entry is named by
@@ -420,7 +424,7 @@ object WearBridge {
                                 .setPosition(position)
                                 .setLength(if (length < 0) C.LENGTH_UNSET.toLong() else length)
                                 .build(),
-                        )
+                        ) }
                     }.onFailure { Log.w(TAG, "stream open failed: ${it.message}") }.getOrNull()
                 }
                 val ds = source
@@ -650,7 +654,7 @@ class WearCommandService : WearableListenerService() {
         val done = CountDownLatch(1)
         Controllers.use(applicationContext, onMissing = { done.countDown() }) { controller ->
             runCatching { execute(controller, command, arg) }
-                .onFailure { Log.w("MYLOWear", "command $command failed", it) }
+                .onFailure { Log.w("BitChordWear", "command $command failed", it) }
             done.countDown()
         }
         done.await(8, TimeUnit.SECONDS)

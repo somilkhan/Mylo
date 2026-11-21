@@ -77,24 +77,17 @@ class JamInviteLinkTest {
     @Test
     fun `builds custom scheme URL`() {
         assertEquals(
-            "mylo://party/ABC123?server=https%3A%2F%2Fmy-party.onrender.com",
+            "bitchord://party/ABC123?server=https%3A%2F%2Fmy-party.onrender.com",
             JamInviteLink.schemeUrl("abc123", "https://my-party.onrender.com"),
         )
         assertEquals(
-            "mylo://party/ABC123",
+            "bitchord://party/ABC123",
             JamInviteLink.schemeUrl("abc123", null),
         )
     }
 
     @Test
-    fun `parses MYLO scheme invite`() {
-        val invite = JamInviteLink.parseInvite("mylo://party/a1b2c3")
-        assertEquals("A1B2C3", invite?.code)
-        assertNull(invite?.serverUrl)
-    }
-
-    @Test
-    fun `parses legacy custom scheme invite with server`() {
+    fun `parses custom scheme invite with server`() {
         val invite = JamInviteLink.parseInvite("bitchord://party/a1b2c3?server=https%3A%2F%2Fmy-party.onrender.com")
         assertEquals("A1B2C3", invite?.code)
         assertEquals("https://my-party.onrender.com", invite?.serverUrl)

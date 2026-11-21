@@ -6,8 +6,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -24,9 +22,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.DragHandle
 import androidx.compose.material3.Icon
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -46,8 +48,10 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -55,7 +59,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.music.bitchord.data.lyrics.LyricsSource
-import com.music.bitchord.ui.icons.BitChordIcons
 import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.ui.player.edgeScrollSpeed
 import dev.chrisbanes.haze.HazeState
@@ -205,58 +208,34 @@ fun LyricsSourcesDialog(
 
     if (showPaxSenixKeyDialog) {
         var input by remember(paxSenixApiKey) { mutableStateOf(paxSenixApiKey) }
-        AlertScaffold(
-            hazeState = hazeState,
-            onDismiss = { showPaxSenixKeyDialog = false },
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 19.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Text(
-                    text = stringResource(R.string.paxsenix_api_key),
-                    style = MaterialTheme.typography.bodyLarge.copy(
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.W600,
-                    ),
-                    color = MaterialTheme.colorScheme.onSurface,
-                    textAlign = TextAlign.Center,
-                )
-                PillTextField(
+        AlertDialog(
+            onDismissRequest = { showPaxSenixKeyDialog = false },
+            title = { Text(stringResource(R.string.paxsenix_api_key)) },
+            text = {
+                OutlinedTextField(
                     value = input,
                     onValueChange = { input = it },
-                    placeholder = stringResource(R.string.api_token),
-                    isPassword = true,
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.Password,
                         imeAction = ImeAction.Done,
                     ),
-                    keyboardActions = KeyboardActions(
-                        onDone = {
-                            AppSettings.setPaxSenixApiKey(input)
-                            showPaxSenixKeyDialog = false
-                        },
-                    ),
+                    modifier = Modifier.fillMaxWidth(),
                 )
-            }
-            AlertRule()
-            AlertAction(
-                label = stringResource(R.string.save),
-                emphasised = true,
-                onClick = {
+            },
+            confirmButton = {
+                TextButton(onClick = {
                     AppSettings.setPaxSenixApiKey(input)
                     showPaxSenixKeyDialog = false
-                },
-            )
-            AlertRule()
-            AlertAction(
-                label = stringResource(R.string.cancel),
-                emphasised = false,
-                onClick = { showPaxSenixKeyDialog = false },
-            )
-        }
+                }) { Text(stringResource(R.string.save)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPaxSenixKeyDialog = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            },
+        )
     }
 }
 
@@ -301,7 +280,7 @@ private fun SyllableSyncToggle(checked: Boolean, onToggle: () -> Unit) {
         Spacer(Modifier.width(10.dp))
         if (checked) {
             Icon(
-                imageVector = BitChordIcons.Check,
+                imageVector = Icons.Rounded.Check,
                 contentDescription = stringResource(R.string.enabled),
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(19.dp),
@@ -517,7 +496,7 @@ private fun ReorderableSourceList(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Icon(
-                            imageVector = BitChordIcons.DragHandle,
+                            imageVector = Icons.Rounded.DragHandle,
                             contentDescription = stringResource(R.string.drag_to_reorder),
                             tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
                             modifier = Modifier

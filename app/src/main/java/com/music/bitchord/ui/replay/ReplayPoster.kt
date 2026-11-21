@@ -87,7 +87,7 @@ suspend fun renderReplayPoster(
             ?: songs.firstOrNull()?.artworkUrl
         val bitmap = Bitmap.createBitmap(POSTER_W, POSTER_H, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
-        val type = Fonts()
+        val type = Fonts(context)
 
         // The same cover and the same turn of the colour wheel the card on
         // screen was drawn with, so the picture is recognisably that card.
@@ -406,11 +406,11 @@ private fun drawHeader(
     val brand = type.heading(46f, 0xE6FFFFFF.toInt()).apply {
         textAlign = Paint.Align.RIGHT
     }
-    canvas.drawText("MYLO", POSTER_W - MARGIN, 132f, brand)
+    canvas.drawText("BitChord", POSTER_W - MARGIN, 132f, brand)
     // The mark, to the left of the word, exactly as the story header and the
     // card carry it. Without it the one artefact of this app that ends up in
     // somebody else's chat was the only place the logo didn't appear.
-    val wordWidth = brand.measureText("MYLO")
+    val wordWidth = brand.measureText("BitChord")
     drawLogo(canvas, context, POSTER_W - MARGIN - wordWidth - LOGO_GAP, 132f)
 
     val credit = listOfNotNull(
@@ -727,10 +727,10 @@ internal fun ellipsised(text: String, paint: Paint, width: Float): String {
  * missing font resource a slightly plainer picture rather than a crash on the
  * share button.
  */
-internal class Fonts {
-    private val heavy = Typeface.create("sans-serif-black", Typeface.NORMAL)
-    private val semibold = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-    private val regular = Typeface.create("sans-serif", Typeface.NORMAL)
+internal class Fonts(context: Context) {
+    private val heavy = font(context, R.font.sf_pro_display_heavy) ?: Typeface.DEFAULT_BOLD
+    private val semibold = font(context, R.font.sf_pro_display_semibold) ?: Typeface.DEFAULT_BOLD
+    private val regular = font(context, R.font.sf_pro_display_regular) ?: Typeface.DEFAULT
 
     fun heading(size: Float, color: Int) = paint(heavy, size, color)
 
@@ -747,6 +747,8 @@ internal class Fonts {
             this.color = color
         }
 
+    private fun font(context: Context, id: Int): Typeface? =
+        runCatching { ResourcesCompat.getFont(context, id) }.getOrNull()
 }
 
 internal suspend fun loadBitmap(context: Context, url: String): Bitmap? = runCatching {

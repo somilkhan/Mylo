@@ -47,7 +47,7 @@ export default function LibraryPage() {
         <PageHeader title={title} />
         <EmptyState
           title="Sign in to see your library"
-          detail="MYLO uses the YouTube Music account this browser is signed in to. Sign in on music.youtube.com, then come back."
+          detail="BitChord uses the YouTube Music account this browser is signed in to. Sign in on music.youtube.com, then come back."
         />
       </>
     );

@@ -55,7 +55,7 @@ internal suspend fun renderLyricsShareCard(
     /** Pad out to the full 1080×1920 frame, the passage centred in the room. */
     story: Boolean = false,
 ): Bitmap = withContext(Dispatchers.Default) {
-    val type = Fonts()
+    val type = Fonts(context)
     val cover = card.artworkUrl?.let { loadBitmap(context, it) }
 
     // ── Sizing ──────────────────────────────────────────────────────────────
@@ -267,7 +267,7 @@ private const val CARD_MARGIN = 72f
 private const val CARD_CONTENT_W = CARD_W - CARD_MARGIN * 2
 
 private const val LOGO_GAP = 20f
-private const val BRAND = "MYLO"
+private const val BRAND = "BitChord"
 
 /** Baseline of the mark at the top right, and just under it where the gap starts. */
 private const val HEADER_BASELINE = 132f

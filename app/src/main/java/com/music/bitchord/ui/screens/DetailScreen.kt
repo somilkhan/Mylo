@@ -1,5 +1,6 @@
 package com.music.bitchord.ui.screens
 
+import com.music.bitchord.ui.components.trackArtSize
 import android.os.Build
 import com.music.bitchord.R
 
@@ -14,6 +15,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import com.music.bitchord.ui.components.liquidGlassRim
+import com.music.bitchord.ui.components.continuous
+import com.music.bitchord.ui.components.FadingText
 import com.music.bitchord.ui.components.longPressMenuClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -48,14 +51,16 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Check
 import com.music.bitchord.data.model.LibraryState
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.StarBorder
 import androidx.compose.material3.HorizontalDivider
@@ -101,6 +106,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -118,8 +124,10 @@ import androidx.compose.runtime.mutableIntStateOf
 import kotlinx.coroutines.delay
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.Album
 import com.music.bitchord.data.LocalGroups
+import com.music.bitchord.data.OfflinePlaylists
 import com.music.bitchord.data.matchesSearch
 import com.music.bitchord.data.sortedForLibrary
 import com.music.bitchord.data.useTrackTags
@@ -127,6 +135,7 @@ import com.music.bitchord.ui.components.CoverPlaceholder
 import com.music.bitchord.data.canvas.AppleArtistArt
 import com.music.bitchord.data.DebugLog as Log
 import com.music.bitchord.data.canvas.AppleArtistArtRepository
+import com.music.bitchord.data.canvas.appleCatalogue
 import com.music.bitchord.data.canvas.ArtistSignature
 import com.music.bitchord.data.canvas.ArtistSignatureRepository
 import com.music.bitchord.data.canvas.SignatureInkTransformation
@@ -170,6 +179,8 @@ import com.music.bitchord.ui.components.trackColumnWidth
 import com.music.bitchord.ui.haptics.Haptic
 import com.music.bitchord.ui.haptics.rememberHaptics
 import com.music.bitchord.ui.icons.BitChordIcons
+import com.music.bitchord.ui.graphics.FADE_CURVE_STOPS
+import com.music.bitchord.ui.graphics.smootherStep
 import com.music.bitchord.ui.player.CanvasArtworkPlayer
 import com.music.bitchord.ui.theme.ArtworkPalette
 import com.music.bitchord.ui.theme.rememberArtworkPalette
@@ -191,6 +202,20 @@ private const val SLEEVE_MAX_HEIGHT = 0.5f
 
 private val SLEEVE_SHAPE = RoundedCornerShape(12.dp)
 private val SLEEVE_SHADOW = 18.dp
+
+/**
+ * The tallest a full-bleed sleeve may be, as a fraction of the page's height.
+ * A square the page's width that would stand taller than this — a landscape
+ * window, a wide tablet — keeps the framed sleeve, so the title is never
+ * pushed off the bottom of the screen.
+ */
+private const val FULL_BLEED_MAX_HEIGHT = 0.62f
+
+/** How much of a full-bleed sleeve's foot dissolves into the page — the player's banner's share. */
+private const val FULL_BLEED_FADE_FRACTION = 0.42f
+
+/** How far the title rides up into that dissolve, where the sleeve has all but gone. */
+private val FULL_BLEED_TITLE_OVERLAP = 44.dp
 
 /** Shuffle and Add to Library either side of the release page's Play pill. */
 private val RELEASE_SIDE_BUTTON = 50.dp
@@ -336,6 +361,12 @@ fun DetailScreen(
      * [LocalFolder].
      */
     folder: LocalFolder? = null,
+    /**
+     * Set while this playlist's songs are being rearranged: drawn in place of
+     * the track list, over the same page colour, and handed the page's
+     * [ArtworkPalette] so it reads as this page rather than a sheet over it.
+     */
+    reorder: (@Composable (ArtworkPalette) -> Unit)? = null,
 ) {
     val rawSongs = (page.songs as? UiState.Success)?.data.orEmpty()
     // A folder keeps its own sort — the one its top bar menu sets — rather
@@ -358,10 +389,18 @@ fun DetailScreen(
     // item; it is read off the album once, as soon as the card is known.
     val topReleaseId = if (isArtist) page.sections.topRelease()?.browseId else null
     LaunchedEffect(topReleaseId) { topReleaseId?.let { onLoadReleaseLibrary?.invoke(it) } }
-    // Apple Music's hero photo and title logo for this artist, found by name.
-    // Null until (and unless) it arrives; the YouTube header stands in meanwhile.
+    // Apple Music's hero photo and title logo for this artist, found by name and
+    // confirmed by a shared title in both catalogues — so it waits for the
+    // page's songs. Null until (and unless) it arrives; the YouTube header
+    // stands in meanwhile.
     var appleArt by remember(page.browseId) {
-        mutableStateOf(if (isArtist) AppleArtistArtRepository.cached(page.title) else null)
+        mutableStateOf(if (isArtist) AppleArtistArtRepository.cached(page.browseId) else null)
+    }
+    val songsLoading = page.songs is UiState.Loading
+    LaunchedEffect(page.browseId, page.title, songsLoading) {
+        if (isArtist && !songsLoading) {
+            appleArt = AppleArtistArtRepository.artFor(page.browseId, page.title) { page.appleCatalogue() } ?: appleArt
+        }
     }
     // Secondary provider: handwritten signature from the user's own
     // artist-signature API. Drawn only when Apple has no title logo.
@@ -374,9 +413,6 @@ fun DetailScreen(
     // nobody, so a title that reads as several artists waits for that swap; any
     // other name starts the moment the page opens.
     val nameSettled = !page.title.looksLikeCredit() || page.songs !is UiState.Loading
-    LaunchedEffect(page.browseId, page.title, nameSettled) {
-        if (isArtist && nameSettled) appleArt = AppleArtistArtRepository.artFor(page.title) ?: appleArt
-    }
     LaunchedEffect(page.browseId, page.title, nameSettled, signatureEnabled, signatureBaseUrl, signatureUpdates) {
         if (!isArtist || !nameSettled) return@LaunchedEffect
         val base = ArtistSignatureRepository.effectiveBaseUrl(signatureEnabled, signatureBaseUrl)
@@ -452,6 +488,7 @@ fun DetailScreen(
     // Albums only: a playlist's artwork is a collage and an artist page's is a
     // photograph, and neither is something a label publishes a canvas for.
     val canvasEnabled by AppSettings.animatedCanvas.collectAsStateWithLifecycle()
+    val fullBleedArtwork by AppSettings.fullBleedDetailArtwork.collectAsStateWithLifecycle()
     val prioritizeSpotifyCanvas by AppSettings.prioritizeSpotifyCanvas.collectAsStateWithLifecycle()
     // The credit line the header shows is the artist as far as the catalogue
     // services are concerned. A browse card's subtitle sometimes omits it, in
@@ -516,6 +553,7 @@ fun DetailScreen(
                 // the narrow one it was written for.
                 val artHeight = (maxWidth / ARTIST_PHOTO_RATIO).coerceAtMost(maxHeight * 0.6f)
                 val sleeveSize = (maxWidth * SLEEVE_FRACTION).coerceAtMost(maxHeight * SLEEVE_MAX_HEIGHT)
+                val fullBleedSleeve = fullBleedArtwork && maxWidth <= maxHeight * FULL_BLEED_MAX_HEIGHT
                 // A folder's grid view: the same column count the Library's
                 // "Show all" grids reach at this width.
                 val gridColumns = libraryGrid(maxWidth - PAGE_GUTTER * 2).columns
@@ -536,7 +574,9 @@ fun DetailScreen(
                     )
                 }
 
-                LazyColumn(
+                if (reorder != null) {
+                    reorder(palette)
+                } else LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
                     // The artist photo runs edge-to-edge up under the glass bar;
@@ -551,6 +591,7 @@ fun DetailScreen(
                         page = page,
                         palette = palette,
                         sleeveSize = sleeveSize,
+                        fullBleed = fullBleedSleeve,
                         canvas = canvas,
                         songs = songs,
                         onPlay = { onSongClick(songs, 0) },
@@ -558,6 +599,7 @@ fun DetailScreen(
                         // A folder's credit says where its tracks live, not who made them.
                         onArtistClick = onArtistClick.takeIf { folder == null },
                         onToggleLibrary = onToggleLibrary,
+                        onDownloadAll = folder?.onDownload?.let { download -> { download(songs) } },
                     )
                 }
             }
@@ -826,6 +868,7 @@ fun DetailScreen(
                                 palette = palette,
                                 onClick = { onSectionItemClick(item) },
                                 onLongPress = onSectionItemLongPress?.let { { it(item) } },
+                                modifier = Modifier.width(if (item.isVideo) VIDEO_CARD_WIDTH else SHELF_CARD_WIDTH),
                             )
                         }
                     }
@@ -873,28 +916,92 @@ private fun ReleaseHeader(
     page: DetailPage,
     palette: ArtworkPalette,
     sleeveSize: Dp,
+    /**
+     * Runs the sleeve the page's width off the top of the screen, dissolving
+     * into the page colour like the player's banner, in place of the framed
+     * one. Everything under it is unchanged.
+     */
+    fullBleed: Boolean,
     canvas: CanvasArtwork?,
     songs: List<Song>,
     onPlay: () -> Unit,
     onShuffle: () -> Unit,
     onArtistClick: ((String, String) -> Unit)?,
     onToggleLibrary: (() -> Unit)?,
-    topPadding: Dp = topBarContentPadding(),
+    /** The Cached songs folder's: saves every track on it to Downloads. Null hides it. */
+    onDownloadAll: (() -> Unit)? = null,
 ) {
     val (credit, meta) = page.headerLines(songs.size, songs.playtime())
     // Every row on a release carries the same credit — see [pageCredit] — so
     // the first one speaks for the whole page, the same source the rows'
     // own long-press "Open artist" already reads from.
     val artist = songs.firstOrNull()
+    var artFailed by remember(page.thumbnailUrl) { mutableStateOf(false) }
+    // A placeholder is a sleeve or it is nothing, as on the player: blown out
+    // to the page's width it would only tint the top of the screen.
+    val bleed = fullBleed && page.thumbnailUrl != null && !artFailed
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            // Clear of the floating bar, which the sleeve no longer runs under.
-            .padding(top = topPadding, bottom = 18.dp),
+            // Clear of the floating bar, which only a full-bleed sleeve runs under.
+            .padding(top = if (bleed) 0.dp else topBarContentPadding(), bottom = 18.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Box(
+        if (bleed) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    // Laid out shorter than it draws, so the title rides up into
+                    // the dissolve rather than starting under a band of page
+                    // colour where the sleeve has already gone.
+                    .layout { measurable, constraints ->
+                        val placeable = measurable.measure(constraints)
+                        val height = (placeable.height - FULL_BLEED_TITLE_OVERLAP.roundToPx()).coerceAtLeast(0)
+                        layout(placeable.width, height) { placeable.place(0, 0) }
+                    }
+                    .aspectRatio(1f),
+            ) {
+                AsyncImage(
+                    model = page.thumbnailUrl.artworkAt(HEADER_ART_PX),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    onState = { artFailed = it is AsyncImagePainter.State.Error },
+                    modifier = Modifier
+                        .matchParentSize()
+                        // The mask below erases part of what this layer drew,
+                        // which it can only do in a buffer of its own.
+                        .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                        .drawWithContent {
+                            drawContent()
+                            // The player banner's dissolve, along smootherstep so
+                            // neither end of it shows as a line.
+                            drawRect(
+                                brush = Brush.verticalGradient(
+                                    colorStops = Array(FADE_CURVE_STOPS + 1) { i ->
+                                        val t = i / FADE_CURVE_STOPS.toFloat()
+                                        t to Color.Black.copy(alpha = 1f - smootherStep(t))
+                                    },
+                                    startY = size.height * (1f - FULL_BLEED_FADE_FRACTION),
+                                    endY = size.height,
+                                ),
+                                blendMode = BlendMode.DstIn,
+                            )
+                        }
+                        .background(palette.elevated),
+                )
+                // Beside the still rather than inside its layer: a clip's
+                // TextureView takes no Compose mask, so it dissolves itself.
+                canvas?.let { clip ->
+                    CanvasArtworkPlayer(
+                        canvas = clip,
+                        isPlaying = true,
+                        bottomFade = FULL_BLEED_FADE_FRACTION,
+                        modifier = Modifier.matchParentSize(),
+                    )
+                }
+            }
+        } else Box(
             Modifier
                 .size(sleeveSize)
                 .shadow(SLEEVE_SHADOW, SLEEVE_SHAPE)
@@ -906,7 +1013,6 @@ private fun ReleaseHeader(
             // placeholder sleeve rather than an empty square. Not shown while a
             // real one is still on its way, so a loading cover doesn't flash
             // a glyph first.
-            var artFailed by remember(page.thumbnailUrl) { mutableStateOf(false) }
             if (page.thumbnailUrl == null || artFailed) {
                 CoverPlaceholder(
                     icon = page.placeholderIcon(),
@@ -1016,6 +1122,16 @@ private fun ReleaseHeader(
                         size = RELEASE_SIDE_BUTTON,
                         modifier = Modifier.weight(1f),
                     )
+                    // The song cache's copies, saved to Downloads in one go —
+                    // from disk, so it works offline. See [LocalFolder.onDownload].
+                    onDownloadAll?.let {
+                        CircleIconButton(
+                            icon = Icons.Rounded.Download,
+                            contentDescription = stringResource(R.string.download_all),
+                            onClick = it,
+                            size = RELEASE_SIDE_BUTTON,
+                        )
+                    }
                     return@Row
                 }
                 CircleIconButton(
@@ -1062,55 +1178,6 @@ private fun ReleaseHeader(
         }
     }
 }
-
-/**
- * The exact release header used by [DetailScreen], adapted for a generated
- * local playlist. The playlist editor keeps its own list because it owns
- * local-only add/remove/reorder/export actions, but the visible release
- * presentation must not fork from the app's normal playlist page.
- */
-@Composable
-internal fun LocalPlaylistReleaseHeader(
-    playlistId: String,
-    title: String,
-    thumbnailUrl: String?,
-    songs: List<Song>,
-    onPlay: () -> Unit,
-    onShuffle: () -> Unit,
-) {
-    val page = remember(playlistId, title, thumbnailUrl, songs) {
-        DetailPage(
-            browseId = "local:playlist:$playlistId",
-            title = title,
-            subtitle = "Playlist",
-            thumbnailUrl = thumbnailUrl,
-            songs = UiState.Success(songs),
-            type = BrowseType.PLAYLIST,
-        )
-    }
-    val palette = rememberArtworkPalette(imageUrl = page.thumbnailUrl).copy(
-        elevated = MaterialTheme.colorScheme.surfaceVariant,
-        onBackground = MaterialTheme.colorScheme.onSurface,
-        onBackgroundVariant = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-    BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val sleeveSize = (maxWidth * SLEEVE_FRACTION)
-            .coerceAtMost(maxHeight * SLEEVE_MAX_HEIGHT)
-        ReleaseHeader(
-            page = page,
-            palette = palette,
-            sleeveSize = sleeveSize,
-            canvas = null,
-            songs = songs,
-            onPlay = onPlay,
-            onShuffle = onShuffle,
-            onArtistClick = null,
-            onToggleLibrary = null,
-            topPadding = 0.dp,
-        )
-    }
-}
-
 
 /**
  * The filter box, shown under the header while the top bar's search button is on.
@@ -1500,8 +1567,8 @@ private fun LazyListState.headerTop(artHeightPx: Float): Float =
 
 /** Where the blurred copy starts to show and where it has fully taken over. */
 private val SOFT_FOOT_MASK = Brush.verticalGradient(
-    0.35f to Color.Transparent,
-    0.75f to Color.Black,
+    0.55f to Color.Transparent,
+    0.85f to Color.Black,
 )
 
 /**
@@ -1902,7 +1969,7 @@ private fun AboutSection(
             style = MaterialTheme.typography.bodyLarge,
             fontWeight = FontWeight.Medium,
             color = palette.onBackgroundVariant,
-            maxLines = if (expanded) Int.MAX_VALUE else 3,
+            maxLines = if (expanded) Int.MAX_VALUE else 2,
             overflow = TextOverflow.Ellipsis,
             onTextLayout = { result -> if (!expanded) clipped = result.hasVisualOverflow },
             modifier = Modifier
@@ -1987,12 +2054,13 @@ private fun CompactSongRow(
             .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.size(48.dp)) {
+        Box(Modifier.trackArtSize(48.dp, song.isVideo)) {
             AsyncImage(
                 model = song.artworkAt(ROW_ART_PX),
                 contentDescription = null,
+                contentScale = ContentScale.Crop,
                 modifier = Modifier
-                    .size(48.dp)
+                    .matchParentSize()
                     .clip(RoundedCornerShape(7.dp))
                     .thumbnailBorder(RoundedCornerShape(7.dp))
                     .background(palette.elevated),
@@ -2042,16 +2110,21 @@ private fun SuggestedSongRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .longPressMenuClickable(onClick = onClick, onLongClick = onLongPress)
+            .longPressMenuClickable(
+                onClick = onClick,
+                onLongClick = onLongPress,
+                liftPadding = PaddingValues(horizontal = PAGE_GUTTER),
+            )
             .padding(horizontal = PAGE_GUTTER, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.size(52.dp)) {
+        Box(Modifier.trackArtSize(52.dp, song.isVideo)) {
             AsyncImage(
                 model = song.artworkAt(ROW_ART_PX),
                 contentDescription = null,
+                contentScale = ContentScale.Crop,
                 modifier = Modifier
-                    .size(52.dp)
+                    .matchParentSize()
                     .clip(RoundedCornerShape(8.dp))
                     .thumbnailBorder(RoundedCornerShape(8.dp))
                     .background(palette.elevated),
@@ -2133,7 +2206,12 @@ private fun ShelfItem.recentLabel(): Int {
 
 /**
  * The artist page's top-release card: sleeve, what it is and when, and its
- * title, in a rounded glass panel the width of the page.
+ * title, in a squircle panel the width of the page.
+ *
+ * Proportioned off Apple Music's: a 24pt continuous corner, a 96pt sleeve 12pt
+ * in from the edge, the text 12pt after it, and a 32pt add button 19pt in
+ * from the end. The panel and its button are a light veil with a light
+ * hairline, as Apple's containers read slightly white against the page.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -2147,9 +2225,11 @@ private fun TopReleaseCard(
     /** Null hides the button. */
     onToggleSaved: (() -> Unit)?,
 ) {
-    val shape = RoundedCornerShape(28.dp)
-    val coverShape = RoundedCornerShape(12.dp)
+    val shape = remember { RoundedCornerShape(TOP_RELEASE_CORNER).continuous() }
+    // Concentric with the panel: its corner less the inset the sleeve sits at.
+    val coverShape = remember { RoundedCornerShape(TOP_RELEASE_CORNER - TOP_RELEASE_INSET).continuous() }
     val haptics = rememberHaptics()
+    val hasButton = onToggleSaved != null && saved != null
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -2162,38 +2242,51 @@ private fun TopReleaseCard(
             .border(1.dp, Color.White.copy(alpha = TOP_RELEASE_EDGE_ALPHA), shape)
             .clip(shape)
             .longPressMenuClickable(onClick = onClick, onLongClick = onLongPress)
-            .padding(16.dp),
+            .padding(
+                start = TOP_RELEASE_INSET,
+                top = TOP_RELEASE_INSET,
+                bottom = TOP_RELEASE_INSET,
+                end = if (hasButton) 19.dp else TOP_RELEASE_INSET,
+            ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         AsyncImage(
             model = item.thumbnailUrl.artworkAt(CARD_ART_PX),
             contentDescription = null,
             modifier = Modifier
-                .size(88.dp)
+                .size(96.dp)
                 .clip(coverShape)
                 .border(1.dp, Color.White.copy(alpha = TOP_RELEASE_COVER_EDGE_ALPHA), coverShape)
                 .background(palette.elevated),
         )
-        Spacer(Modifier.width(14.dp))
+        Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
+            // The lines either side of the title in the player's secondary
+            // treatment, the artist line's: the page's own colour, partly
+            // transparent.
+            val secondary = palette.onBackground.copy(alpha = TOP_RELEASE_SECONDARY_ALPHA)
             Text(
                 text = item.subtitle,
                 style = MaterialTheme.typography.bodyMedium,
-                color = palette.onBackgroundVariant,
+                color = secondary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Text(
+            // Faded out at the end of its last line, as the player's title is,
+            // and set a little tighter than the scale for when it takes two.
+            FadingText(
                 text = item.title,
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.titleLarge.copy(
+                    lineHeight = TOP_RELEASE_TITLE_LINE_HEIGHT,
+                    lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.None),
+                ),
                 color = palette.onBackground,
                 maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = stringResource(item.recentLabel()),
                 style = MaterialTheme.typography.bodyMedium,
-                color = palette.onBackgroundVariant,
+                color = secondary,
                 maxLines = 1,
             )
         }
@@ -2201,7 +2294,7 @@ private fun TopReleaseCard(
             Spacer(Modifier.width(10.dp))
             Box(
                 modifier = Modifier
-                    .size(40.dp)
+                    .size(32.dp)
                     .clip(CircleShape)
                     .background(Color.White.copy(alpha = LIGHT_FILL_ALPHA), CircleShape)
                     .border(1.dp, Color.White.copy(alpha = TOP_RELEASE_EDGE_ALPHA), CircleShape)
@@ -2217,12 +2310,22 @@ private fun TopReleaseCard(
                         if (saved) R.string.remove_from_library else R.string.add_to_library,
                     ),
                     tint = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.size(22.dp),
+                    modifier = Modifier.size(17.dp),
                 )
             }
         }
     }
 }
+
+/** The top-release panel's continuous corner, and the inset its sleeve sits at. */
+private val TOP_RELEASE_CORNER = 24.dp
+private val TOP_RELEASE_INSET = 12.dp
+
+/** The panel's secondary lines, at the player's artist line's strength. */
+private const val TOP_RELEASE_SECONDARY_ALPHA = 0.55f
+
+/** The panel's title on two lines: a little under titleLarge's natural 24sp. */
+private val TOP_RELEASE_TITLE_LINE_HEIGHT = 22.sp
 
 /** The white veil under Apple-style containers and their buttons. */
 private const val LIGHT_FILL_ALPHA = 0.07f
@@ -2242,6 +2345,19 @@ private fun SectionCard(
     modifier: Modifier = Modifier.width(SHELF_CARD_WIDTH),
     onLongPress: (() -> Unit)? = null,
 ) {
+    // An artist's Videos shelf: widescreen, as on the web player.
+    if (item.isVideo) {
+        VideoShelfCard(
+            item = item,
+            onClick = onClick,
+            onLongPress = onLongPress,
+            modifier = modifier,
+            titleColor = palette.onBackground,
+            subtitleColor = palette.onBackgroundVariant,
+            placeholderColor = palette.elevated,
+        )
+        return
+    }
     Column(
         modifier = modifier
             .longPressMenuClickable(onClick = onClick, onLongClick = onLongPress),
@@ -2299,7 +2415,7 @@ private fun ArtistShelfGridPage(
                 .fillMaxSize()
                 .padding(horizontal = PAGE_GUTTER),
         ) {
-            items(shelf.items, key = { it.browseId ?: it.title }) { item ->
+            items(shelf.items, key = { it.browseId ?: it.videoId ?: it.title }) { item ->
                 SectionCard(
                     item = item,
                     palette = palette,
@@ -2331,9 +2447,14 @@ private fun DetailPage.headerLines(trackCount: Int, playtime: String? = null): P
     // playtime, whose "min" and "1h 25m" are units, not words.
     // An artist grouped out of a device folder is a plain track list, not an
     // artist page, but it is still billed as the artist it is.
-    val localKind = if (LocalGroups.isArtist(browseId)) stringResource(R.string.artist) else null
+    // A device directory plays like a playlist, but it is billed as a folder.
+    val localKind = when {
+        LocalGroups.isArtist(browseId) -> stringResource(R.string.artist)
+        LocalGroups.isDirectory(browseId) -> stringResource(R.string.folder)
+        else -> null
+    }
     val meta = listOfNotNull(
-        (kind ?: type.localizedLabel() ?: localKind)?.capitalizeWords(),
+        (kind ?: localKind ?: type.localizedLabel())?.capitalizeWords(),
         year,
         trackCount.takeIf { it > 0 }?.let {
             pluralStringResource(R.plurals.track_count_plural, it, it).capitalizeWords()
@@ -2346,8 +2467,10 @@ private fun DetailPage.headerLines(trackCount: Int, playtime: String? = null): P
 /** The glyph on a release page's placeholder sleeve: what kind of thing has no cover. */
 private fun DetailPage.placeholderIcon(): ImageVector = deviceFolderIcon(browseId) ?: when {
     LocalGroups.isArtist(browseId) -> Icons.Rounded.Person
+    OfflinePlaylists.isLikedPage(browseId) -> Icons.Rounded.Favorite
+    LocalGroups.isDirectory(browseId) -> Icons.Rounded.Folder
     type == BrowseType.ALBUM -> Icons.Rounded.Album
-    type == BrowseType.PLAYLIST -> BitChordIcons.Queue
+    type == BrowseType.PLAYLIST -> Icons.AutoMirrored.Rounded.QueueMusic
     else -> BitChordIcons.MusicNote
 }
 

@@ -47,8 +47,6 @@ class ReplayState(
      * chips were switched to This month.
      */
     val memberSince: String?,
-    /** Period represented by [summary]; may lag [period] while a new read is in flight. */
-    val summaryPeriod: ReplayPeriod?,
 )
 
 /**
@@ -65,7 +63,6 @@ fun rememberReplayState(active: Boolean): Pair<ReplayState, (ReplayPeriod) -> Un
     var summary by remember { mutableStateOf<ReplaySummary?>(null) }
     var loading by remember { mutableStateOf(true) }
     var memberSince by remember { mutableStateOf<String?>(null) }
-    var summaryPeriod by remember { mutableStateOf<ReplayPeriod?>(null) }
 
     LaunchedEffect(active) {
         if (!active) return@LaunchedEffect
@@ -83,7 +80,6 @@ fun rememberReplayState(active: Boolean): Pair<ReplayState, (ReplayPeriod) -> Un
         // the page breaking rather than as it answering a different question.
         loading = summary == null
         summary = ListeningStats.summary(period)
-        summaryPeriod = period
         loading = false
 
         // Artist pictures and pages arrive after the page has been built — see
@@ -98,10 +94,9 @@ fun rememberReplayState(active: Boolean): Pair<ReplayState, (ReplayPeriod) -> Un
         ArtistFacts.revision.drop(1).collectLatest {
             delay(SETTLE_MILLIS)
             summary = ListeningStats.summary(period)
-            summaryPeriod = period
         }
     }
-    return ReplayState(period, summary, loading, memberSince, summaryPeriod) to
+    return ReplayState(period, summary, loading, memberSince) to
         { next: ReplayPeriod -> period = next }
 }
 
@@ -192,6 +187,14 @@ fun ReplayPeriod.localizedChip(context: Context): String = when (this) {
     ReplayPeriod.THIS_MONTH -> context.getString(R.string.this_month)
     ReplayPeriod.THIS_YEAR -> context.getString(R.string.this_year)
     ReplayPeriod.ALL_TIME -> context.getString(R.string.all_time)
+}
+
+/** The period picker's short name for each stretch — see `PeriodPicker`. */
+fun ReplayPeriod.localizedTab(context: Context): String = when (this) {
+    ReplayPeriod.THIS_WEEK -> context.getString(R.string.replay_period_weekly)
+    ReplayPeriod.THIS_MONTH -> context.getString(R.string.replay_period_monthly)
+    ReplayPeriod.THIS_YEAR -> context.getString(R.string.replay_period_yearly)
+    ReplayPeriod.ALL_TIME -> context.getString(R.string.replay_period_lifetime)
 }
 
 fun ReplaySummary.localizedLabel(context: Context): String = when (period) {
