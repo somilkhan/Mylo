@@ -2507,3 +2507,51 @@ private fun List<Song>.playtime(): String? {
         else -> stringResource(R.string.hours_minutes_short, (minutes / 60).toInt(), (minutes % 60).toInt())
     }
 }
+
+/**
+ * The exact release header used by [DetailScreen], adapted for a generated
+ * local playlist. The playlist editor keeps its own list because it owns
+ * local-only add/remove/reorder/export actions, but the visible release
+ * presentation must not fork from the app's normal playlist page.
+ */
+@Composable
+internal fun LocalPlaylistReleaseHeader(
+    playlistId: String,
+    title: String,
+    thumbnailUrl: String?,
+    songs: List<Song>,
+    onPlay: () -> Unit,
+    onShuffle: () -> Unit,
+) {
+    val page = remember(playlistId, title, thumbnailUrl, songs) {
+        DetailPage(
+            browseId = "local:playlist:$playlistId",
+            title = title,
+            subtitle = "Playlist",
+            thumbnailUrl = thumbnailUrl,
+            songs = UiState.Success(songs),
+            type = BrowseType.PLAYLIST,
+        )
+    }
+    val palette = rememberArtworkPalette(imageUrl = page.thumbnailUrl).copy(
+        elevated = MaterialTheme.colorScheme.surfaceVariant,
+        onBackground = MaterialTheme.colorScheme.onSurface,
+        onBackgroundVariant = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val sleeveSize = (maxWidth * SLEEVE_FRACTION)
+            .coerceAtMost(maxHeight * SLEEVE_MAX_HEIGHT)
+        ReleaseHeader(
+            page = page,
+            palette = palette,
+            sleeveSize = sleeveSize,
+            fullBleed = false,
+            canvas = null,
+            songs = songs,
+            onPlay = onPlay,
+            onShuffle = onShuffle,
+            onArtistClick = null,
+            onToggleLibrary = null,
+        )
+    }
+}
