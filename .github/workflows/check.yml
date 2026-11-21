@@ -45,6 +45,15 @@ jobs:
       - name: Tests
         run: ./gradlew testDevDebugUnitTest
 
+      # TEMPORARY debug step: when the build fails, print the compiler errors as
+      # annotations so they can be read from the check run. Remove once fixed.
+      - name: Show compile errors as annotations
+        if: failure()
+        run: |
+          ./gradlew :app:compileDevDebugKotlin --continue > build.log 2>&1 || true
+          grep -E '^e: ' build.log | head -40 | while IFS= read -r line; do echo "::error::${line}"; done
+          grep -E 'What went wrong' -A4 build.log | head -20 | while IFS= read -r line; do echo "::error::${line}"; done
+
       - name: Build the dev APK
         run: ./gradlew assembleDevDebug
 
