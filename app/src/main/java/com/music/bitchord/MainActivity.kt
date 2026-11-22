@@ -260,6 +260,7 @@ import com.music.bitchord.ui.components.GlassNavBar
 import com.music.bitchord.ui.components.ScrobbleFab
 import com.music.bitchord.ui.components.scrobbleFabVisible
 import com.music.bitchord.ui.scrobble.ScrobbleHost
+import com.music.bitchord.ui.scrobble.ScrobbleGenerateViewModel
 import com.music.bitchord.ui.scrobble.ScrobbleHubTheme
 import com.music.bitchord.ui.components.floatingtabbar.rememberFloatingTabBarScrollConnection
 import com.music.bitchord.ui.components.FrostedTopBar
@@ -1608,6 +1609,31 @@ private fun BitChordApp(
             // Start playback in the mini-player; the user opens the full view by tapping it.
         }
     }
+    // Scrobble's VM is the activity-scoped one ScrobbleHost also reads, so the
+    // save and start-mix events reach the page from here.
+    val scrobbleGenerateViewModel: ScrobbleGenerateViewModel = viewModel()
+    var handledScrobblePlaylistId by rememberSaveable { mutableStateOf<String?>(null) }
+    // A successful save moves to Playlists once, while Scrobble is open.
+    LaunchedEffect(scrobbleOpen, scrobbleGenerateViewModel) {
+        if (scrobbleOpen) {
+            scrobbleGenerateViewModel.savedPlaylistEvents.collect { playlist ->
+                if (handledScrobblePlaylistId != playlist.id) {
+                    handledScrobblePlaylistId = playlist.id
+                    scrobbleTab = 2
+                }
+            }
+        }
+    }
+    // A "Start mix" from a song waits for the controller, then plays its queue.
+    LaunchedEffect(scrobbleGenerateViewModel, controller) {
+        scrobbleGenerateViewModel.pendingStartMixQueue.collect { playlist ->
+            if (playlist != null && controller != null) {
+                scrobbleGenerateViewModel.consumeStartMixQueue(playlist.id)
+                playFrom(playlist.songs, 0, QueueSource("Scrobble Playlist", PlaybackSourceType.QUEUE))
+            }
+        }
+    }
+
     // Kept for entry points whose rows already carry their origin (notably a
     // collection action fetched before this callback). The explicit wrappers
     // below are preferred because a track's album is not necessarily where it
