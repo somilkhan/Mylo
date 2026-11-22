@@ -75,6 +75,16 @@ jobs:
       - name: Report installed Android platforms
         run: sdkmanager --list | grep -E "platforms;android-|build-tools;" | head -30
 
+      # Same stable debug key as the other dev builds, so an APK from here
+      # installs over the one already on the phone.
+      - name: Write the debug keystore
+        env:
+          DEBUG_KEYSTORE_BASE64: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
+        run: |
+          [ -n "$DEBUG_KEYSTORE_BASE64" ] || exit 0
+          mkdir -p ~/.android
+          echo "$DEBUG_KEYSTORE_BASE64" | base64 -d > ~/.android/debug.keystore
+
       - name: Build Android app, TV and Wear OS APKs
         id: build_apks
         if: (github.event_name == 'workflow_dispatch' && inputs.build_apks) || (github.event_name == 'issue_comment' && github.event.issue.pull_request && github.event.comment.body == '/build-apk' && github.event.comment.user.login == 'somilkhan')
