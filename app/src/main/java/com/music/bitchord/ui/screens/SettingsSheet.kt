@@ -315,6 +315,7 @@ fun SettingsScreen(
     }
 
     // Scrobbling states
+    val scrobbleGradientTheme by AppSettings.scrobbleGradientTheme.collectAsStateWithLifecycle()
     val lastfmEnabled by AppSettings.lastfmEnabled.collectAsStateWithLifecycle()
     val lastfmUsername by AppSettings.lastfmUsername.collectAsStateWithLifecycle()
     val lastfmSessionKey by AppSettings.lastfmSessionKey.collectAsStateWithLifecycle()
@@ -1017,6 +1018,21 @@ fun SettingsScreen(
                     subtitle = appFont.description(),
                     value = appFont.localizedLabel(),
                     onClick = { onOpenChoice(SettingsChoiceKind.FONT) },
+                )
+            }
+            val scrobbleGradientThemeTitle = "Scrobble gradient theme"
+            row(scrobbleGradientThemeTitle, "statistics", "generate", "playlists", "gradient") {
+                SettingsRow(
+                    icon = SfIcons.Gradient,
+                    title = scrobbleGradientThemeTitle,
+                    subtitle = "Use the approved gradient on Statistics, Generate and Playlists",
+                    trailing = {
+                        IosSwitch(
+                            checked = scrobbleGradientTheme,
+                            onCheckedChange = AppSettings::setScrobbleGradientTheme,
+                        )
+                    },
+                    onClick = { AppSettings.setScrobbleGradientTheme(!scrobbleGradientTheme) },
                 )
             }
             val reduceAnimationTitle = stringResource(R.string.reduce_animation)

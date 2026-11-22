@@ -260,6 +260,7 @@ import com.music.bitchord.ui.components.GlassNavBar
 import com.music.bitchord.ui.components.ScrobbleFab
 import com.music.bitchord.ui.components.scrobbleFabVisible
 import com.music.bitchord.ui.scrobble.ScrobbleHost
+import com.music.bitchord.ui.scrobble.ScrobbleHubTheme
 import com.music.bitchord.ui.components.floatingtabbar.rememberFloatingTabBarScrollConnection
 import com.music.bitchord.ui.components.FrostedTopBar
 import com.music.bitchord.ui.components.LastfmLoginAlert
@@ -553,6 +554,7 @@ private fun BitChordApp(
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     // Scrobble's own tab, while its page is open: 0 Stats, 1 Generate, 2 Playlists.
     var scrobbleTab by rememberSaveable { mutableIntStateOf(0) }
+    val scrobbleGradientTheme by AppSettings.scrobbleGradientTheme.collectAsStateWithLifecycle()
     // Explore loads the first time it's shown, not at launch beside Home.
     LaunchedEffect(selectedTab) {
         if (selectedTab == TAB_EXPLORE) viewModel.onExploreShown()
@@ -2999,17 +3001,19 @@ private fun BitChordApp(
                                 )
                             }
                         } else if (pageRoute == AppRoute.Scrobble && scrobbleTab != 0) {
-                            ScrobbleHost(
-                                tab = scrobbleTab,
-                                currentSong = player.song,
-                                isPlaying = player.isPlaying,
-                                reduceMotion = reducePlayerMotion,
-                                contentPadding = listPadding,
-                                onPlaySongs = { songs, index ->
-                                    playFrom(songs, index, QueueSource("Scrobble Playlist", PlaybackSourceType.QUEUE))
-                                },
-                                onTabChange = onScrobbleTab,
-                            )
+                            ScrobbleHubTheme(gradientEnabled = scrobbleGradientTheme) {
+                                ScrobbleHost(
+                                    tab = scrobbleTab,
+                                    currentSong = player.song,
+                                    isPlaying = player.isPlaying,
+                                    reduceMotion = reducePlayerMotion,
+                                    contentPadding = listPadding,
+                                    onPlaySongs = { songs, index ->
+                                        playFrom(songs, index, QueueSource("Scrobble Playlist", PlaybackSourceType.QUEUE))
+                                    },
+                                    onTabChange = onScrobbleTab,
+                                )
+                            }
                         } else if (pageRoute == AppRoute.Moods) {
                             MoodGridPage(
                                 gridState = moodsGridState,
