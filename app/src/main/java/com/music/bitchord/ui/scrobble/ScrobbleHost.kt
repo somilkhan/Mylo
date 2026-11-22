@@ -30,7 +30,7 @@ import dev.chrisbanes.haze.HazeState
  * Scrobble FAB on Home, so back and the back stack are handled by the
  * navigator. Leaving the page cancels any running generation.
  */
-@OptIn(ExperimentalSharedTransitionApi::class)
+@OptIn(ExperimentalSharedTransitionApi::class, androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun ScrobbleHost(
     currentSong: Song?,

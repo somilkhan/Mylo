@@ -260,7 +260,6 @@ import com.music.bitchord.ui.components.GlassNavBar
 import com.music.bitchord.ui.components.ScrobbleFab
 import com.music.bitchord.ui.components.scrobbleFabVisible
 import com.music.bitchord.ui.scrobble.ScrobbleHost
-import androidx.compose.ui.unit.toDp
 import com.music.bitchord.ui.components.floatingtabbar.rememberFloatingTabBarScrollConnection
 import com.music.bitchord.ui.components.FrostedTopBar
 import com.music.bitchord.ui.components.LastfmLoginAlert
