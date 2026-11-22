@@ -116,7 +116,7 @@ android {
         create("dev") {
             dimension = "env"
             applicationId = "app.mylo.music.dev"
-            resValue("string", "app_name", "MYLO Dev")
+            resValue("string", "app_name", "Mylo Dev")
         }
         create("prod") {
             dimension = "env"
