@@ -259,6 +259,7 @@ import com.music.bitchord.ui.components.FLOATING_BAR_MAX_WIDTH
 import com.music.bitchord.ui.components.FloatingBottomBar
 import com.music.bitchord.ui.components.GlassNavBar
 import com.music.bitchord.ui.components.ScrobbleFab
+import com.music.bitchord.ui.components.liquidGlass
 import com.music.bitchord.ui.components.scrobbleFabVisible
 import com.music.bitchord.ui.scrobble.ScrobbleHost
 import com.music.bitchord.ui.scrobble.ScrobbleStatisticsContent
@@ -4282,26 +4283,43 @@ private fun BitChordApp(
                     showLastfmLogin || showListenBrainzLogin || showUpdateDialog ||
                     showLyricsSources || showTranslationLanguage || webSession != null
 
-                // Scrobble's entry point, on Home only, floating above the nav bar.
-                ScrobbleFab(
-                    visible = scrobbleFabVisible(
-                        selectedTab = selectedTab,
-                        homeTab = TAB_HOME,
-                        overlayOpen = scrobbleOverlayOpen,
-                        playerOpen = showNowPlaying,
-                        keyboardVisible = keyboardVisible,
-                        hubOpen = scrobbleOpen,
-                    ),
-                    open = scrobbleOpen,
-                    onClick = {
-                        if (scrobbleOpen) navigator.pop() else navigator.push(AppRoute.Scrobble)
-                    },
-                    surface = Modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh, CircleShape),
-                    reduceMotion = reducePlayerMotion,
+                // Scrobble's entry point, on Home only, sitting on the bar's row at the
+                // right, as Mylo lays it out: the same glass or tint surface as the bar.
+                val fabSurface = if (glassActive) {
+                    Modifier.liquidGlass(shape = CircleShape)
+                } else {
+                    Modifier.clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant)
+                }
+                val fabBarHeight = with(LocalDensity.current) {
+                    floatingBarsHeight.intValue.toDp()
+                }.coerceAtLeast(88.dp)
+                Box(
                     modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(end = 16.dp, bottom = with(LocalDensity.current) { (floatingBarsHeight.intValue + 12).toDp() }),
-                )
+                        .align(Alignment.BottomCenter)
+                        .widthIn(max = FLOATING_BAR_MAX_WIDTH)
+                        .fillMaxWidth()
+                        .padding(bottom = fabBarHeight + 12.dp),
+                    contentAlignment = Alignment.CenterEnd,
+                ) {
+                    ScrobbleFab(
+                        visible = scrobbleFabVisible(
+                            selectedTab = selectedTab,
+                            homeTab = TAB_HOME,
+                            overlayOpen = scrobbleOverlayOpen,
+                            playerOpen = showNowPlaying,
+                            keyboardVisible = keyboardVisible,
+                            hubOpen = scrobbleOpen,
+                        ),
+                        open = scrobbleOpen,
+                        onClick = {
+                            if (scrobbleOpen) navigator.pop() else navigator.push(AppRoute.Scrobble)
+                        },
+                        surface = fabSurface,
+                        reduceMotion = reducePlayerMotion,
+                        folded = glassActive && navBarScroll.isInline,
+                        modifier = Modifier.padding(end = 8.dp),
+                    )
+                }
 
                 if (glassActive) Column(
                     modifier = Modifier
