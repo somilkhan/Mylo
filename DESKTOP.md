@@ -1,6 +1,6 @@
-# BitChord Desktop
+# Mylo Desktop
 
-BitChord has a Kotlin Multiplatform shared module and a Compose Multiplatform
+Mylo has a Kotlin Multiplatform shared module and a Compose Multiplatform
 desktop application for macOS, Linux, and Windows. Desktop uses the JVM target, which is
 the supported Compose Multiplatform desktop model.
 
@@ -27,7 +27,7 @@ running `gradlew.bat :desktopApp:run`.
 
 ## Installing a release
 
-Every download on the [releases page](https://github.com/kushagrasinghx/BitChord/releases) carries its own Java
+Every download on the [releases page](https://github.com/somilkhan/Mylo/releases) carries its own Java
 runtime, the FFmpeg and ONNX natives, the Automix analyser and its models.
 Nothing else has to be installed first — no JDK, no codec pack.
 

@@ -215,7 +215,7 @@ class BitChordApplication : Application(), SingletonImageLoader.Factory, Configu
                     chain.request().newBuilder()
                         .header(
                             "User-Agent",
-                            "BitChord/${BuildConfig.VERSION_NAME} (Android; +https://github.com/kushagrasinghx/BitChord)",
+                            "Mylo/${BuildConfig.VERSION_NAME} (Android; +https://github.com/somilkhan/Mylo)",
                         )
                         .build(),
                 )
