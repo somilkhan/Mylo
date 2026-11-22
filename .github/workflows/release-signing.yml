@@ -86,6 +86,11 @@ jobs:
           echo "Keystore file and configured alias validated."
 
       - name: Build signed phone, TV and Wear OS release APKs
+        env:
+          # Read by app/tv build files; without them the release silently ships empty Last.fm keys.
+          LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
+          LASTFM_SECRET: ${{ secrets.LASTFM_SECRET }}
+          LISTEN_TOGETHER_SERVER: ${{ secrets.LISTEN_TOGETHER_SERVER }}
         run: ./gradlew --no-daemon --stacktrace :app:assembleProdRelease :tv:assembleProdRelease :wearos:assembleProdRelease
 
       - name: Name release APKs for the in-app updater
