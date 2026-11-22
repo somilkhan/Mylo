@@ -94,28 +94,12 @@ class AddonSource(
 
     /**
      * Reads the manifest (the client's cached copy when there is one) and
-     * stores what it says. An addon with no usable manifest is recorded as out
-     * of date, since it has nowhere to declare `bitchordAuth`; a manifest that
-     * merely couldn't be fetched just now changes nothing.
-     *
-     * Returns whether the addon is up to date by what was just read, or null
-     * when nothing could be read and the stored answer has to stand.
+     * stores what it says. A manifest that couldn't be fetched just now
+     * changes nothing.
      */
-    suspend fun refreshPolicy(): Boolean? =
-        client.manifest().fold(
-            onSuccess = { manifest ->
-                recordPolicy(manifest)
-                manifest.requiresBitChordAuth
-            },
-            onFailure = { failure ->
-                if (failure is AddonException) {
-                    SourceRegistry.markAddonOutdated(config.id)
-                    false
-                } else {
-                    null
-                }
-            },
-        )
+    suspend fun refreshPolicy() {
+        client.manifest().onSuccess { manifest -> recordPolicy(manifest) }
+    }
 
     private fun recordPolicy(manifest: AddonManifest) =
         SourceRegistry.updatePolicy(
@@ -123,7 +107,6 @@ class AddonSource(
             manifest.downloadsAllowed,
             manifest.requiresLosslessOutput,
             manifest.qualityOptions,
-            manifest.requiresBitChordAuth,
         )
 
     // ── Health ────────────────────────────────────────────────────────────
@@ -158,10 +141,7 @@ class AddonSource(
             onFailure = { failure ->
                 // No readable manifest is not the same as no addon: one that
                 // never published a manifest still answers a search, and is
-                // healthy the moment it does. It has nowhere to declare
-                // `bitchordAuth`, though, so it is recorded as out of date and
-                // the row flags that on its own line.
-                if (failure is AddonException) SourceRegistry.markAddonOutdated(config.id)
+                // healthy the moment it does.
                 if (client.probeSearch().isSuccess) {
                     TrackLog.d(TAG, "${config.displayName}: no manifest, but search answers")
                     return@fold SourceHealth.Ok("No manifest · search works")

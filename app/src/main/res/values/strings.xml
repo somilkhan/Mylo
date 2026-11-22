@@ -1214,8 +1214,6 @@
     <string name="card_songs_format">%1$s songs</string>
 
     <string name="source_needs_lossless_output">Needs a lossless output · use a lossless supported device</string>
-    <string name="source_needs_update">This addon is out of date. It still works, but ask its developer to update it by following the latest BitChord addon docs.</string>
-    <string name="source_outdated">Outdated addon</string>
     <string name="source_needs_lossless_bt_codec">Needs a lossless output · Bluetooth is on %1$s; use a lossless supported device</string>
     <string name="source_needs_lossless_bt_unknown">Needs a lossless output · can’t tell which Bluetooth codec is in use</string>
     <string name="source_downloads_on">Downloads allowed</string>
