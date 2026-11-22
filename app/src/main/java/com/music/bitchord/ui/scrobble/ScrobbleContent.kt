@@ -38,7 +38,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import com.music.bitchord.ui.screens.LocalPlaylistReleaseHeader
 import com.music.bitchord.ui.components.SongRow
 import com.music.bitchord.ui.components.AlertAction
 import com.music.bitchord.ui.components.AlertRule
@@ -47,6 +46,7 @@ import com.music.bitchord.ui.components.PillTextField
 import com.music.bitchord.ui.components.SearchField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
+import com.music.bitchord.ui.screens.LocalPlaylistReleaseHeader
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
@@ -1240,8 +1240,8 @@ fun ScrobblePlaylistsContent(
             AlertRule()
             AlertAction(
                 label = "Save",
-                contentColor = scrobbleAccentColor(),
                 emphasised = true,
+                contentColor = scrobbleAccentColor(),
                 onClick = {
                     val clean = renameText.trim()
                     val duplicate = playlists.any { it.id != target.id && it.title.equals(clean, ignoreCase = true) }
@@ -1261,8 +1261,8 @@ fun ScrobblePlaylistsContent(
             AlertRule()
             AlertAction(
                 label = "Cancel",
-                contentColor = MaterialTheme.colorScheme.onSurface,
                 emphasised = false,
+                contentColor = MaterialTheme.colorScheme.onSurface,
                 onClick = { renameTarget = null },
             )
         }
@@ -1293,12 +1293,12 @@ fun ScrobblePlaylistsContent(
             AlertRule()
             AlertAction(
                 label = "Delete",
-                contentColor = MaterialTheme.colorScheme.error,
                 emphasised = true,
                 destructive = true,
+                contentColor = MaterialTheme.colorScheme.error,
                 onClick = {
                     scope.launch {
-                        withContext<Unit>(NonCancellable) {
+                        withContext(NonCancellable) {
                             if (LocalPlaylistStore.deletePlaylist(target.id)) {
                                 target.customCoverUri?.let { savedUri ->
                                     runCatching {
@@ -1321,8 +1321,8 @@ fun ScrobblePlaylistsContent(
             AlertRule()
             AlertAction(
                 label = "Cancel",
-                contentColor = MaterialTheme.colorScheme.onSurface,
                 emphasised = false,
+                contentColor = MaterialTheme.colorScheme.onSurface,
                 onClick = { deleteTarget = null; deleteError = null },
             )
         }
@@ -1539,13 +1539,13 @@ private fun PlaylistDetailContent(
                     if (newUri != oldUri) {
                         context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     }
-                    withContext<Unit>(NonCancellable) {
+                    withContext(NonCancellable) {
                         saved = LocalPlaylistStore.setCustomCover(playlist.id, newUri)
                         if (saved) {
-                            oldUri?.takeIf { it != newUri }?.let { staleUri ->
+                            if (oldUri != null && oldUri != newUri) {
                                 runCatching {
                                     context.contentResolver.releasePersistableUriPermission(
-                                        Uri.parse(staleUri),
+                                        Uri.parse(oldUri),
                                         Intent.FLAG_GRANT_READ_URI_PERMISSION,
                                     )
                                 }
@@ -1693,7 +1693,7 @@ private fun PlaylistDetailContent(
                                     detailMenuExpanded = false
                                     val oldUri = playlist.customCoverUri
                                     scope.launch {
-                                        withContext<Unit>(NonCancellable) {
+                                        withContext(NonCancellable) {
                                             if (LocalPlaylistStore.setCustomCover(playlist.id, null)) {
                                                 oldUri?.let { savedUri ->
                                                     runCatching {
