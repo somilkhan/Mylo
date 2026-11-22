@@ -551,6 +551,8 @@ private fun BitChordApp(
     // and the page is a sibling of the bar rather than a child.
     val navBarScroll = rememberFloatingTabBarScrollConnection()
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+    // Scrobble's own tab, while its page is open: 0 Stats, 1 Generate, 2 Playlists.
+    var scrobbleTab by rememberSaveable { mutableIntStateOf(0) }
     // Explore loads the first time it's shown, not at launch beside Home.
     LaunchedEffect(selectedTab) {
         if (selectedTab == TAB_EXPLORE) viewModel.onExploreShown()
@@ -834,6 +836,19 @@ private fun BitChordApp(
     val detailActiveShelf = artistShelfRoute?.shelf
     /** The route on screen, or null when a release page or a tab is. */
     val route = visibleEntry?.route
+    // Scrobble mode: while its page is open the bars show its three tabs
+    // in place of Home, Explore, Library and Search, and the FAB closes it.
+    val scrobbleOpen = route == AppRoute.Scrobble
+    val scrobbleTabs = remember {
+        listOf(
+            BottomTab("Stats", BitChordIcons.Performance),
+            BottomTab("Generate", BitChordIcons.Shuffle),
+            BottomTab("Playlists", BitChordIcons.Library),
+        )
+    }
+    val onScrobbleTab: (Int) -> Unit = { scrobbleTab = it }
+    // Every open starts on Stats, as does every close.
+    LaunchedEffect(scrobbleOpen) { scrobbleTab = 0 }
     /**
      * The release page at the top of its stack, whether or not a route
      * covers it. Most things want [detail] — the one actually on screen.
@@ -2467,7 +2482,7 @@ private fun BitChordApp(
     // picture, so they cannot disagree. Read while any of them is on screen —
     // which includes the Library tab, since the cards live at the top of it.
     // See [rememberReplayState].
-    val replayOpen = route == AppRoute.Replay || replayStory != null || showReplayShare ||
+    val replayOpen = route == AppRoute.Replay || (scrobbleOpen && scrobbleTab == 0) || replayStory != null || showReplayShare ||
         (selectedTab == TAB_LIBRARY && detail == null && route == null)
     val (replay, setReplayPeriod) = rememberReplayState(replayOpen)
     val replayCards = remember(replay.summary) {
@@ -2983,20 +2998,17 @@ private fun BitChordApp(
                                     contentPadding = listPadding,
                                 )
                             }
-                        } else if (pageRoute == AppRoute.Scrobble) {
+                        } else if (pageRoute == AppRoute.Scrobble && scrobbleTab != 0) {
                             ScrobbleHost(
+                                tab = scrobbleTab,
                                 currentSong = player.song,
                                 isPlaying = player.isPlaying,
-                                holder = account?.name.orEmpty(),
                                 reduceMotion = reducePlayerMotion,
                                 contentPadding = listPadding,
-                                onPlaySong = { song -> playRadio(song, QueueSource("Scrobble", PlaybackSourceType.SEARCH)) },
                                 onPlaySongs = { songs, index ->
                                     playFrom(songs, index, QueueSource("Scrobble Playlist", PlaybackSourceType.QUEUE))
                                 },
-                                onOpenReplay = { navigator.push(AppRoute.Replay) },
-                                onOpenArtist = { id, name -> openByName(id, name, null, BrowseType.ARTIST) },
-                                onOpenAlbum = { id, title, artist, art -> openByName(id, title, artist, BrowseType.ALBUM, art) },
+                                onTabChange = onScrobbleTab,
                             )
                         } else if (pageRoute == AppRoute.Moods) {
                             MoodGridPage(
@@ -3004,7 +3016,7 @@ private fun BitChordApp(
                                 onClick = playMood,
                                 contentPadding = listPadding,
                             )
-                        } else if (pageRoute == AppRoute.Replay) {
+                        } else if (pageRoute == AppRoute.Replay || (pageRoute == AppRoute.Scrobble && scrobbleTab == 0)) {
                             ReplayScreen(
                                 state = replay,
                                 holder = account?.name.orEmpty(),
@@ -4187,11 +4199,13 @@ private fun BitChordApp(
                     visible = scrobbleFabVisible(
                         selectedTab = selectedTab,
                         homeTab = TAB_HOME,
-                        overlayOpen = route != null || detail != null || selectedMoodGenre != null || onboardingVisible,
+                        overlayOpen = (route != null && !scrobbleOpen) || detail != null || selectedMoodGenre != null || onboardingVisible,
                         playerOpen = showNowPlaying,
                     ),
-                    open = false,
-                    onClick = { navigator.push(AppRoute.Scrobble) },
+                    open = scrobbleOpen,
+                    onClick = {
+                        if (scrobbleOpen) navigator.pop() else navigator.push(AppRoute.Scrobble)
+                    },
                     surface = Modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh, CircleShape),
                     reduceMotion = reducePlayerMotion,
                     modifier = Modifier
@@ -4212,9 +4226,9 @@ private fun BitChordApp(
                     // controls dock into the tab bar rather than riding above it,
                     // and the pair folds together on scroll. See [GlassNavBar].
                     GlassNavBar(
-                        tabs = tabs,
-                        selectedIndex = selectedTab,
-                        onTabSelected = onTabSelected,
+                        tabs = if (scrobbleOpen) scrobbleTabs else tabs,
+                        selectedIndex = if (scrobbleOpen) scrobbleTab else selectedTab,
+                        onTabSelected = if (scrobbleOpen) onScrobbleTab else onTabSelected,
                         scrollConnection = navBarScroll,
                         song = player.song,
                         isPlaying = player.isPlaying,
@@ -4275,10 +4289,10 @@ private fun BitChordApp(
                         Spacer(Modifier.height(8.dp))
                     }
                     FloatingBottomBar(
-                        tabs = tabs,
-                        selectedIndex = selectedTab,
+                        tabs = if (scrobbleOpen) scrobbleTabs else tabs,
+                        selectedIndex = if (scrobbleOpen) scrobbleTab else selectedTab,
                         hazeState = hazeState,
-                        onTabSelected = onTabSelected,
+                        onTabSelected = if (scrobbleOpen) onScrobbleTab else onTabSelected,
                     )
                 }
             }
