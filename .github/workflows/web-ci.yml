@@ -67,6 +67,9 @@ jobs:
         run: |
           set -o pipefail
           pnpm build 2>&1 | tee ../web-build.log
+        env:
+          # Build-only placeholder: vite.config.ts fails without it. Nothing from this job is deployed.
+          VITE_PARTY_SERVER_URL: https://party.example.com
 
       - name: Post web failure output to the PR
         if: failure() && github.event.pull_request.number != ''
