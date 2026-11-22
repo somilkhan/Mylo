@@ -1623,6 +1623,13 @@ private fun BitChordApp(
     // save and start-mix events reach the page from here.
     val scrobbleGenerateViewModel: ScrobbleGenerateViewModel = viewModel()
     var handledScrobblePlaylistId by rememberSaveable { mutableStateOf<String?>(null) }
+    // Leaving Scrobble by any route (back, a sign-in clear, Settings) stops any
+    // generation still running, as main's closeScrobble does.
+    DisposableEffect(scrobbleOpen) {
+        onDispose {
+            if (scrobbleOpen) scrobbleGenerateViewModel.cancelGeneration()
+        }
+    }
     // A successful save moves to Playlists once, while Scrobble is open.
     LaunchedEffect(scrobbleOpen, scrobbleGenerateViewModel) {
         if (scrobbleOpen) {
