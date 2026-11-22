@@ -49,6 +49,9 @@ sealed interface AppRoute {
 
     /** The Equalizer's list of preset curves. */
     data object EqualizerPresets : AppRoute
+
+    /** The Scrobble page, opened from its FAB on Home. */
+    data object Scrobble : AppRoute
 }
 
 /**

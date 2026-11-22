@@ -257,6 +257,10 @@ import com.music.bitchord.ui.components.BottomTab
 import com.music.bitchord.ui.components.FLOATING_BAR_MAX_WIDTH
 import com.music.bitchord.ui.components.FloatingBottomBar
 import com.music.bitchord.ui.components.GlassNavBar
+import com.music.bitchord.ui.components.ScrobbleFab
+import com.music.bitchord.ui.components.scrobbleFabVisible
+import com.music.bitchord.ui.scrobble.ScrobbleHost
+import androidx.compose.ui.unit.toDp
 import com.music.bitchord.ui.components.floatingtabbar.rememberFloatingTabBarScrollConnection
 import com.music.bitchord.ui.components.FrostedTopBar
 import com.music.bitchord.ui.components.LastfmLoginAlert
@@ -2980,6 +2984,21 @@ private fun BitChordApp(
                                     contentPadding = listPadding,
                                 )
                             }
+                        } else if (pageRoute == AppRoute.Scrobble) {
+                            ScrobbleHost(
+                                currentSong = player.song,
+                                isPlaying = player.isPlaying,
+                                holder = account?.name.orEmpty(),
+                                reduceMotion = reducePlayerMotion,
+                                contentPadding = listPadding,
+                                onPlaySong = { song -> playRadio(song, QueueSource("Scrobble", PlaybackSourceType.SEARCH)) },
+                                onPlaySongs = { songs, index ->
+                                    playFrom(songs, index, QueueSource("Scrobble Playlist", PlaybackSourceType.QUEUE))
+                                },
+                                onOpenReplay = { navigator.push(AppRoute.Replay) },
+                                onOpenArtist = { id, name -> openByName(id, name, null, BrowseType.ARTIST) },
+                                onOpenAlbum = { id, title, artist, art -> openByName(id, title, artist, BrowseType.ALBUM, art) },
+                            )
                         } else if (pageRoute == AppRoute.Moods) {
                             MoodGridPage(
                                 gridState = moodsGridState,
@@ -3802,6 +3821,7 @@ private fun BitChordApp(
                         is AppRoute.SettingsChoice -> stringResource(route.choice.title)
                         AppRoute.EqualizerPresets -> stringResource(R.string.equalizer_preset)
                         AppRoute.Replay -> stringResource(R.string.replay)
+                        AppRoute.Scrobble -> "Scrobble"
                         null -> when {
                             detail != null && detailActiveShelf != null -> detailActiveShelf?.title.orEmpty()
                             detail != null -> detail.title
@@ -4162,6 +4182,23 @@ private fun BitChordApp(
                         searchFocusRequested = true
                     }
                 }
+
+                // Scrobble's entry point, on Home only, floating above the nav bar.
+                ScrobbleFab(
+                    visible = scrobbleFabVisible(
+                        selectedTab = selectedTab,
+                        homeTab = TAB_HOME,
+                        overlayOpen = route != null || detail != null || selectedMoodGenre != null || onboardingVisible,
+                        playerOpen = showNowPlaying,
+                    ),
+                    open = false,
+                    onClick = { navigator.push(AppRoute.Scrobble) },
+                    surface = Modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh, CircleShape),
+                    reduceMotion = reducePlayerMotion,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 16.dp, bottom = with(LocalDensity.current) { (floatingBarsHeight.intValue + 12).toDp() }),
+                )
 
                 if (glassActive) Column(
                     modifier = Modifier
