@@ -557,6 +557,8 @@ private fun BitChordApp(
     // rather than inside the bar because the page's scroll is what drives it,
     // and the page is a sibling of the bar rather than a child.
     val navBarScroll = rememberFloatingTabBarScrollConnection()
+    // Scrobble has its own bar connection, as on Mylo, so Home's folded state does not carry over.
+    val scrobbleNavBarScroll = rememberFloatingTabBarScrollConnection()
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     // Scrobble's own tab, while its page is open: 0 Stats, 1 Generate, 2 Playlists.
     var scrobbleTab by rememberSaveable { mutableIntStateOf(0) }
@@ -847,6 +849,7 @@ private fun BitChordApp(
     // Scrobble mode: while its page is open the bars show its three tabs
     // in place of Home, Explore, Library and Search, and the FAB closes it.
     val scrobbleOpen = route == AppRoute.Scrobble
+    val activeNavBarScroll = if (scrobbleOpen) scrobbleNavBarScroll else navBarScroll
     val scrobbleTabs = remember {
         listOf(
             BottomTab("Stats", BitChordIcons.Clock),
@@ -2998,7 +3001,7 @@ private fun BitChordApp(
                                     // Every page's scroll passes through here, so
                                     // the glass bar collapses on all of them
                                     // without each one having to know about it.
-                                    .nestedScroll(navBarScroll)
+                                    .nestedScroll(activeNavBarScroll)
                             } else {
                                 Modifier
                             },
@@ -3961,7 +3964,7 @@ private fun BitChordApp(
                             // stays out of the way until that has been scrolled off.
                             route == AppRoute.Replay -> replayScrolled
                             // As Mylo: the bar's title comes up once the page's own header scrolls off.
-                            route == AppRoute.Scrobble -> navBarScroll.isInline
+                            route == AppRoute.Scrobble -> scrobbleNavBarScroll.isInline
                             route != null -> true
                             detail != null && detailActiveShelf != null -> true
                             detail != null -> detailScrolled
@@ -4341,11 +4344,16 @@ private fun BitChordApp(
                         ),
                         open = scrobbleOpen,
                         onClick = {
-                            if (scrobbleOpen) navigator.pop() else navigator.push(AppRoute.Scrobble)
+                            if (scrobbleOpen) {
+                                navigator.pop()
+                            } else {
+                                scrobbleNavBarScroll.expand()
+                                navigator.push(AppRoute.Scrobble)
+                            }
                         },
                         surface = fabSurface,
                         reduceMotion = reducePlayerMotion,
-                        folded = glassActive && navBarScroll.isInline,
+                        folded = glassActive && activeNavBarScroll.isInline,
                         modifier = Modifier.padding(end = 8.dp),
                     )
                 }
@@ -4366,7 +4374,7 @@ private fun BitChordApp(
                         tabs = if (scrobbleOpen) scrobbleTabs else tabs,
                         selectedIndex = if (scrobbleOpen) scrobbleTab else selectedTab,
                         onTabSelected = if (scrobbleOpen) onScrobbleTab else onTabSelected,
-                        scrollConnection = navBarScroll,
+                        scrollConnection = activeNavBarScroll,
                         song = player.song,
                         isPlaying = player.isPlaying,
                         isLoading = playPauseBusy,
