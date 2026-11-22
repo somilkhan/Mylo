@@ -260,6 +260,8 @@ import com.music.bitchord.ui.components.GlassNavBar
 import com.music.bitchord.ui.components.ScrobbleFab
 import com.music.bitchord.ui.components.scrobbleFabVisible
 import com.music.bitchord.ui.scrobble.ScrobbleHost
+import com.music.bitchord.ui.scrobble.ScrobbleStatisticsContent
+import com.music.bitchord.ui.scrobble.ScrobbleStatisticsViewModel
 import com.music.bitchord.ui.scrobble.ScrobbleGenerateViewModel
 import com.music.bitchord.ui.scrobble.ScrobbleHubTheme
 import com.music.bitchord.ui.components.floatingtabbar.rememberFloatingTabBarScrollConnection
@@ -1259,6 +1261,10 @@ private fun BitChordApp(
     val homePull = rememberPullToRefreshState()
     val explorePull = rememberPullToRefreshState()
     val libraryPull = rememberPullToRefreshState()
+    // Scrobble's Stats tab owns its own refresh: its pull and its loading flag.
+    val scrobbleStatisticsPull = rememberPullToRefreshState()
+    val scrobbleStatisticsViewModel: ScrobbleStatisticsViewModel = viewModel()
+    val scrobbleStatisticsState by scrobbleStatisticsViewModel.state.collectAsStateWithLifecycle()
     val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
     val currentFeed = when {
         route != null || detail != null -> null
@@ -1276,11 +1282,14 @@ private fun BitChordApp(
         if (currentFeed == MainViewModel.Feed.LIBRARY) viewModel.onLibraryShown()
     }
 
-    val currentPull = when (currentFeed) {
-        MainViewModel.Feed.HOME -> homePull
-        MainViewModel.Feed.EXPLORE -> explorePull
-        MainViewModel.Feed.LIBRARY -> libraryPull
-        null -> null
+    val currentPull = when {
+        scrobbleOpen && scrobbleTab == 0 -> scrobbleStatisticsPull
+        else -> when (currentFeed) {
+            MainViewModel.Feed.HOME -> homePull
+            MainViewModel.Feed.EXPLORE -> explorePull
+            MainViewModel.Feed.LIBRARY -> libraryPull
+            null -> null
+        }
     }
     val scrolled by remember(currentListState) {
         derivedStateOf {
@@ -3046,7 +3055,37 @@ private fun BitChordApp(
                                 onClick = playMood,
                                 contentPadding = listPadding,
                             )
-                        } else if (pageRoute == AppRoute.Replay || (pageRoute == AppRoute.Scrobble && scrobbleTab == 0)) {
+                        } else if (pageRoute == AppRoute.Scrobble && scrobbleTab == 0) {
+                            ScrobbleHubTheme(gradientEnabled = scrobbleGradientTheme) {
+                                ScrobbleStatisticsContent(
+                                    viewModel = scrobbleStatisticsViewModel,
+                                    reduceMotion = reducePlayerMotion,
+                                    refreshing = scrobbleStatisticsState.isRefreshing,
+                                    onRefresh = scrobbleStatisticsViewModel::refresh,
+                                    pullState = scrobbleStatisticsPull,
+                                    onPlaySong = { song ->
+                                        playRadio(song, QueueSource(replayLabel, PlaybackSourceType.REPLAY))
+                                    },
+                                    onOpenSettings = {
+                                        navigator.pop()
+                                        navigator.push(AppRoute.Settings)
+                                    },
+                                    holder = account?.name.orEmpty(),
+                                    memberSince = replay.memberSince,
+                                    onOpenReplay = { page, period ->
+                                        setReplayPeriod(period)
+                                        replayStory = page
+                                    },
+                                    onOpenArtist = { id, name ->
+                                        openByName(id, name, null, BrowseType.ARTIST)
+                                    },
+                                    onOpenAlbum = { id, title, artist, art ->
+                                        openByName(id, title, artist, BrowseType.ALBUM, art)
+                                    },
+                                    contentPadding = listPadding,
+                                )
+                            }
+                        } else if (pageRoute == AppRoute.Replay) {
                             ReplayScreen(
                                 state = replay,
                                 holder = account?.name.orEmpty(),
@@ -3892,7 +3931,8 @@ private fun BitChordApp(
                             else -> scrolled || selectedTab == TAB_SEARCH
                         }
                     },
-                    refreshing = currentFeed != null && currentFeed in refreshing,
+                    refreshing = (currentFeed != null && currentFeed in refreshing) ||
+                        (scrobbleOpen && scrobbleTab == 0 && scrobbleStatisticsState.isRefreshing),
                     pullFraction = { currentPull?.distanceFraction ?: 0f },
                     // The same step the back gesture takes — see [goBack] —
                     // offered on anything pushed over a tab.
