@@ -69,6 +69,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.IosShare
@@ -848,9 +849,9 @@ private fun BitChordApp(
     val scrobbleOpen = route == AppRoute.Scrobble
     val scrobbleTabs = remember {
         listOf(
-            BottomTab("Stats", BitChordIcons.Performance),
-            BottomTab("Generate", BitChordIcons.Shuffle),
-            BottomTab("Playlists", BitChordIcons.Library),
+            BottomTab("Stats", BitChordIcons.Clock),
+            BottomTab("Generate", Icons.Rounded.GraphicEq),
+            BottomTab("Playlists", BitChordIcons.TabLibrary),
         )
     }
     val onScrobbleTab: (Int) -> Unit = { scrobbleTab = it }
@@ -1624,6 +1625,14 @@ private fun BitChordApp(
     // save and start-mix events reach the page from here.
     val scrobbleGenerateViewModel: ScrobbleGenerateViewModel = viewModel()
     var handledScrobblePlaylistId by rememberSaveable { mutableStateOf<String?>(null) }
+    // The playlist a save just created, and whether it came from Generate, so
+    // Playlists can run its arrival motion. Cleared with the page.
+    var scrobbleHandoffPlaylistId by remember { mutableStateOf<String?>(null) }
+    var scrobbleHandoffFromGenerate by remember { mutableStateOf(false) }
+    LaunchedEffect(scrobbleOpen) {
+        scrobbleHandoffPlaylistId = null
+        scrobbleHandoffFromGenerate = false
+    }
     // Leaving Scrobble by any route (back, a sign-in clear, Settings) stops any
     // generation still running, as main's closeScrobble does.
     DisposableEffect(scrobbleOpen) {
@@ -1637,9 +1646,21 @@ private fun BitChordApp(
             scrobbleGenerateViewModel.savedPlaylistEvents.collect { playlist ->
                 if (handledScrobblePlaylistId != playlist.id) {
                     handledScrobblePlaylistId = playlist.id
+                    scrobbleHandoffFromGenerate = scrobbleTab == 1
+                    scrobbleHandoffPlaylistId = playlist.id
                     scrobbleTab = 2
                 }
             }
+        }
+    }
+    // Clear the target after the arrival motion, so revisiting Playlists does
+    // not replay it for an older save.
+    LaunchedEffect(scrobbleHandoffPlaylistId) {
+        val playlistId = scrobbleHandoffPlaylistId ?: return@LaunchedEffect
+        delay(1_600)
+        if (scrobbleHandoffPlaylistId == playlistId) {
+            scrobbleHandoffPlaylistId = null
+            scrobbleHandoffFromGenerate = false
         }
     }
     // A "Start mix" from a song waits for the controller, then plays its queue.
@@ -3048,6 +3069,8 @@ private fun BitChordApp(
                             ScrobbleHubTheme(gradientEnabled = scrobbleGradientTheme) {
                                 ScrobbleHost(
                                     tab = scrobbleTab,
+                                    highlightedPlaylistId = scrobbleHandoffPlaylistId,
+                                    sharedHandoffFromGenerate = scrobbleHandoffFromGenerate,
                                     currentSong = player.song,
                                     isPlaying = player.isPlaying,
                                     reduceMotion = reducePlayerMotion,
@@ -3910,7 +3933,11 @@ private fun BitChordApp(
                         is AppRoute.SettingsChoice -> stringResource(route.choice.title)
                         AppRoute.EqualizerPresets -> stringResource(R.string.equalizer_preset)
                         AppRoute.Replay -> stringResource(R.string.replay)
-                        AppRoute.Scrobble -> "Scrobble"
+                        AppRoute.Scrobble -> when (scrobbleTab) {
+                            0 -> "Statistics"
+                            1 -> "Generate"
+                            else -> "Playlists"
+                        }
                         null -> when {
                             detail != null && detailActiveShelf != null -> detailActiveShelf?.title.orEmpty()
                             detail != null -> detail.title
@@ -3933,6 +3960,8 @@ private fun BitChordApp(
                             // The page leads with its own large "Replay", so the bar
                             // stays out of the way until that has been scrolled off.
                             route == AppRoute.Replay -> replayScrolled
+                            // As Mylo: the bar's title comes up once the page's own header scrolls off.
+                            route == AppRoute.Scrobble -> navBarScroll.isInline
                             route != null -> true
                             detail != null && detailActiveShelf != null -> true
                             detail != null -> detailScrolled
