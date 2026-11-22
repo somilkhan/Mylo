@@ -53,12 +53,7 @@ class LocaleStringsTest(private val tag: String) {
          * Keys added to values/strings.xml that no locale translates yet. They fall back to
          * English until translated; remove each entry here when its translations land.
          */
-        internal val AWAITING_TRANSLATION = setOf(
-            "automix_overview",
-            "diwali_cta",
-            "diwali_subtitle",
-            "diwali_title",
-        )
+        internal val AWAITING_TRANSLATION = setOf<String>()
 
         private val baseKeys: Set<String> by lazy {
             translatableKeys(parse(File(resDir, "values/strings.xml")))
