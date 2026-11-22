@@ -3,7 +3,6 @@ package com.music.bitchord.data.sources
 import com.music.bitchord.data.TrackLog
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.settings.AppSettings
-import com.music.bitchord.data.sources.addon.AddonAuth
 import com.music.bitchord.data.sources.addon.AddonClient
 import com.music.bitchord.data.sources.addon.AddonException
 import com.music.bitchord.data.sources.addon.AddonManifest
@@ -86,33 +85,12 @@ class AddonSource(
      * an addon that has just turned the switch on is stopped before the request
      * rather than after it. The manifest is the client's shared, cached copy,
      * which the request was about to read for its settings anyway.
-     *
-     * An addon that doesn't declare `bitchordAuth` is out of date but still
-     * used: the sources screen flags it, and nothing is sent to it but the
-     * plain requests it has always had. One that declares it needs this device
-     * verified. While the device was just refused, every request would fail
-     * the same way before leaving the phone, so none is made, and the reason is
-     * logged once rather than once per query.
      */
     private suspend fun admitted(what: String): Boolean {
         if (shutOut(what)) return false
-        val declared = refreshPolicy()
-        if (shutOut(what)) return false
-        if ((declared ?: live.bitchordAuth) != true) return true
-        AddonAuth.standingRefusal()?.let { reason ->
-            if (reason != loggedRefusal) {
-                loggedRefusal = reason
-                TrackLog.d(TAG, "${config.displayName}: skipped until verification is retried — $reason")
-            }
-            return false
-        }
-        loggedRefusal = null
-        return true
+        refreshPolicy()
+        return !shutOut(what)
     }
-
-    /** The refusal [admitted] last logged a skip for, so a run of skips costs one line. */
-    @Volatile
-    private var loggedRefusal: String? = null
 
     /**
      * Reads the manifest (the client's cached copy when there is one) and
@@ -170,19 +148,6 @@ class AddonSource(
         client.manifest().fold(
             onSuccess = { manifest ->
                 recordPolicy(manifest)
-                // An addon that asks for auth is still not usable if this device
-                // can't be verified. Said here, in the auth service's words,
-                // because otherwise the row reads healthy while every search
-                // fails, and the reason is only in the log. One that doesn't ask
-                // is out of date, which the row flags on its own line, but works.
-                if (manifest.requiresBitChordAuth) client.checkAuth().exceptionOrNull()?.let { failure ->
-                    val reason = failure.message ?: "BitChord couldn't verify this device"
-                    return@fold if (failure is AddonUnavailable) {
-                        SourceHealth.Unreachable(reason)
-                    } else {
-                        SourceHealth.Rejected(reason)
-                    }
-                }
                 SourceHealth.Ok(
                     listOfNotNull(
                         manifest.displayName.takeIf { it.isNotBlank() },

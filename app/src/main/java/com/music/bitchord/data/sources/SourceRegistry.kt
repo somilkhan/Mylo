@@ -8,7 +8,6 @@ import com.music.bitchord.auth.EncryptedPrefs
 import com.music.bitchord.data.TrackLog
 import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.data.settings.permits
-import com.music.bitchord.data.sources.addon.AddonAuth
 import com.music.bitchord.data.sources.addon.AddonClient
 import com.music.bitchord.data.sources.addon.AddonException
 import com.music.bitchord.data.sources.addon.AddonQualityOption
@@ -220,16 +219,11 @@ object SourceRegistry {
      * apply no connection-quality ceiling — see [SourceResolver.forDownload].
      */
     fun active(): List<MusicSource> {
-        val unverified = AddonAuth.standingRefusal() != null
         return enabledConfigs(configs.value)
             // Not in the walk at all while it would be refused anyway: an addon
             // that asked for a lossless output costs nothing — not even a timed
             // out search — while there isn't one. See [SourceConfig.checkValidLossless].
             .filterNot { it.awaitsLosslessOutput }
-            // Nor, for an addon that asks for auth, while this device was just
-            // refused verification: back in the walk once the backoff lapses,
-            // when the next resolve asks the auth service again.
-            .filterNot { unverified && it.kind == SourceKind.ADDON && it.bitchordAuth == true }
             .sortedBy { it.kind.rank }
             .mapNotNull { instances[it.id] }
     }
