@@ -5734,6 +5734,8 @@ private fun BitChordApp(
                                     AppSettings.setLastfmSessionKey(auth.session.key)
                                     AppSettings.setLastfmUsername(auth.session.name)
                                     AppSettings.setLastfmEnabled(true)
+                                    // Stats reloads now that there is a Last.fm account to read.
+                                    scrobbleStatisticsViewModel.onLastFmConnected()
                                     showLastfmLogin = false
                                 }
                                 .onFailure { e ->

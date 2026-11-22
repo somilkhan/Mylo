@@ -142,6 +142,7 @@ import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.SingletonImageLoader
 import coil3.compose.AsyncImage
 import com.music.bitchord.ui.components.PillSegmentedControl
@@ -173,6 +174,7 @@ import com.music.bitchord.data.settings.PlayerTheme
 import com.music.bitchord.data.stats.Backup
 import com.music.bitchord.playback.AudioCache
 import com.music.bitchord.ui.player.fullBleedArtworkAvailable
+import com.music.bitchord.ui.scrobble.ScrobbleStatisticsViewModel
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 import java.util.Locale
@@ -407,6 +409,8 @@ fun SettingsScreen(
     var showListenBrainzTokenDialog by remember { mutableStateOf(false) }
     var showLastfmLoginDialog by remember { mutableStateOf(false) }
     val scrobbleScope = rememberCoroutineScope()
+    // The activity-scoped one Stats reads, so it reloads when a login lands here.
+    val scrobbleStatisticsViewModel: ScrobbleStatisticsViewModel = viewModel()
 
     val version = remember(context) {
         runCatching {
@@ -2024,6 +2028,7 @@ fun SettingsScreen(
                                         AppSettings.setLastfmSessionKey(auth.session.key)
                                         AppSettings.setLastfmUsername(auth.session.name)
                                         AppSettings.setLastfmEnabled(true)
+                                        scrobbleStatisticsViewModel.onLastFmConnected()
                                         showLastfmLoginDialog = false
                                     }
                                     .onFailure { e ->
