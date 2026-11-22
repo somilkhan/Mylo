@@ -53,7 +53,7 @@ class LocaleStringsTest(private val tag: String) {
          * Keys added to values/strings.xml that no locale translates yet. They fall back to
          * English until translated; remove each entry here when its translations land.
          */
-        internal val AWAITING_TRANSLATION = setOf<String>()
+        internal val AWAITING_TRANSLATION = setOf("about_gpl_fork_credit")
 
         private val baseKeys: Set<String> by lazy {
             translatableKeys(parse(File(resDir, "values/strings.xml")))

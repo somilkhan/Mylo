@@ -1808,6 +1808,7 @@ fun SettingsScreen(
         // The version line is the page's colophon, not a setting: it belongs to
         // the whole list, so it goes when the list is narrowed to a few rows.
         if (section == null && searchQuery.isBlank()) {
+        val aboutGplCredit = stringResource(R.string.about_gpl_fork_credit)
         Text(
             text = buildAnnotatedString {
                 append("Mylo $version  ")
@@ -1832,7 +1833,16 @@ fun SettingsScreen(
                 withLink(LinkAnnotation.Url("https://bitchord.kushagrasingh.in/", linkStyles)) {
                     append("Website")
                 }
-                append("\n~YouTube Music & Listen Together Backend")
+                append("\n~YouTube Music & Listen Together Backend\n")
+                append(aboutGplCredit)
+                append("  ")
+                withLink(LinkAnnotation.Url("https://github.com/somilkhan/Mylo/blob/main/NOTICE", linkStyles)) {
+                    append("NOTICE")
+                }
+                append("  ")
+                withLink(LinkAnnotation.Url("https://github.com/kushagrasinghx/BitChord", linkStyles)) {
+                    append("BitChord")
+                }
             },
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
