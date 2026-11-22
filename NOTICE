@@ -1,0 +1,12 @@
+MYLO
+Copyright (C) the MYLO contributors
+
+MYLO includes code derived from BitChord, a free software music player
+originally developed by kushagrasinghx (https://github.com/kushagrasinghx/BitChord)
+and licensed under the GNU General Public License v3.0 (GPLv3).
+
+BitChord is an independent project and is not affiliated with, endorsed by,
+or connected to the MYLO project.
+
+MYLO is distributed under the same GNU General Public License v3.0 as BitChord.
+See the LICENSE file for the full text.
