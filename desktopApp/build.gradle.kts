@@ -589,3 +589,7 @@ compose.desktop {
     }
 
 }
+
+compose.resources {
+    packageOfResClass = "mylo.desktopapp.generated.resources"
+}

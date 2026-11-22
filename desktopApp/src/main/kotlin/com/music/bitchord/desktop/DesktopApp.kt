@@ -4228,6 +4228,7 @@ fun BitChordDesktopApp() {
                                             type = if (entity.entityType == EntityType.ALBUM) BrowseType.ALBUM else BrowseType.PLAYLIST,
                                         ),
                                     )
+                                    else -> Unit
                                 }
                             },
                             onHistoryRemove = DesktopSearchHistory::remove,
