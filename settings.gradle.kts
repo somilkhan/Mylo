@@ -15,7 +15,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "BitChord"
+rootProject.name = "Mylo"
 include(":shared")
 include(":sharedUi")
 // Desktop modules are JVM-only and need no Android SDK, so they are always included.
