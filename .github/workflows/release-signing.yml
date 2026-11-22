@@ -76,6 +76,10 @@ jobs:
           EOF
           chmod 600 keystore.properties "$RUNNER_TEMP/mylo-signing/MYLO-release-key.jks"
           keytool -list -keystore "$RUNNER_TEMP/mylo-signing/MYLO-release-key.jks" -storepass "$MYLO_RELEASE_STORE_PASSWORD" -alias "$MYLO_RELEASE_KEY_ALIAS" >/dev/null
+          # Public certificate digest; the verify step requires every APK to be signed by exactly this key.
+          expected_digest="$(keytool -exportcert -alias "$MYLO_RELEASE_KEY_ALIAS" -keystore "$RUNNER_TEMP/mylo-signing/MYLO-release-key.jks" -storepass "$MYLO_RELEASE_STORE_PASSWORD" | sha256sum | cut -d' ' -f1)"
+          test -n "$expected_digest"
+          echo "MYLO_EXPECTED_CERT_SHA256=$expected_digest" >> "$GITHUB_ENV"
           echo "Keystore file and configured alias validated."
 
       - name: Build signed phone, TV and Wear OS release APKs
@@ -90,9 +94,15 @@ jobs:
             echo "::error::No release APKs were produced."
             exit 1
           fi
+          test -n "${MYLO_EXPECTED_CERT_SHA256:-}"
           for apk in "${apks[@]}"; do
-            "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$apk"
-            echo "Verified signature: $apk"
+            out="$("$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs --verbose "$apk")"
+            printf '%s\n' "$out"
+            if ! grep -qi "Signer #1 certificate SHA-256 digest: ${MYLO_EXPECTED_CERT_SHA256}" <<<"$out"; then
+              echo "::error::$apk is not signed with the MYLO release key (debug or other key)."
+              exit 1
+            fi
+            echo "Verified MYLO release signature: $apk"
           done
 
       - name: Upload signed release APKs (manual opt-in only)

@@ -30,6 +30,9 @@ on:
       - 'gradle/**'
       - '.github/workflows/tv.yml'
 
+permissions:
+  contents: read
+
 concurrency:
   group: tv-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -38,6 +41,7 @@ jobs:
   tv:
     name: Android TV
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
@@ -50,10 +54,16 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
 
       - name: Write local.properties
+        env:
+          LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
+          LASTFM_SECRET: ${{ secrets.LASTFM_SECRET }}
+          LISTEN_TOGETHER_SERVER: ${{ secrets.LISTEN_TOGETHER_SERVER }}
         run: |
-          echo "LASTFM_API_KEY=${{ secrets.LASTFM_API_KEY }}" > local.properties
-          echo "LASTFM_SECRET=${{ secrets.LASTFM_SECRET }}" >> local.properties
-          echo "LISTEN_TOGETHER_SERVER=${{ secrets.LISTEN_TOGETHER_SERVER }}" >> local.properties
+          {
+            echo "LASTFM_API_KEY=$LASTFM_API_KEY"
+            echo "LASTFM_SECRET=$LASTFM_SECRET"
+            echo "LISTEN_TOGETHER_SERVER=$LISTEN_TOGETHER_SERVER"
+          } > local.properties
 
       # The local debug key, so this APK installs over a local dev build and
       # back. Fork PRs get no secrets; AGP then makes a throwaway key itself.
@@ -63,7 +73,7 @@ jobs:
         run: |
           [ -n "$DEBUG_KEYSTORE_BASE64" ] || exit 0
           mkdir -p ~/.android
-          echo "$DEBUG_KEYSTORE_BASE64" | base64 -d > ~/.android/debug.keystore
+          printf '%s' "$DEBUG_KEYSTORE_BASE64" | base64 --decode > ~/.android/debug.keystore
 
       - run: chmod +x gradlew
 
@@ -73,7 +83,7 @@ jobs:
       - name: Upload the TV dev APK
         uses: actions/upload-artifact@v4
         with:
-          name: bitchord-tv-dev-debug
+          name: mylo-tv-dev-debug
           path: tv/build/outputs/apk/dev/debug/*universal*.apk
 
       - name: Upload build reports
