@@ -41,6 +41,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -4264,13 +4265,25 @@ private fun BitChordApp(
                     }
                 }
 
+                // Scrobble's FAB hides under any overlay, the player or the keyboard.
+                val keyboardVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+                val scrobbleOverlayOpen = route != null && !scrobbleOpen ||
+                    detail != null || selectedMoodGenre != null || onboardingVisible ||
+                    replayStory != null || showReplayShare || songActions != null ||
+                    browseActions != null || playlistTarget != null || creatingPlaylist ||
+                    showSpotifyImportDialog || showLyricsOffset || showAccountSelector ||
+                    showLastfmLogin || showListenBrainzLogin || showUpdateDialog ||
+                    showLyricsSources || showTranslationLanguage || webSession != null
+
                 // Scrobble's entry point, on Home only, floating above the nav bar.
                 ScrobbleFab(
                     visible = scrobbleFabVisible(
                         selectedTab = selectedTab,
                         homeTab = TAB_HOME,
-                        overlayOpen = (route != null && !scrobbleOpen) || detail != null || selectedMoodGenre != null || onboardingVisible,
+                        overlayOpen = scrobbleOverlayOpen,
                         playerOpen = showNowPlaying,
+                        keyboardVisible = keyboardVisible,
+                        hubOpen = scrobbleOpen,
                     ),
                     open = scrobbleOpen,
                     onClick = {
