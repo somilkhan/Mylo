@@ -1523,6 +1523,7 @@ private fun PlaylistDetailContent(
     var addTrackLoading by remember(playlist.id) { mutableStateOf(false) }
     var addTrackError by remember(playlist.id) { mutableStateOf<String?>(null) }
     var addTrackMessage by remember(playlist.id) { mutableStateOf<String?>(null) }
+    var addTrackIsError by remember(playlist.id) { mutableStateOf(false) }
     var detailMenuExpanded by remember(playlist.id) { mutableStateOf(false) }
     var coverMessage by remember(playlist.id) { mutableStateOf<String?>(null) }
     var trackActionMessage by remember(playlist.id) { mutableStateOf<String?>(null) }
@@ -1803,7 +1804,7 @@ private fun PlaylistDetailContent(
                 addTrackMessage?.let {
                     Text(
                         it,
-                        color = if (it.startsWith("Couldn't") || it.contains("no longer")) MaterialTheme.colorScheme.error
+                        color = if (addTrackIsError) MaterialTheme.colorScheme.error
                         else scrobbleAccentColor(),
                     )
                 }
@@ -1843,6 +1844,7 @@ private fun PlaylistDetailContent(
                             scope.launch {
                                 val added = LocalPlaylistStore.addSongIfAbsent(playlist.id, song)
                                 val current = LocalPlaylistStore.getPlaylist(playlist.id)
+                                addTrackIsError = !added && (current == null || current.songs.none { it.videoId == song.videoId })
                                 addTrackMessage = when {
                                     added -> context.getString(R.string.scrobble_added_track, song.title)
                                     current == null -> context.getString(R.string.scrobble_playlist_missing)

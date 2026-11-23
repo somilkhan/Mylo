@@ -71,8 +71,8 @@
     <string name="search_hint">藝人、歌曲、歌詞等</string>
     <string name="recent_search_edit">編輯“%1$s”</string>
     <string name="recent_search_remove">從最近搜尋中移除“%1$s”</string>
-    <string name="storage_required_save">需要儲存訪問許可權才能儲存歌曲</string>
-    <string name="storage_required_read">需要儲存許可權才能讀取本地音訊檔案</string>
+    <string name="storage_required_save">需要儲存訪問權限才能儲存歌曲</string>
+    <string name="storage_required_read">需要儲存權限才能讀取本地音訊檔案</string>
     <string name="sharing_coming_soon">分享功能即將推出</string>
     <string name="already_downloaded">已下載</string>
     <plurals name="downloading_song_count">
@@ -303,7 +303,7 @@
     <string name="discord_token">Discord 令牌</string>
     <string name="discord_token_description">貼上你的 Discord 賬號令牌。它會在此裝置上加密儲存，且只會傳送給 Discord。</string>
     <string name="discord_token_rejected">Discord 拒絕了該令牌。</string>
-    <string name="discord_token_warning">Discord 沒有提供可供應用設定狀態的 API，因此此功能會以你的賬號登入並使用 Discord 的協議。你的令牌會在此裝置上加密儲存，且只會傳送給 Discord。它會授予對你整個賬號的訪問許可權，而賬號自動化違反了 Discord 的服務條款。請僅在你接受此風險時使用此功能。</string>
+    <string name="discord_token_warning">Discord 沒有提供可供應用設定狀態的 API，因此此功能會以你的賬號登入並使用 Discord 的協議。你的令牌會在此裝置上加密儲存，且只會傳送給 Discord。它會授予對你整個賬號的訪問權限，而賬號自動化違反了 Discord 的服務條款。請僅在你接受此風險時使用此功能。</string>
     <string name="dislike">不喜歡</string>
     <string name="done">完成</string>
     <string name="download">下載</string>
@@ -1281,7 +1281,7 @@
     <string name="source_downloads_on">允許下載</string>
     <string name="source_downloads_off">僅限線上播放</string>
     <string name="lossless_output_permission">檢查藍芽編解碼器</string>
-    <string name="lossless_output_permission_detail">允許“附近的裝置”許可權，LDAC 或 LHDC 耳機即可解鎖僅限無損的外掛</string>
+    <string name="lossless_output_permission_detail">允許“附近的裝置”權限，LDAC 或 LHDC 耳機即可解鎖僅限無損的外掛</string>
     <string name="cached_songs">已快取的歌曲</string>
     <string name="cached_songs_subtitle">歌曲快取中的 YouTube 和 JioSaavn 歌曲</string>
     <string name="cached_songs_empty">還沒有已快取的歌曲。你從 YouTube 或 JioSaavn 播放的歌曲會顯示在這裡。</string>
@@ -1298,7 +1298,7 @@
     <string name="import_spotify">從 Spotify 匯入</string>
     <string name="import_spotify_subtitle">從播放列表連結</string>
     <string name="local_playlist_subtitle">%1$d 首歌曲 · 本裝置上</string>
-    <string name="lossless_output_permission_denied">附近裝置許可權未開啟</string>
+    <string name="lossless_output_permission_denied">附近裝置權限未開啟</string>
     <string name="lossless_output_permission_denied_detail">點按以開啟設定並允許「附近裝置」——沒有它就無法讀取你的藍芽編解碼器</string>
     <string name="recent_album">最近的專輯</string>
     <string name="recent_ep">最近的 EP</string>

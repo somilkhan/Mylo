@@ -226,7 +226,7 @@
     <string name="top_pick_named_station">%1$s İstasyonu</string>
     <string name="top_pick_your_station">Senin İstasyonun</string>
     <string name="top_pick_discovery_station">Keşif İstasyonu</string>
-    <string name="top_pick_new_from">%1$s'den Yeniler</string>
+    <string name="top_pick_new_from">%1$s\'den Yeniler</string>
     <string name="mood_energy">Enerji</string>
     <string name="mood_energy_line">Sizi hareketli tutacak yüksek enerjili parçalar.</string>
     <string name="mood_relax">Rahatlama</string>

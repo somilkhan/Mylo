@@ -212,10 +212,10 @@
     <string name="best_part">La parte migliore</string>
     <string name="best_part_description">Vai alla parte migliore</string>
     <string name="watch_output">Orologio</string>
-    <string name="watch_output_subtitle">Riproduci sull'altoparlante o sulle cuffie dell'orologio</string>
+    <string name="watch_output_subtitle">Riproduci sull\'altoparlante o sulle cuffie dell\'orologio</string>
     <string name="previously_played">Riprodotti in precedenza</string>
     <string name="search_addons_hint">Cerca nei tuoi addon</string>
-    <string name="search_addons_empty">Cerca in tutti gli addon attivi in una volta sola. I brani vengono riprodotti direttamente dall'addon.</string>
+    <string name="search_addons_empty">Cerca in tutti gli addon attivi in una volta sola. I brani vengono riprodotti direttamente dall\'addon.</string>
     <string name="search_addons_no_results">Nessun addon contiene “%1$s”.</string>
     <string name="sign_in_with_google">Accedi con Google</string>
     <string name="top_picks_for_you">I migliori consigli per te</string>
@@ -230,7 +230,7 @@
     <string name="mood_energy">Energia</string>
     <string name="mood_energy_line">Brani ad alta energia per non fermarti mai.</string>
     <string name="mood_relax">Relax</string>
-    <string name="mood_relax_line">Suoni dolci e rilassanti per rallentare un po'.</string>
+    <string name="mood_relax_line">Suoni dolci e rilassanti per rallentare un po\'.</string>
     <string name="mood_feeling_blue">Malinconia</string>
     <string name="mood_feeling_blue_line">Canzoni tristi per quando ne hai bisogno.</string>
     <string name="mood_feel_good">Buonumore</string>
@@ -264,7 +264,7 @@
     <string name="mood_morning_line">Brani luminosi per iniziare la giornata nel modo giusto.</string>
     <string name="mood_motivation">Motivazione</string>
     <string name="mood_motivation_line">Inni per darti la carica.</string>
-    <string name="mood_outdoors">All'aperto</string>
+    <string name="mood_outdoors">All\'aperto</string>
     <string name="mood_outdoors_line">Musica per aria fresca e strade aperte.</string>
     <string name="mood_party">Festa</string>
     <string name="mood_party_line">Hit che fanno ballare tutta la notte.</string>
@@ -273,8 +273,8 @@
     <string name="mood_social">Socialità</string>
     <string name="mood_social_line">Canzoni che tutti nella stanza conosceranno.</string>
     <string name="mood_sports">Sport</string>
-    <string name="mood_sports_line">Energia da giorno di partita, dall'inizio alla fine.</string>
-    <string name="mood_summertime">Suoni d'estate</string>
+    <string name="mood_sports_line">Energia da giorno di partita, dall\'inizio alla fine.</string>
+    <string name="mood_summertime">Suoni d\'estate</string>
     <string name="mood_summertime_line">Canzoni solari per le lunghe giornate calde.</string>
     <string name="mood_holiday">Vacanza</string>
     <string name="mood_holiday_line">I preferiti delle feste per la stagione.</string>
