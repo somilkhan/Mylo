@@ -17,6 +17,7 @@ creates the GitHub release; the workflow can also be run by hand from the Action
 
    The workflow fails with a clear error if the tag and `bitchordVersionName` differ.
    A tag containing a hyphen (for example `v1.9.1-beta.1`) is marked as a prerelease.
+The in-app updater reads `releases/latest`, which skips prereleases, so a prerelease tag is not offered as an update.
    Note that a suffixed tag such as `v1.9.1-mylo.1` is rejected by the tag check, since
    the version name has no suffix; bump `bitchordVersionName` to change the version.
 4. The job builds the prod flavor of the phone app, the TV app and the Wear OS app,

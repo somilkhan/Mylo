@@ -1825,14 +1825,6 @@ fun SettingsScreen(
                 withLink(LinkAnnotation.Url("https://github.com/somilkhan", linkStyles)) {
                     append("Developer")
                 }
-                append("  ")
-                withLink(LinkAnnotation.Url("https://discord.gg/pDdKfrdHY6", linkStyles)) {
-                    append("Discord")
-                }
-                append("  ")
-                withLink(LinkAnnotation.Url("https://bitchord.kushagrasingh.in/", linkStyles)) {
-                    append("Website")
-                }
                 append("\n~YouTube Music & Listen Together Backend\n")
                 append(aboutGplCredit)
                 append("  ")
