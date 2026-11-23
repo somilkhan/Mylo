@@ -521,6 +521,7 @@
     <string name="downloading_progress">다운로드 · %1$d%%</string>
     <string name="starting">시작 중</string>
     <string name="start_radio">라디오 시작</string>
+    <string name="start_mix_with_song">Start Mix with this Song</string>
     <string name="shared_link">공유 링크</string>
     <string name="radio_started">%1$s 라디오 시작함</string>
     <string name="saved_to_bitchord_folder">Music/BitChord에 저장 완료</string>
