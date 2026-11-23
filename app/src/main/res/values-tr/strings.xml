@@ -1056,16 +1056,16 @@
     <string name="settings_search_empty">“%1$s” ile eşleşen ayar yok</string>
 
 
-    <string name="content_preferences">Content Preferences</string>
-    <string name="hide_recents">Hide Recents</string>
-    <string name="hide_home_videos">Hide videos from Home</string>
-    <string name="hide_home_videos_subtitle">Shelves of only videos go too. Search, artists and playlists still show them</string>
-    <string name="hide_top_picks">Hide Top Picks for You</string>
-    <string name="hide_home_moods">Hide Find Your Mood</string>
-    <string name="square_video_thumbnails">Square video thumbnails</string>
-    <string name="square_video_thumbnails_subtitle">Show music videos as squares everywhere, including the player</string>
-    <string name="prefer_music_only">Prefer music-only version</string>
-    <string name="prefer_music_only_subtitle">Music videos play as their audio version, and the next track in the queue is converted ahead of time so Automix and crossfade work</string>
+    <string name="content_preferences">İçerik tercihleri</string>
+    <string name="hide_recents">Son çalınanları gizle</string>
+    <string name="hide_home_videos">Ana sayfadaki videoları gizle</string>
+    <string name="hide_home_videos_subtitle">Yalnızca video içeren bölümler de gizlenir. Arama, sanatçılar ve çalma listeleri yine de gösterir</string>
+    <string name="hide_top_picks">Sizin İçin En İyiler’i gizle</string>
+    <string name="hide_home_moods">Ruh halini bul bölümünü gizle</string>
+    <string name="square_video_thumbnails">Kare video küçük resimleri</string>
+    <string name="square_video_thumbnails_subtitle">Müzik videolarını her yerde, oynatıcı dahil kare olarak göster</string>
+    <string name="prefer_music_only">Yalnızca müzik sürümünü tercih et</string>
+    <string name="prefer_music_only_subtitle">Müzik videoları ses sürümüyle çalınır ve kuyruktaki sonraki parça önceden dönüştürülür, böylece AutoMix ve çapraz geçiş çalışır</string>
     <string name="smart_version_alignment">Akıllı ses hizalama</string>
     <string name="smart_version_alignment_subtitle">Tam karşılık gelen çalma anını bulmak için ses dalga biçimlerini analiz eder</string>
 
@@ -1099,9 +1099,9 @@
 
     <string name="equalizer_balance">Denge</string>
 
-    <string name="equalizer_balance_left">L</string>
+    <string name="equalizer_balance_left">S</string>
 
-    <string name="equalizer_balance_right">R</string>
+    <string name="equalizer_balance_right">S</string>
 
     <string name="equalizer_balance_footer">Diğer kulağı kısarak sesi bir kulağa doğru kaydırır.</string>
     <string name="equalizer_bitstream_title">Şu anda çalışmıyor</string>
@@ -1128,7 +1128,7 @@
 
     <string name="eq_preset_treble_cut">Tiz kısma</string>
 
-    <string name="eq_preset_loudness">Loudness</string>
+    <string name="eq_preset_loudness">Yükseklik</string>
 
     <string name="eq_preset_spoken_word">Konuşma</string>
 
@@ -1165,15 +1165,15 @@
 
 
     <string name="audio_pipeline">Ses Hattı</string>
-    <string name="cast_dialog_title">Cast</string>
-    <string name="cast_dialog_subtitle">Play on a Chromecast or Google Cast speaker</string>
-    <string name="cast_searching">Looking for devices…</string>
-    <string name="cast_searching_hint">Your phone and the receiver need to be on the same Wi-Fi network.</string>
-    <string name="cast_device_connecting">Connecting…</string>
-    <string name="cast_device_connected">Casting</string>
-    <string name="cast_stop">Stop casting</string>
-    <string name="cast_track_unsupported">This track can\'t be cast</string>
-    <string name="cast_connect_failed">Couldn\'t connect to the receiver</string>
+    <string name="cast_dialog_title">Yayınla</string>
+    <string name="cast_dialog_subtitle">Bir Chromecast veya Google Cast hoparlöründe çal</string>
+    <string name="cast_searching">Cihazlar aranıyor…</string>
+    <string name="cast_searching_hint">Telefonunuz ve alıcı aynı Wi-Fi ağında olmalı.</string>
+    <string name="cast_device_connecting">Bağlanıyor…</string>
+    <string name="cast_device_connected">Yayınlanıyor</string>
+    <string name="cast_stop">Yayını durdur</string>
+    <string name="cast_track_unsupported">Bu parça yayınlanamaz</string>
+    <string name="cast_connect_failed">Alıcıya bağlanılamadı</string>
     <string name="audio_pipeline_subtitle">Kod çözücüden çıkışa canlı sinyal yolu</string>
 
     <string name="pipeline_track_info">Parça Bilgisi</string>
@@ -1380,9 +1380,9 @@
     <string name="wear_os_code_hint">Eşleme kodu</string>
     <string name="wear_os_done">Bitti</string>
     <string name="signed_by">%1$s tarafından imzalandı</string>
-    <string name="no_audio_version">No audio version found for this video</string>
-    <string name="no_video_version">No video version found for this song</string>
-    <string name="version_switch_in_party">Everyone in Listen Together hears the same version</string>
+    <string name="no_audio_version">Bu video için ses sürümü bulunamadı</string>
+    <string name="no_video_version">Bu şarkı için video sürümü bulunamadı</string>
+    <string name="version_switch_in_party">Birlikte Dinle’deki herkes aynı sürümü duyar</string>
     <string name="opened_file">Açılan dosya</string>
     <string name="folders">Klasörler</string>
     <string name="folder">Klasör</string>
@@ -1548,53 +1548,53 @@
     <string name="drive_over_cellular_subtitle">Kapalıyken otomatik eşitlemeler Wi-Fi\'ı bekler</string>
 
     <!-- Not translated yet: English until a translator adds these. -->
-    <string name="automix_art_transition">Art transition</string>
-    <string name="automix_art_transition_subtitle">Smoothly blends cover art between tracks during AutoMix.</string>
-    <string name="automix_mini_art_transition">Mini-player art transition</string>
-    <string name="automix_mini_art_transition_subtitle">Shows artwork transitions in the mini-player during AutoMix.</string>
-    <string name="show_best_part">Best Part button</string>
-    <string name="show_best_part_subtitle">A button on the artwork that skips to the part of the song people replay most</string>
-    <string name="replay_year_open">Open your Replay %1$s</string>
-    <string name="replay_year_building">Building your year…</string>
-    <string name="replay_year_opener_start">Your</string>
-    <string name="replay_year_opener_end">in Mylo</string>
-    <string name="replay_year_opener_detail">Let’s look back at what you played.</string>
-    <string name="replay_year_minutes_start">This year you listened for</string>
+    <string name="automix_art_transition">Kapak geçişi</string>
+    <string name="automix_art_transition_subtitle">AutoMix sırasında parçalar arasında kapak resimlerini yumuşak bir geçişle birleştirir.</string>
+    <string name="automix_mini_art_transition">Mini oynatıcıda kapak geçişi</string>
+    <string name="automix_mini_art_transition_subtitle">AutoMix sırasında mini oynatıcıda kapak geçişlerini gösterir.</string>
+    <string name="show_best_part">“En iyi bölüm” düğmesi</string>
+    <string name="show_best_part_subtitle">Kapak resminde, insanların en çok tekrar dinlediği bölüme atlayan bir düğme</string>
+    <string name="replay_year_open">Replay %1$s’nizi açın</string>
+    <string name="replay_year_building">Yılınız hazırlanıyor…</string>
+    <string name="replay_year_opener_start">Mylo’daki</string>
+    <string name="replay_year_opener_end">yılınız</string>
+    <string name="replay_year_opener_detail">Neler dinlediğinize birlikte bakalım.</string>
+    <string name="replay_year_minutes_start">Bu yıl şu kadar süre dinledin:</string>
     <plurals name="replay_year_minutes_word">
         <item quantity="one">minute</item>
         <item quantity="other">minutes</item>
     </plurals>
-    <string name="replay_year_minutes_days_start">That’s</string>
-    <string name="replay_year_minutes_days_value">%1$s days</string>
-    <string name="replay_year_minutes_hours_value">%1$s hours</string>
-    <string name="replay_year_minutes_days_end">of music.</string>
-    <string name="replay_year_busiest_start">Your biggest day was</string>
-    <string name="replay_year_busiest_minutes">%1$s minutes of music in one day</string>
-    <string name="replay_year_busiest_song">Mostly %1$s</string>
-    <string name="replay_year_clock_start">You came alive around</string>
-    <string name="replay_year_night_owl">Night Owl</string>
-    <string name="replay_year_night_owl_detail">So much of your listening happened after 10 pm.</string>
-    <string name="replay_year_early_bird">Early Riser</string>
-    <string name="replay_year_early_bird_detail">Your days started with music before 10 am.</string>
-    <string name="replay_year_golden_hour">Golden Hour</string>
-    <string name="replay_year_golden_hour_detail">Evenings were when the music came out.</string>
-    <string name="replay_year_daytime">Daytime Drifter</string>
-    <string name="replay_year_daytime_detail">You kept the music going through the day.</string>
-    <string name="replay_year_all_day">Around the Clock</string>
-    <string name="replay_year_all_day_detail">Morning, noon or night, something was playing.</string>
-    <string name="replay_year_genres_start">Your sound this year</string>
-    <string name="replay_year_artist_start">Your top artist this year was…</string>
-    <string name="replay_year_minutes_together">%1$s minutes together</string>
-    <string name="replay_year_top_artists">Your top artists</string>
-    <string name="replay_year_song_start">And your song of the year…</string>
+    <string name="replay_year_minutes_days_start">Bu,</string>
+    <string name="replay_year_minutes_days_value">%1$s gün</string>
+    <string name="replay_year_minutes_hours_value">%1$s saat</string>
+    <string name="replay_year_minutes_days_end">müzik demek.</string>
+    <string name="replay_year_busiest_start">En yoğun gününüz şuydu:</string>
+    <string name="replay_year_busiest_minutes">Tek bir günde %1$s dakika müzik</string>
+    <string name="replay_year_busiest_song">Çoğunlukla %1$s</string>
+    <string name="replay_year_clock_start">En canlı olduğunuz saat civarı:</string>
+    <string name="replay_year_night_owl">Gece Kuşu</string>
+    <string name="replay_year_night_owl_detail">Dinlemenizin büyük kısmı saat 22.00’den sonra oldu.</string>
+    <string name="replay_year_early_bird">Erken Kalkan</string>
+    <string name="replay_year_early_bird_detail">Gününüz saat 10.00’dan önce müzikle başladı.</string>
+    <string name="replay_year_golden_hour">Altın Saat</string>
+    <string name="replay_year_golden_hour_detail">Müzik en çok akşamları ortaya çıktı.</string>
+    <string name="replay_year_daytime">Gündüz Gezgini</string>
+    <string name="replay_year_daytime_detail">Müziği gün boyunca açık tuttunuz.</string>
+    <string name="replay_year_all_day">Gün Boyu</string>
+    <string name="replay_year_all_day_detail">Sabah, öğle ya da gece, bir şey hep çalıyordu.</string>
+    <string name="replay_year_genres_start">Bu yılki sesiniz</string>
+    <string name="replay_year_artist_start">Bu yılki en çok dinlediğiniz sanatçı…</string>
+    <string name="replay_year_minutes_together">%1$s dakika birlikte</string>
+    <string name="replay_year_top_artists">En çok dinlediğiniz sanatçılar</string>
+    <string name="replay_year_song_start">Yılın şarkınız ise…</string>
     <plurals name="replay_year_played_times">
         <item quantity="one">Played %1$s time</item>
         <item quantity="other">Played %1$s times</item>
     </plurals>
-    <string name="replay_year_top_songs">The rest of your top songs</string>
-    <string name="replay_year_albums">Albums you lived in</string>
-    <string name="replay_year_months">Your year, month by month</string>
-    <string name="replay_year_discovery_start">This year you explored</string>
+    <string name="replay_year_top_songs">En çok dinlediğiniz diğer şarkılar</string>
+    <string name="replay_year_albums">İçinde yaşadığınız albümler</string>
+    <string name="replay_year_months">Yılınız, ay ay</string>
+    <string name="replay_year_discovery_start">Bu yıl keşfettiniz:</string>
     <plurals name="replay_year_songs_word">
         <item quantity="one">song</item>
         <item quantity="other">songs</item>
@@ -1607,10 +1607,26 @@
         <item quantity="one">album</item>
         <item quantity="other">albums</item>
     </plurals>
-    <string name="replay_year_summary_title">Your %1$s</string>
-    <string name="replay_year_summary_artists">Top artists</string>
-    <string name="replay_year_summary_songs">Top songs</string>
-    <string name="replay_year_summary_minutes">Minutes listened</string>
-    <string name="replay_year_mute">Mute the story</string>
-    <string name="replay_year_unmute">Unmute the story</string>
+    <string name="replay_year_summary_title">%1$s’niz</string>
+    <string name="replay_year_summary_artists">En çok dinlenen sanatçılar</string>
+    <string name="replay_year_summary_songs">En çok dinlenen şarkılar</string>
+    <string name="replay_year_summary_minutes">Dinlenen dakika</string>
+    <string name="replay_year_mute">Hikâyeyi sessize al</string>
+    <string name="replay_year_unmute">Hikâyenin sesini aç</string>
+    <string name="scrobble_tracks_count">%1$d parça</string>
+    <string name="scrobble_playlists_tracks_summary">%1$d çalma listesi · %2$d parça</string>
+    <string name="scrobble_created_title">Oluşturuldu: %1$s</string>
+    <string name="scrobble_view_all_tracks">Tüm %1$d parçayı göster</string>
+    <string name="scrobble_remove_device_message">%1$s bu cihazdan kaldırılacak. Dinleme geçmişi etkilenmeyecek.</string>
+    <string name="scrobble_created_go_back">Oluşturuldu: %1$s. Görmek için geri dön.</string>
+    <string name="scrobble_added_track">%1$s eklendi</string>
+    <string name="scrobble_playlist_missing">Çalma listesi artık yok</string>
+    <string name="scrobble_track_already_in_playlist">Parça bu çalma listesinde zaten var</string>
+    <string name="scrobble_save_track_failed">Parça kaydedilemedi. Tekrar deneyin.</string>
+    <string name="scrobble_plays_count">%1$s dinleme</string>
+    <string name="scrobble_choose_format">%1$s için bir biçim seçin.</string>
+    <string name="scrobble_mylo_listening_time">Mylo dinleme süresi · %1$s</string>
+    <string name="scrobble_not_recorded_yet">Henüz kaydedilmedi</string>
+    <string name="scrobble_percent_summary">%1$s · %2$s</string>
+    <string name="scrobble_pinned">Sabitlendi</string>
 </resources>

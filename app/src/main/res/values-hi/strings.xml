@@ -516,8 +516,8 @@
     <string name="default_replay_holder">Mylo श्रोता</string>
     <string name="different_albums">अलग-अलग एल्बम</string>
     <string name="genres_pending">आपके सुनने का इतिहास बढ़ने पर शैलियां दिखेंगी</string>
-    <string name="hour_am">%1$d AM</string>
-    <string name="hour_pm">%1$d PM</string>
+    <string name="hour_am">सुबह %1$d बजे</string>
+    <string name="hour_pm">शाम %1$d बजे</string>
     <string name="hours_minutes_short">%1$dh %2$dm</string>
     <string name="listen_most_around">आप सबसे ज़्यादा %1$s के आसपास सुनते हैं।</string>
     <string name="lyrics_share_title">गाने के शब्द साझा करें</string>
@@ -1056,220 +1056,220 @@
     <string name="use_this_profile">इस प्रोफ़ाइल का उपयोग करें</string>
 
 
-    <string name="lyrics_offset">Lyrics offset</string>
+    <string name="lyrics_offset">गीत का समय-अंतर</string>
 
 
 
 
 
-    <string name="auto_quick_picks">Quick picks</string>
+    <string name="auto_quick_picks">त्वरित चुनाव</string>
 
-    <string name="auto_recents">Recent</string>
+    <string name="auto_recents">हाल के</string>
 
-    <string name="auto_liked">Liked songs</string>
+    <string name="auto_liked">पसंदीदा गाने</string>
 
-    <string name="auto_login_title">Sign in to YouTube on your phone</string>
+    <string name="auto_login_title">अपने फ़ोन पर YouTube में साइन इन करें</string>
 
-    <string name="auto_login_subtitle">Open Mylo on your phone to sign in</string>
+    <string name="auto_login_subtitle">साइन इन करने के लिए अपने फ़ोन पर Mylo खोलें</string>
 
-    <string name="auto_empty_recents_title">No recent songs</string>
+    <string name="auto_empty_recents_title">कोई हाल का गाना नहीं</string>
 
-    <string name="auto_empty_recents_subtitle">Songs you play will appear here</string>
+    <string name="auto_empty_recents_subtitle">आपके चलाए गए गाने यहाँ दिखेंगे</string>
 
-    <string name="auto_empty_quick_picks_title">No suggestions</string>
+    <string name="auto_empty_quick_picks_title">कोई सुझाव नहीं</string>
 
-    <string name="auto_empty_quick_picks_subtitle">Check your connection and try again</string>
+    <string name="auto_empty_quick_picks_subtitle">अपना कनेक्शन जाँचें और फिर से कोशिश करें</string>
 
-    <string name="auto_empty_playlists_title">No playlists available</string>
+    <string name="auto_empty_playlists_title">कोई प्लेलिस्ट उपलब्ध नहीं</string>
 
-    <string name="auto_empty_playlists_subtitle">Check your connection and try again</string>
+    <string name="auto_empty_playlists_subtitle">अपना कनेक्शन जाँचें और फिर से कोशिश करें</string>
 
-    <string name="auto_empty_liked_title">No liked songs</string>
+    <string name="auto_empty_liked_title">कोई पसंदीदा गाना नहीं</string>
 
-    <string name="auto_empty_liked_subtitle">Tap the heart on a song to save it here</string>
+    <string name="auto_empty_liked_subtitle">किसी गाने पर दिल का निशान दबाकर उसे यहाँ सहेजें</string>
 
-    <string name="auto_empty_offline_title">No offline songs</string>
+    <string name="auto_empty_offline_title">कोई ऑफ़लाइन गाना नहीं</string>
 
-    <string name="auto_empty_offline_subtitle">Download songs on your phone to listen here</string>
+    <string name="auto_empty_offline_subtitle">यहाँ सुनने के लिए अपने फ़ोन पर गाने डाउनलोड करें</string>
 
-    <string name="auto_unavailable_title">Content unavailable</string>
+    <string name="auto_unavailable_title">सामग्री उपलब्ध नहीं है</string>
 
-    <string name="auto_unavailable_subtitle">Reopen the folder and try again</string>
+    <string name="auto_unavailable_subtitle">फ़ोल्डर फिर से खोलें और दोबारा कोशिश करें</string>
 
-    <string name="settings_search_hint">Search settings</string>
+    <string name="settings_search_hint">सेटिंग्स खोजें</string>
 
-    <string name="settings_search_empty">No settings match “%1$s”</string>
+    <string name="settings_search_empty">“%1$s” से मेल खाने वाली कोई सेटिंग नहीं है</string>
 
 
-    <string name="content_preferences">Content Preferences</string>
-    <string name="hide_recents">Hide Recents</string>
-    <string name="hide_home_videos">Hide videos from Home</string>
-    <string name="hide_home_videos_subtitle">Shelves of only videos go too. Search, artists and playlists still show them</string>
-    <string name="hide_top_picks">Hide Top Picks for You</string>
-    <string name="hide_home_moods">Hide Find Your Mood</string>
-    <string name="square_video_thumbnails">Square video thumbnails</string>
-    <string name="square_video_thumbnails_subtitle">Show music videos as squares everywhere, including the player</string>
-    <string name="prefer_music_only">Prefer music-only version</string>
-    <string name="prefer_music_only_subtitle">Music videos play as their audio version, and the next track in the queue is converted ahead of time so Automix and crossfade work</string>
+    <string name="content_preferences">सामग्री प्राथमिकताएँ</string>
+    <string name="hide_recents">हाल के छिपाएँ</string>
+    <string name="hide_home_videos">होम से वीडियो छिपाएँ</string>
+    <string name="hide_home_videos_subtitle">केवल वीडियो वाले सेक्शन भी छिप जाएँगे। खोज, कलाकार और प्लेलिस्ट अब भी इन्हें दिखाएँगे</string>
+    <string name="hide_top_picks">आपके लिए टॉप पिक्स छिपाएँ</string>
+    <string name="hide_home_moods">अपना मूड खोजें छिपाएँ</string>
+    <string name="square_video_thumbnails">वर्गाकार वीडियो थंबनेल</string>
+    <string name="square_video_thumbnails_subtitle">संगीत वीडियो हर जगह वर्गाकार दिखाएँ, प्लेयर में भी</string>
+    <string name="prefer_music_only">केवल-संगीत संस्करण को प्राथमिकता दें</string>
+    <string name="prefer_music_only_subtitle">संगीत वीडियो उनके ऑडियो संस्करण में चलते हैं, और कतार का अगला गाना पहले से बदल दिया जाता है, ताकि AutoMix और क्रॉसफ़ेड काम करें</string>
     <string name="smart_version_alignment">स्मार्ट ऑडियो अलाइनमेंट</string>
     <string name="smart_version_alignment_subtitle">ठीक मेल खाने वाला प्लेबैक पल ढूँढने के लिए ऑडियो वेवफ़ॉर्म का विश्लेषण करता है</string>
 
-    <string name="equalizer_footer">Shapes the sound inside Mylo, before it reaches the system.</string>
+    <string name="equalizer_footer">सिस्टम तक पहुँचने से पहले Mylo के अंदर की आवाज़ को आकार देता है।</string>
 
-    <string name="equalizer_dynamic">Dynamic</string>
+    <string name="equalizer_dynamic">डायनामिक</string>
 
-    <string name="equalizer_manual">Manual</string>
+    <string name="equalizer_manual">मैन्युअल</string>
 
-    <string name="equalizer_tone">Tone</string>
+    <string name="equalizer_tone">टोन</string>
 
-    <string name="equalizer_tilt">Tilt</string>
+    <string name="equalizer_tilt">टिल्ट</string>
 
-    <string name="equalizer_contour">Contour</string>
+    <string name="equalizer_contour">कंटूर</string>
 
-    <string name="equalizer_broad">Broad</string>
+    <string name="equalizer_broad">चौड़ा</string>
 
-    <string name="equalizer_focused">Focused</string>
+    <string name="equalizer_focused">केंद्रित</string>
 
-    <string name="equalizer_broad_footer">Drag left for a warmer sound and right for a brighter one; down scoops the middle, up brings it forward. Broad moves wide stretches of the spectrum at once.</string>
+    <string name="equalizer_broad_footer">गर्म आवाज़ के लिए बाईं ओर और चमकीली आवाज़ के लिए दाईं ओर खींचें; नीचे करने पर बीच का हिस्सा दब जाता है, ऊपर करने पर वह आगे आता है। चौड़ा एक साथ स्पेक्ट्रम के बड़े हिस्सों को बदलता है।</string>
 
-    <string name="equalizer_focused_footer">Drag left for a warmer sound and right for a brighter one; down scoops the middle, up brings it forward. Focused works on narrower stretches, so it changes less around what it moves.</string>
+    <string name="equalizer_focused_footer">गर्म आवाज़ के लिए बाईं ओर और चमकीली आवाज़ के लिए दाईं ओर खींचें; नीचे करने पर बीच का हिस्सा दब जाता है, ऊपर करने पर वह आगे आता है। केंद्रित संकरे हिस्सों पर काम करता है, इसलिए जिस हिस्से को आप खिसकाते हैं उसके आसपास कम बदलाव होता है।</string>
 
-    <string name="equalizer_preset">Preset</string>
+    <string name="equalizer_preset">प्रीसेट</string>
 
-    <string name="equalizer_bands">Bands</string>
+    <string name="equalizer_bands">बैंड</string>
 
-    <string name="equalizer_bands_footer">Moving a band leaves the preset behind and the curve becomes your own.</string>
+    <string name="equalizer_bands_footer">किसी बैंड को खिसकाने पर प्रीसेट हट जाता है और कर्व आपका अपना हो जाता है।</string>
 
-    <string name="equalizer_reset">Reset all bands</string>
+    <string name="equalizer_reset">सभी बैंड रीसेट करें</string>
 
-    <string name="equalizer_balance">Balance</string>
+    <string name="equalizer_balance">बैलेंस</string>
 
-    <string name="equalizer_balance_left">L</string>
+    <string name="equalizer_balance_left">बा</string>
 
-    <string name="equalizer_balance_right">R</string>
+    <string name="equalizer_balance_right">दा</string>
 
-    <string name="equalizer_balance_footer">Shifts the sound towards one ear by quietening the other.</string>
+    <string name="equalizer_balance_footer">एक कान की ओर आवाज़ को ले जाता है, दूसरे को धीमा करके।</string>
     <string name="equalizer_bitstream_title">अभी चालू नहीं है</string>
     <string name="equalizer_bitstream_subtitle">यह ट्रैक बिना डीकोड किए आउटपुट पर भेजा जा रहा है</string>
     <string name="equalizer_bitstream_footer">इक्वलाइज़र डीकोड किए गए ऑडियो पर काम करता है। यह ट्रैक बिटस्ट्रीम के रूप में आपके डिवाइस को डीकोड करने के लिए भेजा जाता है, इसलिए यहाँ फ़िल्टर करने के लिए कोई सैंपल नहीं है।</string>
 
-    <string name="system_equalizer">System equalizer</string>
+    <string name="system_equalizer">सिस्टम इक्वलाइज़र</string>
 
-    <string name="system_equalizer_subtitle">Your device\'s own panel</string>
+    <string name="system_equalizer_subtitle">आपके डिवाइस का अपना पैनल</string>
 
-    <string name="system_equalizer_footer">Runs after Mylo\'s, on the whole audio session. Using both applies both.</string>
+    <string name="system_equalizer_footer">Mylo के इक्वलाइज़र के बाद, पूरे ऑडियो सेशन पर चलता है। दोनों का उपयोग करने पर दोनों लागू होते हैं।</string>
 
-    <string name="eq_preset_flat">Flat</string>
+    <string name="eq_preset_flat">फ़्लैट</string>
 
-    <string name="eq_preset_acoustic">Acoustic</string>
+    <string name="eq_preset_acoustic">अकूस्टिक</string>
 
-    <string name="eq_preset_bass_boost">Bass boost</string>
+    <string name="eq_preset_bass_boost">बास बढ़ाएँ</string>
 
-    <string name="eq_preset_bass_cut">Bass cut</string>
+    <string name="eq_preset_bass_cut">बास घटाएँ</string>
 
-    <string name="eq_preset_vocal">Vocal</string>
+    <string name="eq_preset_vocal">वोकल</string>
 
-    <string name="eq_preset_treble_boost">Treble boost</string>
+    <string name="eq_preset_treble_boost">ट्रेबल बढ़ाएँ</string>
 
-    <string name="eq_preset_treble_cut">Treble cut</string>
+    <string name="eq_preset_treble_cut">ट्रेबल घटाएँ</string>
 
-    <string name="eq_preset_loudness">Loudness</string>
+    <string name="eq_preset_loudness">लाउडनेस</string>
 
-    <string name="eq_preset_spoken_word">Spoken word</string>
+    <string name="eq_preset_spoken_word">बोलचाल</string>
 
-    <string name="eq_preset_electronic">Electronic</string>
+    <string name="eq_preset_electronic">इलेक्ट्रॉनिक</string>
 
-    <string name="eq_preset_rock">Rock</string>
+    <string name="eq_preset_rock">रॉक</string>
 
-    <string name="eq_preset_hip_hop">Hip-hop</string>
+    <string name="eq_preset_hip_hop">हिप-हॉप</string>
 
-    <string name="eq_preset_jazz">Jazz</string>
+    <string name="eq_preset_jazz">जैज़</string>
 
-    <string name="eq_preset_classical">Classical</string>
+    <string name="eq_preset_classical">शास्त्रीय</string>
 
-    <string name="eq_preset_small_speakers">Small speakers</string>
+    <string name="eq_preset_small_speakers">छोटे स्पीकर</string>
 
-    <string name="eq_preset_late_night">Late night</string>
+    <string name="eq_preset_late_night">देर रात</string>
 
-    <string name="eq_preset_custom">Custom</string>
+    <string name="eq_preset_custom">कस्टम</string>
 
-    <string name="translation_language">Translation language</string>
+    <string name="translation_language">अनुवाद की भाषा</string>
 
-    <string name="translation_language_description">The language the translate button turns lyrics into.</string>
+    <string name="translation_language_description">वह भाषा जिसमें अनुवाद बटन गीत के बोल बदलेगा।</string>
 
-    <string name="translation_language_app_default">App language</string>
+    <string name="translation_language_app_default">ऐप की भाषा</string>
 
-    <string name="translation_language_subtitle">Follows the app language</string>
+    <string name="translation_language_subtitle">ऐप की भाषा का अनुसरण करता है</string>
 
-    <string name="search_languages">Search languages</string>
+    <string name="search_languages">भाषाएँ खोजें</string>
 
-    <string name="no_languages_match">No languages match</string>
+    <string name="no_languages_match">कोई भाषा नहीं मिली</string>
 
 
 
-    <string name="audio_pipeline">Audio Pipeline</string>
-    <string name="cast_dialog_title">Cast</string>
-    <string name="cast_dialog_subtitle">Play on a Chromecast or Google Cast speaker</string>
-    <string name="cast_searching">Looking for devices…</string>
-    <string name="cast_searching_hint">Your phone and the receiver need to be on the same Wi-Fi network.</string>
-    <string name="cast_device_connecting">Connecting…</string>
-    <string name="cast_device_connected">Casting</string>
-    <string name="cast_stop">Stop casting</string>
-    <string name="cast_track_unsupported">This track can\'t be cast</string>
-    <string name="cast_connect_failed">Couldn\'t connect to the receiver</string>
+    <string name="audio_pipeline">ऑडियो पाइपलाइन</string>
+    <string name="cast_dialog_title">कास्ट</string>
+    <string name="cast_dialog_subtitle">Chromecast या Google Cast स्पीकर पर चलाएँ</string>
+    <string name="cast_searching">डिवाइस खोजे जा रहे हैं…</string>
+    <string name="cast_searching_hint">आपका फ़ोन और रिसीवर एक ही Wi-Fi नेटवर्क पर होने चाहिए।</string>
+    <string name="cast_device_connecting">कनेक्ट हो रहा है…</string>
+    <string name="cast_device_connected">कास्ट हो रहा है</string>
+    <string name="cast_stop">कास्टिंग रोकें</string>
+    <string name="cast_track_unsupported">यह ट्रैक कास्ट नहीं किया जा सकता</string>
+    <string name="cast_connect_failed">रिसीवर से कनेक्ट नहीं हो सका</string>
     <string name="audio_pipeline_subtitle">डीकोडर से आउटपुट तक लाइव सिग्नल पाथ</string>
 
-    <string name="pipeline_track_info">Track Info</string>
+    <string name="pipeline_track_info">ट्रैक की जानकारी</string>
 
-    <string name="pipeline_decoder">Decoder</string>
+    <string name="pipeline_decoder">डीकोडर</string>
 
-    <string name="pipeline_resampler">Resampler</string>
+    <string name="pipeline_resampler">रीसैम्पलर</string>
 
     <string name="pipeline_dsp">DSP</string>
 
-    <string name="pipeline_output_device">Output Device</string>
+    <string name="pipeline_output_device">आउटपुट डिवाइस</string>
 
-    <string name="pipeline_source">Source</string>
+    <string name="pipeline_source">स्रोत</string>
 
-    <string name="pipeline_format">Format</string>
+    <string name="pipeline_format">प्रारूप</string>
 
-    <string name="pipeline_bit_depth">Bit Depth</string>
+    <string name="pipeline_bit_depth">बिट डेप्थ</string>
 
-    <string name="pipeline_sample_rate">Sample Rate</string>
+    <string name="pipeline_sample_rate">सैंपल दर</string>
 
-    <string name="pipeline_bitrate">Bitrate</string>
+    <string name="pipeline_bitrate">बिटरेट</string>
 
-    <string name="pipeline_channels">Channels</string>
+    <string name="pipeline_channels">चैनल</string>
 
-    <string name="pipeline_decoder_name">Decoder Name</string>
+    <string name="pipeline_decoder_name">डीकोडर का नाम</string>
 
-    <string name="pipeline_io_rate">I/O Rate</string>
+    <string name="pipeline_io_rate">I/O दर</string>
 
-    <string name="pipeline_type">Type</string>
+    <string name="pipeline_type">प्रकार</string>
 
-    <string name="pipeline_cutoff">Cutoff</string>
+    <string name="pipeline_cutoff">कटऑफ़</string>
 
-    <string name="pipeline_quality">Quality</string>
+    <string name="pipeline_quality">गुणवत्ता</string>
 
-    <string name="pipeline_pcm_format">PCM Format</string>
+    <string name="pipeline_pcm_format">PCM प्रारूप</string>
 
-    <string name="pipeline_eq_preset">EQ Preset</string>
+    <string name="pipeline_eq_preset">EQ प्रीसेट</string>
 
-    <string name="pipeline_stereo_expand">Stereo Expand</string>
+    <string name="pipeline_stereo_expand">स्टीरियो विस्तार</string>
 
-    <string name="pipeline_buffers">Buffers</string>
+    <string name="pipeline_buffers">बफ़र</string>
 
-    <string name="pipeline_output_api">Output API</string>
+    <string name="pipeline_output_api">आउटपुट API</string>
 
-    <string name="pipeline_device_name">Device Name</string>
+    <string name="pipeline_device_name">डिवाइस का नाम</string>
 
 
 
-    <string name="shared_link">Shared link</string>
+    <string name="shared_link">साझा किया गया लिंक</string>
 
-    <string name="song_will_play_next">Song will play next</string>
+    <string name="song_will_play_next">गाना अगला चलेगा</string>
 
-    <string name="song_added_to_queue">Song added to queue</string>
+    <string name="song_added_to_queue">गाना कतार में जोड़ा गया</string>
     <string name="song_added_to_playlist">प्लेलिस्ट में जोड़ा गया</string>
     <string name="song_already_in_playlist">पहले से प्लेलिस्ट में है</string>
     <plurals name="add_to_playlists_count">
@@ -1282,11 +1282,11 @@
     </plurals>
     <string name="party_queue_full">कतार भर गई है (पार्टी में अधिकतम %d गाने)</string>
 
-    <string name="paxsenix_api_key">PaxSenix API key</string>
+    <string name="paxsenix_api_key">PaxSenix API कुंजी</string>
 
-    <string name="paxsenix_api_key_configured">PaxSenix API key — configured</string>
+    <string name="paxsenix_api_key_configured">PaxSenix API कुंजी — कॉन्फ़िगर की गई</string>
 
-    <string name="paxsenix_api_key_missing">PaxSenix API key — optional, not configured</string>
+    <string name="paxsenix_api_key_missing">PaxSenix API कुंजी — वैकल्पिक, कॉन्फ़िगर नहीं की गई</string>
 
 
 
@@ -1423,9 +1423,9 @@
     <string name="song_info_unavailable">उपलब्ध नहीं</string>
     <string name="song_info_error">कुछ जानकारी लोड नहीं हो सकी।</string>
     <string name="song_info_retry">फिर से कोशिश करें</string>
-    <string name="no_audio_version">No audio version found for this video</string>
-    <string name="no_video_version">No video version found for this song</string>
-    <string name="version_switch_in_party">Everyone in Listen Together hears the same version</string>
+    <string name="no_audio_version">इस वीडियो का कोई ऑडियो संस्करण नहीं मिला</string>
+    <string name="no_video_version">इस गाने का कोई वीडियो संस्करण नहीं मिला</string>
+    <string name="version_switch_in_party">एक साथ सुनें में सभी लोग एक ही संस्करण सुनते हैं</string>
     <string name="opened_file">खोली गई फ़ाइल</string>
     <string name="folders">फ़ोल्डर</string>
     <string name="folder">फ़ोल्डर</string>
@@ -1591,53 +1591,53 @@
     <string name="drive_over_cellular_subtitle">बंद होने पर, ऑटो सिंक Wi-Fi का इंतज़ार करते हैं</string>
 
     <!-- Not translated yet: English until a translator adds these. -->
-    <string name="automix_art_transition">Art transition</string>
-    <string name="automix_art_transition_subtitle">Smoothly blends cover art between tracks during AutoMix.</string>
-    <string name="automix_mini_art_transition">Mini-player art transition</string>
-    <string name="automix_mini_art_transition_subtitle">Shows artwork transitions in the mini-player during AutoMix.</string>
-    <string name="show_best_part">Best Part button</string>
-    <string name="show_best_part_subtitle">A button on the artwork that skips to the part of the song people replay most</string>
-    <string name="replay_year_open">Open your Replay %1$s</string>
-    <string name="replay_year_building">Building your year…</string>
-    <string name="replay_year_opener_start">Your</string>
-    <string name="replay_year_opener_end">in Mylo</string>
-    <string name="replay_year_opener_detail">Let’s look back at what you played.</string>
-    <string name="replay_year_minutes_start">This year you listened for</string>
+    <string name="automix_art_transition">कवर आर्ट संक्रमण</string>
+    <string name="automix_art_transition_subtitle">AutoMix के दौरान गानों के बीच कवर आर्ट को धीरे-धीरे मिलाता है।</string>
+    <string name="automix_mini_art_transition">मिनी-प्लेयर में कवर आर्ट संक्रमण</string>
+    <string name="automix_mini_art_transition_subtitle">AutoMix के दौरान मिनी-प्लेयर में कवर आर्ट संक्रमण दिखाता है।</string>
+    <string name="show_best_part">“बेस्ट पार्ट” बटन</string>
+    <string name="show_best_part_subtitle">कवर पर एक बटन जो गाने के उस हिस्से पर ले जाता है जिसे लोग सबसे ज़्यादा दोबारा सुनते हैं</string>
+    <string name="replay_year_open">अपना %1$s का Replay खोलें</string>
+    <string name="replay_year_building">आपका साल तैयार हो रहा है…</string>
+    <string name="replay_year_opener_start">Mylo में आपका</string>
+    <string name="replay_year_opener_end">साल</string>
+    <string name="replay_year_opener_detail">चलिए, आपने जो सुना उस पर एक नज़र डालते हैं।</string>
+    <string name="replay_year_minutes_start">इस साल आपने सुना</string>
     <plurals name="replay_year_minutes_word">
         <item quantity="one">minute</item>
         <item quantity="other">minutes</item>
     </plurals>
-    <string name="replay_year_minutes_days_start">That’s</string>
-    <string name="replay_year_minutes_days_value">%1$s days</string>
-    <string name="replay_year_minutes_hours_value">%1$s hours</string>
-    <string name="replay_year_minutes_days_end">of music.</string>
-    <string name="replay_year_busiest_start">Your biggest day was</string>
-    <string name="replay_year_busiest_minutes">%1$s minutes of music in one day</string>
-    <string name="replay_year_busiest_song">Mostly %1$s</string>
-    <string name="replay_year_clock_start">You came alive around</string>
-    <string name="replay_year_night_owl">Night Owl</string>
-    <string name="replay_year_night_owl_detail">So much of your listening happened after 10 pm.</string>
-    <string name="replay_year_early_bird">Early Riser</string>
-    <string name="replay_year_early_bird_detail">Your days started with music before 10 am.</string>
-    <string name="replay_year_golden_hour">Golden Hour</string>
-    <string name="replay_year_golden_hour_detail">Evenings were when the music came out.</string>
-    <string name="replay_year_daytime">Daytime Drifter</string>
-    <string name="replay_year_daytime_detail">You kept the music going through the day.</string>
-    <string name="replay_year_all_day">Around the Clock</string>
-    <string name="replay_year_all_day_detail">Morning, noon or night, something was playing.</string>
-    <string name="replay_year_genres_start">Your sound this year</string>
-    <string name="replay_year_artist_start">Your top artist this year was…</string>
-    <string name="replay_year_minutes_together">%1$s minutes together</string>
-    <string name="replay_year_top_artists">Your top artists</string>
-    <string name="replay_year_song_start">And your song of the year…</string>
+    <string name="replay_year_minutes_days_start">यह है</string>
+    <string name="replay_year_minutes_days_value">%1$s दिन</string>
+    <string name="replay_year_minutes_hours_value">%1$s घंटे</string>
+    <string name="replay_year_minutes_days_end">संगीत।</string>
+    <string name="replay_year_busiest_start">आपका सबसे व्यस्त दिन था</string>
+    <string name="replay_year_busiest_minutes">एक ही दिन में %1$s मिनट संगीत</string>
+    <string name="replay_year_busiest_song">ज़्यादातर %1$s</string>
+    <string name="replay_year_clock_start">आप लगभग इस समय सबसे ज़्यादा सक्रिय थे</string>
+    <string name="replay_year_night_owl">रात का उल्लू</string>
+    <string name="replay_year_night_owl_detail">आपकी ज़्यादातर सुनाई रात 10 बजे के बाद हुई।</string>
+    <string name="replay_year_early_bird">जल्दी उठने वाले</string>
+    <string name="replay_year_early_bird_detail">आपके दिन सुबह 10 बजे से पहले संगीत से शुरू हुए।</string>
+    <string name="replay_year_golden_hour">स्वर्णिम घड़ी</string>
+    <string name="replay_year_golden_hour_detail">शामें वो समय थीं जब संगीत सबसे ज़्यादा बजता था।</string>
+    <string name="replay_year_daytime">दिन का घुमक्कड़</string>
+    <string name="replay_year_daytime_detail">आपने दिन भर संगीत चालू रखा।</string>
+    <string name="replay_year_all_day">चौबीसों घंटे</string>
+    <string name="replay_year_all_day_detail">सुबह, दोपहर या रात, कुछ न कुछ बजता ही रहा।</string>
+    <string name="replay_year_genres_start">इस साल आपकी धुन</string>
+    <string name="replay_year_artist_start">इस साल आपके सबसे पसंदीदा कलाकार थे…</string>
+    <string name="replay_year_minutes_together">%1$s मिनट साथ में</string>
+    <string name="replay_year_top_artists">आपके सबसे पसंदीदा कलाकार</string>
+    <string name="replay_year_song_start">और साल का आपका गाना…</string>
     <plurals name="replay_year_played_times">
         <item quantity="one">Played %1$s time</item>
         <item quantity="other">Played %1$s times</item>
     </plurals>
-    <string name="replay_year_top_songs">The rest of your top songs</string>
-    <string name="replay_year_albums">Albums you lived in</string>
-    <string name="replay_year_months">Your year, month by month</string>
-    <string name="replay_year_discovery_start">This year you explored</string>
+    <string name="replay_year_top_songs">आपके बाकी टॉप गाने</string>
+    <string name="replay_year_albums">वे एल्बम जिनमें आप रहे</string>
+    <string name="replay_year_months">आपका साल, महीने-दर-महीने</string>
+    <string name="replay_year_discovery_start">इस साल आपने खोजा</string>
     <plurals name="replay_year_songs_word">
         <item quantity="one">song</item>
         <item quantity="other">songs</item>
@@ -1650,10 +1650,26 @@
         <item quantity="one">album</item>
         <item quantity="other">albums</item>
     </plurals>
-    <string name="replay_year_summary_title">Your %1$s</string>
-    <string name="replay_year_summary_artists">Top artists</string>
-    <string name="replay_year_summary_songs">Top songs</string>
-    <string name="replay_year_summary_minutes">Minutes listened</string>
-    <string name="replay_year_mute">Mute the story</string>
-    <string name="replay_year_unmute">Unmute the story</string>
+    <string name="replay_year_summary_title">आपका %1$s</string>
+    <string name="replay_year_summary_artists">टॉप कलाकार</string>
+    <string name="replay_year_summary_songs">टॉप गाने</string>
+    <string name="replay_year_summary_minutes">सुने गए मिनट</string>
+    <string name="replay_year_mute">कहानी म्यूट करें</string>
+    <string name="replay_year_unmute">कहानी अनम्यूट करें</string>
+    <string name="scrobble_tracks_count">%1$d ट्रैक</string>
+    <string name="scrobble_playlists_tracks_summary">%1$d प्लेलिस्ट · %2$d ट्रैक</string>
+    <string name="scrobble_created_title">%1$s बनाई गई</string>
+    <string name="scrobble_view_all_tracks">सभी %1$d ट्रैक देखें</string>
+    <string name="scrobble_remove_device_message">%1$s इस डिवाइस से हटा दिया जाएगा। सुनने का इतिहास प्रभावित नहीं होगा।</string>
+    <string name="scrobble_created_go_back">%1$s बनाई गई। देखने के लिए वापस जाएँ।</string>
+    <string name="scrobble_added_track">%1$s जोड़ा गया</string>
+    <string name="scrobble_playlist_missing">प्लेलिस्ट अब मौजूद नहीं है</string>
+    <string name="scrobble_track_already_in_playlist">यह ट्रैक इस प्लेलिस्ट में पहले से है</string>
+    <string name="scrobble_save_track_failed">ट्रैक सेव नहीं हो सका। फिर से कोशिश करें।</string>
+    <string name="scrobble_plays_count">%1$s बार सुना</string>
+    <string name="scrobble_choose_format">%1$s के लिए एक फ़ॉर्मेट चुनें।</string>
+    <string name="scrobble_mylo_listening_time">Mylo पर सुनने का समय · %1$s</string>
+    <string name="scrobble_not_recorded_yet">अभी तक दर्ज नहीं</string>
+    <string name="scrobble_percent_summary">%1$s · %2$s</string>
+    <string name="scrobble_pinned">पिन किया गया</string>
 </resources>

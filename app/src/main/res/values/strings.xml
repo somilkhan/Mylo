@@ -1525,4 +1525,20 @@
     <string name="replay_year_summary_minutes">Minutes listened</string>
     <string name="replay_year_mute">Mute the story</string>
     <string name="replay_year_unmute">Unmute the story</string>
+    <string name="scrobble_tracks_count">%1$d tracks</string>
+    <string name="scrobble_playlists_tracks_summary">%1$d playlists · %2$d tracks</string>
+    <string name="scrobble_created_title">Created %1$s</string>
+    <string name="scrobble_view_all_tracks">View all %1$d tracks</string>
+    <string name="scrobble_remove_device_message">%1$s will be removed from this device. Listening history is not affected.</string>
+    <string name="scrobble_created_go_back">Created %1$s. Go back to view it.</string>
+    <string name="scrobble_added_track">Added %1$s</string>
+    <string name="scrobble_playlist_missing">Playlist no longer exists</string>
+    <string name="scrobble_track_already_in_playlist">Track already in this playlist</string>
+    <string name="scrobble_save_track_failed">Couldn\'t save track. Try again.</string>
+    <string name="scrobble_plays_count">%1$s plays</string>
+    <string name="scrobble_choose_format">Choose a format for %1$s.</string>
+    <string name="scrobble_mylo_listening_time">Mylo listening time · %1$s</string>
+    <string name="scrobble_not_recorded_yet">Not recorded yet</string>
+    <string name="scrobble_percent_summary">%1$s · %2$s</string>
+    <string name="scrobble_pinned">Pinned</string>
 </resources>
