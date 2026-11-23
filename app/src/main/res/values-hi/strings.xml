@@ -758,7 +758,7 @@
     <string name="listen_together_custom_server_dialog_message">यह पार्टी एक बाहरी सर्वर पर चल रही है:\n\n%1$s\n\nक्या आप अपना पार्टी सर्वर बदलकर पार्टी %2$s में शामिल होना चाहते हैं?</string>
     <string name="listen_together_custom_server_switch_and_join">बदलें और शामिल हों</string>
     <string name="listen_together_official_server_dialog_title">आधिकारिक सर्वर पर जाएँ?</string>
-    <string name="listen_together_official_server_dialog_message">यह पार्टी BitChord के आधिकारिक सर्वर पर चल रही है।\n\nक्या आप आधिकारिक सर्वर पर लौटकर पार्टी %1$s में शामिल होना चाहते हैं?</string>
+    <string name="listen_together_official_server_dialog_message">यह पार्टी डिफ़ॉल्ट Listen Together सर्वर पर चल रही है।\n\nक्या आप डिफ़ॉल्ट सर्वर पर लौटकर पार्टी %1$s में शामिल होना चाहते हैं?</string>
     <string name="listen_together_switch_failed_stayed_in_party">पार्टी में शामिल नहीं हो सके: %1$s। आप पार्टी %2$s में बने रहेंगे।</string>
     <string name="listen_together_switch_failed">पार्टी में शामिल नहीं हो सके: %1$s।</string>
     <string name="listen_together_ping">%1$d ms</string>

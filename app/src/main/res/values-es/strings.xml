@@ -788,7 +788,7 @@
     <string name="listen_together_custom_server_dialog_message">Esta fiesta está alojada en un servidor externo:\n\n%1$s\n\n¿Quieres cambiar tu servidor de fiestas y unirte a la fiesta %2$s?</string>
     <string name="listen_together_custom_server_switch_and_join">Cambiar y unirse</string>
     <string name="listen_together_official_server_dialog_title">¿Cambiar al servidor oficial?</string>
-    <string name="listen_together_official_server_dialog_message">Esta fiesta está alojada en el servidor oficial de BitChord.\n\n¿Quieres volver al servidor oficial y unirte a la fiesta %1$s?</string>
+    <string name="listen_together_official_server_dialog_message">Esta fiesta está alojada en el servidor predeterminado de Listen Together.\n\n¿Quieres volver al servidor predeterminado y unirte a la fiesta %1$s?</string>
     <string name="listen_together_switch_failed_stayed_in_party">No se pudo unir a la fiesta: %1$s. Sigues en la fiesta %2$s.</string>
     <string name="listen_together_switch_failed">No se pudo unir a la fiesta: %1$s.</string>
     <string name="listen_together_ping">%1$d ms</string>

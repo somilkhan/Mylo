@@ -763,7 +763,7 @@
     <string name="listen_together_custom_server_dialog_message">Esta festa está hospedada em um servidor externo:\n\n%1$s\n\nQuer trocar seu servidor de festas e entrar na festa %2$s?</string>
     <string name="listen_together_custom_server_switch_and_join">Trocar e entrar</string>
     <string name="listen_together_official_server_dialog_title">Mudar para o servidor oficial?</string>
-    <string name="listen_together_official_server_dialog_message">Esta festa está hospedada no servidor oficial do BitChord.\n\nQuer voltar ao servidor oficial e entrar na festa %1$s?</string>
+    <string name="listen_together_official_server_dialog_message">Esta festa está hospedada no servidor padrão do Listen Together.\n\nQuer voltar ao servidor padrão e entrar na festa %1$s?</string>
     <string name="listen_together_switch_failed_stayed_in_party">Não foi possível entrar na festa: %1$s. Você continua na festa %2$s.</string>
     <string name="listen_together_switch_failed">Não foi possível entrar na festa: %1$s.</string>
     <string name="listen_together_ping">%1$d ms</string>

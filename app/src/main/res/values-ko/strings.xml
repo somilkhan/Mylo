@@ -999,7 +999,7 @@
     <string name="listen_together_custom_server_dialog_message">이 파티는 외부 서버에서 호스팅합니다.\n\n%1$s\n\n파티 서버를 전환하고 %2$s 파티에 참여하시겠습니까?</string>
     <string name="listen_together_custom_server_switch_and_join">전환 및 참여</string>
     <string name="listen_together_official_server_dialog_title">공식 서버로 전환하시겠습니까?</string>
-    <string name="listen_together_official_server_dialog_message">이 파티는 공식 BitChord 서버에서 호스팅합니다.\n\n공식 서버로 되돌아가고 %1$s 파티에 참여하시겠습니까?</string>
+    <string name="listen_together_official_server_dialog_message">이 파티는 기본 Listen Together 서버에서 호스팅합니다.\n\n기본 서버로 되돌아가고 %1$s 파티에 참여하시겠습니까?</string>
     <string name="listen_together_switch_failed_stayed_in_party">파티 참여 불가: %1$s. 파티 %2$s에 남습니다.</string>
     <string name="listen_together_switch_failed">파티 참여 불가: %1$s.</string>
     <string name="listen_together_ping">%1$d ms</string>

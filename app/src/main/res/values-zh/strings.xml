@@ -738,7 +738,7 @@
     <string name="listen_together_custom_server_dialog_message">此派对托管在外部服务器上：\n\n%1$s\n\n要切换派对服务器并加入派对 %2$s 吗？</string>
     <string name="listen_together_custom_server_switch_and_join">切换并加入</string>
     <string name="listen_together_official_server_dialog_title">切换到官方服务器？</string>
-    <string name="listen_together_official_server_dialog_message">此派对托管在 BitChord 官方服务器上。\n\n要切换回官方服务器并加入派对 %1$s 吗？</string>
+    <string name="listen_together_official_server_dialog_message">此派对托管在默认的 Listen Together 服务器上。\n\n要切换回默认服务器并加入派对 %1$s 吗？</string>
     <string name="listen_together_switch_failed_stayed_in_party">无法加入派对：%1$s。仍留在派对 %2$s 中。</string>
     <string name="listen_together_switch_failed">无法加入派对：%1$s。</string>
     <string name="listen_together_ping">%1$d ms</string>

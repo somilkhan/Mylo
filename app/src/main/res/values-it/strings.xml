@@ -824,7 +824,7 @@
     <string name="listen_together_custom_server_dialog_message">Questo party è ospitato su un server esterno:\n\n%1$s\n\nVuoi cambiare server dei party ed entrare nel party %2$s?</string>
     <string name="listen_together_custom_server_switch_and_join">Cambia ed entra</string>
     <string name="listen_together_official_server_dialog_title">Passare al server ufficiale?</string>
-    <string name="listen_together_official_server_dialog_message">Questo party è ospitato sul server ufficiale di BitChord.\n\nVuoi tornare al server ufficiale ed entrare nel party %1$s?</string>
+    <string name="listen_together_official_server_dialog_message">Questo party è ospitato sul server predefinito di Listen Together.\n\nVuoi tornare al server predefinito ed entrare nel party %1$s?</string>
     <string name="listen_together_switch_failed_stayed_in_party">Impossibile entrare nel party: %1$s. Resti nel party %2$s.</string>
     <string name="listen_together_switch_failed">Impossibile entrare nel party: %1$s.</string>
     <string name="listen_together_ping">%1$d ms</string>

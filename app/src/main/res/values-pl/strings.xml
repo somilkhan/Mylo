@@ -794,7 +794,7 @@
     <string name="listen_together_custom_server_dialog_message">Ta impreza działa na zewnętrznym serwerze:\n\n%1$s\n\nCzy chcesz zmienić serwer imprez i dołączyć do imprezy %2$s?</string>
     <string name="listen_together_custom_server_switch_and_join">Zmień i dołącz</string>
     <string name="listen_together_official_server_dialog_title">Przełączyć na oficjalny serwer?</string>
-    <string name="listen_together_official_server_dialog_message">Ta impreza działa na oficjalnym serwerze BitChord.\n\nCzy chcesz wrócić na oficjalny serwer i dołączyć do imprezy %1$s?</string>
+    <string name="listen_together_official_server_dialog_message">Ta impreza działa na domyślnym serwerze Listen Together.\n\nCzy chcesz wrócić na domyślny serwer i dołączyć do imprezy %1$s?</string>
     <string name="listen_together_switch_failed_stayed_in_party">Nie udało się dołączyć do imprezy: %1$s. Pozostajesz na imprezie %2$s.</string>
     <string name="listen_together_switch_failed">Nie udało się dołączyć do imprezy: %1$s.</string>
     <string name="listen_together_ping">%1$d ms</string>

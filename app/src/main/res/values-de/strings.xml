@@ -758,7 +758,7 @@
     <string name="listen_together_custom_server_dialog_message">Diese Party läuft auf einem externen Server:\n\n%1$s\n\nMöchtest du deinen Party-Server wechseln und der Party %2$s beitreten?</string>
     <string name="listen_together_custom_server_switch_and_join">Wechseln &amp; beitreten</string>
     <string name="listen_together_official_server_dialog_title">Zum offiziellen Server wechseln?</string>
-    <string name="listen_together_official_server_dialog_message">Diese Party läuft auf dem offiziellen BitChord-Server.\n\nMöchtest du zurück zum offiziellen Server wechseln und der Party %1$s beitreten?</string>
+    <string name="listen_together_official_server_dialog_message">Diese Party läuft auf dem Standard-Listen-Together-Server.\n\nMöchtest du zum Standardserver zurückwechseln und der Party %1$s beitreten?</string>
     <string name="listen_together_switch_failed_stayed_in_party">Party-Beitritt fehlgeschlagen: %1$s. Du bleibst in der Party %2$s.</string>
     <string name="listen_together_switch_failed">Party-Beitritt fehlgeschlagen: %1$s.</string>
     <string name="listen_together_ping">%1$d ms</string>

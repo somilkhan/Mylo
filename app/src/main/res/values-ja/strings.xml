@@ -738,7 +738,7 @@
     <string name="listen_together_custom_server_dialog_message">このパーティーは外部サーバーでホストされています:\n\n%1$s\n\nパーティーサーバーを切り替えて、パーティー %2$s に参加しますか？</string>
     <string name="listen_together_custom_server_switch_and_join">切り替えて参加</string>
     <string name="listen_together_official_server_dialog_title">公式サーバーに切り替えますか？</string>
-    <string name="listen_together_official_server_dialog_message">このパーティーはBitChord公式サーバーでホストされています。\n\n公式サーバーに戻して、パーティー %1$s に参加しますか？</string>
+    <string name="listen_together_official_server_dialog_message">このパーティーはListen Togetherのデフォルトサーバーでホストされています。\n\nデフォルトサーバーに戻して、パーティー %1$s に参加しますか？</string>
     <string name="listen_together_switch_failed_stayed_in_party">パーティーに参加できませんでした: %1$s。パーティー %2$s に残ります。</string>
     <string name="listen_together_switch_failed">パーティーに参加できませんでした: %1$s。</string>
     <string name="listen_together_ping">%1$d ms</string>
