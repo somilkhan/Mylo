@@ -1656,4 +1656,20 @@
     <string name="replay_year_summary_minutes">Gehörte Minuten</string>
     <string name="replay_year_mute">Geschichte stummschalten</string>
     <string name="replay_year_unmute">Geschichte wieder einschalten</string>
+    <string name="scrobble_tracks_count">%1$d Titel</string>
+    <string name="scrobble_playlists_tracks_summary">%1$d Playlists · %2$d Titel</string>
+    <string name="scrobble_created_title">%1$s erstellt</string>
+    <string name="scrobble_view_all_tracks">Alle %1$d Titel anzeigen</string>
+    <string name="scrobble_remove_device_message">%1$s wird von diesem Gerät entfernt. Der Hörverlauf bleibt unverändert.</string>
+    <string name="scrobble_created_go_back">%1$s erstellt. Zurück gehen, um sie anzusehen.</string>
+    <string name="scrobble_added_track">%1$s hinzugefügt</string>
+    <string name="scrobble_playlist_missing">Playlist existiert nicht mehr</string>
+    <string name="scrobble_track_already_in_playlist">Titel ist bereits in dieser Playlist</string>
+    <string name="scrobble_save_track_failed">Titel konnte nicht gespeichert werden. Versuch es erneut.</string>
+    <string name="scrobble_plays_count">%1$s Wiedergaben</string>
+    <string name="scrobble_choose_format">Format für %1$s wählen.</string>
+    <string name="scrobble_mylo_listening_time">Mylo-Hörzeit · %1$s</string>
+    <string name="scrobble_not_recorded_yet">Noch nicht erfasst</string>
+    <string name="scrobble_percent_summary">%1$s · %2$s</string>
+    <string name="scrobble_pinned">Angeheftet</string>
 </resources>

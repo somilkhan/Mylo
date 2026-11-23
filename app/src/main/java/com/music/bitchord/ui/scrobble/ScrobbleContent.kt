@@ -371,7 +371,7 @@ fun ScrobbleGenerateContent(
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
-                            Text("${playlist.songs.size} tracks", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(stringResource(R.string.scrobble_tracks_count, playlist.songs.size), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         TextButton(onClick = onOpenPlaylists, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSecondaryContainer)) { Text(stringResource(R.string.open)) }
                     }
@@ -580,8 +580,8 @@ fun ScrobbleGenerateContent(
                         }
                     }
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("${PlaylistGenerationRepository.MIN_TRACKS} tracks", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text("${PlaylistGenerationRepository.MAX_TRACKS} tracks", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(R.string.scrobble_tracks_count, PlaylistGenerationRepository.MIN_TRACKS), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(R.string.scrobble_tracks_count, PlaylistGenerationRepository.MAX_TRACKS), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
 
@@ -1005,7 +1005,7 @@ fun ScrobblePlaylistsContent(
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                             Text(stringResource(R.string.scrobble_tab_playlists), style = MaterialTheme.typography.displayLarge, color = MaterialTheme.colorScheme.onBackground)
                             Text(
-                                "${playlists.size} playlists · ${totalTracks} tracks",
+                                stringResource(R.string.scrobble_playlists_tracks_summary, playlists.size, totalTracks),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -1056,7 +1056,7 @@ fun ScrobblePlaylistsContent(
             generationState.savedPlaylist?.takeIf { it.generationMode == "similar-playlist" }?.let { saved ->
                 item(key = "similar_playlist_saved") {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Created ${saved.title}", modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurface)
+                        Text(stringResource(R.string.scrobble_created_title, saved.title), modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurface)
                         TextButton(onClick = { selectedId = saved.id }, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface)) { Text(stringResource(R.string.open)) }
                     }
                 }
@@ -1200,7 +1200,7 @@ fun ScrobblePlaylistsContent(
                                         }
                                     }
                                     TextButton(onClick = { selectedId = playlist.id }, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface)) {
-                                        Text("View all ${playlist.songs.size} tracks")
+                                        Text(stringResource(R.string.scrobble_view_all_tracks, playlist.songs.size))
                                     }
                                 }
                             }
@@ -1285,7 +1285,7 @@ fun ScrobblePlaylistsContent(
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
-                    "${target.title} will be removed from this device. Listening history is not affected.",
+                    stringResource(R.string.scrobble_remove_device_message, target.title),
                     style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp, lineHeight = 17.sp),
                     color = MaterialTheme.colorScheme.onSurface,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
@@ -1413,7 +1413,7 @@ private fun PlaylistRow(
                         horizontalArrangement = Arrangement.spacedBy(7.dp),
                     ) {
                         Text(
-                            "${playlist.songs.size} tracks${if (playlist.isPinned) " · Pinned" else ""}",
+                            listOfNotNull(stringResource(R.string.scrobble_tracks_count, playlist.songs.size), if (playlist.isPinned) stringResource(R.string.scrobble_pinned) else null).joinToString(" · "),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
@@ -1560,7 +1560,7 @@ private fun PlaylistDetailContent(
                                 }
                             }
                             coverMessage = if (LocalPlaylistStore.getPlaylist(playlist.id) == null) {
-                                "Playlist no longer exists"
+                                context.getString(R.string.scrobble_playlist_missing)
                             } else {
                                 "Couldn't save cover. Try again."
                             }
@@ -1763,7 +1763,7 @@ private fun PlaylistDetailContent(
             }
             trackActionMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
             generationState.savedPlaylist?.takeIf { it.generationMode == "similar-playlist" }?.let {
-                Text("Created ${it.title}. Go back to view it.", style = MaterialTheme.typography.bodySmall, color = scrobbleAccentColor())
+                Text(stringResource(R.string.scrobble_created_go_back, it.title), style = MaterialTheme.typography.bodySmall, color = scrobbleAccentColor())
             }
             exportMessage?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall, color = if (it.startsWith("Couldn't")) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
@@ -1844,10 +1844,10 @@ private fun PlaylistDetailContent(
                                 val added = LocalPlaylistStore.addSongIfAbsent(playlist.id, song)
                                 val current = LocalPlaylistStore.getPlaylist(playlist.id)
                                 addTrackMessage = when {
-                                    added -> "Added ${song.title}"
-                                    current == null -> "Playlist no longer exists"
-                                    current.songs.any { it.videoId == song.videoId } -> "Track already in this playlist"
-                                    else -> "Couldn't save track. Try again."
+                                    added -> context.getString(R.string.scrobble_added_track, song.title)
+                                    current == null -> context.getString(R.string.scrobble_playlist_missing)
+                                    current.songs.any { it.videoId == song.videoId } -> context.getString(R.string.scrobble_track_already_in_playlist)
+                                    else -> context.getString(R.string.scrobble_save_track_failed)
                                 }
                             }
                         },

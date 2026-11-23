@@ -1698,4 +1698,20 @@
     <string name="replay_year_summary_minutes">Przesłuchane minuty</string>
     <string name="replay_year_mute">Wycisz historię</string>
     <string name="replay_year_unmute">Wyłącz wyciszenie historii</string>
+    <string name="scrobble_tracks_count">%1$d utworów</string>
+    <string name="scrobble_playlists_tracks_summary">%1$d playlist · %2$d utworów</string>
+    <string name="scrobble_created_title">Utworzono: %1$s</string>
+    <string name="scrobble_view_all_tracks">Pokaż wszystkie %1$d utworów</string>
+    <string name="scrobble_remove_device_message">%1$s zostanie usunięte z tego urządzenia. Historia odsłuchów nie zostanie zmieniona.</string>
+    <string name="scrobble_created_go_back">Utworzono: %1$s. Wróć, aby ją zobaczyć.</string>
+    <string name="scrobble_added_track">Dodano: %1$s</string>
+    <string name="scrobble_playlist_missing">Playlista już nie istnieje</string>
+    <string name="scrobble_track_already_in_playlist">Utwór jest już na tej playliście</string>
+    <string name="scrobble_save_track_failed">Nie udało się zapisać utworu. Spróbuj ponownie.</string>
+    <string name="scrobble_plays_count">%1$s odtworzeń</string>
+    <string name="scrobble_choose_format">Wybierz format dla: %1$s.</string>
+    <string name="scrobble_mylo_listening_time">Czas słuchania w Mylo · %1$s</string>
+    <string name="scrobble_not_recorded_yet">Jeszcze nie zapisano</string>
+    <string name="scrobble_percent_summary">%1$s · %2$s</string>
+    <string name="scrobble_pinned">Przypięta</string>
 </resources>

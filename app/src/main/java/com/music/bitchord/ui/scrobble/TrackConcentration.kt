@@ -145,7 +145,7 @@ internal fun TrackConcentrationCard(
                 }
             }
             Text(
-                "Mylo listening time · ${if (localListeningMs > 0L) formatConcentrationDuration(localListeningMs) else "Not recorded yet"}",
+                stringResource(R.string.scrobble_mylo_listening_time, if (localListeningMs > 0L) formatConcentrationDuration(localListeningMs) else stringResource(R.string.scrobble_not_recorded_yet)),
                 style = MaterialTheme.typography.labelSmall,
                 color = colors.onSurfaceVariant,
             )
@@ -174,7 +174,7 @@ private fun ConcentrationBreakdownRow(
         )
         Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
         Text(
-            "$percent% · ${NumberFormat.getIntegerInstance().format(plays)} plays",
+            stringResource(R.string.scrobble_percent_summary, "$percent%", stringResource(R.string.scrobble_plays_count, NumberFormat.getIntegerInstance().format(plays))),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

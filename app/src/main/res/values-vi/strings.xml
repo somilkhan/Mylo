@@ -1572,4 +1572,20 @@
     <string name="replay_year_summary_minutes">Số phút đã nghe</string>
     <string name="replay_year_mute">Tắt tiếng câu chuyện</string>
     <string name="replay_year_unmute">Bật tiếng câu chuyện</string>
+    <string name="scrobble_tracks_count">%1$d bài</string>
+    <string name="scrobble_playlists_tracks_summary">%1$d danh sách phát · %2$d bài</string>
+    <string name="scrobble_created_title">Đã tạo: %1$s</string>
+    <string name="scrobble_view_all_tracks">Xem tất cả %1$d bài</string>
+    <string name="scrobble_remove_device_message">%1$s sẽ bị xóa khỏi thiết bị này. Lịch sử nghe không bị ảnh hưởng.</string>
+    <string name="scrobble_created_go_back">Đã tạo: %1$s. Quay lại để xem.</string>
+    <string name="scrobble_added_track">Đã thêm: %1$s</string>
+    <string name="scrobble_playlist_missing">Danh sách phát không còn tồn tại</string>
+    <string name="scrobble_track_already_in_playlist">Bài này đã có trong danh sách phát</string>
+    <string name="scrobble_save_track_failed">Không thể lưu bài. Thử lại.</string>
+    <string name="scrobble_plays_count">%1$s lượt nghe</string>
+    <string name="scrobble_choose_format">Chọn định dạng cho %1$s.</string>
+    <string name="scrobble_mylo_listening_time">Thời gian nghe trên Mylo · %1$s</string>
+    <string name="scrobble_not_recorded_yet">Chưa ghi nhận</string>
+    <string name="scrobble_percent_summary">%1$s · %2$s</string>
+    <string name="scrobble_pinned">Đã ghim</string>
 </resources>

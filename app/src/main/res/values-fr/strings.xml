@@ -1657,4 +1657,20 @@
     <string name="replay_year_summary_minutes">Minutes écoutées</string>
     <string name="replay_year_mute">Couper le récit</string>
     <string name="replay_year_unmute">Réactiver le récit</string>
+    <string name="scrobble_tracks_count">%1$d pistes</string>
+    <string name="scrobble_playlists_tracks_summary">%1$d playlists · %2$d pistes</string>
+    <string name="scrobble_created_title">Créée : %1$s</string>
+    <string name="scrobble_view_all_tracks">Voir les %1$d pistes</string>
+    <string name="scrobble_remove_device_message">%1$s sera supprimé de cet appareil. L\'historique d\'écoute n\'est pas affecté.</string>
+    <string name="scrobble_created_go_back">Créée : %1$s. Revenez en arrière pour la voir.</string>
+    <string name="scrobble_added_track">Ajoutée : %1$s</string>
+    <string name="scrobble_playlist_missing">La playlist n\'existe plus</string>
+    <string name="scrobble_track_already_in_playlist">Cette piste est déjà dans la playlist</string>
+    <string name="scrobble_save_track_failed">Impossible d\'enregistrer la piste. Réessayez.</string>
+    <string name="scrobble_plays_count">%1$s écoutes</string>
+    <string name="scrobble_choose_format">Choisissez un format pour %1$s.</string>
+    <string name="scrobble_mylo_listening_time">Temps d\'écoute dans Mylo · %1$s</string>
+    <string name="scrobble_not_recorded_yet">Pas encore enregistré</string>
+    <string name="scrobble_percent_summary">%1$s · %2$s</string>
+    <string name="scrobble_pinned">Épinglée</string>
 </resources>

@@ -403,7 +403,7 @@ private fun ReplayInsightRow(
                     color = colors.onSurface,
                 )
                 Text(
-                    listOfNotNull(entry.subtitle, duration, "${entry.plays} plays").joinToString(" · "),
+                    listOfNotNull(entry.subtitle, duration, stringResource(R.string.scrobble_plays_count, entry.plays)).joinToString(" · "),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     style = MaterialTheme.typography.bodySmall,
@@ -668,7 +668,7 @@ internal fun ScrobblePlaylistExportDialog(
                 color = MaterialTheme.colorScheme.onSurface,
             )
             Text(
-                "Choose a format for ${playlist.title}.",
+                stringResource(R.string.scrobble_choose_format, playlist.title),
                 style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp, lineHeight = 17.sp),
                 color = MaterialTheme.colorScheme.onSurface,
                 textAlign = TextAlign.Center,

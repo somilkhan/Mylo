@@ -1661,4 +1661,20 @@
     <string name="replay_year_summary_minutes">דקות שהאזנת להן</string>
     <string name="replay_year_mute">השתק את הסיפור</string>
     <string name="replay_year_unmute">בטל השתקה של הסיפור</string>
+    <string name="scrobble_tracks_count">%1$d רצועות</string>
+    <string name="scrobble_playlists_tracks_summary">%1$d פלייליסטים · %2$d רצועות</string>
+    <string name="scrobble_created_title">נוצר: %1$s</string>
+    <string name="scrobble_view_all_tracks">הצג את כל %1$d הרצועות</string>
+    <string name="scrobble_remove_device_message">%1$s יוסר מהמכשיר הזה. היסטוריית ההאזנה לא תושפע.</string>
+    <string name="scrobble_created_go_back">נוצר: %1$s. חזור כדי לראות אותו.</string>
+    <string name="scrobble_added_track">%1$s נוסף</string>
+    <string name="scrobble_playlist_missing">הפלייליסט כבר לא קיים</string>
+    <string name="scrobble_track_already_in_playlist">הרצועה כבר נמצאת בפלייליסט הזה</string>
+    <string name="scrobble_save_track_failed">לא ניתן לשמור את הרצועה. נסה שוב.</string>
+    <string name="scrobble_plays_count">%1$s השמעות</string>
+    <string name="scrobble_choose_format">בחר פורמט עבור %1$s.</string>
+    <string name="scrobble_mylo_listening_time">זמן האזנה ב-Mylo · %1$s</string>
+    <string name="scrobble_not_recorded_yet">עדיין לא נרשם</string>
+    <string name="scrobble_percent_summary">%1$s · %2$s</string>
+    <string name="scrobble_pinned">מוצמד</string>
 </resources>

@@ -1690,4 +1690,20 @@
     <string name="replay_year_summary_minutes">Прослушано минут</string>
     <string name="replay_year_mute">Выключить звук истории</string>
     <string name="replay_year_unmute">Включить звук истории</string>
+    <string name="scrobble_tracks_count">%1$d треков</string>
+    <string name="scrobble_playlists_tracks_summary">%1$d плейлистов · %2$d треков</string>
+    <string name="scrobble_created_title">Создано: %1$s</string>
+    <string name="scrobble_view_all_tracks">Показать все треки (%1$d)</string>
+    <string name="scrobble_remove_device_message">%1$s будет удалён с этого устройства. История прослушивания не изменится.</string>
+    <string name="scrobble_created_go_back">Создано: %1$s. Вернитесь, чтобы посмотреть.</string>
+    <string name="scrobble_added_track">Добавлено: %1$s</string>
+    <string name="scrobble_playlist_missing">Плейлист больше не существует</string>
+    <string name="scrobble_track_already_in_playlist">Трек уже есть в этом плейлисте</string>
+    <string name="scrobble_save_track_failed">Не удалось сохранить трек. Попробуйте ещё раз.</string>
+    <string name="scrobble_plays_count">%1$s прослушиваний</string>
+    <string name="scrobble_choose_format">Выберите формат для «%1$s».</string>
+    <string name="scrobble_mylo_listening_time">Время прослушивания в Mylo · %1$s</string>
+    <string name="scrobble_not_recorded_yet">Пока не записано</string>
+    <string name="scrobble_percent_summary">%1$s · %2$s</string>
+    <string name="scrobble_pinned">Закреплён</string>
 </resources>

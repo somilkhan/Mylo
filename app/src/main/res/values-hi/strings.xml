@@ -1656,4 +1656,20 @@
     <string name="replay_year_summary_minutes">सुने गए मिनट</string>
     <string name="replay_year_mute">कहानी म्यूट करें</string>
     <string name="replay_year_unmute">कहानी अनम्यूट करें</string>
+    <string name="scrobble_tracks_count">%1$d ट्रैक</string>
+    <string name="scrobble_playlists_tracks_summary">%1$d प्लेलिस्ट · %2$d ट्रैक</string>
+    <string name="scrobble_created_title">%1$s बनाई गई</string>
+    <string name="scrobble_view_all_tracks">सभी %1$d ट्रैक देखें</string>
+    <string name="scrobble_remove_device_message">%1$s इस डिवाइस से हटा दिया जाएगा। सुनने का इतिहास प्रभावित नहीं होगा।</string>
+    <string name="scrobble_created_go_back">%1$s बनाई गई। देखने के लिए वापस जाएँ।</string>
+    <string name="scrobble_added_track">%1$s जोड़ा गया</string>
+    <string name="scrobble_playlist_missing">प्लेलिस्ट अब मौजूद नहीं है</string>
+    <string name="scrobble_track_already_in_playlist">यह ट्रैक इस प्लेलिस्ट में पहले से है</string>
+    <string name="scrobble_save_track_failed">ट्रैक सेव नहीं हो सका। फिर से कोशिश करें।</string>
+    <string name="scrobble_plays_count">%1$s बार सुना</string>
+    <string name="scrobble_choose_format">%1$s के लिए एक फ़ॉर्मेट चुनें।</string>
+    <string name="scrobble_mylo_listening_time">Mylo पर सुनने का समय · %1$s</string>
+    <string name="scrobble_not_recorded_yet">अभी तक दर्ज नहीं</string>
+    <string name="scrobble_percent_summary">%1$s · %2$s</string>
+    <string name="scrobble_pinned">पिन किया गया</string>
 </resources>

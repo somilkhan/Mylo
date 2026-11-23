@@ -1595,4 +1595,20 @@
     <string name="replay_year_summary_minutes">Minuti ascoltati</string>
     <string name="replay_year_mute">Silenzia la storia</string>
     <string name="replay_year_unmute">Riattiva la storia</string>
+    <string name="scrobble_tracks_count">%1$d brani</string>
+    <string name="scrobble_playlists_tracks_summary">%1$d playlist · %2$d brani</string>
+    <string name="scrobble_created_title">Creata: %1$s</string>
+    <string name="scrobble_view_all_tracks">Vedi tutti i %1$d brani</string>
+    <string name="scrobble_remove_device_message">%1$s verrà rimosso da questo dispositivo. La cronologia d\'ascolto non viene modificata.</string>
+    <string name="scrobble_created_go_back">Creata: %1$s. Torna indietro per vederla.</string>
+    <string name="scrobble_added_track">Aggiunta: %1$s</string>
+    <string name="scrobble_playlist_missing">La playlist non esiste più</string>
+    <string name="scrobble_track_already_in_playlist">Il brano è già in questa playlist</string>
+    <string name="scrobble_save_track_failed">Impossibile salvare il brano. Riprova.</string>
+    <string name="scrobble_plays_count">%1$s riproduzioni</string>
+    <string name="scrobble_choose_format">Scegli un formato per %1$s.</string>
+    <string name="scrobble_mylo_listening_time">Tempo d\'ascolto in Mylo · %1$s</string>
+    <string name="scrobble_not_recorded_yet">Non ancora registrato</string>
+    <string name="scrobble_percent_summary">%1$s · %2$s</string>
+    <string name="scrobble_pinned">Fissata</string>
 </resources>
