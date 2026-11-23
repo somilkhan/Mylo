@@ -222,6 +222,11 @@ object LocalPlaylistStore {
         persistNow(updated)
     }
 
+    /** Test seam: sets the in-memory playlists, without device storage. */
+    internal fun setPlaylistsForTest(playlists: List<LocalPlaylist>) {
+        _playlists.value = playlists
+    }
+
     fun getPlaylist(id: String): LocalPlaylist? {
         val cleanId = normalizeId(id)
         return _playlists.value.firstOrNull { it.id == cleanId || it.id == id || it.browseId == id }
