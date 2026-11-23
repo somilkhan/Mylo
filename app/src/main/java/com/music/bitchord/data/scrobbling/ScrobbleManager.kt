@@ -7,8 +7,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlin.math.min
-import kotlin.math.roundToLong
 
 class ScrobbleManager(
     private val scope: CoroutineScope,
@@ -21,6 +19,7 @@ class ScrobbleManager(
     private var scrobbleTimerStartedAt: Long = 0L
     private var songStartedAt: Long = 0L
     private var songStarted = false
+    private var scrobbled = false
     var useNowPlaying = true
     var usePrimaryArtistOnly = false
 
@@ -30,6 +29,7 @@ class ScrobbleManager(
         scrobbleTimerStartedAt = 0L
         songStartedAt = 0L
         songStarted = false
+        scrobbled = false
     }
 
     fun onSongStart(
@@ -39,6 +39,7 @@ class ScrobbleManager(
         if (song == null) return
         songStartedAt = System.currentTimeMillis() / 1000
         songStarted = true
+        scrobbled = false
         startScrobbleTimer(song, durationMs)
         if (useNowPlaying) {
             updateNowPlaying(song)
@@ -63,14 +64,18 @@ class ScrobbleManager(
         durationMs: Long? = null,
     ) {
         scrobbleJob?.cancel()
+        if (scrobbled) return
         val resolvedDurationSeconds = durationMs?.toInt()?.div(1000)
-            ?: song.durationText?.let { parseDurationSeconds(it) }
+            ?: song.durationText?.let { ScrobbleTiming.parseDurationSeconds(it) }
             ?: return
 
-        if (resolvedDurationSeconds <= minSongDuration) return
+        if (!ScrobbleTiming.isEligible(resolvedDurationSeconds, minSongDuration)) return
 
-        val thresholdMs = (resolvedDurationSeconds * 1000L * scrobbleDelayPercent).roundToLong()
-        scrobbleRemainingMillis = min(thresholdMs, scrobbleDelaySeconds * 1000L)
+        scrobbleRemainingMillis = ScrobbleTiming.thresholdMillis(
+            resolvedDurationSeconds,
+            scrobbleDelayPercent,
+            scrobbleDelaySeconds,
+        )
 
         if (scrobbleRemainingMillis <= 0) {
             scrobbleSong(song, resolvedDurationSeconds)
@@ -96,13 +101,14 @@ class ScrobbleManager(
     }
 
     private fun resumeScrobbleTimer(song: Song) {
-        if (scrobbleRemainingMillis <= 0) return
+        // Once a song has been scrobbled, a resume must not submit it again.
+        if (scrobbled || scrobbleRemainingMillis <= 0) return
         scrobbleJob?.cancel()
         scrobbleTimerStartedAt = System.currentTimeMillis()
         scrobbleJob =
             scope.launch {
                 delay(scrobbleRemainingMillis)
-                val durationSeconds = song.durationText?.let { parseDurationSeconds(it) } ?: 0
+                val durationSeconds = song.durationText?.let { ScrobbleTiming.parseDurationSeconds(it) } ?: 0
                 scrobbleSong(song, durationSeconds)
                 scrobbleJob = null
             }
@@ -115,6 +121,9 @@ class ScrobbleManager(
     }
 
     private fun scrobbleSong(song: Song, durationSeconds: Int) {
+        if (scrobbled) return
+        scrobbled = true
+        scrobbleRemainingMillis = 0L
         val entry = LastFmScrobbleEntry(
             artist = song.artist.forScrobble(),
             track = song.title,
@@ -133,7 +142,7 @@ class ScrobbleManager(
                     artist = scrobbleArtist,
                     track = song.title,
                     album = song.albumName,
-                    duration = song.durationText?.let { parseDurationSeconds(it) },
+                    duration = song.durationText?.let { ScrobbleTiming.parseDurationSeconds(it) },
                 ).onSuccess {
                     Log.d(TAG, "Updated now playing: ${song.title}")
                 }.onFailure { throwable ->
@@ -158,17 +167,6 @@ class ScrobbleManager(
         } else {
             onSongPause()
         }
-    }
-
-    /**
-     * Parse "M:SS" or "MM:SS" duration text to total seconds.
-     */
-    private fun parseDurationSeconds(text: String): Int {
-        val parts = text.split(":")
-        if (parts.size != 2) return 0
-        val minutes = parts[0].toIntOrNull() ?: return 0
-        val seconds = parts[1].toIntOrNull() ?: return 0
-        return minutes * 60 + seconds
     }
 
     private fun String.forScrobble(): String = if (usePrimaryArtistOnly) primaryArtist() else this
