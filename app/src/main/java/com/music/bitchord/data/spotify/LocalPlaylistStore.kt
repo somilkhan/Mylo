@@ -219,7 +219,7 @@ object LocalPlaylistStore {
             if (index < 0) playlist else playlist.copy(songs = playlist.songs.filterIndexed { i, _ -> i != index })
         }
         _playlists.value = updated
-        persist(updated)
+        persistNow(updated)
     }
 
     fun getPlaylist(id: String): LocalPlaylist? {
@@ -237,6 +237,19 @@ object LocalPlaylistStore {
         } finally {
             mutationMutex.unlock()
         }
+    }
+
+    /**
+     * The same write as [persist], for the callers that cannot suspend (the
+     * one-row removal above). Fire and forget on the calling thread, as the
+     * upstream store wrote it.
+     */
+    private fun persistNow(list: List<LocalPlaylist>) {
+        if (!this@LocalPlaylistStore::prefs.isInitialized) return
+        val saved = runCatching {
+            prefs.edit().putString(KEY_PLAYLISTS, LocalPlaylistCodec.encode(list)).apply()
+        }.isSuccess
+        if (saved) _loadError.value = null
     }
 
     private suspend fun persist(list: List<LocalPlaylist>): Boolean = withContext(Dispatchers.IO) {

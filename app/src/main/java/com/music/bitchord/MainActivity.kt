@@ -5751,7 +5751,7 @@ private fun BitChordApp(
                 } ?: importEditable?.let { p ->
                     { name: String ->
                         browseActions = null
-                        com.music.bitchord.data.spotify.LocalPlaylistStore.renamePlaylist(p.browseId, name.trim())
+                        scope.launch { com.music.bitchord.data.spotify.LocalPlaylistStore.renamePlaylist(p.browseId, name.trim()) }
                         viewModel.retitleDetail(p.browseId, name.trim())
                     }
                 },
@@ -5798,7 +5798,7 @@ private fun BitChordApp(
                     {
                         browseActions = null
                         if (detail?.browseId == p.browseId) viewModel.closeDetail()
-                        com.music.bitchord.data.spotify.LocalPlaylistStore.deletePlaylist(p.browseId)
+                        scope.launch { com.music.bitchord.data.spotify.LocalPlaylistStore.deletePlaylist(p.browseId) }
                     }
                 },
                 onDeleteDownload = target.downloadId?.let { id ->
