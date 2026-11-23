@@ -7,7 +7,7 @@ plugins {
 }
 
 /*
- * MYLO for Wear OS: a remote for the phone app, not a second player.
+ * BitChord for Wear OS: a remote for the phone app, not a second player.
  *
  * It holds no library, streams nothing and runs no Palette or blur of its own —
  * the phone sends it what is playing, the cover as a 240px JPEG, and the mesh
@@ -16,8 +16,8 @@ plugins {
  *
  * It has to share the phone app's application id *and* signing key, because the
  * Wearable Data Layer only delivers between apps that match on both. So:
- *   dev  -> app.mylo.music.dev pairs only with the phone's dev build
- *   prod -> app.mylo.music pairs only with the phone's prod build
+ *   dev  -> app.mylo.music.wear.dev
+ *   prod -> app.mylo.music.wear
  * and each build type is signed exactly the way the phone's is (debug key for
  * debug, the release keystore for release), so a watch build pairs with the
  * phone build of the same variant.
@@ -35,7 +35,7 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "app.mylo.music"
+        applicationId = "app.mylo.music.wear"
         // Wear OS 3, the oldest a Galaxy Watch 4 ever shipped with.
         minSdk = 30
         targetSdk = 36
@@ -53,12 +53,12 @@ android {
     productFlavors {
         create("dev") {
             dimension = "env"
-            applicationId = "app.mylo.music.dev"
-            resValue("string", "app_name", "MYLO Dev")
+            applicationId = "app.mylo.music.wear.dev"
+            resValue("string", "app_name", "Mylo Wear Dev")
         }
         create("prod") {
             dimension = "env"
-            resValue("string", "app_name", "MYLO")
+            resValue("string", "app_name", "Mylo Wear")
         }
     }
 
@@ -136,10 +136,10 @@ kotlin {
     }
 }
 
-// Named after the phone APKs (MYLO-v1.8.apk) but with their own prefix, so
-// the phone's updater — which only takes assets starting "MYLO-" — can never
+// Named after the phone APKs (Mylo-1.9.1.apk) but with their own prefix, so
+// the phone's updater — which only takes assets starting "Mylo-" — can never
 // pick a watch APK by mistake.
-base.archivesName.set("MYLOWear")
+base.archivesName.set("BitChordWear")
 
 dependencies {
     implementation("androidx.wear.compose:compose-material3:1.6.2")

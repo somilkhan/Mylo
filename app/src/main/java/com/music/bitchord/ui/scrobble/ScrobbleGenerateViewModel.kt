@@ -81,6 +81,9 @@ class ScrobbleGenerateViewModel(application: Application) : AndroidViewModel(app
     fun generate(request: PlaylistGenerationRequest) {
         if (generationJob?.isActive == true) return
         val queueAfterSave = queueMixOnSave
+        // Consumed by this run only: a failed or cancelled Start mix must not
+        // leave the flag set for a later, unrelated generation to pick up.
+        queueMixOnSave = false
         val token = ++generationToken
         _uiState.update {
             it.copy(
@@ -117,12 +120,14 @@ class ScrobbleGenerateViewModel(application: Application) : AndroidViewModel(app
                     },
                 )
                 if (generationToken == token) {
-                    if (queueAfterSave) {
-                        _pendingStartMixQueue.value = playlist
-                        queueMixOnSave = false
-                    }
                     _uiState.update { it.copy(savedPlaylist = playlist) }
-                    _savedPlaylistEvents.emit(playlist)
+                    if (queueAfterSave) {
+                        // A Start mix stays on Generate: it queues playback instead of
+                        // emitting the saved-playlist handoff that moves to Playlists.
+                        _pendingStartMixQueue.value = playlist
+                    } else {
+                        _savedPlaylistEvents.emit(playlist)
+                    }
                 }
             } catch (_: TimeoutCancellationException) {
                 if (generationToken == token) {

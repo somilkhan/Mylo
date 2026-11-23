@@ -271,14 +271,8 @@ func handleTime(w http.ResponseWriter, r *http.Request) {
 }
 
 // handlePresence takes the open apps' heartbeat:
-// {"id": "<install uuid>", "platform": "android"|"pc", "open": true|false}.
+// {"id": "<install uuid>", "platform": "android"|"pc"|"browser", "open": true|false}.
 func handlePresence(w http.ResponseWriter, r *http.Request) {
-	// Only the apps ping, and they send no Origin. Refusing browsers stops any web
-	// page from making its visitors post made-up installs from their addresses.
-	if r.Header.Get("Origin") != "" {
-		jsonError(w, http.StatusForbidden, "origin_not_allowed", "Presence is only accepted from the apps.")
-		return
-	}
 	if !presenceLimiter.Allow(clientIP(r)) {
 		jsonError(w, http.StatusTooManyRequests, "rate_limited", "Too many presence pings from this address.")
 		return
@@ -298,11 +292,19 @@ func handlePresence(w http.ResponseWriter, r *http.Request) {
 	}
 	platform, ok := presence.ParsePlatform(body.Platform)
 	if !ok {
-		jsonError(w, http.StatusUnprocessableEntity, "invalid_platform", "platform must be android or pc.")
+		jsonError(w, http.StatusUnprocessableEntity, "invalid_platform", "platform must be android, pc or browser.")
 		return
 	}
 	if body.Open == nil {
 		jsonError(w, http.StatusUnprocessableEntity, "invalid_open", "open must be true or false.")
+		return
+	}
+	// The native apps send no Origin; only the web player does, and only from a
+	// named origin. Refusing every other browser stops any web page from making
+	// its visitors post made-up installs from their addresses.
+	origin := r.Header.Get("Origin")
+	if (platform == presence.Browser) != (origin != "") || (origin != "" && !config.IsAllowedOrigin(origin)) {
+		jsonError(w, http.StatusForbidden, "origin_not_allowed", "Presence is only accepted from the apps and the web player.")
 		return
 	}
 	if *body.Open {
@@ -749,7 +751,7 @@ var inviteTemplate = template.Must(template.New("invite").Parse(`<!DOCTYPE html>
             <a id="joinBtn" href="{{.IntentURI}}" class="btn">Join Party in BitChord</a>
             <p class="footer-note">
                 Didn’t open automatically? Tap the button above.<br>
-                Don't have BitChord yet? <a href="https://github.com/kushagrasinghx/BitChord/releases" target="_blank" rel="noopener">Download it here</a>.
+                Don't have Mylo yet? <a href="https://github.com/somilkhan/Mylo/releases" target="_blank" rel="noopener">Download it here</a>.
             </p>
             <script>
                 var intentUri = {{.IntentURI}};

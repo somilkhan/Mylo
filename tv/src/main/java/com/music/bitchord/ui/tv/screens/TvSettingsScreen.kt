@@ -41,6 +41,7 @@ import com.music.bitchord.ui.tv.dialogs.TvEqualizerDialog
 import com.music.bitchord.ui.tv.dialogs.TvLyricsSourcesDialog
 import com.music.bitchord.ui.tv.dialogs.TvRefreshRateDialog
 import com.music.bitchord.ui.tv.dialogs.TvScrobbleDialog
+import com.music.bitchord.data.settings.TvPlayerStyle
 import com.music.bitchord.ui.tv.dialogs.TvThemeDialog
 import com.music.bitchord.ui.tv.dialogs.TvUpdateDialog
 import com.music.bitchord.ui.tv.display.TvRefreshRateController
@@ -52,7 +53,7 @@ import com.music.bitchord.ui.tv.theme.TvType
 // Discord Rich Presence is hidden on TV for now; TvDiscordDialog is kept for when it returns.
 private enum class SettingsSheet { Theme, RefreshRate, Equalizer, Scrobbling, LyricsSources, Update, About }
 
-private const val DefaultBlurb = "Playback, sound and display preferences for MYLO on this TV."
+private const val DefaultBlurb = "Playback, sound and display preferences for BitChord on this TV."
 
 /**
  * Settings, as tvOS lays it out: the app on the left with a plain description of
@@ -84,6 +85,7 @@ fun TvSettingsScreen(
     val lyricsCanvas by TvSettings.tvLyricsCanvasEnabled.collectAsState()
     val nerdStats by AppSettings.showNerdStats.collectAsState()
     val themeId by TvSettings.tvTheme.collectAsState()
+    val playerStyle by TvSettings.tvPlayerStyle.collectAsState()
     val uiScale by TvSettings.tvUiScale.collectAsState()
     val refreshRate by TvRefreshRateController.preference.collectAsState()
     val reduceMotion by AppSettings.reduceAnimation.collectAsState()
@@ -267,8 +269,19 @@ fun TvSettingsScreen(
                 TvListRow(
                     title = "Appearance",
                     value = AppThemeOption.fromId(themeId).title,
-                    onFocused = { blurb = "The background behind MYLO's pages." },
+                    onFocused = { blurb = "The background behind BitChord's pages." },
                     onClick = { sheet = SettingsSheet.Theme },
+                )
+            }
+            item {
+                TvListRow(
+                    title = "Player Background",
+                    value = playerStyle.label,
+                    onFocused = { blurb = "What Now Playing shows behind the song: the artwork's colours, or AMOLED's pure black." },
+                    onClick = {
+                        val styles = TvPlayerStyle.entries
+                        TvSettings.setTvPlayerStyle(styles[(playerStyle.ordinal + 1) % styles.size])
+                    },
                 )
             }
             item {
@@ -323,7 +336,7 @@ fun TvSettingsScreen(
                     TvListRow(
                         title = "Software Update",
                         value = "${update?.version.orEmpty()} Available",
-                        onFocused = { blurb = "Download and install the new version of MYLO for TV." },
+                        onFocused = { blurb = "Download and install the new version of BitChord for TV." },
                         onClick = { sheet = SettingsSheet.Update },
                     )
                 }

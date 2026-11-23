@@ -31,6 +31,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.ui.res.stringResource
+import com.music.bitchord.R
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -137,7 +139,7 @@ internal fun ScrobbleStatisticsContent(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                             Text(
-                                "Statistics",
+                                stringResource(R.string.scrobble_title_stats),
                                 style = MaterialTheme.typography.displayLarge,
                                 fontWeight = FontWeight.SemiBold,
                             )
@@ -260,7 +262,7 @@ internal fun ScrobbleStatisticsContent(
                                     modifier = Modifier.size(18.dp),
                                 )
                                 Spacer(Modifier.width(8.dp))
-                                Text("Play your Replay")
+                                Text(stringResource(R.string.play_your_replay))
                             }
                         }
                     }
@@ -434,7 +436,7 @@ private fun StatisticsRetryNotice(
         ) {
             Text(message, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
             TextButton(onClick = onRetry, colors = scrobbleTextButtonColors(colors.onErrorContainer)) {
-                Text("Retry", color = colors.onErrorContainer)
+                Text(stringResource(R.string.retry), color = colors.onErrorContainer)
             }
         }
     }
@@ -452,7 +454,7 @@ private fun StatisticsEmptyState(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Text("No listening yet", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Text(stringResource(R.string.scrobble_no_listening_yet), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         Text(
             if (lastFmConnected) {
                 "No listening history for this period."
@@ -465,7 +467,7 @@ private fun StatisticsEmptyState(
         )
         if (!lastFmConnected) {
             Button(onClick = onOpenSettings, colors = scrobblePrimaryButtonColors()) {
-                Text("Open Settings")
+                Text(stringResource(R.string.scrobble_open_settings))
             }
         }
     }
@@ -674,35 +676,35 @@ internal fun ScrobblePlaylistExportDialog(
         }
         AlertRule()
         AlertAction(
-            label = "Save CSV",
+            label = stringResource(R.string.scrobble_save_csv),
             emphasised = true,
             contentColor = scrobbleAccentColor(),
             onClick = { csvSaveLauncher.launch(LocalPlaylistExport.fileName(playlist.title, "csv")) },
         )
         AlertRule()
         AlertAction(
-            label = "Share CSV",
+            label = stringResource(R.string.scrobble_share_csv),
             emphasised = false,
             contentColor = MaterialTheme.colorScheme.onSurface,
             onClick = { share(true); onDismiss() },
         )
         AlertRule()
         AlertAction(
-            label = "Save M3U",
+            label = stringResource(R.string.scrobble_save_m3u),
             emphasised = true,
             contentColor = scrobbleAccentColor(),
             onClick = { m3uSaveLauncher.launch(LocalPlaylistExport.fileName(playlist.title, "m3u")) },
         )
         AlertRule()
         AlertAction(
-            label = "Share M3U",
+            label = stringResource(R.string.scrobble_share_m3u),
             emphasised = false,
             contentColor = MaterialTheme.colorScheme.onSurface,
             onClick = { share(false); onDismiss() },
         )
         AlertRule()
         AlertAction(
-            label = "Done",
+            label = stringResource(R.string.done),
             emphasised = false,
             contentColor = MaterialTheme.colorScheme.onSurface,
             onClick = onDismiss,

@@ -38,6 +38,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import com.music.bitchord.ui.screens.LocalPlaylistReleaseHeader
 import com.music.bitchord.ui.components.SongRow
 import com.music.bitchord.ui.components.AlertAction
 import com.music.bitchord.ui.components.AlertRule
@@ -46,7 +47,6 @@ import com.music.bitchord.ui.components.PillTextField
 import com.music.bitchord.ui.components.SearchField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
-import com.music.bitchord.ui.screens.LocalPlaylistReleaseHeader
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
@@ -64,6 +64,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.ui.res.stringResource
+import com.music.bitchord.R
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -249,7 +251,7 @@ fun ScrobbleGenerateContent(
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                Text("Generate", style = MaterialTheme.typography.displayLarge, color = MaterialTheme.colorScheme.onBackground)
+                Text(stringResource(R.string.scrobble_tab_generate), style = MaterialTheme.typography.displayLarge, color = MaterialTheme.colorScheme.onBackground)
                 Text(
                     "Pick a vibe to build a playlist.",
                     style = MaterialTheme.typography.bodyLarge,
@@ -292,9 +294,9 @@ fun ScrobbleGenerateContent(
                 ) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("Building your mix", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                            Text(stringResource(R.string.scrobble_building_mix), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                             Spacer(Modifier.weight(1f))
-                            TextButton(onClick = viewModel::cancelGeneration, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSecondaryContainer)) { Text("Cancel") }
+                            TextButton(onClick = viewModel::cancelGeneration, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSecondaryContainer)) { Text(stringResource(R.string.cancel)) }
                         }
                         LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = scrobbleAccentColor())
                         Text(
@@ -322,9 +324,9 @@ fun ScrobbleGenerateContent(
                             Text(error, modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onErrorContainer)
                             val retryRequest = uiState.activeRequest
                             if (retryRequest != null) {
-                                TextButton(onClick = { viewModel.generate(retryRequest) }, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onErrorContainer)) { Text("Retry") }
+                                TextButton(onClick = { viewModel.generate(retryRequest) }, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onErrorContainer)) { Text(stringResource(R.string.retry)) }
                             } else {
-                                TextButton(onClick = viewModel::dismissError, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onErrorContainer)) { Text("Dismiss") }
+                                TextButton(onClick = viewModel::dismissError, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onErrorContainer)) { Text(stringResource(R.string.scrobble_dismiss)) }
                             }
                         }
                     }
@@ -362,7 +364,7 @@ fun ScrobbleGenerateContent(
                             modifier = Modifier.size(64.dp).clip(RoundedCornerShape(12.dp)),
                         )
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                            Text("Playlist saved", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                            Text(stringResource(R.string.scrobble_playlist_saved), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                             Text(
                                 playlist.title,
                                 color = MaterialTheme.colorScheme.onSecondaryContainer,
@@ -371,7 +373,7 @@ fun ScrobbleGenerateContent(
                             )
                             Text("${playlist.songs.size} tracks", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        TextButton(onClick = onOpenPlaylists, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSecondaryContainer)) { Text("Open") }
+                        TextButton(onClick = onOpenPlaylists, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSecondaryContainer)) { Text(stringResource(R.string.open)) }
                     }
                 }
             }
@@ -567,7 +569,7 @@ fun ScrobbleGenerateContent(
                                 color = scrobbleAccentColor(),
                                 fontWeight = FontWeight.Bold,
                             )
-                            Text("tracks · steps of 5", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(stringResource(R.string.scrobble_tracks_steps), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         IconButton(
                             onClick = { count = (count + 5).coerceAtMost(PlaylistGenerationRepository.MAX_TRACKS) },
@@ -624,7 +626,7 @@ fun ScrobbleGenerateContent(
                         modifier = Modifier.weight(1f).height(52.dp),
                         colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface),
                     ) {
-                        Text("Cancel")
+                        Text(stringResource(R.string.cancel))
                     }
                     Button(
                         onClick = {
@@ -705,7 +707,7 @@ private fun GeneratorSeedPicker(
             Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
         }
         if (!seedSearching && seedSearchError == null && seedQuery.trim().length >= 2 && seedResults.isEmpty()) {
-            Text("No tracks found", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+            Text(stringResource(R.string.scrobble_no_tracks_found), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
         }
         seedResults.forEach { song ->
             GeneratorSeedResult(
@@ -1001,7 +1003,7 @@ fun ScrobblePlaylistsContent(
                 Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                            Text("Playlists", style = MaterialTheme.typography.displayLarge, color = MaterialTheme.colorScheme.onBackground)
+                            Text(stringResource(R.string.scrobble_tab_playlists), style = MaterialTheme.typography.displayLarge, color = MaterialTheme.colorScheme.onBackground)
                             Text(
                                 "${playlists.size} playlists · ${totalTracks} tracks",
                                 style = MaterialTheme.typography.bodyMedium,
@@ -1011,7 +1013,7 @@ fun ScrobblePlaylistsContent(
                         TextButton(onClick = onOpenGenerator, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface)) {
                             Icon(Icons.Rounded.AutoAwesome, contentDescription = null, modifier = Modifier.size(17.dp))
                             Spacer(Modifier.width(6.dp))
-                            Text("Generate")
+                            Text(stringResource(R.string.scrobble_tab_generate))
                         }
                         Box {
                             IconButton(onClick = { sortMenuExpanded = true }) {
@@ -1037,14 +1039,14 @@ fun ScrobblePlaylistsContent(
                             }
                         }
                     }
-                    Text("Your generated and saved mixes", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.scrobble_mixes_subtitle), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             storageError?.let { error ->
                 item(key = "playlist_storage_error") {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(error, color = MaterialTheme.colorScheme.error)
-                        TextButton(onClick = { scope.launch { LocalPlaylistStore.reload() } }, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface)) { Text("Retry") }
+                        TextButton(onClick = { scope.launch { LocalPlaylistStore.reload() } }, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface)) { Text(stringResource(R.string.retry)) }
                     }
                 }
             }
@@ -1055,7 +1057,7 @@ fun ScrobblePlaylistsContent(
                 item(key = "similar_playlist_saved") {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("Created ${saved.title}", modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurface)
-                        TextButton(onClick = { selectedId = saved.id }, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface)) { Text("Open") }
+                        TextButton(onClick = { selectedId = saved.id }, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface)) { Text(stringResource(R.string.open)) }
                     }
                 }
             }
@@ -1070,7 +1072,7 @@ fun ScrobblePlaylistsContent(
                         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = scrobbleAccentColor())
                             Text(generationState.progress, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            TextButton(onClick = viewModel::cancelGeneration, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSecondaryContainer)) { Text("Cancel") }
+                            TextButton(onClick = viewModel::cancelGeneration, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSecondaryContainer)) { Text(stringResource(R.string.cancel)) }
                         }
                     }
                 }
@@ -1114,7 +1116,7 @@ fun ScrobblePlaylistsContent(
                             Button(onClick = onOpenGenerator, colors = scrobblePrimaryButtonColors(), shape = RoundedCornerShape(16.dp)) {
                                 Icon(Icons.Rounded.AutoAwesome, contentDescription = null)
                                 Spacer(Modifier.width(8.dp))
-                                Text("Open Generator")
+                                Text(stringResource(R.string.scrobble_open_generator))
                             }
                         }
                     }
@@ -1239,9 +1241,9 @@ fun ScrobblePlaylistsContent(
             }
             AlertRule()
             AlertAction(
-                label = "Save",
-                emphasised = true,
+                label = stringResource(R.string.save),
                 contentColor = scrobbleAccentColor(),
+                emphasised = true,
                 onClick = {
                     val clean = renameText.trim()
                     val duplicate = playlists.any { it.id != target.id && it.title.equals(clean, ignoreCase = true) }
@@ -1260,9 +1262,9 @@ fun ScrobblePlaylistsContent(
             )
             AlertRule()
             AlertAction(
-                label = "Cancel",
-                emphasised = false,
+                label = stringResource(R.string.cancel),
                 contentColor = MaterialTheme.colorScheme.onSurface,
+                emphasised = false,
                 onClick = { renameTarget = null },
             )
         }
@@ -1292,13 +1294,13 @@ fun ScrobblePlaylistsContent(
             }
             AlertRule()
             AlertAction(
-                label = "Delete",
+                label = stringResource(R.string.delete),
+                contentColor = MaterialTheme.colorScheme.error,
                 emphasised = true,
                 destructive = true,
-                contentColor = MaterialTheme.colorScheme.error,
                 onClick = {
                     scope.launch {
-                        withContext(NonCancellable) {
+                        withContext<Unit>(NonCancellable) {
                             if (LocalPlaylistStore.deletePlaylist(target.id)) {
                                 target.customCoverUri?.let { savedUri ->
                                     runCatching {
@@ -1320,9 +1322,9 @@ fun ScrobblePlaylistsContent(
             )
             AlertRule()
             AlertAction(
-                label = "Cancel",
-                emphasised = false,
+                label = stringResource(R.string.cancel),
                 contentColor = MaterialTheme.colorScheme.onSurface,
+                emphasised = false,
                 onClick = { deleteTarget = null; deleteError = null },
             )
         }
@@ -1450,32 +1452,32 @@ private fun PlaylistRow(
                             onClick = { menuExpanded = false; onPin() },
                         )
                         DropdownMenuItem(
-                            text = { Text("Generate similar") },
+                            text = { Text(stringResource(R.string.scrobble_generate_similar)) },
                             leadingIcon = { Icon(Icons.Rounded.Shuffle, contentDescription = null) },
                             enabled = canGenerateSimilar,
                             onClick = { menuExpanded = false; onGenerateSimilar() },
                         )
                         if (showReorder) {
                             DropdownMenuItem(
-                                text = { Text("Move up") },
+                                text = { Text(stringResource(R.string.scrobble_move_up)) },
                                 leadingIcon = { Icon(Icons.Rounded.ArrowUpward, contentDescription = null) },
                                 enabled = index > 0,
                                 onClick = { menuExpanded = false; onMoveUp() },
                             )
                             DropdownMenuItem(
-                                text = { Text("Move down") },
+                                text = { Text(stringResource(R.string.scrobble_move_down)) },
                                 leadingIcon = { Icon(Icons.Rounded.ArrowDownward, contentDescription = null) },
                                 enabled = index < lastIndex,
                                 onClick = { menuExpanded = false; onMoveDown() },
                             )
                         }
                         DropdownMenuItem(
-                            text = { Text("Rename") },
+                            text = { Text(stringResource(R.string.rename)) },
                             leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null) },
                             onClick = { menuExpanded = false; onRename() },
                         )
                         DropdownMenuItem(
-                            text = { Text("Delete") },
+                            text = { Text(stringResource(R.string.delete)) },
                             leadingIcon = { Icon(Icons.Rounded.Delete, contentDescription = null) },
                             onClick = { menuExpanded = false; onDelete() },
                         )
@@ -1539,13 +1541,13 @@ private fun PlaylistDetailContent(
                     if (newUri != oldUri) {
                         context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     }
-                    withContext(NonCancellable) {
+                    withContext<Unit>(NonCancellable) {
                         saved = LocalPlaylistStore.setCustomCover(playlist.id, newUri)
                         if (saved) {
-                            if (oldUri != null && oldUri != newUri) {
+                            oldUri?.takeIf { it != newUri }?.let { staleUri ->
                                 runCatching {
                                     context.contentResolver.releasePersistableUriPermission(
-                                        Uri.parse(oldUri),
+                                        Uri.parse(staleUri),
                                         Intent.FLAG_GRANT_READ_URI_PERMISSION,
                                     )
                                 }
@@ -1653,7 +1655,7 @@ private fun PlaylistDetailContent(
                     ) {
                         Icon(Icons.Rounded.MyLocation, contentDescription = null)
                         Spacer(Modifier.width(4.dp))
-                        Text("Locate")
+                        Text(stringResource(R.string.scrobble_locate))
                     }
                 }
                 Spacer(Modifier.weight(1f))
@@ -1678,7 +1680,7 @@ private fun PlaylistDetailContent(
                         containerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 1f),
                     ) {
                         DropdownMenuItem(
-                            text = { Text("Change cover") },
+                            text = { Text(stringResource(R.string.scrobble_change_cover)) },
                             leadingIcon = { Icon(Icons.Rounded.Image, contentDescription = null) },
                             onClick = {
                                 detailMenuExpanded = false
@@ -1687,13 +1689,13 @@ private fun PlaylistDetailContent(
                         )
                         if (playlist.customCoverUri != null) {
                             DropdownMenuItem(
-                                text = { Text("Reset cover") },
+                                text = { Text(stringResource(R.string.scrobble_reset_cover)) },
                                 leadingIcon = { Icon(Icons.Rounded.Delete, contentDescription = null) },
                                 onClick = {
                                     detailMenuExpanded = false
                                     val oldUri = playlist.customCoverUri
                                     scope.launch {
-                                        withContext(NonCancellable) {
+                                        withContext<Unit>(NonCancellable) {
                                             if (LocalPlaylistStore.setCustomCover(playlist.id, null)) {
                                                 oldUri?.let { savedUri ->
                                                     runCatching {
@@ -1713,7 +1715,7 @@ private fun PlaylistDetailContent(
                             )
                         }
                         DropdownMenuItem(
-                            text = { Text("Generate similar") },
+                            text = { Text(stringResource(R.string.scrobble_generate_similar)) },
                             leadingIcon = { Icon(Icons.Rounded.Shuffle, contentDescription = null) },
                             enabled = !generationState.isGenerating && playlist.songs.any { it.videoId.isNotBlank() && !it.isVideo },
                             onClick = {
@@ -1722,7 +1724,7 @@ private fun PlaylistDetailContent(
                             },
                         )
                         DropdownMenuItem(
-                            text = { Text("Export playlist") },
+                            text = { Text(stringResource(R.string.scrobble_export_playlist)) },
                             leadingIcon = { Icon(Icons.Rounded.Share, contentDescription = null) },
                             onClick = {
                                 detailMenuExpanded = false
@@ -1730,12 +1732,12 @@ private fun PlaylistDetailContent(
                             },
                         )
                         DropdownMenuItem(
-                            text = { Text("Rename") },
+                            text = { Text(stringResource(R.string.rename)) },
                             leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null) },
                             onClick = { detailMenuExpanded = false; onRename() },
                         )
                         DropdownMenuItem(
-                            text = { Text("Delete") },
+                            text = { Text(stringResource(R.string.delete)) },
                             leadingIcon = { Icon(Icons.Rounded.Delete, contentDescription = null) },
                             onClick = { detailMenuExpanded = false; onDelete() },
                         )
@@ -1777,7 +1779,7 @@ private fun PlaylistDetailContent(
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = scrobbleAccentColor())
                     Text(generationState.progress, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    TextButton(onClick = viewModel::cancelGeneration, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSecondaryContainer)) { Text("Cancel") }
+                    TextButton(onClick = viewModel::cancelGeneration, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSecondaryContainer)) { Text(stringResource(R.string.cancel)) }
                 }
             }
         }
@@ -1806,7 +1808,7 @@ private fun PlaylistDetailContent(
                     )
                 }
                 if (!addTrackLoading && addTrackError == null && addTrackQuery.trim().length >= 2 && addTrackResults.isEmpty()) {
-                    Text("No tracks found", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.scrobble_no_tracks_found), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             items(addTrackResults, key = { "add-${it.videoId}" }) { song ->
@@ -1883,7 +1885,7 @@ private fun PlaylistDetailContent(
                     containerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 1f),
                 ) {
                     DropdownMenuItem(
-                        text = { Text("Move up") },
+                        text = { Text(stringResource(R.string.scrobble_move_up)) },
                         leadingIcon = { Icon(Icons.Rounded.ArrowUpward, contentDescription = null) },
                         enabled = index > 0,
                         onClick = {
@@ -1895,7 +1897,7 @@ private fun PlaylistDetailContent(
                         },
                     )
                     DropdownMenuItem(
-                        text = { Text("Move down") },
+                        text = { Text(stringResource(R.string.scrobble_move_down)) },
                         leadingIcon = { Icon(Icons.Rounded.ArrowDownward, contentDescription = null) },
                         enabled = index < playlist.songs.lastIndex,
                         onClick = {
@@ -1907,7 +1909,7 @@ private fun PlaylistDetailContent(
                         },
                     )
                     DropdownMenuItem(
-                        text = { Text("Remove from playlist") },
+                        text = { Text(stringResource(R.string.scrobble_remove_from_playlist)) },
                         leadingIcon = { Icon(Icons.Rounded.Delete, contentDescription = null) },
                         onClick = {
                             trackMenuExpanded = false

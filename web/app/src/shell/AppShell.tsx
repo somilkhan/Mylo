@@ -3,6 +3,7 @@ import { resumeSession } from '@/party/listenTogether';
 import { startPartySync } from '@/party/partySync';
 import { useDiscordPresence } from '@/playback/discordPresence';
 import { startHistoryReporting } from '@/playback/historyReporting';
+import { startLivePresence } from '@/playback/livePresence';
 import { Outlet } from 'react-router';
 import { PrefetchLink } from '@/components/PrefetchLink';
 import { config } from '@/config';
@@ -35,6 +36,8 @@ export function AppShell() {
   }, []);
   // Plays into the account's YouTube Music history (Settings › Share Listening Activity).
   useEffect(() => startHistoryReporting(), []);
+  // Counts this tab in the "listening now" figure beside the phone and PC apps.
+  useEffect(() => startLivePresence(), []);
   const extension = useExtension();
   const bannerDismissed = useUi((s) => s.installBannerDismissed);
   const dismissBanner = useUi((s) => s.dismissInstallBanner);
@@ -44,8 +47,8 @@ export function AppShell() {
   if (mobile) {
     banner = (
       <Banner
-        title="MYLO is better in the app."
-        detail="Phone browsers can’t run the companion browser extension. The Android app has everything."
+        title="BitChord is better in the app."
+        detail="Phone browsers can’t run the BitChord extension. The Android app has everything."
         action={
           <a className={bannerButtonClass} href={config.androidAppUrl} target="_blank" rel="noreferrer">
             Get the App
@@ -56,7 +59,7 @@ export function AppShell() {
   } else if (extension.state === 'missing' && !bannerDismissed) {
     banner = (
       <Banner
-        title="Connect the browser extension to play YouTube Music."
+        title="Play YouTube Music with the BitChord extension."
         detail="Playback, YouTube Music sign-in, Spotify and Discord need the extension. Addons and lyrics work without it."
         action={
           <PrefetchLink className={bannerButtonClass} to="/extension">

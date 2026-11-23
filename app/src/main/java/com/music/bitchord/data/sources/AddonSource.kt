@@ -9,6 +9,7 @@ import com.music.bitchord.data.sources.addon.AddonManifest
 import com.music.bitchord.data.sources.addon.AddonNotFound
 import com.music.bitchord.data.sources.addon.AddonStream
 import com.music.bitchord.data.sources.addon.AddonTrack
+import com.music.bitchord.data.sources.addon.AddonUnavailable
 import com.music.bitchord.playback.StreamContainer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -38,7 +39,8 @@ class AddonSource(
     override val kind: SourceKind get() = config.kind
     override val displayName: String get() = config.displayName
 
-    private val client = AddonClient(config.baseUrl)
+    /** Holds the pick for this instance's life: changing it is an edit, and [SourceRegistry] rebuilds on one. */
+    private val client = AddonClient(config.baseUrl, config.pickedQuality)
 
     /**
      * Rows this addon has recently handed over, by their own track id.
@@ -86,12 +88,26 @@ class AddonSource(
      */
     private suspend fun admitted(what: String): Boolean {
         if (shutOut(what)) return false
-        client.manifest().getOrNull()?.let(::recordPolicy)
+        refreshPolicy()
         return !shutOut(what)
     }
 
+    /**
+     * Reads the manifest (the client's cached copy when there is one) and
+     * stores what it says. A manifest that couldn't be fetched just now
+     * changes nothing.
+     */
+    suspend fun refreshPolicy() {
+        client.manifest().onSuccess { manifest -> recordPolicy(manifest) }
+    }
+
     private fun recordPolicy(manifest: AddonManifest) =
-        SourceRegistry.updatePolicy(config.id, manifest.downloadsAllowed, manifest.requiresLosslessOutput)
+        SourceRegistry.updatePolicy(
+            config.id,
+            manifest.downloadsAllowed,
+            manifest.requiresLosslessOutput,
+            manifest.qualityOptions,
+        )
 
     // ── Health ────────────────────────────────────────────────────────────
 
@@ -123,12 +139,9 @@ class AddonSource(
                 )
             },
             onFailure = { failure ->
-                // No readable manifest is not the same as no addon. The
-                // endpoints are what this app uses; the manifest only describes
-                // them, and an addon that never published one is healthy the
-                // moment it answers a search. Reported plainly rather than as a
-                // success with a hidden caveat, so the row says which of the two
-                // kinds of working this is.
+                // No readable manifest is not the same as no addon: one that
+                // never published a manifest still answers a search, and is
+                // healthy the moment it does.
                 if (client.probeSearch().isSuccess) {
                     TrackLog.d(TAG, "${config.displayName}: no manifest, but search answers")
                     return@fold SourceHealth.Ok("No manifest · search works")
@@ -335,13 +348,8 @@ class AddonSource(
         }
 
         val format = formatOf(answer, url, tier)
-        val playsAtmos = DeviceCodecs.playsDolbyAtmos
-        if (ModuleSource.unplayable(format, atmosAllowed = playsAtmos && AppSettings.dolbyAtmos.value)) {
-            val why = if (playsAtmos) {
-                "which is switched off in Settings"
-            } else {
-                "which this device has no decoder for"
-            }
+        if (ModuleSource.unplayable(format, atmosAllowed = DeviceCodecs.atmosWanted)) {
+            val why = DeviceCodecs.atmosRefusal()
             TrackLog.w(
                 TAG,
                 "${config.displayName}: answered a $tier request with ${format.summary}, $why — passing",
@@ -391,18 +399,21 @@ class AddonSource(
                     .lowercase(Locale.ROOT).takeIf { it in AUDIO_CODECS }
             }
 
+        // The tier's own published meaning is the last resort and only for
+        // the lossy rungs, where "HIGH" is a statement of 320 and the
+        // number is what says "this is not what you asked for". Flagged, so
+        // stats for nerds measures the stream instead of repeating the tier.
+        val tierKbps = when (tier) {
+            AddonClient.TIER_HIGH -> 320
+            AddonClient.TIER_LOW -> 128
+            else -> null
+        }
         return StreamFormat(
             codec = codec,
-            // The tier's own published meaning is the last resort and only for
-            // the lossy rungs, where "HIGH" is a statement of 320 and the
-            // number is what says "this is not what you asked for".
-            kbps = answer.kbps ?: when (tier) {
-                AddonClient.TIER_HIGH -> 320
-                AddonClient.TIER_LOW -> 128
-                else -> null
-            },
+            kbps = answer.kbps ?: tierKbps,
             sampleRateHz = answer.sampleRateHz,
             bitDepth = answer.bits,
+            kbpsInferred = answer.kbps == null && tierKbps != null,
         )
     }
 

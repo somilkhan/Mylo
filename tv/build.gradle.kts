@@ -1,5 +1,4 @@
 import java.util.Properties
-import java.util.Base64
 import java.io.FileInputStream
 
 plugins {
@@ -48,9 +47,11 @@ val lastfmSecret: String = (
  * the screen. See ListenTogether.DEFAULT_SERVER.
  */
 val listenTogetherServer: String = (
-    localProps.getProperty("LISTEN_TOGETHER_SERVER")
-        ?: System.getenv("LISTEN_TOGETHER_SERVER")
-        ?: ""
+    // A blank value (an unset CI secret arrives as "") means "not set": fall back
+    // to the default server rather than turning Listen Together off.
+    localProps.getProperty("LISTEN_TOGETHER_SERVER")?.takeIf { it.isNotBlank() }
+        ?: System.getenv("LISTEN_TOGETHER_SERVER")?.takeIf { it.isNotBlank() }
+        ?: "https://bitchord-listen-together.onrender.com"
     ).trim().trimEnd('/')
 
 /*
@@ -83,8 +84,8 @@ android {
         // Haze falls back to a translucent scrim below that.
         minSdk = 26
         targetSdk = 36
-        versionCode = rootProject.extra["bitchordVersionCode"] as Int
-        versionName = rootProject.extra["bitchordVersionName"] as String
+        versionCode = 39
+        versionName = "1.9.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -97,10 +98,10 @@ android {
             "\"${listenTogetherServer.replace("\\", "\\\\").replace("\"", "\\\"")}\"",
         )
         // The TV APKs share a GitHub release with the phone ones and are told
-        // apart by name (MYLOTV-v1.8.apk, MYLOTV-v1.8_x86_64.apk), so
+        // apart by name (MyloTV-1.9.1.apk, MyloTV-1.9.1_x86_64.apk), so
         // the updater installs the TV app here, never the phone app. See
         // AppUpdateChecker.apkAssetUrl.
-        buildConfigField("String", "UPDATE_APK_PREFIX", "\"MYLOTV-\"")
+        buildConfigField("String", "UPDATE_APK_PREFIX", "\"MyloTV-\"")
     }
 
     splits {
@@ -149,11 +150,11 @@ android {
         create("dev") {
             dimension = "env"
             applicationId = "app.mylo.music.tv.dev"
-            resValue("string", "app_name", "MYLO TV")
+            resValue("string", "app_name", "Mylo TV Dev")
         }
         create("prod") {
             dimension = "env"
-            resValue("string", "app_name", "MYLO TV")
+            resValue("string", "app_name", "Mylo TV")
         }
     }
 
@@ -314,8 +315,8 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     // ProcessLifecycleOwner: whether the app is on screen, for the open-app count.
     implementation("androidx.lifecycle:lifecycle-process:2.8.7")
-    // TV compiles the shared app sources too, including the account sync worker.
-    implementation("androidx.work:work-runtime:2.10.1")
+    // The scheduled check behind "Keep playlists updated"; see PlaylistSync.
+    implementation("androidx.work:work-runtime-ktx:2.10.1")
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.appcompat:appcompat:1.7.0")
     debugImplementation("androidx.compose.ui:ui-tooling")
@@ -357,6 +358,12 @@ dependencies {
     implementation("io.coil-kt.coil3:coil-network-okhttp:3.0.4")
     // The shared app sources register SvgDecoder (artist signatures).
     implementation("io.coil-kt.coil3:coil-svg:3.0.4")
+    // SF Symbols as Compose vectors: the shared app sources draw their menus and
+    // settings with them. Without its own dependencies, for the reason given in
+    // app/build.gradle.kts.
+    implementation("com.github.cosmictaserdev-creator.Jetpack_SF_Symbols:sfsymbols-android:1.1.1") {
+        isTransitive = false
+    }
     implementation("androidx.palette:palette-ktx:1.0.0")
 
     // ---- Frosted glass / progressive blur (Telegram-style bars) ----
@@ -496,48 +503,5 @@ val replacedByTv: Set<String> = fileTree(tvJava) { include("**/*.kt") }.files
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
     exclude { el ->
         el.file.startsWith(phoneJava) && el.relativePath.pathString in replacedByTv
-    }
-}
-
-// The TV application compiles the shared MyloSplash composable too, so it must
-// generate the same approved drawable as the phone app. Keep the encoded source
-// in the app module as the single source of truth.
-val generateMyloSplashArtwork = tasks.register("generateMyloSplashArtwork") {
-    val encodedLogo = rootProject.file("app/src/main/branding/mylo-logo.webp.base64")
-    val generatedLogo = layout.buildDirectory.file("generated/myloSplash/res/drawable-nodpi/mylo_logo.webp")
-    inputs.file(encodedLogo)
-    outputs.file(generatedLogo)
-
-    doLast {
-        if (!encodedLogo.isFile) {
-            throw GradleException("Missing approved MYLO splash artwork: $encodedLogo")
-        }
-        val output = generatedLogo.get().asFile
-        output.parentFile.mkdirs()
-        val encoded = encodedLogo.readText().filterNot(Char::isWhitespace)
-        val bytes = Base64.getDecoder().decode(encoded)
-        val isWebp = bytes.size >= 12 &&
-            String(bytes, 0, 4, Charsets.US_ASCII) == "RIFF" &&
-            String(bytes, 8, 4, Charsets.US_ASCII) == "WEBP"
-        val riffSize = if (bytes.size >= 8) {
-            (bytes[4].toLong() and 0xff) or
-                ((bytes[5].toLong() and 0xff) shl 8) or
-                ((bytes[6].toLong() and 0xff) shl 16) or
-                ((bytes[7].toLong() and 0xff) shl 24)
-        } else {
-            -1L
-        }
-        if (!isWebp || riffSize != bytes.size.toLong() - 8L) {
-            throw GradleException("Approved MYLO splash artwork is not a complete WebP image")
-        }
-        output.writeBytes(bytes)
-    }
-}
-
-android.sourceSets.getByName("main").res.srcDir(layout.buildDirectory.dir("generated/myloSplash/res"))
-tasks.named("preBuild").configure { dependsOn(generateMyloSplashArtwork) }
-tasks.configureEach {
-    if (name.startsWith("merge") && name.endsWith("Resources")) {
-        dependsOn(generateMyloSplashArtwork)
     }
 }

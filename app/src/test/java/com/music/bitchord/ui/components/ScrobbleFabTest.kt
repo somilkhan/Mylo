@@ -39,7 +39,7 @@ class ScrobbleFabTest {
     }
 
     @Test
-    fun fullPlayerAndKeyboardStillSuppressOpenHubFab() {
+    fun fullPlayerStillSuppressesOpenHubFab() {
         assertFalse(
             scrobbleFabVisible(
                 selectedTab = 0,
@@ -49,9 +49,13 @@ class ScrobbleFabTest {
                 hubOpen = true,
             ),
         )
-        assertFalse(
+    }
+
+    @Test
+    fun openHubKeepsCloseFabVisibleWhenKeyboardIsUp() {
+        assertTrue(
             scrobbleFabVisible(
-                selectedTab = 0,
+                selectedTab = 1,
                 homeTab = 0,
                 overlayOpen = false,
                 keyboardVisible = true,

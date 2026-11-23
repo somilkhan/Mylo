@@ -24,6 +24,9 @@ jobs:
     name: Build and verify signed Android releases
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    # Only this job writes to the repo: it creates the GitHub release.
+    permissions:
+      contents: write
     steps:
       - name: Check out source
         uses: actions/checkout@v4
@@ -76,10 +79,48 @@ jobs:
           EOF
           chmod 600 keystore.properties "$RUNNER_TEMP/mylo-signing/MYLO-release-key.jks"
           keytool -list -keystore "$RUNNER_TEMP/mylo-signing/MYLO-release-key.jks" -storepass "$MYLO_RELEASE_STORE_PASSWORD" -alias "$MYLO_RELEASE_KEY_ALIAS" >/dev/null
+          # Public certificate digest; the verify step requires every APK to be signed by exactly this key.
+          expected_digest="$(keytool -exportcert -alias "$MYLO_RELEASE_KEY_ALIAS" -keystore "$RUNNER_TEMP/mylo-signing/MYLO-release-key.jks" -storepass "$MYLO_RELEASE_STORE_PASSWORD" | sha256sum | cut -d' ' -f1)"
+          test -n "$expected_digest"
+          echo "MYLO_EXPECTED_CERT_SHA256=$expected_digest" >> "$GITHUB_ENV"
           echo "Keystore file and configured alias validated."
 
       - name: Build signed phone, TV and Wear OS release APKs
+        env:
+          # Read by app/tv build files; without them the release silently ships empty Last.fm keys.
+          LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
+          LASTFM_SECRET: ${{ secrets.LASTFM_SECRET }}
+          LISTEN_TOGETHER_SERVER: ${{ secrets.LISTEN_TOGETHER_SERVER }}
         run: ./gradlew --no-daemon --stacktrace :app:assembleProdRelease :tv:assembleProdRelease :wearos:assembleProdRelease
+
+      - name: Name release APKs for the in-app updater
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(grep -oP 'bitchordVersionName"\] = "\K[^"]+' build.gradle.kts)"
+          test -n "$version"
+          if [[ "$GITHUB_REF_TYPE" == "tag" && "$GITHUB_REF_NAME" != "v${version}" ]]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match app version v${version} in build.gradle.kts."
+            exit 1
+          fi
+          rename_module() {
+            local dir="$1" prefix="$2" apk base abi new
+            local -a apks
+            [[ -d "$dir" ]] || { echo "::error::Missing release output directory $dir"; exit 1; }
+            mapfile -d '' -t apks < <(find "$dir" -maxdepth 1 -type f -name '*.apk' -print0)
+            for apk in "${apks[@]}"; do
+              base="$(basename "$apk")"
+              abi="$(grep -oE 'armeabi-v7a|arm64-v8a|x86_64' <<<"$base" | head -n1 || true)"
+              if [[ -n "$abi" ]]; then new="${prefix}-${version}_${abi}.apk"; else new="${prefix}-${version}.apk"; fi
+              if [[ -e "$dir/$new" ]]; then echo "::error::Name clash for $new in $dir"; exit 1; fi
+              mv "$apk" "$dir/$new"
+              echo "Named $base -> $new"
+            done
+          }
+          # Prefixes must match UPDATE_APK_PREFIX in app/ and tv/ build files.
+          rename_module app/build/outputs/apk/prod/release Mylo
+          rename_module tv/build/outputs/apk/prod/release MyloTV
+          rename_module wearos/build/outputs/apk/prod/release MyloWear
 
       - name: Verify release APK signatures
         shell: bash
@@ -90,9 +131,15 @@ jobs:
             echo "::error::No release APKs were produced."
             exit 1
           fi
+          test -n "${MYLO_EXPECTED_CERT_SHA256:-}"
           for apk in "${apks[@]}"; do
-            "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$apk"
-            echo "Verified signature: $apk"
+            out="$("$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs --verbose "$apk")"
+            printf '%s\n' "$out"
+            if ! grep -qi "Signer #1 certificate SHA-256 digest: ${MYLO_EXPECTED_CERT_SHA256}" <<<"$out"; then
+              echo "::error::$apk is not signed with the MYLO release key (debug or other key)."
+              exit 1
+            fi
+            echo "Verified MYLO release signature: $apk"
           done
 
       - name: Upload signed release APKs (manual opt-in only)
@@ -122,6 +169,24 @@ jobs:
       - name: Report artifact upload skipped
         if: github.event_name == 'workflow_dispatch' && !inputs.upload_apks
         run: echo "Signed APKs were built and verified locally in the runner; artifact upload was skipped to preserve Actions storage quota."
+
+      - name: Create GitHub release with the signed APKs
+        if: github.ref_type == 'tag'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          prerelease=()
+          if [[ "$GITHUB_REF_NAME" == *-* ]]; then prerelease=(--prerelease); fi
+          gh release create "$GITHUB_REF_NAME" \
+            --verify-tag \
+            --title "Mylo $GITHUB_REF_NAME" \
+            --generate-notes \
+            "${prerelease[@]}" \
+            app/build/outputs/apk/prod/release/*.apk \
+            tv/build/outputs/apk/prod/release/*.apk \
+            wearos/build/outputs/apk/prod/release/*.apk
 
       - name: Remove temporary signing material
         if: always()

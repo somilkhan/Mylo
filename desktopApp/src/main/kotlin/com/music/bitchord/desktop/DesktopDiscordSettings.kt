@@ -92,7 +92,7 @@ internal object DesktopDiscordSettings {
     fun activityVerb(id: String) = activities.firstOrNull { it.id == id }?.detail ?: "Listening to"
 
     const val DEFAULT_BUTTON_1 = "Listen on YouTube Music"
-    const val DEFAULT_BUTTON_2 = "Visit BitChord"
+    const val DEFAULT_BUTTON_2 = "Visit Mylo"
     const val APP_NAME = "BitChord"
 
     private const val KEY_USE_DETAILS = "discord_use_details"

@@ -17,6 +17,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.ui.res.stringResource
+import com.music.bitchord.R
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -105,7 +107,7 @@ internal fun TrackConcentrationCard(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text("Track concentration", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(R.string.scrobble_track_concentration), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Text(
                 "How your plays are distributed across your tracks.",
                 style = MaterialTheme.typography.bodySmall,
@@ -135,11 +137,11 @@ internal fun TrackConcentrationCard(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(data.averagePlaysPerTrack, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    Text("Avg plays / track", style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant)
+                    Text(stringResource(R.string.scrobble_avg_plays_per_track), style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant)
                 }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(data.uniqueTracks.toString(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    Text("Unique tracks", style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant)
+                    Text(stringResource(R.string.scrobble_unique_tracks), style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant)
                 }
             }
             Text(

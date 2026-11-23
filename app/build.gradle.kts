@@ -1,5 +1,4 @@
 import java.util.Properties
-import java.util.Base64
 import java.security.MessageDigest
 import java.io.FileInputStream
 
@@ -42,17 +41,17 @@ val lastfmSecret: String = (
  * deployment-specific rather than a property of the source, which is what puts
  * it here beside the others instead of in a constant.
  *
- * The default points at BitChord’s existing public party service so a fresh MYLO
- * install can try Listen Together without manual server setup. Local properties
- * or the environment can override it for testing or an independently hosted
- * deployment; an explicitly empty value still disables the built-in default.
- * See ListenTogether.DEFAULT_SERVER.
+ * Empty is a supported state, not a broken build: the field below is only the
+ * *default* the address box on the Listen Together screen starts with, and
+ * anything typed there wins and persists. So a fresh checkout without this line
+ * builds and runs, and simply asks for an address the first time somebody opens
+ * the screen. See ListenTogether.DEFAULT_SERVER.
  */
 val listenTogetherServer: String = (
-    localProps.getProperty("LISTEN_TOGETHER_SERVER")
-        ?: System.getenv("LISTEN_TOGETHER_SERVER")
-        // Default to BitChord’s deployed Listen Together service; local properties or
-        // the environment can override it for a self-hosted deployment.
+    // A blank value (an unset CI secret arrives as "") means "not set": fall back
+    // to the default server rather than turning Listen Together off.
+    localProps.getProperty("LISTEN_TOGETHER_SERVER")?.takeIf { it.isNotBlank() }
+        ?: System.getenv("LISTEN_TOGETHER_SERVER")?.takeIf { it.isNotBlank() }
         ?: "https://bitchord-listen-together.onrender.com"
     ).trim().trimEnd('/')
 
@@ -86,7 +85,7 @@ android {
         // Which release assets are this app's: the phone and TV APKs ship in
         // the same GitHub release, told apart by file name. See
         // AppUpdateChecker.apkAssetUrl.
-        buildConfigField("String", "UPDATE_APK_PREFIX", "\"MYLO-\"")
+        buildConfigField("String", "UPDATE_APK_PREFIX", "\"Mylo-\"")
     }
 
     splits {
@@ -119,11 +118,11 @@ android {
         create("dev") {
             dimension = "env"
             applicationId = "app.mylo.music.dev"
-            resValue("string", "app_name", "MYLO Dev")
+            resValue("string", "app_name", "Mylo Dev")
         }
         create("prod") {
             dimension = "env"
-            // Matches defaultConfig — MYLO's new production application ID.
+            // Matches defaultConfig — this is the package already shipped/installed.
         }
     }
 
@@ -168,6 +167,7 @@ android {
              * `benchmark` build type below before it ships.
              */
             isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -285,8 +285,8 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     // ProcessLifecycleOwner: whether the app is on screen, for the open-app count.
     implementation("androidx.lifecycle:lifecycle-process:2.8.7")
-    // WorkManager 2.10+ ships its Kotlin APIs in work-runtime; the -ktx artifact is empty.
-    implementation("androidx.work:work-runtime:2.10.1")
+    // The scheduled check behind "Keep playlists updated"; see PlaylistSync.
+    implementation("androidx.work:work-runtime-ktx:2.10.1")
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.appcompat:appcompat:1.7.0")
     debugImplementation("androidx.compose.ui:ui-tooling")
@@ -324,6 +324,13 @@ dependencies {
     // Title logos are PNG, but artist signatures are usually SVG — without
     // this Coil can't decode them (see ArtistSignatureRepository).
     implementation("io.coil-kt.coil3:coil-svg:3.0.4")
+    // SF Symbols as Compose vectors, for the iOS-style settings and menus (as Convx uses).
+    // Without its own dependencies: it asks for Compose 1.12, which needs a newer Android
+    // Gradle plugin than this build, and the plain ImageVectors used here need nothing
+    // the app's own Compose doesn't already have.
+    implementation("com.github.cosmictaserdev-creator.Jetpack_SF_Symbols:sfsymbols-android:1.1.1") {
+        isTransitive = false
+    }
     implementation("androidx.palette:palette-ktx:1.0.0")
 
     // ---- Frosted glass / progressive blur (Telegram-style bars) ----
@@ -412,7 +419,7 @@ dependencies {
     // Opens the watch app after an update, so its install prompt is on screen.
     implementation("androidx.wear:wear-remote-interactions:1.1.0")
 
-    // ---- "MYLO for Wear OS": the first install onto a watch ----
+    // ---- "BitChord for Wear OS": the first install onto a watch ----
     // Without the Play Store only ADB can install on a watch, so this phone is
     // the ADB client, over the watch's Wireless debugging — see WatchInstaller.
     // GPL-3.0/Apache-2.0 dual-licensed. Its own BouncyCastle (jdk15to18) is the
@@ -425,6 +432,7 @@ dependencies {
     implementation("org.bouncycastle:bcpkix-jdk18on:1.85")
 
     testImplementation("junit:junit:4.13.2")
+    // The JVM's org.json for the codec tests; the Android stub returns nulls.
     testImplementation("org.json:json:20240303")
     // A real HTTP server for the addon tests. The addon protocol is entirely
     // "what does this app send, and what does it do with what comes back", and
@@ -470,53 +478,8 @@ val verifyDevInstall = tasks.register("verifyDevInstall") {
 }
 tasks.matching { it.name == "installDevDebug" }.configureEach { finalizedBy(verifyDevInstall) }
 
-// The approved splash artwork is stored losslessly in Git as a small Base64 WebP
-// source so the repository write path can preserve the binary bytes. Decode it
-// at build time into a generated Android drawable; never decode image data on
-// the UI thread during startup.
-val generateMyloSplashArtwork = tasks.register("generateMyloSplashArtwork") {
-    val encodedLogo = layout.projectDirectory.file("src/main/branding/mylo-logo.webp.base64")
-    val generatedLogo = layout.buildDirectory.file("generated/myloSplash/res/drawable-nodpi/mylo_logo.webp")
-    inputs.file(encodedLogo)
-    outputs.file(generatedLogo)
-
-    doLast {
-        if (!encodedLogo.asFile.isFile) {
-            throw GradleException("Missing approved MYLO splash artwork: ${encodedLogo.asFile}")
-        }
-        val output = generatedLogo.get().asFile
-        output.parentFile.mkdirs()
-        val encoded = encodedLogo.asFile.readText().filterNot(Char::isWhitespace)
-        val bytes = Base64.getDecoder().decode(encoded)
-        val isWebp = bytes.size >= 12 &&
-            String(bytes, 0, 4, Charsets.US_ASCII) == "RIFF" &&
-            String(bytes, 8, 4, Charsets.US_ASCII) == "WEBP"
-        val riffSize = if (bytes.size >= 8) {
-            (bytes[4].toLong() and 0xff) or
-                ((bytes[5].toLong() and 0xff) shl 8) or
-                ((bytes[6].toLong() and 0xff) shl 16) or
-                ((bytes[7].toLong() and 0xff) shl 24)
-        } else {
-            -1L
-        }
-        if (!isWebp || riffSize != bytes.size.toLong() - 8L) {
-            throw GradleException("Approved MYLO splash artwork is not a complete WebP image")
-        }
-        output.writeBytes(bytes)
-    }
-}
-
-android.sourceSets.getByName("main").res.srcDir(layout.buildDirectory.dir("generated/myloSplash/res"))
-tasks.named("preBuild").configure { dependsOn(generateMyloSplashArtwork) }
-tasks.configureEach {
-    if (name.startsWith("merge") && name.endsWith("Resources")) {
-        dependsOn(generateMyloSplashArtwork)
-    }
-}
-
-
 /*
- * The watch app rides inside the phone app, so "MYLO for Wear OS" in
+ * The watch app rides inside the phone app, so "BitChord for Wear OS" in
  * Settings can put it on a watch — or update it — with no computer involved.
  *
  * Each phone variant carries the watch build of the same flavor *and* build
@@ -542,7 +505,7 @@ abstract class BundleWearApk : DefaultTask() {
         out.mkdirs()
         val apk = apks.asFileTree.matching { include("*.apk") }.files.singleOrNull()
             ?: throw GradleException("Expected exactly one watch APK in ${apks.files}")
-        val target = out.resolve("MYLO-Wear.apk")
+        val target = out.resolve("BitChordWear.apk")
         apk.copyTo(target, overwrite = true)
         val digest = MessageDigest.getInstance("SHA-256")
         target.inputStream().use { input ->
@@ -553,7 +516,7 @@ abstract class BundleWearApk : DefaultTask() {
                 digest.update(buffer, 0, read)
             }
         }
-        out.resolve("MYLO-Wear.sha256").writeText(digest.digest().joinToString("") { "%02x".format(it) })
+        out.resolve("BitChordWear.sha256").writeText(digest.digest().joinToString("") { "%02x".format(it) })
     }
 }
 

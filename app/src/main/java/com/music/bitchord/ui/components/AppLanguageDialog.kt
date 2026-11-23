@@ -17,12 +17,15 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,7 +39,6 @@ import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.music.bitchord.R
 import com.music.bitchord.data.settings.AppSettings
-import com.music.bitchord.ui.icons.BitChordIcons
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
 import dev.chrisbanes.haze.materials.HazeMaterials
@@ -70,6 +72,7 @@ val SUPPORTED_LANGUAGES = listOf(
     AppLanguage("tr", R.string.turkish),
     AppLanguage("th", R.string.thai),
     AppLanguage("vi", R.string.vietnamese),
+    AppLanguage("ko", R.string.korean),
 )
 
 fun languageDisplayNameRes(languageTag: String): Int {
@@ -96,6 +99,7 @@ fun AppLanguageDialog(
     modifier: Modifier = Modifier,
 ) {
     val reduceDynamicBlur by AppSettings.reduceDynamicBlur.collectAsStateWithLifecycle()
+
     val shape = RoundedCornerShape(ALERT_CORNER)
     // Full script tag (zh-Hant / zh-Hans preserved); legacy bare "zh" reads as Simplified.
     val currentLanguage = com.music.bitchord.data.LocaleTags.normalizeAppTag(
@@ -213,7 +217,7 @@ private fun LanguageRow(language: AppLanguage, selected: Boolean, onClick: () ->
         )
         if (selected) {
             Icon(
-                imageVector = BitChordIcons.Check,
+                imageVector = Icons.Rounded.Check,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(19.dp),

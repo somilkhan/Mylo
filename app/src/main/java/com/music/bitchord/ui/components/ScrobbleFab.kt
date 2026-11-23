@@ -34,8 +34,9 @@ internal val SCROBBLE_FAB_SIZE = 62.dp
 
 /**
  * The FAB belongs to the Home surface only. It hides on other tabs and while
- * a competing surface, the full player, or the keyboard is active. Scrolling
- * folds it slightly rather than removing it, so it remains reachable.
+ * a competing surface or the full player is active. An open hub keeps its
+ * Close control even with the keyboard up; on Home the keyboard hides it.
+ * Scrolling folds it slightly rather than removing it, so it remains reachable.
  */
 internal fun scrobbleFabVisible(
     selectedTab: Int,
@@ -47,7 +48,7 @@ internal fun scrobbleFabVisible(
 ): Boolean = (hubOpen || selectedTab == homeTab) &&
     !overlayOpen &&
     !playerOpen &&
-    !keyboardVisible
+    (hubOpen || !keyboardVisible)
 
 /**
  * Floating entry point to Scrobble.

@@ -36,6 +36,9 @@ jobs:
         uses: pnpm/action-setup@v4
         with:
           version: 12.11.2
+          # Default would run `pnpm install` from the repo root, where there is no
+          # package.json (web/ is the workspace), failing the job in seconds.
+          run_install: false
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -48,10 +51,19 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Typecheck all web workspaces
-        run: pnpm typecheck
+        run: |
+          set -o pipefail
+          pnpm typecheck
 
       - name: Run web unit tests
-        run: pnpm test
+        run: |
+          set -o pipefail
+          pnpm test
 
       - name: Build web app and extension
-        run: pnpm build
+        run: |
+          set -o pipefail
+          pnpm build
+        env:
+          # Build-only placeholder: vite.config.ts fails without it. Nothing from this job is deployed.
+          VITE_PARTY_SERVER_URL: https://party.example.com

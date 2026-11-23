@@ -2,7 +2,6 @@ package com.music.bitchord.data.sources.addon
 
 import com.music.bitchord.data.Http
 import com.music.bitchord.data.TrackLog
-import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.data.sources.DeviceCodecs
 import com.music.bitchord.data.sources.module.SharedCalls
 import kotlinx.coroutines.CancellationException
@@ -32,8 +31,11 @@ import java.util.concurrent.TimeUnit
  * there at length: the callers above this are *designed* to give up, and a
  * request abandoned after it has already reached somebody's server is work
  * their server did for nobody.
+ *
+ * [pickedQuality] is the `quality` value the listener chose for this addon, or
+ * null for the addon's first listed option. See [settingsFor] for when it applies.
  */
-class AddonClient(rawBaseUrl: String) {
+class AddonClient(rawBaseUrl: String, private val pickedQuality: String? = null) {
 
     /** Where this addon lives, with `/manifest.json` and trailing slashes off. */
     val baseUrl: String = normalizeBase(rawBaseUrl)
@@ -140,7 +142,7 @@ class AddonClient(rawBaseUrl: String) {
             // and an addon whose catalogue differs by tier would otherwise
             // answer the second one with the first one's rows.
             key = keyOf(trimmed, params.toString()),
-            describe = { "▶ addon search(${redact(baseUrl)}) q=\"$trimmed\" tier=$tier" },
+            describe = { "▶ addon search(${redact(baseUrl)}) q=\"$trimmed\" tier=$tier quality=${params[QUALITY_KEY]}" },
         ) {
             fetch<AddonSearchResponse>(endpoint(listOf("search"), params + ("q" to trimmed)))
         }.map { it.tracks }
@@ -165,7 +167,7 @@ class AddonClient(rawBaseUrl: String) {
         val params = settingsFor(tier, stereoOnly)
         return streams.get(
             key = keyOf(trackId, params.toString()),
-            describe = { "▶ addon stream(${redact(baseUrl)}) id=$trackId tier=$tier" },
+            describe = { "▶ addon stream(${redact(baseUrl)}) id=$trackId tier=$tier quality=${params[QUALITY_KEY]}" },
         ) {
             fetch<AddonStream>(endpoint(listOf("stream", trackId), params))
         }
@@ -184,13 +186,24 @@ class AddonClient(rawBaseUrl: String) {
      * that arrived carrying the manifest's `"default": "high"` is a request for
      * lossless that comes back at 320kbps.
      *
-     * The value sent for `quality` is negotiated rather than asserted. This
-     * app's tiers are `LOSSLESS`/`HIGH`/`LOW`, and an addon declaring a
-     * `quality` select of `high|normal|low` understands none of them — sending
-     * `LOSSLESS` there is not a strong ask, it is an invalid value that lands on
-     * the addon's fallback. So when the manifest enumerates options, the closest
-     * one is chosen from that list; only when it does not is the tier name sent
-     * as-is, which is what the reference host does unconditionally.
+     * The value sent for `quality` comes from the addon's own list rather than
+     * this app's. The tiers here are `LOSSLESS`/`HIGH`/`LOW`, and an addon
+     * declaring a `quality` select of `high|normal|low` understands none of them
+     * — sending `LOSSLESS` there is not a strong ask, it is an invalid value that
+     * lands on the addon's fallback. Only when the manifest enumerates nothing is
+     * the tier name sent as-is, which is what the reference host does
+     * unconditionally.
+     *
+     * Asking for the best it can get, the app sends the listener's pick for this
+     * addon, or the first option listed when there is none. Matching on the word
+     * `lossless` is not good enough here: an addon may use it for its CD tier and
+     * list better ones above it. A pick the addon has since stopped listing is
+     * dropped, since it would land on the addon's fallback; with no manifest in
+     * hand there is nothing to judge it against, so it goes as chosen.
+     *
+     * A lower tier is a setting saying what a file may cost — a download kept at
+     * High or Standard — and a pick does not get to overrule it, so that goes to
+     * [matchTier] instead.
      *
      * The manifest is read best-effort. It is normally already in hand — it was
      * fetched to add the addon in the first place, and is shared and cached —
@@ -202,7 +215,8 @@ class AddonClient(rawBaseUrl: String) {
      * quality. See [atmosHint].
      */
     private suspend fun settingsFor(tier: String, stereoOnly: Boolean = false): Map<String, String> {
-        val declared = manifest().getOrNull()?.settings.orEmpty()
+        val manifest = manifest().getOrNull()
+        val declared = manifest?.settings.orEmpty()
         val params = LinkedHashMap<String, String>()
         declared.forEach { setting ->
             val key = setting.key.takeIf { it.isNotBlank() } ?: return@forEach
@@ -212,7 +226,12 @@ class AddonClient(rawBaseUrl: String) {
             val options = declared.firstOrNull { it.key == QUALITY_KEY }
                 ?.options.orEmpty()
                 .mapNotNull { it.stringValue }
-            params[QUALITY_KEY] = matchTier(tier, options) ?: tier
+            val chosen = when {
+                tier != TIER_LOSSLESS -> matchTier(tier, options)
+                manifest == null -> pickedQuality
+                else -> pickedQuality?.takeIf { it in options } ?: options.firstOrNull()
+            }
+            params[QUALITY_KEY] = chosen ?: tier
         }
         if (stereoOnly) {
             // Asked for the stereo mix by name, so nothing that lets the addon
@@ -266,13 +285,13 @@ class AddonClient(rawBaseUrl: String) {
      * nothing on the IO thread it already runs on.
      */
     private fun atmosHint(): String? {
-        val wanted = DeviceCodecs.playsDolbyAtmos && AppSettings.dolbyAtmos.value
+        val wanted = DeviceCodecs.atmosWanted
         return if (wanted) ATMOS_AUTO else null
     }
 
     /**
-     * The option in [options] that best answers a request for [tier], or null
-     * when the addon enumerated nothing to choose from.
+     * The option in [options] that best answers a request below the top tier,
+     * or null when the addon enumerated nothing to choose from.
      *
      * Matched on what an option *says* rather than on its position, so an addon
      * listing its tiers best-first and one listing them worst-first are both
@@ -282,11 +301,7 @@ class AddonClient(rawBaseUrl: String) {
     private fun matchTier(tier: String, options: List<String>): String? {
         if (options.isEmpty()) return null
         options.firstOrNull { it.equals(tier, ignoreCase = true) }?.let { return it }
-        val wanted = when (tier.uppercase()) {
-            TIER_LOSSLESS -> LOSSLESS_WORDS
-            TIER_LOW -> LOW_WORDS
-            else -> HIGH_WORDS
-        }
+        val wanted = if (tier.equals(TIER_LOW, ignoreCase = true)) LOW_WORDS else HIGH_WORDS
         return options.firstOrNull { option -> wanted.any { it in option.lowercase() } }
             ?: options.first()
     }
@@ -328,6 +343,9 @@ class AddonClient(rawBaseUrl: String) {
      * protocol's way of saying this addon does not hold that recording, which
      * is precisely the miss the caller is equipped to handle and not something
      * to log as a fault.
+     *
+     * A 401 is an ordinary refusal: nothing is sent to an addon that asks for
+     * credentials this app does not have, so it is reported as it is.
      */
     private suspend fun body(url: String): String = withContext(Dispatchers.IO) {
         var attempt = 0
@@ -413,7 +431,7 @@ class AddonClient(rawBaseUrl: String) {
         const val TIER_HIGH = "HIGH"
         const val TIER_LOW = "LOW"
 
-        private const val QUALITY_KEY = "quality"
+        internal const val QUALITY_KEY = "quality"
 
         /** The spec's immersive-audio hint: `auto` normally, an "off" only for a stereo row picked by hand. */
         private const val ATMOS_KEY = "atmos"
@@ -421,7 +439,6 @@ class AddonClient(rawBaseUrl: String) {
         private const val ATMOS_NEVER = "0"
         private val ATMOS_OFF = Regex("0|false|off|no|none|never|stereo", RegexOption.IGNORE_CASE)
 
-        private val LOSSLESS_WORDS = listOf("lossless", "flac", "hifi", "hi-res", "hires", "max", "best")
         private val HIGH_WORDS = listOf("high", "320", "normal", "standard")
         private val LOW_WORDS = listOf("low", "96", "128", "min")
 
@@ -493,6 +510,7 @@ class AddonClient(rawBaseUrl: String) {
         const val STREAM_TTL_MS = 5 * 60 * 1000L
 
         private const val MAX_RETRIES = 2
+
         private const val BACKOFF_BASE_MS = 500L
         private const val BACKOFF_CAP_MS = 8_000L
 
@@ -515,11 +533,19 @@ class AddonClient(rawBaseUrl: String) {
          * client bounds each *read*, which a server dribbling a byte at a time
          * never trips, and an addon doing that would otherwise hold a
          * source-resolution slot indefinitely. The spec asks addons to answer
-         * search in under five seconds and streams in under three.
+         * search in under five seconds and streams in under three; the ceiling
+         * is wider than that because a TorBox-backed addon cold-caching a long
+         * FLAC spends twenty to thirty seconds before it can answer at all —
+         * thirty-two was the worst a real Nebula addon took, and 35 s left no
+         * room once the call itself is added to the wait. The read timeout is
+         * lifted above the ceiling for the same reason: that wait is silence,
+         * not a slow trickle, so an inherited read timeout would fire first and
+         * the ceiling here would never be reached.
          */
         private val client: OkHttpClient by lazy {
             Http.client.newBuilder()
-                .callTimeout(20, TimeUnit.SECONDS)
+                .readTimeout(60, TimeUnit.SECONDS)
+                .callTimeout(45, TimeUnit.SECONDS)
                 .build()
         }
     }

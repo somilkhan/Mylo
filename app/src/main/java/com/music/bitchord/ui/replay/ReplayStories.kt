@@ -29,6 +29,9 @@ import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.IosShare
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -70,7 +73,6 @@ import com.music.bitchord.data.model.HEADER_ART_PX
 import com.music.bitchord.data.model.ROW_ART_PX
 import com.music.bitchord.data.model.artworkAt
 import com.music.bitchord.data.stats.ReplaySummary
-import com.music.bitchord.ui.icons.BitChordIcons
 import com.music.bitchord.ui.player.MeshGradientBackground
 import com.music.bitchord.ui.player.MeshPalette
 import com.music.bitchord.ui.player.rememberArtworkColors
@@ -371,7 +373,7 @@ private fun StoryChrome(
     Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
         Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.End) {
             Icon(
-                imageVector = BitChordIcons.Close,
+                imageVector = Icons.Rounded.Close,
                 contentDescription = stringResource(R.string.close_replay),
                 tint = Color.White,
                 modifier = Modifier
@@ -419,7 +421,7 @@ private fun StoryChrome(
             )
             Spacer(Modifier.width(7.dp))
             Text(
-                text = "BitChord",
+                text = "Mylo",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.W700,
                 color = Color.White.copy(alpha = 0.9f),
@@ -493,7 +495,7 @@ private fun StoryPage(
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    imageVector = BitChordIcons.Share,
+                    imageVector = Icons.Rounded.IosShare,
                     contentDescription = stringResource(R.string.share_my_replay),
                     tint = Color.White,
                     modifier = Modifier.size(20.dp),
