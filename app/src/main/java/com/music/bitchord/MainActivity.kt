@@ -36,6 +36,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -4524,58 +4525,63 @@ private fun BitChordApp(
                     }
                 }
 
-                // Scrobble's FAB hides under any overlay or the player, and on Home under the keyboard; an open hub keeps its Close.
-                val keyboardVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
-                val scrobbleOverlayOpen = route != null && !scrobbleOpen ||
-                    detail != null || selectedMoodGenre != null || onboardingVisible ||
-                    replayStory != null || showReplayShare || songActions != null ||
-                    browseActions != null || playlistTarget != null || creatingPlaylist ||
-                    showSpotifyImportDialog || showLyricsOffset || showAccountSelector ||
-                    showLastfmLogin || showListenBrainzLogin || showUpdateDialog ||
-                    showLyricsSources || showTranslationLanguage || webSession != null
+                // The FAB is its own composable lambda: this one function is at the JVM
+                // method size limit, and the lambda body compiles to a separate method.
+                val scrobbleFabLayer: @Composable BoxScope.() -> Unit = {
+                    // Scrobble's FAB hides under any overlay or the player, and on Home under the keyboard; an open hub keeps its Close.
+                    val keyboardVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+                    val scrobbleOverlayOpen = route != null && !scrobbleOpen ||
+                        detail != null || selectedMoodGenre != null || onboardingVisible ||
+                        replayStory != null || showReplayShare || songActions != null ||
+                        browseActions != null || playlistTarget != null || creatingPlaylist ||
+                        showSpotifyImportDialog || showLyricsOffset || showAccountSelector ||
+                        showLastfmLogin || showListenBrainzLogin || showUpdateDialog ||
+                        showLyricsSources || showTranslationLanguage || webSession != null
 
-                // Scrobble's entry point, on Home only, sitting on the bar's row at the
-                // right, as Mylo lays it out: the same glass or tint surface as the bar.
-                val fabSurface = if (glassActive) {
-                    Modifier.liquidGlass(shape = CircleShape)
-                } else {
-                    Modifier.clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant)
+                    // Scrobble's entry point, on Home only, sitting on the bar's row at the
+                    // right, as Mylo lays it out: the same glass or tint surface as the bar.
+                    val fabSurface = if (glassActive) {
+                        Modifier.liquidGlass(shape = CircleShape)
+                    } else {
+                        Modifier.clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant)
+                    }
+                    val fabBarHeight = with(LocalDensity.current) {
+                        floatingBarsHeight.intValue.toDp()
+                    }.coerceAtLeast(88.dp)
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .widthIn(max = FLOATING_BAR_MAX_WIDTH)
+                            .fillMaxWidth()
+                            .padding(bottom = fabBarHeight + 12.dp),
+                        contentAlignment = Alignment.CenterEnd,
+                    ) {
+                        ScrobbleFab(
+                            visible = scrobbleFabVisible(
+                                selectedTab = selectedTab,
+                                homeTab = TAB_HOME,
+                                overlayOpen = scrobbleOverlayOpen,
+                                playerOpen = showNowPlaying,
+                                keyboardVisible = keyboardVisible,
+                                hubOpen = scrobbleOpen,
+                            ),
+                            open = scrobbleOpen,
+                            onClick = {
+                                if (scrobbleOpen) {
+                                    navigator.pop()
+                                } else {
+                                    scrobbleNavBarScroll.expand()
+                                    navigator.push(AppRoute.Scrobble)
+                                }
+                            },
+                            surface = fabSurface,
+                            reduceMotion = reducePlayerMotion,
+                            folded = glassActive && activeNavBarScroll.isInline,
+                            modifier = Modifier.padding(end = 8.dp),
+                        )
+                    }
                 }
-                val fabBarHeight = with(LocalDensity.current) {
-                    floatingBarsHeight.intValue.toDp()
-                }.coerceAtLeast(88.dp)
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .widthIn(max = FLOATING_BAR_MAX_WIDTH)
-                        .fillMaxWidth()
-                        .padding(bottom = fabBarHeight + 12.dp),
-                    contentAlignment = Alignment.CenterEnd,
-                ) {
-                    ScrobbleFab(
-                        visible = scrobbleFabVisible(
-                            selectedTab = selectedTab,
-                            homeTab = TAB_HOME,
-                            overlayOpen = scrobbleOverlayOpen,
-                            playerOpen = showNowPlaying,
-                            keyboardVisible = keyboardVisible,
-                            hubOpen = scrobbleOpen,
-                        ),
-                        open = scrobbleOpen,
-                        onClick = {
-                            if (scrobbleOpen) {
-                                navigator.pop()
-                            } else {
-                                scrobbleNavBarScroll.expand()
-                                navigator.push(AppRoute.Scrobble)
-                            }
-                        },
-                        surface = fabSurface,
-                        reduceMotion = reducePlayerMotion,
-                        folded = glassActive && activeNavBarScroll.isInline,
-                        modifier = Modifier.padding(end = 8.dp),
-                    )
-                }
+                scrobbleFabLayer()
 
                 val haptics = rememberHaptics()
                 val scrollScope = rememberCoroutineScope()
