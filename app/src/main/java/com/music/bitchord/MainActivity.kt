@@ -557,6 +557,17 @@ class MainActivity : AppCompatActivity() {
     }
 }
 
+/**
+ * [Box] with its content passed through, as a call of its own. [Box] is an
+ * inline function, so called directly its whole content is compiled into the
+ * caller; BitChordApp is at the JVM 64 KB method limit. This keeps the layout
+ * identical and moves the content out of that method.
+ */
+@Composable
+private fun LayeredBox(modifier: Modifier, content: @Composable BoxScope.() -> Unit) {
+    Box(modifier = modifier, content = content)
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun BitChordApp(
@@ -3049,7 +3060,7 @@ private fun BitChordApp(
         }
     }
 
-    Box(
+    LayeredBox(
         Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
