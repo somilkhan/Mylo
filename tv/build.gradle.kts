@@ -47,8 +47,10 @@ val lastfmSecret: String = (
  * the screen. See ListenTogether.DEFAULT_SERVER.
  */
 val listenTogetherServer: String = (
-    localProps.getProperty("LISTEN_TOGETHER_SERVER")
-        ?: System.getenv("LISTEN_TOGETHER_SERVER")
+    // A blank value (an unset CI secret arrives as "") means "not set": fall back
+    // to the default server rather than turning Listen Together off.
+    localProps.getProperty("LISTEN_TOGETHER_SERVER")?.takeIf { it.isNotBlank() }
+        ?: System.getenv("LISTEN_TOGETHER_SERVER")?.takeIf { it.isNotBlank() }
         ?: "https://bitchord-listen-together.onrender.com"
     ).trim().trimEnd('/')
 
