@@ -98,7 +98,7 @@ class LastFmScrobbleQueueTest {
     }
 
     @Test
-    fun permanentSessionFailureIsDroppedAndQueueContinues() = runBlocking {
+    fun sessionFailurePausesQueueAndKeepsEveryEntry() = runBlocking {
         val attempted = mutableListOf<String>()
         val logs = mutableListOf<String>()
         val queue = DurableLastFmScrobbleQueue(
@@ -106,22 +106,73 @@ class LastFmScrobbleQueueTest {
             canFlush = { true },
             send = { pending ->
                 attempted += pending.track
-                if (pending.track == "invalid") {
-                    Result.failure(LastFM.LastFmException(9, "Invalid session key"))
-                } else {
-                    Result.success(Unit)
-                }
+                Result.failure(LastFM.LastFmException(9, "Invalid session key"))
             },
             log = { message, _ -> logs += message },
         )
-        queue.enqueue(entry("invalid"))
-        queue.enqueue(entry("valid"))
+        queue.enqueue(entry("first"))
+        queue.enqueue(entry("second"))
 
         queue.flush()
 
-        assertEquals(listOf("invalid", "valid"), attempted)
+        assertEquals(listOf("first"), attempted)
+        assertEquals(listOf("first", "second"), queue.pendingEntries().map { it.track })
+        assertTrue(logs.any { it.contains("Paused Last.fm queue") })
+    }
+
+    @Test
+    fun httpForbiddenAndUnauthorizedAreAuthBlockedNotDropped() = runBlocking {
+        for (status in listOf(401, 403)) {
+            val file = File(temporaryFolder.root, "queue-$status.json")
+            val queue = queue(file) { Result.failure(LastFM.LastFmException(status, "Forbidden")) }
+            queue.enqueue(entry("kept"))
+
+            queue.flush()
+
+            assertEquals("status $status", listOf("kept"), queue.pendingEntries().map { it.track })
+        }
+    }
+
+    @Test
+    fun retryableFailureBacksOffAndResetsAfterSuccess() = runBlocking {
+        var now = 0L
+        val scheduled = mutableListOf<Long>()
+        var fail = true
+        val sent = mutableListOf<String>()
+        val queue = DurableLastFmScrobbleQueue(
+            file = File(temporaryFolder.root, "queue.json"),
+            canFlush = { true },
+            send = { pending ->
+                if (fail) Result.failure(LastFM.LastFmException(11, "Service offline"))
+                else { sent += pending.track; Result.success(Unit) }
+            },
+            log = { _, _ -> },
+            clock = { now },
+            scheduleRetry = { scheduled += it },
+        )
+        queue.enqueue(entry("only"))
+
+        queue.flush()
+        assertEquals(listOf(30_000L), scheduled)
+
+        // Still inside the backoff window: nothing is sent.
+        now = 10_000L
+        fail = false
+        queue.flush()
+        assertTrue(sent.isEmpty())
+
+        now = 30_000L
+        queue.flush()
+        assertEquals(listOf("only"), sent)
         assertTrue(queue.pendingEntries().isEmpty())
-        assertTrue(logs.any { it.contains("Dropped permanent") })
+    }
+
+    @Test
+    fun backoffDoublesAndIsCapped() {
+        assertEquals(30_000L, DurableLastFmScrobbleQueue.retryBackoffMillis(1))
+        assertEquals(60_000L, DurableLastFmScrobbleQueue.retryBackoffMillis(2))
+        assertEquals(120_000L, DurableLastFmScrobbleQueue.retryBackoffMillis(3))
+        assertEquals(DurableLastFmScrobbleQueue.MAX_BACKOFF_MILLIS, DurableLastFmScrobbleQueue.retryBackoffMillis(30))
     }
 
     @Test

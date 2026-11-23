@@ -479,11 +479,24 @@ object LastFM {
         if (!response.status.isSuccess()) {
             throw LastFmException(response.status.value, response.status.description)
         }
-        if (responseText.contains("\"error\"")) {
-            val error = json.decodeFromString<LastFmError>(responseText)
+        lastFmErrorOrNull(responseText)?.let { error ->
             throw LastFmException(error.error, error.message)
         }
         return responseText
+    }
+
+    /**
+     * Last.fm reports API errors as a top-level `{"error": N, "message": "..."}` object.
+     * Only that shape counts: a track or artist literally named "error" must not be treated
+     * as a failure. A top-level "error" we cannot decode is treated as temporary (code 16),
+     * so the entry is retried instead of dropped.
+     */
+    internal fun lastFmErrorOrNull(raw: String): LastFmError? {
+        val root = runCatching { Json.parseToJsonElement(raw) }.getOrNull() as? JsonObject
+            ?: return null
+        if (root["error"] == null) return null
+        return runCatching { json.decodeFromString<LastFmError>(raw) }.getOrNull()
+            ?: LastFmError(error = 16, message = "Unreadable Last.fm error response")
     }
 
     const val DEFAULT_SCROBBLE_DELAY_PERCENT = 0.5f
