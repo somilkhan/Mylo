@@ -357,6 +357,7 @@
     <string name="downloading_progress">İndiriliyor · %1$d%%</string>
     <string name="starting">Başlatılıyor</string>
     <string name="start_radio">Radyoyu başlat</string>
+    <string name="start_mix_with_song">Bu Şarkıyla Mix Başlat</string>
     <string name="radio_started">%1$s radyosu başlatıldı</string>
     <string name="saved_to_bitchord_folder">Müzik/BitChord klasörüne kaydedildi</string>
     <string name="nothing_downloading">İndirilen bir şey yok</string>

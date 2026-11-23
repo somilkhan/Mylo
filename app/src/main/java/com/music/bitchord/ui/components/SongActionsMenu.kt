@@ -107,6 +107,11 @@ fun SongActionsMenu(
     onPlayNext: () -> Unit,
     onAddToQueue: () -> Unit,
     onStartRadio: () -> Unit,
+    /**
+     * Starts a generated mix seeded by this track. Null hides the row; the
+     * caller passes one only where the track can seed a mix.
+     */
+    onStartMix: (() -> Unit)? = null,
     onDownload: () -> Unit,
     /**
      * Copies this track to the WebDAV server. Null hides the row — the caller
@@ -338,6 +343,16 @@ fun SongActionsMenu(
             )
         }
         WebDavUploadRow(song, palette, isOffline, onUploadToWebDav)
+        if (onStartMix != null && !isOffline && song.videoId.isNotBlank() &&
+            !song.isVideo && song.title.isNotBlank() && song.artist.isNotBlank()
+        ) {
+            ActionRow(
+                icon = SfIcons.AutoAwesome,
+                label = stringResource(R.string.start_mix_with_song),
+                accent = palette.accent,
+                onClick = onStartMix,
+            )
+        }
         onRemoveFromHistory?.let {
             ActionRow(
                 icon = SfIcons.History,

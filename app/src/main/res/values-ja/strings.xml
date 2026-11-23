@@ -1000,6 +1000,7 @@
     <string name="source_unrecognised">Mylo はそのリンクを認識できませんでした</string>
 
     <string name="start_radio">ラジオを開始</string>
+    <string name="start_mix_with_song">この曲でミックスを開始</string>
 
     <string name="subscribe">チャンネル登録</string>
 

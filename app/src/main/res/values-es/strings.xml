@@ -976,6 +976,7 @@
     <string name="scrobble_primary_artist_only_subtitle">Usar el primer artista cuando una pista acredite a varios</string>
 
     <string name="start_radio">Iniciar radio</string>
+    <string name="start_mix_with_song">Iniciar mezcla con esta canción</string>
 
     <string name="sort_library">Ordenar</string>
 

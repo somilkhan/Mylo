@@ -856,8 +856,9 @@ private fun BitChordApp(
         )
     }
     val onScrobbleTab: (Int) -> Unit = { scrobbleTab = it }
-    // Every open starts on Stats, as does every close.
-    LaunchedEffect(scrobbleOpen) { scrobbleTab = 0 }
+    // Every close returns to Stats. An open starts there too, except a Start
+    // mix from a song, which sets Generate in the same step as it opens.
+    LaunchedEffect(scrobbleOpen) { if (!scrobbleOpen) scrobbleTab = 0 }
     /**
      * The release page at the top of its stack, whether or not a route
      * covers it. Most things want [detail] — the one actually on screen.
@@ -3109,9 +3110,11 @@ private fun BitChordApp(
                                         replayStory = page
                                     },
                                     onOpenArtist = { id, name ->
+                                        navigator.pop()
                                         openByName(id, name, null, BrowseType.ARTIST)
                                     },
                                     onOpenAlbum = { id, title, artist, art ->
+                                        navigator.pop()
                                         openByName(id, title, artist, BrowseType.ALBUM, art)
                                     },
                                     contentPadding = listPadding,
@@ -4641,6 +4644,12 @@ private fun BitChordApp(
                 onPlayNext = { playNext(song); songActions = null },
                 onAddToQueue = { addToQueue(song); songActions = null },
                 onStartRadio = { startRadio(song); songActions = null },
+                onStartMix = {
+                    songActions = null
+                    scrobbleTab = 1
+                    navigator.push(AppRoute.Scrobble)
+                    scrobbleGenerateViewModel.startMixWithSong(song)
+                },
                 // Stays open: the row it replaces itself with is the
                 // progress, and closing the sheet would hide the only
                 // answer to "did that work?".

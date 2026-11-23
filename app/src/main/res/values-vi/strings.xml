@@ -371,6 +371,7 @@
     <string name="downloading_progress">Đang tải xuống · %1$d%%</string>
     <string name="starting">Đang bắt đầu</string>
     <string name="start_radio">Phát radio</string>
+    <string name="start_mix_with_song">Bắt đầu Mix với bài hát này</string>
     <string name="radio_started">Đã bắt đầu radio %1$s</string>
     <string name="saved_to_bitchord_folder">Đã lưu vào Music/BitChord</string>
     <string name="nothing_downloading">Không có nội dung đang tải</string>

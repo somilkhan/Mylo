@@ -991,6 +991,7 @@
     <string name="source_unrecognised">Mylo 無法識別該連結</string>
 
     <string name="start_radio">開啟電臺</string>
+    <string name="start_mix_with_song">從這首歌開始混音</string>
 
     <string name="subscribe">訂閱</string>
 

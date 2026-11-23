@@ -6,7 +6,6 @@ import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -20,7 +19,7 @@ import dev.chrisbanes.haze.HazeState
  * the tab bar is the app's navigation bar, swapped to the Scrobble tabs while
  * this page is open. [tab] is 1 for Generate and 2 for Playlists.
  *
- * Leaving the page cancels any running generation.
+ * Closing the page cancels any running generation, in the caller.
  */
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
@@ -37,10 +36,6 @@ fun ScrobbleHost(
 ) {
     val generateViewModel: ScrobbleGenerateViewModel = viewModel()
     val hazeState = remember { HazeState() }
-
-    DisposableEffect(Unit) {
-        onDispose { generateViewModel.cancelGeneration() }
-    }
 
     SharedTransitionLayout(modifier = Modifier.fillMaxSize()) {
         AnimatedVisibility(visible = true) {
