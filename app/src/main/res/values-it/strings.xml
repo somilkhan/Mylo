@@ -33,6 +33,10 @@
     <string name="audio_files_on_device">File audio sul dispositivo</string>
     <string name="on_device">Sul dispositivo</string>
     <string name="playlists">Playlist</string>
+    <string name="scrobble_tab_stats">Statistiche</string>
+    <string name="scrobble_title_stats">Statistiche</string>
+    <string name="scrobble_tab_generate">Genera</string>
+    <string name="scrobble_tab_playlists">Playlist</string>
     <string name="new_playlist">Nuova playlist</string>
     <string name="saved_to_youtube_music">Salvato su YouTube Music</string>
     <string name="sign_in">Accedi</string>

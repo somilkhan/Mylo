@@ -31,6 +31,10 @@
     <string name="audio_files_on_device">File audio di perangkat</string>
     <string name="on_device">Di Perangkat</string>
     <string name="playlists">Playlist</string>
+    <string name="scrobble_tab_stats">Statistik</string>
+    <string name="scrobble_title_stats">Statistik</string>
+    <string name="scrobble_tab_generate">Buat</string>
+    <string name="scrobble_tab_playlists">Playlist</string>
     <string name="new_playlist">Playlist baru</string>
     <string name="saved_to_youtube_music">Disimpan ke YouTube Music</string>
     <string name="sign_in">Masuk</string>

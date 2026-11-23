@@ -34,6 +34,10 @@
     <string name="audio_files_on_device">קובצי אודיו במכשיר</string>
     <string name="on_device">במכשיר</string>
     <string name="playlists">פלייליסטים</string>
+    <string name="scrobble_tab_stats">סטטיסטיקה</string>
+    <string name="scrobble_title_stats">סטטיסטיקות</string>
+    <string name="scrobble_tab_generate">יצירה</string>
+    <string name="scrobble_tab_playlists">פלייליסטים</string>
     <string name="new_playlist">פלייליסט חדש</string>
     <string name="saved_to_youtube_music">נשמר ל-YouTube Music</string>
     <string name="sign_in">התחברות</string>

@@ -35,6 +35,10 @@
     <string name="audio_files_on_device">기기의 오디오 파일</string>
     <string name="on_device">기기 내</string>
     <string name="playlists">재생목록</string>
+    <string name="scrobble_tab_stats">통계</string>
+    <string name="scrobble_title_stats">통계</string>
+    <string name="scrobble_tab_generate">생성</string>
+    <string name="scrobble_tab_playlists">재생목록</string>
     <string name="new_playlist">새 재생목록</string>
     <string name="saved_to_youtube_music">YouTube Music에 저장했습니다</string>
     <string name="sign_in">로그인</string>

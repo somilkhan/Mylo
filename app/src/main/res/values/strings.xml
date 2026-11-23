@@ -41,6 +41,10 @@
     <string name="audio_files_on_device">Audio files on device</string>
     <string name="on_device">On Device</string>
     <string name="playlists">Playlists</string>
+    <string name="scrobble_tab_stats">Stats</string>
+    <string name="scrobble_title_stats">Statistics</string>
+    <string name="scrobble_tab_generate">Generate</string>
+    <string name="scrobble_tab_playlists">Playlists</string>
     <string name="new_playlist">New playlist</string>
     <string name="saved_to_youtube_music">Saved to YouTube Music</string>
     <string name="sign_in">Sign in</string>

@@ -120,11 +120,14 @@ class ScrobbleGenerateViewModel(application: Application) : AndroidViewModel(app
                     },
                 )
                 if (generationToken == token) {
-                    if (queueAfterSave) {
-                        _pendingStartMixQueue.value = playlist
-                    }
                     _uiState.update { it.copy(savedPlaylist = playlist) }
-                    _savedPlaylistEvents.emit(playlist)
+                    if (queueAfterSave) {
+                        // A Start mix stays on Generate: it queues playback instead of
+                        // emitting the saved-playlist handoff that moves to Playlists.
+                        _pendingStartMixQueue.value = playlist
+                    } else {
+                        _savedPlaylistEvents.emit(playlist)
+                    }
                 }
             } catch (_: TimeoutCancellationException) {
                 if (generationToken == token) {

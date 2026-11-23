@@ -35,6 +35,10 @@
     <string name="audio_files_on_device">Pliki audio na urządzeniu</string>
     <string name="on_device">Na urządzeniu</string>
     <string name="playlists">Playlisty</string>
+    <string name="scrobble_tab_stats">Statystyki</string>
+    <string name="scrobble_title_stats">Statystyki</string>
+    <string name="scrobble_tab_generate">Generuj</string>
+    <string name="scrobble_tab_playlists">Playlisty</string>
     <string name="new_playlist">Nowa playlista</string>
     <string name="saved_to_youtube_music">Zapisano do YouTube Music</string>
     <string name="sign_in">Zaloguj</string>

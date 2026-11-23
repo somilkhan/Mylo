@@ -848,11 +848,14 @@ private fun BitChordApp(
     // in place of Home, Explore, Library and Search, and the FAB closes it.
     val scrobbleOpen = route == AppRoute.Scrobble
     val activeNavBarScroll = if (scrobbleOpen) scrobbleNavBarScroll else navBarScroll
-    val scrobbleTabs = remember {
+    val scrobbleStatsLabel = stringResource(R.string.scrobble_tab_stats)
+    val scrobbleGenerateLabel = stringResource(R.string.scrobble_tab_generate)
+    val scrobblePlaylistsLabel = stringResource(R.string.scrobble_tab_playlists)
+    val scrobbleTabs = remember(scrobbleStatsLabel, scrobbleGenerateLabel, scrobblePlaylistsLabel) {
         listOf(
-            BottomTab("Stats", BitChordIcons.Clock),
-            BottomTab("Generate", Icons.Rounded.GraphicEq),
-            BottomTab("Playlists", BitChordIcons.TabLibrary),
+            BottomTab(scrobbleStatsLabel, BitChordIcons.Clock),
+            BottomTab(scrobbleGenerateLabel, Icons.Rounded.GraphicEq),
+            BottomTab(scrobblePlaylistsLabel, BitChordIcons.TabLibrary),
         )
     }
     val onScrobbleTab: (Int) -> Unit = { scrobbleTab = it }
@@ -2877,7 +2880,13 @@ private fun BitChordApp(
     val canGoBack = navigator.entries.isNotEmpty() || detailStack.isNotEmpty() ||
         selectedMoodGenre != null || selectedTab != TAB_HOME
     val goBack: () -> Unit = {
-        if (!navigator.pop() && !viewModel.closeMoodGenre()) selectedTab = TAB_HOME
+        // Scrobble's Generate or Playlists tab steps back to Stats first; the
+        // page itself closes only from Stats.
+        if (scrobbleOpen && scrobbleTab != 0) {
+            scrobbleTab = 0
+        } else if (!navigator.pop() && !viewModel.closeMoodGenre()) {
+            selectedTab = TAB_HOME
+        }
     }
 
     Box(
@@ -3936,9 +3945,9 @@ private fun BitChordApp(
                         AppRoute.EqualizerPresets -> stringResource(R.string.equalizer_preset)
                         AppRoute.Replay -> stringResource(R.string.replay)
                         AppRoute.Scrobble -> when (scrobbleTab) {
-                            0 -> "Statistics"
-                            1 -> "Generate"
-                            else -> "Playlists"
+                            0 -> stringResource(R.string.scrobble_title_stats)
+                            1 -> stringResource(R.string.scrobble_tab_generate)
+                            else -> stringResource(R.string.scrobble_tab_playlists)
                         }
                         null -> when {
                             detail != null && detailActiveShelf != null -> detailActiveShelf?.title.orEmpty()
@@ -4304,7 +4313,7 @@ private fun BitChordApp(
                     }
                 }
 
-                // Scrobble's FAB hides under any overlay, the player or the keyboard.
+                // Scrobble's FAB hides under any overlay or the player, and on Home under the keyboard; an open hub keeps its Close.
                 val keyboardVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
                 val scrobbleOverlayOpen = route != null && !scrobbleOpen ||
                     detail != null || selectedMoodGenre != null || onboardingVisible ||
