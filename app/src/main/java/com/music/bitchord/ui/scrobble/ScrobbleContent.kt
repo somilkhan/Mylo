@@ -44,6 +44,8 @@ import com.music.bitchord.ui.components.SongRow
 import com.music.bitchord.ui.components.AlertAction
 import com.music.bitchord.ui.components.AlertRule
 import com.music.bitchord.ui.components.AlertScaffold
+import com.music.bitchord.ui.components.ScrobbleEmptyState
+import com.music.bitchord.ui.components.ScrobbleErrorState
 import com.music.bitchord.ui.components.PillTextField
 import com.music.bitchord.ui.components.ScrobbleErrorState
 import com.music.bitchord.ui.components.SearchField
@@ -56,6 +58,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -1190,8 +1193,8 @@ fun ScrobblePlaylistsContent(
                             )
                         }
                         TextButton(onClick = onOpenGenerator, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface)) {
-                            Icon(Icons.Rounded.AutoAwesome, contentDescription = null, modifier = Modifier.size(17.dp))
-                            Spacer(Modifier.width(6.dp))
+                            Icon(Icons.Rounded.AutoAwesome, contentDescription = null, modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(8.dp))
                             Text(stringResource(R.string.scrobble_tab_generate))
                         }
                         Box {
@@ -1223,10 +1226,7 @@ fun ScrobblePlaylistsContent(
             }
             storageError?.let { error ->
                 item(key = "playlist_storage_error") {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(error, color = MaterialTheme.colorScheme.error)
-                        TextButton(onClick = { scope.launch { LocalPlaylistStore.reload() } }, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface)) { Text(stringResource(R.string.retry)) }
-                    }
+                    ScrobbleErrorState(message = error, onRetry = { scope.launch { LocalPlaylistStore.reload() } })
                 }
             }
             playlistActionError?.let { error ->
@@ -1267,7 +1267,7 @@ fun ScrobblePlaylistsContent(
                     }
                 }
             }
-            if (playlists.isNotEmpty()) {
+            if (playlists.isNotEmpty() && storageError == null) {
                 item {
                     SearchField(
                         query = search,
@@ -1277,26 +1277,30 @@ fun ScrobblePlaylistsContent(
                     )
                 }
             }
-            if (visible.isEmpty() && storageError == null) {
+            if (storageError != null) {
+                // The storage error above is the only content until a retry succeeds.
+            } else if (visible.isEmpty()) {
                 item {
                     Column(
                         Modifier.fillMaxWidth().padding(vertical = 48.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(9.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         Icon(Icons.Rounded.LibraryMusic, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(42.dp))
-                        Text(if (playlists.isEmpty()) "No playlists yet" else "No matching playlists", style = MaterialTheme.typography.titleLarge)
-                        Text(
-                            if (playlists.isEmpty()) "Create your first mix from the Generator." else "Try another playlist name.",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                        )
                         if (playlists.isEmpty()) {
-                            Button(onClick = onOpenGenerator, colors = scrobblePrimaryButtonColors(), shape = RoundedCornerShape(16.dp)) {
-                                Icon(Icons.Rounded.AutoAwesome, contentDescription = null)
-                                Spacer(Modifier.width(8.dp))
-                                Text(stringResource(R.string.scrobble_open_generator))
-                            }
+                            ScrobbleEmptyState(
+                                title = "No playlists yet",
+                                message = "Create your first mix from the Generator.",
+                                action = {
+                                    Button(onClick = onOpenGenerator, colors = scrobblePrimaryButtonColors(), shape = RoundedCornerShape(16.dp)) {
+                                        Icon(Icons.Rounded.AutoAwesome, contentDescription = null)
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(stringResource(R.string.scrobble_open_generator))
+                                    }
+                                },
+                            )
+                        } else {
+                            ScrobbleEmptyState(title = "No matching playlists", message = "Try another playlist name.")
                         }
                     }
                 }
@@ -1403,12 +1407,12 @@ fun ScrobblePlaylistsContent(
             ) {
                 Text(
                     "Rename playlist",
-                    style = MaterialTheme.typography.bodyLarge.copy(fontSize = 17.sp, fontWeight = FontWeight.W600),
+                    style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
                     "Choose a name for this playlist.",
-                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp, lineHeight = 17.sp),
+                    style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 PillTextField(
@@ -1459,13 +1463,19 @@ fun ScrobblePlaylistsContent(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
-                    "Delete playlist?",
-                    style = MaterialTheme.typography.bodyLarge.copy(fontSize = 17.sp, fontWeight = FontWeight.W600),
+                    "Delete \"${target.title}\"?",
+                    style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
                     stringResource(R.string.scrobble_remove_device_message, target.title),
-                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp, lineHeight = 17.sp),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                )
+                Text(
+                    "This cannot be undone.",
+                    style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 )
@@ -1582,6 +1592,7 @@ private fun PlaylistRow(
                     Text(
                         playlist.title,
                         modifier = Modifier.fillMaxWidth(),
+                        style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
@@ -1593,7 +1604,7 @@ private fun PlaylistRow(
                     ) {
                         Text(
                             listOfNotNull(stringResource(R.string.scrobble_tracks_count, playlist.songs.size), if (playlist.isPinned) stringResource(R.string.scrobble_pinned) else null).joinToString(" · "),
-                            style = MaterialTheme.typography.bodySmall,
+                            style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
                         )
@@ -1606,7 +1617,7 @@ private fun PlaylistRow(
                                 Text(
                                     modeLabel,
                                     modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
-                                    style = MaterialTheme.typography.labelSmall,
+                                    style = MaterialTheme.typography.labelMedium,
                                     maxLines = 1,
                                 )
                             }
@@ -1614,11 +1625,11 @@ private fun PlaylistRow(
                     }
                 }
                 IconButton(onClick = onPlay, enabled = playlist.songs.isNotEmpty()) {
-                    Icon(Icons.Rounded.PlayArrow, contentDescription = "Play playlist")
+                    Icon(Icons.Rounded.PlayArrow, contentDescription = "Play ${playlist.title}")
                 }
                 Box {
                     IconButton(onClick = { menuExpanded = true }) {
-                        Icon(Icons.Rounded.MoreVert, contentDescription = "Playlist actions")
+                        Icon(Icons.Rounded.MoreVert, contentDescription = "More options for ${playlist.title}")
                     }
                     DropdownMenu(
                         expanded = menuExpanded,
@@ -1626,17 +1637,30 @@ private fun PlaylistRow(
                         containerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 1f),
                     ) {
                         DropdownMenuItem(
+                            text = { Text("Play") },
+                            leadingIcon = { Icon(Icons.Rounded.PlayArrow, contentDescription = null) },
+                            enabled = playlist.songs.isNotEmpty(),
+                            onClick = { menuExpanded = false; onPlay() },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.scrobble_generate_similar)) },
+                            leadingIcon = { Icon(Icons.Rounded.AutoAwesome, contentDescription = null) },
+                            enabled = canGenerateSimilar,
+                            onClick = { menuExpanded = false; onGenerateSimilar() },
+                        )
+                        HorizontalDivider()
+                        DropdownMenuItem(
                             text = { Text(if (playlist.isPinned) "Unpin" else "Pin") },
                             leadingIcon = { Icon(Icons.Rounded.PushPin, contentDescription = null) },
                             onClick = { menuExpanded = false; onPin() },
                         )
                         DropdownMenuItem(
-                            text = { Text(stringResource(R.string.scrobble_generate_similar)) },
-                            leadingIcon = { Icon(Icons.Rounded.Shuffle, contentDescription = null) },
-                            enabled = canGenerateSimilar,
-                            onClick = { menuExpanded = false; onGenerateSimilar() },
+                            text = { Text(stringResource(R.string.rename)) },
+                            leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null) },
+                            onClick = { menuExpanded = false; onRename() },
                         )
                         if (showReorder) {
+                            HorizontalDivider()
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.scrobble_move_up)) },
                                 leadingIcon = { Icon(Icons.Rounded.ArrowUpward, contentDescription = null) },
@@ -1650,14 +1674,10 @@ private fun PlaylistRow(
                                 onClick = { menuExpanded = false; onMoveDown() },
                             )
                         }
+                        HorizontalDivider()
                         DropdownMenuItem(
-                            text = { Text(stringResource(R.string.rename)) },
-                            leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null) },
-                            onClick = { menuExpanded = false; onRename() },
-                        )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.delete)) },
-                            leadingIcon = { Icon(Icons.Rounded.Delete, contentDescription = null) },
+                            text = { Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error) },
+                            leadingIcon = { Icon(Icons.Rounded.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
                             onClick = { menuExpanded = false; onDelete() },
                         )
                     }
@@ -1818,7 +1838,7 @@ private fun PlaylistDetailContent(
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.Rounded.ChevronLeft, contentDescription = "Back to playlists")
+                    Icon(Icons.AutoMirrored.Rounded.ChevronLeft, contentDescription = "Back to playlists")
                 }
                 if (currentTrackDisplayIndex >= 0) {
                     TextButton(
@@ -1852,7 +1872,7 @@ private fun PlaylistDetailContent(
                 ) { Text(if (addTracksExpanded) "Done" else "Add tracks") }
                 Box {
                     IconButton(onClick = { detailMenuExpanded = true }) {
-                        Icon(Icons.Rounded.MoreVert, contentDescription = "Playlist actions")
+                        Icon(Icons.Rounded.MoreVert, contentDescription = "More options for ${playlist.title}")
                     }
                     DropdownMenu(
                         expanded = detailMenuExpanded,
@@ -1870,7 +1890,7 @@ private fun PlaylistDetailContent(
                         if (playlist.customCoverUri != null) {
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.scrobble_reset_cover)) },
-                                leadingIcon = { Icon(Icons.Rounded.Delete, contentDescription = null) },
+                                leadingIcon = { Icon(Icons.Rounded.Restore, contentDescription = null) },
                                 onClick = {
                                     detailMenuExpanded = false
                                     val oldUri = playlist.customCoverUri
@@ -1896,7 +1916,7 @@ private fun PlaylistDetailContent(
                         }
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.scrobble_generate_similar)) },
-                            leadingIcon = { Icon(Icons.Rounded.Shuffle, contentDescription = null) },
+                            leadingIcon = { Icon(Icons.Rounded.AutoAwesome, contentDescription = null) },
                             enabled = !generationState.isGenerating && playlist.songs.any { it.videoId.isNotBlank() && !it.isVideo },
                             onClick = {
                                 detailMenuExpanded = false
@@ -1905,7 +1925,7 @@ private fun PlaylistDetailContent(
                         )
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.scrobble_export_playlist)) },
-                            leadingIcon = { Icon(Icons.Rounded.Share, contentDescription = null) },
+                            leadingIcon = { Icon(Icons.Rounded.FileDownload, contentDescription = null) },
                             onClick = {
                                 detailMenuExpanded = false
                                 exportDialogVisible = true
@@ -1916,9 +1936,10 @@ private fun PlaylistDetailContent(
                             leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null) },
                             onClick = { detailMenuExpanded = false; onRename() },
                         )
+                        HorizontalDivider()
                         DropdownMenuItem(
-                            text = { Text(stringResource(R.string.delete)) },
-                            leadingIcon = { Icon(Icons.Rounded.Delete, contentDescription = null) },
+                            text = { Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error) },
+                            leadingIcon = { Icon(Icons.Rounded.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
                             onClick = { detailMenuExpanded = false; onDelete() },
                         )
                     }
@@ -2089,9 +2110,10 @@ private fun PlaylistDetailContent(
                             }
                         },
                     )
+                    HorizontalDivider()
                     DropdownMenuItem(
-                        text = { Text(stringResource(R.string.scrobble_remove_from_playlist)) },
-                        leadingIcon = { Icon(Icons.Rounded.Delete, contentDescription = null) },
+                        text = { Text(stringResource(R.string.scrobble_remove_from_playlist), color = MaterialTheme.colorScheme.error) },
+                        leadingIcon = { Icon(Icons.Rounded.RemoveCircleOutline, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
                         onClick = {
                             trackMenuExpanded = false
                             scope.launch {
