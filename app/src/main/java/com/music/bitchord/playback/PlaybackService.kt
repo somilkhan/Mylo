@@ -8320,14 +8320,14 @@ class PlaybackService : MediaLibraryService() {
                 manager.useNowPlaying = snapshot.nowPlaying
                 manager.usePrimaryArtistOnly = snapshot.primaryArtistOnly
 
+                // Settings changes must not drive the timer: onSettingsChanged only starts an
+                // untracked, playing song, so a running scrobble timer is never re-armed here.
                 player?.let { exoPlayer ->
-                    if (exoPlayer.isPlaying) {
-                        manager.onPlayerStateChanged(
-                            isPlaying = true,
-                            song = exoPlayer.currentMediaItem?.toSong(),
-                            durationMs = exoPlayer.duration.takeIf { it > 0 },
-                        )
-                    }
+                    manager.onSettingsChanged(
+                        isPlaying = exoPlayer.isPlaying,
+                        song = exoPlayer.currentMediaItem?.toSong(),
+                        durationMs = exoPlayer.duration.takeIf { it > 0 },
+                    )
                 }
             }
         }

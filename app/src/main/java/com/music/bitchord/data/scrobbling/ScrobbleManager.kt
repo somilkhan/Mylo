@@ -8,130 +8,159 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-class ScrobbleManager(
+/**
+ * Owns the scrobble timer for the song that is playing.
+ *
+ * The timer counts only while the song plays: [onSongPause] stores what is left,
+ * [onSongResume] continues from there, and a song is submitted at most once.
+ * [clock] (epoch ms) and [submit] are injectable so the rules can be tested in virtual time.
+ */
+internal class ScrobbleManager(
     private val scope: CoroutineScope,
     var minSongDuration: Int = 30,
     var scrobbleDelayPercent: Float = 0.5f,
     var scrobbleDelaySeconds: Int = 180,
+    private val clock: () -> Long = System::currentTimeMillis,
+    private val submit: (LastFmScrobbleEntry) -> Unit = { entry -> LastFmScrobbleQueue.submit(entry) },
 ) {
     private var scrobbleJob: Job? = null
-    private var scrobbleRemainingMillis: Long = 0L
-    private var scrobbleTimerStartedAt: Long = 0L
-    private var songStartedAt: Long = 0L
+    private var currentSong: Song? = null
+    private var songDurationSeconds = 0
+    private var songStartedAt = 0L // Last.fm timestamp: epoch seconds of the listen's start
     private var songStarted = false
     private var scrobbled = false
+
+    /** Milliseconds still needed before the scrobble, as of [scrobbleTimerStartedAt]. */
+    private var scrobbleRemainingMillis = 0L
+
+    /** Epoch ms when the timer last started counting, or 0 while paused or stopped. */
+    private var scrobbleTimerStartedAt = 0L
+
     var useNowPlaying = true
     var usePrimaryArtistOnly = false
 
     fun destroy() {
-        scrobbleJob?.cancel()
-        scrobbleRemainingMillis = 0L
-        scrobbleTimerStartedAt = 0L
-        songStartedAt = 0L
+        cancelTimer()
+        currentSong = null
         songStarted = false
         scrobbled = false
     }
 
-    fun onSongStart(
-        song: Song?,
-        durationMs: Long? = null,
-    ) {
+    fun onSongStart(song: Song?, durationMs: Long? = null) {
         if (song == null) return
-        songStartedAt = System.currentTimeMillis() / 1000
+        cancelTimer()
+        songStartedAt = clock() / 1000
         songStarted = true
         scrobbled = false
-        startScrobbleTimer(song, durationMs)
+        currentSong = song
+        armFor(song, durationMs)
         if (useNowPlaying) {
             updateNowPlaying(song)
         }
     }
 
-    fun onSongResume(song: Song) {
-        resumeScrobbleTimer(song)
+    fun onSongPause() {
+        pauseTimer()
     }
 
-    fun onSongPause() {
-        pauseScrobbleTimer()
+    fun onSongResume() {
+        // Already counting (for example, a settings change while playing): leave it alone,
+        // otherwise it would re-arm with its full remaining time and delay the scrobble.
+        if (scrobbleJob?.isActive == true) return
+        startCountingFromRemaining()
     }
 
     fun onSongStop() {
-        stopScrobbleTimer()
+        cancelTimer()
+        scrobbleRemainingMillis = 0L
+        currentSong = null
         songStarted = false
     }
 
-    private fun startScrobbleTimer(
-        song: Song,
+    /**
+     * Called when a setting changes while the player is in some state. It starts tracking only a
+     * song that is not yet tracked and is playing. It never re-drives a running timer.
+     */
+    fun onSettingsChanged(isPlaying: Boolean, song: Song?, durationMs: Long? = null) {
+        if (!isPlaying || songStarted || song == null) return
+        onSongStart(song, durationMs)
+    }
+
+    fun onPlayerStateChanged(
+        isPlaying: Boolean,
+        song: Song?,
         durationMs: Long? = null,
     ) {
-        scrobbleJob?.cancel()
-        if (scrobbled) return
-        val resolvedDurationSeconds = durationMs?.toInt()?.div(1000)
+        if (song == null) return
+        if (isPlaying) {
+            if (!songStarted) {
+                onSongStart(song, durationMs)
+            } else {
+                onSongResume()
+            }
+        } else {
+            onSongPause()
+        }
+    }
+
+    private fun armFor(song: Song, durationMs: Long?) {
+        val duration = durationMs?.let { (it / 1000).toInt() }
             ?: song.durationText?.let { ScrobbleTiming.parseDurationSeconds(it) }
             ?: return
-
-        if (!ScrobbleTiming.isEligible(resolvedDurationSeconds, minSongDuration)) return
-
+        if (!ScrobbleTiming.isEligible(duration, minSongDuration)) return
+        songDurationSeconds = duration
         scrobbleRemainingMillis = ScrobbleTiming.thresholdMillis(
-            resolvedDurationSeconds,
+            duration,
             scrobbleDelayPercent,
             scrobbleDelaySeconds,
         )
-
-        if (scrobbleRemainingMillis <= 0) {
-            scrobbleSong(song, resolvedDurationSeconds)
-            return
-        }
-        scrobbleTimerStartedAt = System.currentTimeMillis()
-        scrobbleJob =
-            scope.launch {
-                delay(scrobbleRemainingMillis)
-                scrobbleSong(song, resolvedDurationSeconds)
-                scrobbleJob = null
-            }
+        startCountingFromRemaining()
     }
 
-    private fun pauseScrobbleTimer() {
+    private fun startCountingFromRemaining() {
+        if (scrobbled || scrobbleRemainingMillis <= 0L) return
         scrobbleJob?.cancel()
+        scrobbleTimerStartedAt = clock()
+        val waitMillis = scrobbleRemainingMillis
+        scrobbleJob = scope.launch {
+            delay(waitMillis)
+            scrobbleCurrent()
+        }
+    }
+
+    private fun pauseTimer() {
+        scrobbleJob?.cancel()
+        scrobbleJob = null
         if (scrobbleTimerStartedAt != 0L) {
-            val elapsed = System.currentTimeMillis() - scrobbleTimerStartedAt
-            scrobbleRemainingMillis -= elapsed
-            if (scrobbleRemainingMillis < 0) scrobbleRemainingMillis = 0
+            val elapsed = clock() - scrobbleTimerStartedAt
+            scrobbleRemainingMillis = (scrobbleRemainingMillis - elapsed).coerceAtLeast(0L)
             scrobbleTimerStartedAt = 0L
         }
     }
 
-    private fun resumeScrobbleTimer(song: Song) {
-        // Once a song has been scrobbled, a resume must not submit it again.
-        if (scrobbled || scrobbleRemainingMillis <= 0) return
-        scrobbleJob?.cancel()
-        scrobbleTimerStartedAt = System.currentTimeMillis()
-        scrobbleJob =
-            scope.launch {
-                delay(scrobbleRemainingMillis)
-                val durationSeconds = song.durationText?.let { ScrobbleTiming.parseDurationSeconds(it) } ?: 0
-                scrobbleSong(song, durationSeconds)
-                scrobbleJob = null
-            }
-    }
-
-    private fun stopScrobbleTimer() {
+    private fun cancelTimer() {
         scrobbleJob?.cancel()
         scrobbleJob = null
-        scrobbleRemainingMillis = 0
+        scrobbleRemainingMillis = 0L
+        scrobbleTimerStartedAt = 0L
     }
 
-    private fun scrobbleSong(song: Song, durationSeconds: Int) {
+    private fun scrobbleCurrent() {
+        val song = currentSong ?: return
         if (scrobbled) return
         scrobbled = true
         scrobbleRemainingMillis = 0L
-        val entry = LastFmScrobbleEntry(
-            artist = song.artist.forScrobble(),
-            track = song.title,
-            timestamp = songStartedAt,
-            album = song.albumName,
-            duration = durationSeconds.takeIf { it > 0 },
+        scrobbleTimerStartedAt = 0L
+        scrobbleJob = null
+        submit(
+            LastFmScrobbleEntry(
+                artist = song.artist.forScrobble(),
+                track = song.title,
+                timestamp = songStartedAt,
+                album = song.albumName,
+                duration = songDurationSeconds.takeIf { it > 0 },
+            ),
         )
-        LastFmScrobbleQueue.submit(entry)
     }
 
     private fun updateNowPlaying(song: Song) {
@@ -149,23 +178,6 @@ class ScrobbleManager(
                     if (throwable is CancellationException) throw throwable
                     Log.e(TAG, "Failed to update now playing: ${song.title}", throwable)
                 }
-        }
-    }
-
-    fun onPlayerStateChanged(
-        isPlaying: Boolean,
-        song: Song?,
-        durationMs: Long? = null,
-    ) {
-        if (song == null) return
-        if (isPlaying) {
-            if (!songStarted) {
-                onSongStart(song, durationMs)
-            } else {
-                onSongResume(song)
-            }
-        } else {
-            onSongPause()
         }
     }
 
