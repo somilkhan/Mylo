@@ -33,8 +33,8 @@ internal class ScrobbleManager(
     /** Milliseconds still needed before the scrobble, as of [scrobbleTimerStartedAt]. */
     private var scrobbleRemainingMillis = 0L
 
-    /** Epoch ms when the timer last started counting, or 0 while paused or stopped. */
-    private var scrobbleTimerStartedAt = 0L
+    /** Epoch ms when the timer last started counting, or null while paused or stopped. */
+    private var scrobbleTimerStartedAt: Long? = null
 
     var useNowPlaying = true
     var usePrimaryArtistOnly = false
@@ -131,18 +131,18 @@ internal class ScrobbleManager(
     private fun pauseTimer() {
         scrobbleJob?.cancel()
         scrobbleJob = null
-        if (scrobbleTimerStartedAt != 0L) {
-            val elapsed = clock() - scrobbleTimerStartedAt
+        scrobbleTimerStartedAt?.let { startedAt ->
+            val elapsed = clock() - startedAt
             scrobbleRemainingMillis = (scrobbleRemainingMillis - elapsed).coerceAtLeast(0L)
-            scrobbleTimerStartedAt = 0L
         }
+        scrobbleTimerStartedAt = null
     }
 
     private fun cancelTimer() {
         scrobbleJob?.cancel()
         scrobbleJob = null
         scrobbleRemainingMillis = 0L
-        scrobbleTimerStartedAt = 0L
+        scrobbleTimerStartedAt = null
     }
 
     private fun scrobbleCurrent() {
@@ -150,7 +150,7 @@ internal class ScrobbleManager(
         if (scrobbled) return
         scrobbled = true
         scrobbleRemainingMillis = 0L
-        scrobbleTimerStartedAt = 0L
+        scrobbleTimerStartedAt = null
         scrobbleJob = null
         submit(
             LastFmScrobbleEntry(
