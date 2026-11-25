@@ -209,6 +209,75 @@ class LastFmScrobbleQueueTest {
         assertEquals(listOf("keep"), queue.pendingEntries().map { it.track })
     }
 
+    @Test
+    fun corruptJsonIsDiscardedAndNewEntryKept() = runBlocking {
+        val file = File(temporaryFolder.root, "queue.json")
+        file.writeText("{not valid json")
+        val sent = mutableListOf<String>()
+        val logs = mutableListOf<String>()
+        val queue = DurableLastFmScrobbleQueue(
+            file = file,
+            canFlush = { true },
+            send = { pending ->
+                sent += pending.track
+                Result.success(Unit)
+            },
+            log = { message, _ -> logs += message },
+        )
+
+        queue.enqueue(entry("fresh"))
+        queue.flush()
+
+        assertEquals(listOf("fresh"), sent)
+        assertTrue(queue.pendingEntries().isEmpty())
+        assertTrue(logs.any { it.contains("Discarded", ignoreCase = true) })
+    }
+
+    @Test
+    fun canFlushFalseKeepsEntries() = runBlocking {
+        val attempted = mutableListOf<String>()
+        val queue = DurableLastFmScrobbleQueue(
+            file = File(temporaryFolder.root, "queue.json"),
+            canFlush = { false },
+            send = { pending ->
+                attempted += pending.track
+                Result.success(Unit)
+            },
+            log = { _, _ -> },
+        )
+        queue.enqueue(entry("waiting"))
+        queue.enqueue(entry("also-waiting"))
+
+        queue.flush()
+
+        assertTrue(attempted.isEmpty())
+        assertEquals(listOf("waiting", "also-waiting"), queue.pendingEntries().map { it.track })
+    }
+
+    @Test
+    fun failureClassificationByCodeAndExceptionType() = runBlocking {
+        // true = entry stays at the FIFO head (retryable); false = dropped (permanent).
+        val cases: List<Pair<Throwable, Boolean>> = listOf(
+            LastFM.LastFmException(500, "server error") to true,
+            LastFM.LastFmException(429, "rate limited") to true,
+            IllegalStateException("unexpected") to true,
+            LastFM.LastFmException(6, "Invalid parameters") to false,
+            // Code 9 (invalid session) is dropped by the current permanent-failure rule.
+            LastFM.LastFmException(9, "Invalid session key") to false,
+        )
+
+        cases.forEachIndexed { index, (failure, retained) ->
+            val queue = queue(File(temporaryFolder.root, "case-$index.json")) {
+                Result.failure(failure)
+            }
+            queue.enqueue(entry("case-$index"))
+
+            queue.flush()
+
+            assertEquals("Retained state for $failure", retained, queue.pendingEntries().isNotEmpty())
+        }
+    }
+
     private fun queue(
         file: File,
         send: suspend (LastFmScrobbleEntry) -> Result<Unit>,
