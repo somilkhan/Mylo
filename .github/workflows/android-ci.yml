@@ -88,6 +88,10 @@ jobs:
       - name: Build Android app, TV and Wear OS APKs
         id: build_apks
         if: (github.event_name == 'workflow_dispatch' && inputs.build_apks) || (github.event_name == 'issue_comment' && github.event.issue.pull_request && github.event.comment.body == '/build-apk' && github.event.comment.user.login == 'somilkhan')
+        env:
+          # Without these the dev APK ships empty Last.fm keys and scrobbling stays off.
+          LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
+          LASTFM_SECRET: ${{ secrets.LASTFM_SECRET }}
         run: ./gradlew --no-daemon --stacktrace :app:assembleDevDebug :tv:assembleDevDebug :wearos:assembleDevDebug
 
       - name: Run Android unit tests
