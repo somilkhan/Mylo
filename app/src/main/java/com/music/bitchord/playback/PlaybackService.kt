@@ -141,6 +141,7 @@ import com.music.bitchord.data.model.isUnresolvedSpotify
 import com.music.bitchord.data.remote.RemoteArtworkStore
 import com.music.bitchord.data.scrobbling.LastFM
 import com.music.bitchord.data.scrobbling.ListenBrainzManager
+import com.music.bitchord.data.scrobbling.ListenBrainzScrobbleQueue
 import com.music.bitchord.data.scrobbling.ScrobbleManager
 import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.data.settings.AudioQuality
@@ -1932,6 +1933,7 @@ class PlaybackService : MediaLibraryService() {
         applySettings(exoPlayer)
         applySettings(sparePlayer)
         observeSettings()
+        ListenBrainzScrobbleQueue.init(this)
         observeScrobbling()
         observeDiscord()
         watchSleepTimer()

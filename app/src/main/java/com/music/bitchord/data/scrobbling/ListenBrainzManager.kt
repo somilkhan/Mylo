@@ -2,6 +2,7 @@ package com.music.bitchord.data.scrobbling
 
 import com.music.bitchord.data.DebugLog as Log
 import com.music.bitchord.data.model.Song
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -71,49 +72,77 @@ object ListenBrainzManager {
         return withContext(Dispatchers.IO) {
             try {
                 val durationMs = durationMsOverride ?: parseDurationMs(song.durationText)
-                val durationPart = if (durationMs > 0) "\"duration_ms\":$durationMs," else ""
-                val releaseName = song.albumName.orEmpty()
-                val releasePart = if (releaseName.isBlank()) "" else "\"release_name\":\"${escapeJson(releaseName)}\","
+                // Same listen rule as Last.fm: half the track or four minutes, minimum 30 s.
                 val playedMs = endMs - startMs
                 val durationSeconds = (durationMs / 1000L).toInt().takeIf { durationMs > 0 }
                 if (!ScrobbleTiming.isListenCountable(playedMs, durationSeconds)) {
                     Log.d(TAG, "finished listen not counted, played ${playedMs}ms of ${song.title}")
                     return@withContext false
                 }
-                var listenedAtStart = startMs / 1000L
+                var listenedAt = startMs / 1000L
                 val MIN_LISTEN_TS = 1033430400L
-                if (listenedAtStart < MIN_LISTEN_TS) {
-                    listenedAtStart = System.currentTimeMillis() / 1000L
+                if (listenedAt < MIN_LISTEN_TS) {
+                    listenedAt = System.currentTimeMillis() / 1000L
                 }
-                val artist = if (primaryArtistOnly) song.artist.primaryArtist() else song.artist
-                val trackMetadata = """{"listened_at":$listenedAtStart,"track_metadata":{"artist_name":"${escapeJson(artist)}","track_name":"${escapeJson(song.title)}",$releasePart"additional_info":{${durationPart}"start_ms":$startMs,"end_ms":$endMs,"submission_client":"BitChord"}}}"""
-                val bodyJson = "{\"listen_type\":\"single\",\"payload\":[$trackMetadata]}"
-                Log.d(TAG, "submitFinished: $bodyJson")
-                val body = bodyJson.toRequestBody("application/json".toMediaType())
-                val request =
-                    Request.Builder()
-                        .url(API_URL)
-                        .post(body)
-                        .addHeader("Content-Type", "application/json")
-                        .addHeader("Authorization", "Token $token")
-                        .build()
-
-                Http.client.newCall(request).execute().use { resp ->
-                    if (resp.isSuccessful) {
-                        Log.d(TAG, "finished listen submitted for ${song.title}")
-                        true
-                    } else {
-                        val bodyText = try { resp.body?.string() ?: "" } catch (_: Exception) { "" }
-                        Log.w(TAG, "finished listen submit failed: ${resp.code} - $bodyText")
-                        false
-                    }
-                }
+                val entry = ListenBrainzListenEntry(
+                    videoId = song.videoId,
+                    artist = if (primaryArtistOnly) song.artist.primaryArtist() else song.artist,
+                    track = song.title,
+                    listenedAt = listenedAt,
+                    startMs = startMs,
+                    endMs = endMs,
+                    album = song.albumName?.takeIf { it.isNotBlank() },
+                    durationMs = durationMs.coerceAtLeast(0L),
+                )
+                // Queued and sent in order by ListenBrainzScrobbleQueue; survives restarts.
+                ListenBrainzScrobbleQueue.submit(entry)
             } catch (ex: Exception) {
                 Log.e(TAG, "submitFinished failed", ex)
                 false
             }
         }
     }
+
+    /**
+     * Sends one queued finished listen. Failures come back as [ListenBrainzHttpException]
+     * (non-2xx, with Retry-After on 429) or the underlying IO error, for the queue to classify.
+     */
+    internal suspend fun postFinished(token: String, entry: ListenBrainzListenEntry): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            try {
+                val durationPart = if (entry.durationMs > 0) "\"duration_ms\":${entry.durationMs}," else ""
+                val releasePart = entry.album?.let { "\"release_name\":\"${escapeJson(it)}\"," } ?: ""
+                val trackMetadata = """{"listened_at":${entry.listenedAt},"track_metadata":{"artist_name":"${escapeJson(entry.artist)}","track_name":"${escapeJson(entry.track)}",$releasePart"additional_info":{${durationPart}"start_ms":${entry.startMs},"end_ms":${entry.endMs},"submission_client":"BitChord"}}}"""
+                val bodyJson = "{\"listen_type\":\"single\",\"payload\":[$trackMetadata]}"
+                Log.d(TAG, "submitFinished: $bodyJson")
+                val request =
+                    Request.Builder()
+                        .url(API_URL)
+                        .post(bodyJson.toRequestBody("application/json".toMediaType()))
+                        .addHeader("Content-Type", "application/json")
+                        .addHeader("Authorization", "Token $token")
+                        .build()
+
+                Http.client.newCall(request).execute().use { resp ->
+                    if (resp.isSuccessful) {
+                        Log.d(TAG, "finished listen submitted for ${entry.track}")
+                        Result.success(Unit)
+                    } else {
+                        val retryAfterMs = if (resp.code == 429) {
+                            resp.header("Retry-After")?.trim()?.toLongOrNull()?.times(1000L)
+                        } else {
+                            null
+                        }
+                        Log.w(TAG, "finished listen submit failed: ${resp.code}")
+                        Result.failure(ListenBrainzHttpException(resp.code, retryAfterMs))
+                    }
+                }
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (ex: Exception) {
+                Result.failure(ex)
+            }
+        }
 
     private fun parseDurationMs(text: String?): Long =
         text?.let { ScrobbleTiming.parseDurationSeconds(it) }?.let { it * 1000L } ?: 0L
