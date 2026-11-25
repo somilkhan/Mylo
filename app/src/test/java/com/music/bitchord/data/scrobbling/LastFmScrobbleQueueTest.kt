@@ -262,8 +262,8 @@ class LastFmScrobbleQueueTest {
             LastFM.LastFmException(429, "rate limited") to true,
             IllegalStateException("unexpected") to true,
             LastFM.LastFmException(6, "Invalid parameters") to false,
-            // Code 9 (invalid session) is dropped by the current permanent-failure rule.
-            LastFM.LastFmException(9, "Invalid session key") to false,
+            // Code 9 (invalid session) pauses the queue and keeps the entry; it is not dropped.
+            LastFM.LastFmException(9, "Invalid session key") to true,
         )
 
         cases.forEachIndexed { index, (failure, retained) ->
