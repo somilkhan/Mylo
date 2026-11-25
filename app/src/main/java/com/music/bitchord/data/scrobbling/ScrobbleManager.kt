@@ -30,6 +30,9 @@ internal class ScrobbleManager(
     private var songStarted = false
     private var scrobbled = false
 
+    /** True once the current song has a threshold timer. A song can start with its duration unknown. */
+    private var armed = false
+
     /** Milliseconds still needed before the scrobble, as of [scrobbleTimerStartedAt]. */
     private var scrobbleRemainingMillis = 0L
 
@@ -44,6 +47,7 @@ internal class ScrobbleManager(
         currentSong = null
         songStarted = false
         scrobbled = false
+        armed = false
     }
 
     fun onSongStart(song: Song?, durationMs: Long? = null) {
@@ -52,6 +56,7 @@ internal class ScrobbleManager(
         songStartedAt = clock() / 1000
         songStarted = true
         scrobbled = false
+        armed = false
         currentSong = song
         armFor(song, durationMs)
         if (useNowPlaying) {
@@ -63,10 +68,16 @@ internal class ScrobbleManager(
         pauseTimer()
     }
 
-    fun onSongResume() {
+    fun onSongResume(durationMs: Long? = null) {
         // Already counting (for example, a settings change while playing): leave it alone,
         // otherwise it would re-arm with its full remaining time and delay the scrobble.
         if (scrobbleJob?.isActive == true) return
+        val song = currentSong
+        if (!armed && song != null) {
+            // The duration was unknown at start and may be known now.
+            armFor(song, durationMs)
+            return
+        }
         startCountingFromRemaining()
     }
 
@@ -75,6 +86,7 @@ internal class ScrobbleManager(
         scrobbleRemainingMillis = 0L
         currentSong = null
         songStarted = false
+        armed = false
     }
 
     /**
@@ -82,8 +94,8 @@ internal class ScrobbleManager(
      * song that is not yet tracked and is playing. It never re-drives a running timer.
      */
     fun onSettingsChanged(isPlaying: Boolean, song: Song?, durationMs: Long? = null) {
-        if (!isPlaying || songStarted || song == null) return
-        onSongStart(song, durationMs)
+        if (!isPlaying || song == null) return
+        if (!songStarted) onSongStart(song, durationMs) else if (!armed) onSongResume(durationMs)
     }
 
     fun onPlayerStateChanged(
@@ -96,7 +108,7 @@ internal class ScrobbleManager(
             if (!songStarted) {
                 onSongStart(song, durationMs)
             } else {
-                onSongResume()
+                onSongResume(durationMs)
             }
         } else {
             onSongPause()
@@ -114,6 +126,7 @@ internal class ScrobbleManager(
             scrobbleDelayPercent,
             scrobbleDelaySeconds,
         )
+        armed = true
         startCountingFromRemaining()
     }
 

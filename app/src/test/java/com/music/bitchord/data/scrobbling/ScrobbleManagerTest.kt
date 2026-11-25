@@ -142,4 +142,34 @@ class ScrobbleManagerTest {
         elapse(1_000_000L)
         assertEquals(0, submitted.size)
     }
+
+    @Test
+    fun unknownDurationAtStartScrobblesOnceDurationIsKnown() = runTest {
+        val submitted = mutableListOf<LastFmScrobbleEntry>()
+        val manager = manager(submitted)
+
+        manager.onSongStart(song(duration = null))
+        elapse(10_000L)
+        // The player reports the duration a moment later.
+        manager.onPlayerStateChanged(isPlaying = true, song = song(duration = null), durationMs = 200_000L)
+
+        elapse(99_999L) // 100 s threshold counted from the moment the duration became known
+        assertEquals(0, submitted.size)
+        elapse(1L)
+        assertEquals(1, submitted.size)
+    }
+
+    @Test
+    fun resumeWhileCountingDoesNotRearm() = runTest {
+        val submitted = mutableListOf<LastFmScrobbleEntry>()
+        val manager = manager(submitted)
+
+        manager.onSongStart(song())
+        elapse(60_000L)
+        manager.onSongResume()
+        elapse(39_999L)
+        assertEquals(0, submitted.size)
+        elapse(1L)
+        assertEquals(1, submitted.size)
+    }
 }
