@@ -98,6 +98,17 @@ internal class ScrobbleManager(
         if (!songStarted) onSongStart(song, durationMs) else if (!armed) onSongResume(durationMs)
     }
 
+    /**
+     * Arms a song that started with its duration unknown, once the player knows the duration.
+     * Only the song being tracked is armed, matched by id, so a stale callback cannot arm the wrong song.
+     */
+    fun onDurationKnown(song: Song?, durationMs: Long?) {
+        val tracked = currentSong ?: return
+        if (song == null || durationMs == null) return
+        if (!songStarted || armed || scrobbled || tracked.videoId != song.videoId) return
+        armFor(tracked, durationMs)
+    }
+
     fun onPlayerStateChanged(
         isPlaying: Boolean,
         song: Song?,

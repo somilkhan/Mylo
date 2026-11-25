@@ -251,4 +251,32 @@ class ScrobbleManagerTest {
         elapse(1L)
         assertEquals(1, submitted.size)
     }
+
+    @Test
+    fun durationArrivingReadyArmsStraightThroughPlay() = runTest {
+        val submitted = mutableListOf<LastFmScrobbleEntry>()
+        val manager = manager(submitted)
+        val playing = song()
+
+        manager.onSongStart(song(duration = null))
+        elapse(5_000L)
+        manager.onDurationKnown(playing, durationMs = 200_000L)
+
+        elapse(99_999L)
+        assertEquals(0, submitted.size)
+        elapse(1L)
+        assertEquals(1, submitted.size)
+    }
+
+    @Test
+    fun durationForAnotherSongDoesNotArmCurrentSong() = runTest {
+        val submitted = mutableListOf<LastFmScrobbleEntry>()
+        val manager = manager(submitted)
+
+        manager.onSongStart(song("current", duration = null))
+        manager.onDurationKnown(song("other"), durationMs = 200_000L)
+
+        elapse(1_000_000L)
+        assertEquals(0, submitted.size)
+    }
 }

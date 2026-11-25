@@ -1206,6 +1206,14 @@ class PlaybackService : MediaLibraryService() {
             // The player this fired on, which is by definition the one the
             // session is currently pointed at.
             val exoPlayer = player ?: return
+            if (state == Player.STATE_READY) {
+                // The duration is only known once the track is ready. Arm the scrobble timer
+                // then, in case the track started with it unknown and plays straight through.
+                scrobbleManager?.onDurationKnown(
+                    song = exoPlayer.currentMediaItem?.toSong(),
+                    durationMs = exoPlayer.duration.takeIf { it > 0 },
+                )
+            }
             if (state == Player.STATE_ENDED) {
                 SleepTimer.cancel()
                 // The queue ran dry, so no transition will ever close the last
