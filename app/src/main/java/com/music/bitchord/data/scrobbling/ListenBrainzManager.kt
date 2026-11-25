@@ -74,6 +74,12 @@ object ListenBrainzManager {
                 val durationPart = if (durationMs > 0) "\"duration_ms\":$durationMs," else ""
                 val releaseName = song.albumName.orEmpty()
                 val releasePart = if (releaseName.isBlank()) "" else "\"release_name\":\"${escapeJson(releaseName)}\","
+                val playedMs = endMs - startMs
+                val durationSeconds = (durationMs / 1000L).toInt().takeIf { durationMs > 0 }
+                if (!ScrobbleTiming.isListenCountable(playedMs, durationSeconds)) {
+                    Log.d(TAG, "finished listen not counted, played ${playedMs}ms of ${song.title}")
+                    return@withContext false
+                }
                 var listenedAtStart = startMs / 1000L
                 val MIN_LISTEN_TS = 1033430400L
                 if (listenedAtStart < MIN_LISTEN_TS) {
@@ -109,14 +115,23 @@ object ListenBrainzManager {
         }
     }
 
-    private fun parseDurationMs(text: String?): Long {
-        if (text == null) return 0L
-        val parts = text.split(":")
-        if (parts.size != 2) return 0L
-        val minutes = parts[0].toLongOrNull() ?: return 0L
-        val seconds = parts[1].toLongOrNull() ?: return 0L
-        return (minutes * 60 + seconds) * 1000
-    }
+    private fun parseDurationMs(text: String?): Long =
+        text?.let { ScrobbleTiming.parseDurationSeconds(it) }?.let { it * 1000L } ?: 0L
 
-    private fun escapeJson(s: String): String = s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
+    /** Escapes every character JSON requires, including all control characters below U+0020. */
+    internal fun escapeJson(s: String): String = buildString(s.length + 8) {
+        for (ch in s) {
+            when {
+                ch == '"' -> append("\\\"")
+                ch == '\\' -> append("\\\\")
+                ch == '\n' -> append("\\n")
+                ch == '\r' -> append("\\r")
+                ch == '\t' -> append("\\t")
+                ch == '\b' -> append("\\b")
+                ch == '\u000C' -> append("\\f")
+                ch < ' ' -> append("\\u%04x".format(ch.code))
+                else -> append(ch)
+            }
+        }
+    }
 }

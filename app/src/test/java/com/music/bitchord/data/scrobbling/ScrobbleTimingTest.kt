@@ -43,4 +43,23 @@ class ScrobbleTimingTest {
     fun thresholdIsCappedAtFourMinutes() {
         assertEquals(180_000L, ScrobbleTiming.thresholdMillis(3_600, 0.5f, 180))
     }
+
+    @Test
+    fun listenCountsAtHalfOrFourMinutes() {
+        assertEquals(false, ScrobbleTiming.isListenCountable(29_000L, 180))
+        assertEquals(true, ScrobbleTiming.isListenCountable(90_000L, 180))
+        assertEquals(false, ScrobbleTiming.isListenCountable(179_000L, 3_600))
+        assertEquals(true, ScrobbleTiming.isListenCountable(180_000L, 3_600))
+    }
+
+    @Test
+    fun listenOfUnknownDurationCountsAtFourMinutes() {
+        assertEquals(false, ScrobbleTiming.isListenCountable(60_000L, null))
+        assertEquals(true, ScrobbleTiming.isListenCountable(180_000L, null))
+    }
+
+    @Test
+    fun shortTrackNeverCounts() {
+        assertEquals(false, ScrobbleTiming.isListenCountable(30_000L, 30))
+    }
 }

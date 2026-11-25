@@ -27,4 +27,24 @@ internal object ScrobbleTiming {
         val fraction = (durationSeconds * 1000L * percent).roundToLong()
         return minOf(fraction, maxSeconds * 1000L)
     }
+
+    /**
+     * Whether a play counts as a listen. An unknown duration counts once the play reaches the
+     * time cap, the conservative choice when the track length cannot be checked.
+     */
+    fun isListenCountable(
+        playedMillis: Long,
+        durationSeconds: Int?,
+        minSeconds: Int = DEFAULT_MIN_SECONDS,
+        percent: Float = DEFAULT_PERCENT,
+        maxSeconds: Int = DEFAULT_MAX_SECONDS,
+    ): Boolean {
+        if (durationSeconds == null) return playedMillis >= maxSeconds * 1000L
+        if (!isEligible(durationSeconds, minSeconds)) return false
+        return playedMillis >= thresholdMillis(durationSeconds, percent, maxSeconds)
+    }
+
+    const val DEFAULT_MIN_SECONDS = 30
+    const val DEFAULT_PERCENT = 0.5f
+    const val DEFAULT_MAX_SECONDS = 180
 }
