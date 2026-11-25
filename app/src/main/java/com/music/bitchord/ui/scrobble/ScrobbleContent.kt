@@ -445,7 +445,9 @@ fun ScrobbleGenerateContent(
                     PlaylistGenerationMode.TOP,
                     PlaylistGenerationMode.RECENT,
                     PlaylistGenerationMode.RECOMMENDATIONS,
-                    PlaylistGenerationMode.LIBRARY -> Unit
+                    PlaylistGenerationMode.LIBRARY,
+                    PlaylistGenerationMode.FORGOTTEN_FAVORITES,
+                    PlaylistGenerationMode.TOP_ARTISTS_MIX -> Unit
 
                     PlaylistGenerationMode.SIMILAR_TRACKS -> {
                         GeneratorSeedPicker(
@@ -478,7 +480,8 @@ fun ScrobbleGenerateContent(
                         )
                     }
 
-                    PlaylistGenerationMode.TAG -> {
+                    PlaylistGenerationMode.TAG,
+                    PlaylistGenerationMode.TAG_TOP -> {
                         GeneratorFieldLabel("Mood or genre")
                         PillTextField(
                             value = tag,
@@ -817,6 +820,9 @@ private fun GeneratorModeRow(
         PlaylistGenerationMode.RECOMMENDATIONS -> Icons.Rounded.AutoAwesome
         PlaylistGenerationMode.NEVER_HEARD -> Icons.Rounded.Explore
         PlaylistGenerationMode.LIBRARY -> Icons.Rounded.LibraryMusic
+        PlaylistGenerationMode.FORGOTTEN_FAVORITES -> Icons.Rounded.History
+        PlaylistGenerationMode.TAG_TOP -> Icons.Rounded.LocalOffer
+        PlaylistGenerationMode.TOP_ARTISTS_MIX -> Icons.Rounded.Star
     }
     val gradientEnabled = LocalScrobbleGradientEnabled.current
     val iconTileBrush = if (gradientEnabled) {
@@ -853,7 +859,12 @@ private fun GeneratorModeRow(
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
-                    mode.label(),
+                    when (mode) {
+                        PlaylistGenerationMode.FORGOTTEN_FAVORITES -> stringResource(R.string.scrobble_mode_forgotten_favorites)
+                        PlaylistGenerationMode.TAG_TOP -> stringResource(R.string.scrobble_mode_tag_top)
+                        PlaylistGenerationMode.TOP_ARTISTS_MIX -> stringResource(R.string.scrobble_mode_top_artists_mix)
+                        else -> mode.label()
+                    },
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurface,
@@ -886,6 +897,9 @@ internal fun playlistGenerationModeLabel(storageValue: String?): String? = when 
     PlaylistGenerationMode.RECOMMENDATIONS.storageValue -> PlaylistGenerationMode.RECOMMENDATIONS.label()
     PlaylistGenerationMode.NEVER_HEARD.storageValue -> PlaylistGenerationMode.NEVER_HEARD.label()
     PlaylistGenerationMode.LIBRARY.storageValue -> PlaylistGenerationMode.LIBRARY.label()
+    PlaylistGenerationMode.FORGOTTEN_FAVORITES.storageValue -> PlaylistGenerationMode.FORGOTTEN_FAVORITES.label()
+    PlaylistGenerationMode.TAG_TOP.storageValue -> PlaylistGenerationMode.TAG_TOP.label()
+    PlaylistGenerationMode.TOP_ARTISTS_MIX.storageValue -> PlaylistGenerationMode.TOP_ARTISTS_MIX.label()
     "similar-playlist" -> "Similar Playlist"
     else -> null
 }
@@ -900,6 +914,9 @@ private fun PlaylistGenerationMode.label(): String = when (this) {
     PlaylistGenerationMode.RECOMMENDATIONS -> "Recommendations"
     PlaylistGenerationMode.NEVER_HEARD -> "Never Heard"
     PlaylistGenerationMode.LIBRARY -> "Library"
+    PlaylistGenerationMode.FORGOTTEN_FAVORITES -> "Forgotten Favorites"
+    PlaylistGenerationMode.TAG_TOP -> "Tag Top Tracks"
+    PlaylistGenerationMode.TOP_ARTISTS_MIX -> "Top Artists Mix"
 }
 private fun PlaylistGenerationMode.description(): String = when (this) {
     PlaylistGenerationMode.TOP -> "Your most-played tracks from Mylo Replay."
@@ -911,6 +928,9 @@ private fun PlaylistGenerationMode.description(): String = when (this) {
     PlaylistGenerationMode.RECOMMENDATIONS -> "Use your current YouTube Music recommendations."
     PlaylistGenerationMode.NEVER_HEARD -> "Find recommendations filtered against your listening history."
     PlaylistGenerationMode.LIBRARY -> "Tracks saved or liked in your YouTube Music library."
+    PlaylistGenerationMode.FORGOTTEN_FAVORITES -> "Your 12-month favorites you haven't played in the last 30 days."
+    PlaylistGenerationMode.TAG_TOP -> "The most-loved tracks for a mood or genre on Last.fm."
+    PlaylistGenerationMode.TOP_ARTISTS_MIX -> "Tracks from your top five Last.fm artists, woven together."
 }
 
 

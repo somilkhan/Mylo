@@ -409,6 +409,34 @@ object LastFM {
         parseLastFmTopAlbums(response)
     }
 
+    /** Public Last.fm tag chart; no user session is required. */
+    suspend fun getTagTopTracks(
+        tag: String,
+        limit: Int = 50,
+    ): Result<List<RankedTrack>> = statsResult {
+        val name = tag.trim()
+        require(name.isNotEmpty()) { "Tag is missing" }
+        val response = postAndRead(
+            "tag.gettoptracks",
+            extra = mapOf("tag" to name, "limit" to limit.coerceIn(1, 100).toString()),
+        )
+        parseLastFmTagTopTracks(response)
+    }
+
+    /** Public Last.fm top tracks for one artist; no user session is required. */
+    suspend fun getArtistTopTracks(
+        artist: String,
+        limit: Int = 10,
+    ): Result<List<RankedTrack>> = statsResult {
+        val name = artist.trim()
+        require(name.isNotEmpty()) { "Artist name is missing" }
+        val response = postAndRead(
+            "artist.gettoptracks",
+            extra = mapOf("artist" to name, "limit" to limit.coerceIn(1, 100).toString()),
+        )
+        parseLastFmArtistTopTracks(response, fallbackArtist = name)
+    }
+
     private suspend fun <T> statsResult(block: suspend () -> T): Result<T> = try {
         Result.success(block())
     } catch (cancellation: CancellationException) {
@@ -626,6 +654,20 @@ internal fun parseLastFmTopAlbums(raw: String): List<LastFM.RankedAlbum> =
         val name = row.text("name") ?: return@mapNotNull null
         LastFM.RankedAlbum(name, row["artist"].artistName().orEmpty(), row.long("playcount"), row.artwork())
     }
+
+internal fun parseLastFmTagTopTracks(raw: String): List<LastFM.RankedTrack> =
+    parseLastFmChart(raw, "tracks", "track").mapNotNull { rankedTrackRow(it, fallbackArtist = null) }
+
+internal fun parseLastFmArtistTopTracks(raw: String, fallbackArtist: String): List<LastFM.RankedTrack> =
+    parseLastFmChart(raw, "toptracks", "track").mapNotNull { rankedTrackRow(it, fallbackArtist) }
+
+private fun rankedTrackRow(row: JsonObject, fallbackArtist: String?): LastFM.RankedTrack? {
+    val name = row.text("name")?.trim()?.takeIf(String::isNotEmpty) ?: return null
+    val artist = row["artist"].artistName()?.trim()?.takeIf(String::isNotEmpty)
+        ?: fallbackArtist?.trim()?.takeIf(String::isNotEmpty)
+        ?: return null
+    return LastFM.RankedTrack(name, artist, row.long("playcount"), row.artwork())
+}
 
 private fun JsonObject.rows(key: String): List<JsonObject> = when (val value = this[key]) {
     is JsonArray -> value.mapNotNull { it as? JsonObject }

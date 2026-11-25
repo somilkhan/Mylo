@@ -16,6 +16,9 @@ class ScrobblePlaylistModeLabelTest {
         assertEquals("Recommendations", playlistGenerationModeLabel("recommendations"))
         assertEquals("Never Heard", playlistGenerationModeLabel("never-heard"))
         assertEquals("Library", playlistGenerationModeLabel("library"))
+        assertEquals("Forgotten Favorites", playlistGenerationModeLabel("forgotten-favorites"))
+        assertEquals("Tag Top Tracks", playlistGenerationModeLabel("tag-top"))
+        assertEquals("Top Artists Mix", playlistGenerationModeLabel("top-artists-mix"))
     }
 
     @Test

@@ -249,6 +249,9 @@ internal fun uniquePlaylistTitle(
         PlaylistGenerationMode.RECOMMENDATIONS -> "Made for You"
         PlaylistGenerationMode.NEVER_HEARD -> "Never Heard"
         PlaylistGenerationMode.LIBRARY -> "My Library Mix"
+        PlaylistGenerationMode.FORGOTTEN_FAVORITES -> "Forgotten Favorites"
+        PlaylistGenerationMode.TAG_TOP -> "${request.tag.trim()} Top Tracks"
+        PlaylistGenerationMode.TOP_ARTISTS_MIX -> "Top Artists Mix"
     }.take(64).ifBlank { "My Mix" }
     return uniquePlaylistTitle(base, existingTitles)
 }

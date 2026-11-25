@@ -25,7 +25,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.util.Locale
 
-/** The nine generator modes, mapped onto Mylo's existing data sources. */
+/** The generator modes, mapped onto Mylo's existing data sources and Last.fm. */
 enum class PlaylistGenerationMode(val storageValue: String) {
     TOP("top"),
     RECENT("recent"),
@@ -36,6 +36,9 @@ enum class PlaylistGenerationMode(val storageValue: String) {
     RECOMMENDATIONS("recommendations"),
     NEVER_HEARD("never-heard"),
     LIBRARY("library"),
+    FORGOTTEN_FAVORITES("forgotten-favorites"),
+    TAG_TOP("tag-top"),
+    TOP_ARTISTS_MIX("top-artists-mix"),
 }
 
 data class PlaylistGenerationRequest(
@@ -111,24 +114,29 @@ class PlaylistGenerationRepository(context: Context) {
                 val tag = request.tag.trim()
                 require(tag.isNotEmpty()) { "Enter a mood or genre" }
                 onProgress("Finding music for $tag…")
-                val category = YtMusicRepository.moodAndGenres().getOrNull().orEmpty()
-                    .asSequence()
-                    .flatMap { it.items.asSequence() }
-                    .firstOrNull { it.title.equals(tag, ignoreCase = true) }
-                val categorySongs = category?.let { mood ->
-                    YtMusicRepository.moodGenreShelves(mood.browseId, mood.params).getOrThrow()
-                        .flatMap { shelf -> shelf.items.mapNotNull(::shelfItemSong) }
-                }.orEmpty()
-                if (categorySongs.isNotEmpty()) categorySongs else {
-                    YtMusicRepository.search(tag, SearchFilter.SONGS).getOrThrow()
-                        .mapNotNull { result ->
-                            when (result) {
-                                is SearchResult.TopTrack -> result.song
-                                is SearchResult.Track -> result.song
-                                is SearchResult.Browse -> null
-                            }
-                        }
+                tagSongsFromYtMusic(tag)
+            }
+            PlaylistGenerationMode.TAG_TOP -> {
+                val tag = request.tag.trim()
+                require(tag.isNotEmpty()) { "Enter a mood or genre" }
+                onProgress("Finding top tracks for $tag…")
+                val lastFmTracks = if (AppSettings.lastfmEnabled.value && LastFM.isInitialized()) {
+                    LastFM.getTagTopTracks(tag, limit = LastFmGenerationRules.TAG_TRACK_LIMIT)
+                        .getOrNull().orEmpty()
+                } else {
+                    emptyList()
                 }
+                val resolved = resolveLastFmTracks(lastFmTracks.take(LastFmGenerationRules.MAX_RESOLVE_CANDIDATES))
+                // Last.fm is optional; an empty or unresolvable tag chart uses the YouTube Music tag path.
+                resolved.ifEmpty { tagSongsFromYtMusic(tag) }
+            }
+            PlaylistGenerationMode.FORGOTTEN_FAVORITES -> {
+                onProgress("Finding favorites you haven't played lately…")
+                forgottenFavoriteCandidates(onProgress)
+            }
+            PlaylistGenerationMode.TOP_ARTISTS_MIX -> {
+                onProgress("Reading your top artists…")
+                topArtistsMixCandidates(request.period, onProgress)
             }
             PlaylistGenerationMode.MIX -> {
                 onProgress("Building a mix from your listening…")
@@ -241,7 +249,11 @@ class PlaylistGenerationRepository(context: Context) {
         currentCoroutineContext().ensureActive()
         // Never Heard must not silently bias against saved playlists. It only
         // excludes them when the explicit excludeSavedPlaylists option is set.
-        val savedSongs = if (request.mode == PlaylistGenerationMode.NEVER_HEARD) {
+        // Forgotten Favorites keeps Last.fm's top-track order, so saved tracks are not moved back.
+        val savedSongs = if (
+            request.mode == PlaylistGenerationMode.NEVER_HEARD ||
+            request.mode == PlaylistGenerationMode.FORGOTTEN_FAVORITES
+        ) {
             emptyList()
         } else {
             LocalPlaylistStore.playlists.value.flatMap { it.songs }
@@ -511,6 +523,136 @@ class PlaylistGenerationRepository(context: Context) {
                         throw cancellation
                     } catch (_: Exception) {
                         null
+                    }
+                }
+            }.awaitAll().filterNotNull()
+        }
+    }
+
+    private suspend fun tagSongsFromYtMusic(tag: String): List<Song> {
+        val category = YtMusicRepository.moodAndGenres().getOrNull().orEmpty()
+            .asSequence()
+            .flatMap { it.items.asSequence() }
+            .firstOrNull { it.title.equals(tag, ignoreCase = true) }
+        val categorySongs = category?.let { mood ->
+            YtMusicRepository.moodGenreShelves(mood.browseId, mood.params).getOrThrow()
+                .flatMap { shelf -> shelf.items.mapNotNull(::shelfItemSong) }
+        }.orEmpty()
+        return if (categorySongs.isNotEmpty()) categorySongs else {
+            YtMusicRepository.search(tag, SearchFilter.SONGS).getOrThrow()
+                .mapNotNull { result ->
+                    when (result) {
+                        is SearchResult.TopTrack -> result.song
+                        is SearchResult.Track -> result.song
+                        is SearchResult.Browse -> null
+                    }
+                }
+        }
+    }
+
+    private fun lastFmUsernameOrThrow(feature: String): String {
+        val username = AppSettings.lastfmUsername.value.trim()
+        if (username.isEmpty() || !(AppSettings.lastfmEnabled.value && LastFM.isInitialized())) {
+            throw IllegalStateException("Connect Last.fm to use $feature")
+        }
+        return username
+    }
+
+    /** Your 12-month top tracks, minus anything scrobbled in the last 30 days. */
+    private suspend fun forgottenFavoriteCandidates(onProgress: (String) -> Unit): List<Song> {
+        val username = lastFmUsernameOrThrow("Forgotten Favorites")
+        val top = LastFM.getTopTracks(
+            username,
+            period = LastFmGenerationRules.FORGOTTEN_PERIOD,
+            limit = LastFmGenerationRules.FORGOTTEN_TRACK_LIMIT,
+        ).getOrThrow()
+        onProgress("Checking what you've played in the last 30 days…")
+        val (from, to) = LastFmGenerationRules.recentWindowSeconds(System.currentTimeMillis())
+        val recentKeys = recentTrackKeys(username, from, to)
+        val forgotten = LastFmGenerationRules.excludeRecent(top, recentKeys) {
+            LastFmGenerationRules.trackKey(it.artist, it.name)
+        }
+        onProgress("Finding those tracks on YouTube Music…")
+        return resolveLastFmTracks(forgotten.take(LastFmGenerationRules.MAX_RESOLVE_CANDIDATES))
+    }
+
+    private suspend fun recentTrackKeys(username: String, from: Long, to: Long): Set<String> {
+        val keys = HashSet<String>()
+        var page = 1
+        var totalPages = 1
+        while (page <= totalPages && page <= LastFmGenerationRules.MAX_RECENT_PAGES) {
+            currentCoroutineContext().ensureActive()
+            val result = LastFM.getRecentTracksPage(
+                username,
+                from = from,
+                to = to,
+                page = page,
+                limit = LastFmGenerationRules.RECENT_PAGE_SIZE,
+            ).getOrThrow()
+            result.items.mapTo(keys) { LastFmGenerationRules.trackKey(it.artist, it.name) }
+            totalPages = result.totalPages
+            page++
+        }
+        return keys
+    }
+
+    /** Last.fm top artists, their top tracks (at most 3 requests in flight), interleaved and deduped. */
+    private suspend fun topArtistsMixCandidates(period: ReplayPeriod, onProgress: (String) -> Unit): List<Song> {
+        val username = lastFmUsernameOrThrow("Top Artists Mix")
+        val artists = LastFM.getTopArtists(
+            username,
+            period = LastFmGenerationRules.lastFmPeriod(period),
+            limit = LastFmGenerationRules.TOP_ARTIST_COUNT,
+        ).getOrThrow().take(LastFmGenerationRules.TOP_ARTIST_COUNT)
+        if (artists.isEmpty()) return emptyList()
+
+        onProgress("Loading tracks from ${artists.size} top artists…")
+        val requestGate = Semaphore(LastFmGenerationRules.ARTIST_REQUEST_CONCURRENCY)
+        val pools = supervisorScope {
+            artists.map { artist ->
+                async {
+                    requestGate.withPermit {
+                        LastFM.getArtistTopTracks(artist.name, limit = LastFmGenerationRules.ARTIST_TRACKS_PER_ARTIST)
+                            .getOrNull().orEmpty()
+                    }
+                }
+            }.awaitAll()
+        }
+        val mixed = LastFmGenerationRules.interleaveUnique(
+            pools = pools,
+            key = { LastFmGenerationRules.trackKey(it.artist, it.name) },
+            cap = LastFmGenerationRules.MIX_TRACK_CAP,
+        )
+        onProgress("Finding those tracks on YouTube Music…")
+        return resolveLastFmTracks(mixed)
+    }
+
+    /** Resolves Last.fm names to playable rows, keeping only exact YouTube Music title and artist matches. */
+    private suspend fun resolveLastFmTracks(tracks: List<LastFM.RankedTrack>): List<Song> {
+        if (tracks.isEmpty()) return emptyList()
+        return supervisorScope {
+            tracks.map { track ->
+                async {
+                    similarTrackSearchGate.withPermit {
+                        try {
+                            val expected = PlaylistGenerationRules.trackKey(
+                                Song(videoId = "", title = track.name, artist = track.artist, thumbnailUrl = track.artworkUrl),
+                            )
+                            YtMusicRepository.search("${track.name} ${track.artist}", SearchFilter.SONGS)
+                                .getOrNull().orEmpty()
+                                .mapNotNull { result ->
+                                    when (result) {
+                                        is SearchResult.TopTrack -> result.song
+                                        is SearchResult.Track -> result.song
+                                        is SearchResult.Browse -> null
+                                    }
+                                }
+                                .firstOrNull { PlaylistGenerationRules.trackKey(it) == expected }
+                        } catch (cancellation: CancellationException) {
+                            throw cancellation
+                        } catch (_: Exception) {
+                            null
+                        }
                     }
                 }
             }.awaitAll().filterNotNull()

@@ -1377,6 +1377,9 @@
     <string name="scrobble_no_tracks_found">No tracks found</string>
     <string name="scrobble_mixes_subtitle">Your generated and saved mixes</string>
     <string name="scrobble_open_generator">Open Generator</string>
+    <string name="scrobble_mode_forgotten_favorites">Forgotten Favorites</string>
+    <string name="scrobble_mode_tag_top">Tag Top Tracks</string>
+    <string name="scrobble_mode_top_artists_mix">Top Artists Mix</string>
     <string name="scrobble_generate_similar">Generate similar</string>
     <string name="scrobble_move_up">Move up</string>
     <string name="scrobble_move_down">Move down</string>
