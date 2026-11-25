@@ -59,6 +59,9 @@ import com.music.bitchord.ui.components.AlertAction
 import com.music.bitchord.ui.components.AlertRule
 import com.music.bitchord.ui.components.AlertScaffold
 import com.music.bitchord.ui.components.PullToRefresh
+import com.music.bitchord.ui.components.ScrobbleEmptyState
+import com.music.bitchord.ui.components.ScrobbleErrorState
+import com.music.bitchord.ui.components.ScrobbleLoadingRow
 import androidx.compose.material3.pulltorefresh.PullToRefreshState
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
@@ -420,26 +423,11 @@ private fun StatisticsRetryNotice(
     message: String,
     onRetry: () -> Unit,
 ) {
-    val colors = MaterialTheme.colorScheme
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp),
-        shape = RoundedCornerShape(16.dp),
-        color = colors.errorContainer,
-        contentColor = colors.onErrorContainer,
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Text(message, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
-            TextButton(onClick = onRetry, colors = scrobbleTextButtonColors(colors.onErrorContainer)) {
-                Text(stringResource(R.string.retry), color = colors.onErrorContainer)
-            }
-        }
-    }
+    ScrobbleErrorState(
+        message = message,
+        onRetry = onRetry,
+        modifier = Modifier.padding(horizontal = 20.dp),
+    )
 }
 
 @Composable
@@ -447,81 +435,29 @@ private fun StatisticsEmptyState(
     lastFmConnected: Boolean,
     onOpenSettings: () -> Unit,
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 28.dp, vertical = 48.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Text(stringResource(R.string.scrobble_no_listening_yet), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-        Text(
-            if (lastFmConnected) {
-                "No listening history for this period."
-            } else {
-                "Play a few tracks, or connect Last.fm in Settings to bring in your history."
-            },
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
-        if (!lastFmConnected) {
-            Button(onClick = onOpenSettings, colors = scrobblePrimaryButtonColors()) {
-                Text(stringResource(R.string.scrobble_open_settings))
+    ScrobbleEmptyState(
+        title = stringResource(R.string.scrobble_no_listening_yet),
+        message = if (lastFmConnected) {
+            "No listening history for this period."
+        } else {
+            "Play a few tracks, or connect Last.fm in Settings to bring in your history."
+        },
+        modifier = Modifier.padding(horizontal = 28.dp, vertical = 48.dp),
+        action = if (!lastFmConnected) {
+            {
+                Button(onClick = onOpenSettings, colors = scrobblePrimaryButtonColors()) {
+                    Text(stringResource(R.string.scrobble_open_settings))
+                }
             }
-        }
-    }
+        } else {
+            null
+        },
+    )
 }
 
 @Composable
 private fun StatisticsTrackSkeletonRow() {
-    val colors = MaterialTheme.colorScheme
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp),
-        shape = RoundedCornerShape(16.dp),
-        color = colors.surfaceVariant,
-    ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Box(
-                Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(colors.surfaceContainerHighest),
-            )
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Box(
-                    Modifier
-                        .fillMaxWidth(0.62f)
-                        .height(12.dp)
-                        .clip(RoundedCornerShape(50))
-                        .background(colors.surfaceContainerHighest),
-                )
-                Box(
-                    Modifier
-                        .fillMaxWidth(0.38f)
-                        .height(10.dp)
-                        .clip(RoundedCornerShape(50))
-                        .background(colors.surfaceContainerHighest),
-                )
-            }
-            Box(
-                Modifier
-                    .width(30.dp)
-                    .height(10.dp)
-                    .clip(RoundedCornerShape(50))
-                    .background(colors.surfaceContainerHighest),
-            )
-        }
-    }
+    ScrobbleLoadingRow(modifier = Modifier.padding(horizontal = 20.dp))
 }
 
 @Composable
