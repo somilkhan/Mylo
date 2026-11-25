@@ -172,4 +172,83 @@ class ScrobbleManagerTest {
         elapse(1L)
         assertEquals(1, submitted.size)
     }
+
+    @Test
+    fun secondPauseKeepsRemaining() = runTest {
+        val submitted = mutableListOf<LastFmScrobbleEntry>()
+        val manager = manager(submitted)
+
+        manager.onSongStart(song())
+        elapse(30_000L)
+        manager.onSongPause()
+        manager.onSongPause()
+        elapse(1_000_000L)
+        manager.onSongResume()
+
+        elapse(69_999L)
+        assertEquals(0, submitted.size)
+        elapse(1L)
+        assertEquals(1, submitted.size)
+    }
+
+    @Test
+    fun repeatOneSameSongScrobblesEachPlay() = runTest {
+        val submitted = mutableListOf<LastFmScrobbleEntry>()
+        val manager = manager(submitted)
+
+        manager.onSongStart(song("loop"))
+        elapse(100_000L)
+        manager.onSongStop()
+        manager.onSongStart(song("loop"))
+        elapse(100_000L)
+
+        assertEquals(2, submitted.size)
+    }
+
+    @Test
+    fun destroyMidTrackCancelsSubmit() = runTest {
+        val submitted = mutableListOf<LastFmScrobbleEntry>()
+        val manager = manager(submitted)
+
+        manager.onSongStart(song())
+        elapse(50_000L)
+        manager.destroy()
+        elapse(1_000_000L)
+
+        assertEquals(0, submitted.size)
+    }
+
+    @Test
+    fun reenableMidTrackRestartsFullThreshold() = runTest {
+        val submitted = mutableListOf<LastFmScrobbleEntry>()
+        val manager = manager(submitted)
+
+        manager.onSongStart(song())
+        elapse(50_000L)
+        manager.destroy()
+        manager.onSettingsChanged(isPlaying = true, song = song(), durationMs = null)
+
+        elapse(99_999L)
+        assertEquals(0, submitted.size)
+        elapse(1L)
+        assertEquals(1, submitted.size)
+    }
+
+    @Test
+    fun settingsChangeWhilePausedKeepsStoredRemainder() = runTest {
+        val submitted = mutableListOf<LastFmScrobbleEntry>()
+        val manager = manager(submitted)
+
+        manager.onSongStart(song())
+        elapse(40_000L)
+        manager.onSongPause()
+        manager.onSettingsChanged(isPlaying = false, song = song(), durationMs = null)
+        elapse(1_000_000L)
+        manager.onSongResume()
+
+        elapse(59_999L)
+        assertEquals(0, submitted.size)
+        elapse(1L)
+        assertEquals(1, submitted.size)
+    }
 }
