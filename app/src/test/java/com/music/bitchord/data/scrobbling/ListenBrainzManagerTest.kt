@@ -1,7 +1,6 @@
 package com.music.bitchord.data.scrobbling
 
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
@@ -22,11 +21,5 @@ class ListenBrainzManagerTest {
     @Test
     fun plainTextIsUnchanged() {
         assertEquals("Hello World", ListenBrainzManager.escapeJson("Hello World"))
-    }
-
-    @Test
-    fun unused() {
-        // Keeps JsonPrimitive imported for future assertions on raw values.
-        assertEquals("x", JsonPrimitive("x").content)
     }
 }
