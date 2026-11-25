@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -44,9 +45,11 @@ import com.music.bitchord.ui.components.AlertAction
 import com.music.bitchord.ui.components.AlertRule
 import com.music.bitchord.ui.components.AlertScaffold
 import com.music.bitchord.ui.components.PillTextField
+import com.music.bitchord.ui.components.ScrobbleErrorState
 import com.music.bitchord.ui.components.SearchField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
+import androidx.compose.material.icons.automirrored.rounded.ChevronRight
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
@@ -79,10 +82,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -248,55 +252,66 @@ fun ScrobbleGenerateContent(
                     top = contentPadding.calculateTopPadding(),
                     bottom = contentPadding.calculateBottomPadding() + 24.dp,
                 ),
-            verticalArrangement = Arrangement.spacedBy(20.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                Text(stringResource(R.string.scrobble_tab_generate), style = MaterialTheme.typography.displayLarge, color = MaterialTheme.colorScheme.onBackground)
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    stringResource(R.string.scrobble_tab_generate),
+                    style = MaterialTheme.typography.displayLarge,
+                    color = MaterialTheme.colorScheme.onBackground,
+                )
                 Text(
                     "Pick a vibe to build a playlist.",
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                GeneratorSectionTitle("Pick a mood")
-                Column {
-                    Box(
-                        Modifier.fillMaxWidth().height(0.5.dp)
-                            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f)),
-                    )
-                    PlaylistGenerationMode.entries.forEach { option ->
-                        GeneratorModeRow(
-                            mode = option,
-                            enabled = !uiState.isGenerating && (option != PlaylistGenerationMode.LIBRARY || ytmSignedIn),
-                            disabledReason = if (option == PlaylistGenerationMode.LIBRARY && !ytmSignedIn) {
-                                "Sign in to YouTube Music to use this"
-                            } else {
-                                null
-                            },
-                            onClick = { openMode(option) },
-                        )
-                        Box(
-                            Modifier.fillMaxWidth().height(0.5.dp)
-                                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f)),
-                        )
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                GeneratorSectionTitle("Start from")
+                GeneratorModeGroups.forEach { group ->
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        GeneratorGroupLabel(group.title)
+                        Column {
+                            GeneratorHairline()
+                            group.modes.forEach { option ->
+                                GeneratorModeRow(
+                                    mode = option,
+                                    enabled = !uiState.isGenerating && (option != PlaylistGenerationMode.LIBRARY || ytmSignedIn),
+                                    disabledReason = if (option == PlaylistGenerationMode.LIBRARY && !ytmSignedIn) {
+                                        "Sign in to YouTube Music to use this"
+                                    } else {
+                                        null
+                                    },
+                                    onClick = { openMode(option) },
+                                )
+                                GeneratorHairline()
+                            }
+                        }
                     }
                 }
             }
 
             if (uiState.isGenerating && !showGeneratorDialog) {
                 Surface(
-                    shape = RoundedCornerShape(18.dp),
+                    shape = RoundedCornerShape(20.dp),
                     color = MaterialTheme.colorScheme.secondaryContainer,
                     contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(stringResource(R.string.scrobble_building_mix), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                stringResource(R.string.scrobble_building_mix),
+                                style = MaterialTheme.typography.titleMedium,
+                            )
                             Spacer(Modifier.weight(1f))
-                            TextButton(onClick = viewModel::cancelGeneration, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSecondaryContainer)) { Text(stringResource(R.string.cancel)) }
+                            TextButton(
+                                onClick = viewModel::cancelGeneration,
+                                colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSecondaryContainer),
+                            ) {
+                                Text(stringResource(R.string.cancel))
+                            }
                         }
                         LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = scrobbleAccentColor())
                         Text(
@@ -310,23 +325,41 @@ fun ScrobbleGenerateContent(
 
             if (!showGeneratorDialog) {
                 uiState.error?.let { error ->
-                    Surface(
-                        shape = RoundedCornerShape(16.dp),
-                        color = MaterialTheme.colorScheme.errorContainer,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Row(
-                            Modifier.padding(14.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    val retryRequest = uiState.activeRequest
+                    if (retryRequest != null) {
+                        ScrobbleErrorState(
+                            message = error,
+                            onRetry = { viewModel.generate(retryRequest) },
+                        )
+                    } else {
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = MaterialTheme.colorScheme.errorContainer,
+                            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.fillMaxWidth(),
                         ) {
-                            Icon(Icons.Rounded.ErrorOutline, contentDescription = null, tint = MaterialTheme.colorScheme.onErrorContainer)
-                            Text(error, modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onErrorContainer)
-                            val retryRequest = uiState.activeRequest
-                            if (retryRequest != null) {
-                                TextButton(onClick = { viewModel.generate(retryRequest) }, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onErrorContainer)) { Text(stringResource(R.string.retry)) }
-                            } else {
-                                TextButton(onClick = viewModel::dismissError, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onErrorContainer)) { Text(stringResource(R.string.scrobble_dismiss)) }
+                            Row(
+                                Modifier.padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                Icon(
+                                    Icons.Rounded.ErrorOutline,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onErrorContainer,
+                                )
+                                Text(
+                                    error,
+                                    modifier = Modifier.weight(1f),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
+                                TextButton(
+                                    onClick = viewModel::dismissError,
+                                    modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp),
+                                    colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onErrorContainer),
+                                ) {
+                                    Text(stringResource(R.string.scrobble_dismiss))
+                                }
                             }
                         }
                     }
@@ -363,17 +396,30 @@ fun ScrobbleGenerateContent(
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.size(64.dp).clip(RoundedCornerShape(12.dp)),
                         )
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                            Text(stringResource(R.string.scrobble_playlist_saved), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(
+                                stringResource(R.string.scrobble_playlist_saved),
+                                style = MaterialTheme.typography.titleMedium,
+                            )
                             Text(
                                 playlist.title,
+                                style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.onSecondaryContainer,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
-                            Text(stringResource(R.string.scrobble_tracks_count, playlist.songs.size), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(
+                                stringResource(R.string.scrobble_tracks_count, playlist.songs.size),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
-                        TextButton(onClick = onOpenPlaylists, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSecondaryContainer)) { Text(stringResource(R.string.open)) }
+                        TextButton(
+                            onClick = onOpenPlaylists,
+                            colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSecondaryContainer),
+                        ) {
+                            Text(stringResource(R.string.open))
+                        }
                     }
                 }
             }
@@ -387,204 +433,240 @@ fun ScrobbleGenerateContent(
             containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 1f),
             contentColor = MaterialTheme.colorScheme.onSurface,
         ) {
+            // The action bar and the progress or error notice sit outside the scroll
+            // area, so the primary action stays pinned at the bottom of the sheet.
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(max = 720.dp)
-                    .verticalScroll(rememberScrollState())
                     .padding(horizontal = 20.dp)
                     .padding(bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Text(mode.label(), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
-                    Text(mode.description(), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-
-                if (!lastFmConnected) {
-                    Surface(
-                        shape = RoundedCornerShape(14.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                    ) {
+                Column(
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(
-                            "Works without Last.fm. Connect it for better picks.",
-                            modifier = Modifier.fillMaxWidth().padding(13.dp),
-                            style = MaterialTheme.typography.bodySmall,
+                            mode.label(),
+                            style = MaterialTheme.typography.headlineMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Text(
+                            mode.description(),
+                            style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                }
 
-                if (mode == PlaylistGenerationMode.TOP || mode == PlaylistGenerationMode.LIBRARY) {
-                    GeneratorFieldLabel("Period")
-                    Row(
-                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(7.dp),
-                    ) {
-                        ReplayPeriod.entries.forEach { option ->
-                            FilterChip(
-                                selected = period == option,
-                                onClick = { period = option },
-                                enabled = !uiState.isGenerating &&
-                                    (mode != PlaylistGenerationMode.LIBRARY || option == ReplayPeriod.ALL_TIME),
-                                modifier = Modifier.heightIn(min = 48.dp),
-                                label = { Text(option.label()) },
-                            )
-                        }
-                    }
-                    if (mode == PlaylistGenerationMode.LIBRARY) {
-                        Text(
-                            "YouTube Music library tracks don't include a saved date in Mylo yet, so only All time can be applied.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-
-                when (mode) {
-                    PlaylistGenerationMode.TOP,
-                    PlaylistGenerationMode.RECENT,
-                    PlaylistGenerationMode.RECOMMENDATIONS,
-                    PlaylistGenerationMode.LIBRARY,
-                    PlaylistGenerationMode.FORGOTTEN_FAVORITES,
-                    PlaylistGenerationMode.TOP_ARTISTS_MIX -> Unit
-
-                    PlaylistGenerationMode.SIMILAR_TRACKS -> {
-                        GeneratorSeedPicker(
-                            label = "Seed track",
-                            currentSong = currentSong,
-                            selectedSeed = selectedSeed,
-                            seedQuery = seedQuery,
-                            seedResults = seedResults,
-                            seedSearching = seedSearching,
-                            seedSearchError = seedSearchError,
-                            enabled = !uiState.isGenerating,
-                            allowOptional = false,
-                            onQueryChange = {
-                                seedQuery = it
-                                selectedSeed = null
-                                seedResults = emptyList()
-                                seedSearchError = null
-                            },
-                            onSelectSeed = { selectedSeed = it },
-                        )
-                    }
-
-                    PlaylistGenerationMode.SIMILAR_ARTISTS -> {
-                        GeneratorFieldLabel("Artist")
-                        PillTextField(
-                            value = artist,
-                            onValueChange = { artist = it },
-                            placeholder = "Artist name",
-                            enabled = !uiState.isGenerating,
-                        )
-                    }
-
-                    PlaylistGenerationMode.TAG,
-                    PlaylistGenerationMode.TAG_TOP -> {
-                        GeneratorFieldLabel("Mood or genre")
-                        PillTextField(
-                            value = tag,
-                            onValueChange = { tag = it },
-                            placeholder = "indie, late-night jazz, ambient…",
-                            enabled = !uiState.isGenerating,
-                        )
-                        val genres = listOf("pop", "rock", "hip-hop", "electronic", "jazz", "lofi", "metal", "indie", "classical", "r&b", "ambient", "punk")
-                        Row(
-                            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(7.dp),
+                    if (!lastFmConnected) {
+                        Surface(
+                            shape = RoundedCornerShape(14.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant,
                         ) {
-                            genres.forEach { genre ->
-                                FilterChip(
-                                    selected = tag.equals(genre, ignoreCase = true),
-                                    onClick = { tag = genre },
-                                    enabled = !uiState.isGenerating,
-                                    modifier = Modifier.heightIn(min = 48.dp),
-                                    label = { Text(genre) },
-                                )
-                            }
-                        }
-                    }
-
-                    PlaylistGenerationMode.MIX -> {
-                        GeneratorSeedPicker(
-                            label = "Optional seed",
-                            currentSong = currentSong,
-                            selectedSeed = selectedSeed,
-                            seedQuery = seedQuery,
-                            seedResults = seedResults,
-                            seedSearching = seedSearching,
-                            seedSearchError = seedSearchError,
-                            enabled = !uiState.isGenerating,
-                            allowOptional = true,
-                            onQueryChange = {
-                                seedQuery = it
-                                selectedSeed = null
-                                seedResults = emptyList()
-                                seedSearchError = null
-                            },
-                            onSelectSeed = { selectedSeed = it },
-                        )
-                    }
-
-                    PlaylistGenerationMode.NEVER_HEARD -> {
-                        Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                            GeneratorFieldLabel("Optional exclusions")
-                            GeneratorExclusionToggle("Tracks in saved playlists", excludeSaved, enabled = true) { excludeSaved = it }
-                            GeneratorExclusionToggle("Liked tracks", excludeLiked, enabled = ytmSignedIn) { excludeLiked = it }
-                            GeneratorExclusionToggle("Library tracks", excludeLibrary, enabled = ytmSignedIn) { excludeLibrary = it }
-                            if (!ytmSignedIn) {
-                                Text(
-                                    "Sign in to YouTube Music to exclude liked or library tracks.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
                             Text(
-                                "Only tracks you've actually heard are excluded by default. Add these filters if you want a stricter discovery mix.",
-                                style = MaterialTheme.typography.bodySmall,
+                                "Works without Last.fm. Connect it for better picks.",
+                                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     }
-                }
 
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    GeneratorFieldLabel("Playlist size")
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(18.dp))
-                            .padding(4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        IconButton(
-                            onClick = { count = (count - 5).coerceAtLeast(PlaylistGenerationRepository.MIN_TRACKS) },
-                            enabled = !uiState.isGenerating && count > PlaylistGenerationRepository.MIN_TRACKS,
-                            modifier = Modifier.size(48.dp),
-                        ) {
-                            Text("−", style = MaterialTheme.typography.titleLarge)
-                        }
-                        Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                count.toString(),
-                                style = MaterialTheme.typography.headlineSmall,
-                                color = scrobbleAccentColor(),
-                                fontWeight = FontWeight.Bold,
-                            )
-                            Text(stringResource(R.string.scrobble_tracks_steps), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        IconButton(
-                            onClick = { count = (count + 5).coerceAtMost(PlaylistGenerationRepository.MAX_TRACKS) },
-                            enabled = !uiState.isGenerating && count < PlaylistGenerationRepository.MAX_TRACKS,
-                            modifier = Modifier.size(48.dp),
-                        ) {
-                            Text("+", style = MaterialTheme.typography.titleLarge)
+                    if (mode == PlaylistGenerationMode.TOP || mode == PlaylistGenerationMode.LIBRARY) {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            GeneratorFieldLabel("Period")
+                            Row(
+                                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                ReplayPeriod.entries.forEach { option ->
+                                    FilterChip(
+                                        selected = period == option,
+                                        onClick = { period = option },
+                                        enabled = !uiState.isGenerating &&
+                                            (mode != PlaylistGenerationMode.LIBRARY || option == ReplayPeriod.ALL_TIME),
+                                        modifier = Modifier.heightIn(min = 48.dp),
+                                        label = { Text(option.label()) },
+                                    )
+                                }
+                            }
+                            if (mode == PlaylistGenerationMode.LIBRARY) {
+                                Text(
+                                    "YouTube Music library tracks don't include a saved date in Mylo yet, so only All time can be applied.",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                         }
                     }
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(stringResource(R.string.scrobble_tracks_count, PlaylistGenerationRepository.MIN_TRACKS), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(stringResource(R.string.scrobble_tracks_count, PlaylistGenerationRepository.MAX_TRACKS), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+                    when (mode) {
+                        PlaylistGenerationMode.TOP,
+                        PlaylistGenerationMode.RECENT,
+                        PlaylistGenerationMode.RECOMMENDATIONS,
+                        PlaylistGenerationMode.LIBRARY,
+                        PlaylistGenerationMode.FORGOTTEN_FAVORITES,
+                        PlaylistGenerationMode.TOP_ARTISTS_MIX -> Unit
+
+                        PlaylistGenerationMode.SIMILAR_TRACKS -> {
+                            GeneratorSeedPicker(
+                                label = "Seed track",
+                                currentSong = currentSong,
+                                selectedSeed = selectedSeed,
+                                seedQuery = seedQuery,
+                                seedResults = seedResults,
+                                seedSearching = seedSearching,
+                                seedSearchError = seedSearchError,
+                                enabled = !uiState.isGenerating,
+                                allowOptional = false,
+                                onQueryChange = {
+                                    seedQuery = it
+                                    selectedSeed = null
+                                    seedResults = emptyList()
+                                    seedSearchError = null
+                                },
+                                onSelectSeed = { selectedSeed = it },
+                            )
+                        }
+
+                        PlaylistGenerationMode.SIMILAR_ARTISTS -> {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                GeneratorFieldLabel("Artist")
+                                PillTextField(
+                                    value = artist,
+                                    onValueChange = { artist = it },
+                                    placeholder = "Artist name",
+                                    enabled = !uiState.isGenerating,
+                                )
+                            }
+                        }
+
+                        PlaylistGenerationMode.TAG,
+                        PlaylistGenerationMode.TAG_TOP -> {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                GeneratorFieldLabel("Mood or genre")
+                                PillTextField(
+                                    value = tag,
+                                    onValueChange = { tag = it },
+                                    placeholder = "indie, late-night jazz, ambient…",
+                                    enabled = !uiState.isGenerating,
+                                )
+                                val genres = listOf(
+                                    "pop", "rock", "hip-hop", "electronic", "jazz", "lofi",
+                                    "metal", "indie", "classical", "r&b", "ambient", "punk",
+                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    genres.forEach { genre ->
+                                        FilterChip(
+                                            selected = tag.equals(genre, ignoreCase = true),
+                                            onClick = { tag = genre },
+                                            enabled = !uiState.isGenerating,
+                                            modifier = Modifier.heightIn(min = 48.dp),
+                                            label = { Text(genre) },
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        PlaylistGenerationMode.MIX -> {
+                            GeneratorSeedPicker(
+                                label = "Optional seed",
+                                currentSong = currentSong,
+                                selectedSeed = selectedSeed,
+                                seedQuery = seedQuery,
+                                seedResults = seedResults,
+                                seedSearching = seedSearching,
+                                seedSearchError = seedSearchError,
+                                enabled = !uiState.isGenerating,
+                                allowOptional = true,
+                                onQueryChange = {
+                                    seedQuery = it
+                                    selectedSeed = null
+                                    seedResults = emptyList()
+                                    seedSearchError = null
+                                },
+                                onSelectSeed = { selectedSeed = it },
+                            )
+                        }
+
+                        PlaylistGenerationMode.NEVER_HEARD -> {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                GeneratorFieldLabel("Optional exclusions")
+                                GeneratorExclusionToggle("Tracks in saved playlists", excludeSaved, enabled = true) { excludeSaved = it }
+                                GeneratorExclusionToggle("Liked tracks", excludeLiked, enabled = ytmSignedIn) { excludeLiked = it }
+                                GeneratorExclusionToggle("Library tracks", excludeLibrary, enabled = ytmSignedIn) { excludeLibrary = it }
+                                if (!ytmSignedIn) {
+                                    Text(
+                                        "Sign in to YouTube Music to exclude liked or library tracks.",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                Text(
+                                    "Only tracks you've actually heard are excluded by default. Add these filters if you want a stricter discovery mix.",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        GeneratorFieldLabel("Playlist size")
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(18.dp))
+                                .padding(4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            IconButton(
+                                onClick = { count = (count - 5).coerceAtLeast(PlaylistGenerationRepository.MIN_TRACKS) },
+                                enabled = !uiState.isGenerating && count > PlaylistGenerationRepository.MIN_TRACKS,
+                                modifier = Modifier.size(48.dp),
+                            ) {
+                                Icon(Icons.Rounded.Remove, contentDescription = "Fewer tracks")
+                            }
+                            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    count.toString(),
+                                    style = MaterialTheme.typography.headlineMedium,
+                                    color = scrobbleAccentColor(),
+                                )
+                                Text(
+                                    stringResource(R.string.scrobble_tracks_steps),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            IconButton(
+                                onClick = { count = (count + 5).coerceAtMost(PlaylistGenerationRepository.MAX_TRACKS) },
+                                enabled = !uiState.isGenerating && count < PlaylistGenerationRepository.MAX_TRACKS,
+                                modifier = Modifier.size(48.dp),
+                            ) {
+                                Icon(Icons.Rounded.Add, contentDescription = "More tracks")
+                            }
+                        }
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(
+                                stringResource(R.string.scrobble_tracks_count, PlaylistGenerationRepository.MIN_TRACKS),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Text(
+                                stringResource(R.string.scrobble_tracks_count, PlaylistGenerationRepository.MAX_TRACKS),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 }
 
@@ -598,24 +680,20 @@ fun ScrobbleGenerateContent(
                 }
 
                 uiState.error?.let { error ->
-                    Surface(
-                        shape = RoundedCornerShape(14.dp),
-                        color = MaterialTheme.colorScheme.errorContainer,
-                    ) {
-                        Row(
-                            Modifier.fillMaxWidth().padding(13.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        ) {
-                            Icon(Icons.Rounded.ErrorOutline, contentDescription = null, tint = MaterialTheme.colorScheme.onErrorContainer)
-                            Text(error, modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onErrorContainer)
-                        }
-                    }
+                    val retryRequest = uiState.activeRequest
+                    ScrobbleErrorState(
+                        message = error,
+                        onRetry = if (retryRequest != null) {
+                            fun() { viewModel.generate(retryRequest) }
+                        } else {
+                            null
+                        },
+                    )
                 }
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     TextButton(
@@ -642,8 +720,8 @@ fun ScrobbleGenerateContent(
                     ) {
                         Text(
                             when {
-                                uiState.isGenerating -> "Building your mix…"
-                                retryingCurrentRequest -> "Retry"
+                                uiState.isGenerating -> stringResource(R.string.scrobble_building_mix)
+                                retryingCurrentRequest -> stringResource(R.string.retry)
                                 else -> "Generate playlist"
                             },
                         )
@@ -653,6 +731,42 @@ fun ScrobbleGenerateContent(
         }
     }
 }
+
+/** The four mode groups on the Generate tab, in display order. Every mode appears once. */
+private data class GeneratorModeGroup(val title: String, val modes: List<PlaylistGenerationMode>)
+
+private val GeneratorModeGroups: List<GeneratorModeGroup> = listOf(
+    GeneratorModeGroup(
+        title = "From your listening",
+        modes = listOf(
+            PlaylistGenerationMode.TOP,
+            PlaylistGenerationMode.RECENT,
+            PlaylistGenerationMode.FORGOTTEN_FAVORITES,
+            PlaylistGenerationMode.TOP_ARTISTS_MIX,
+        ),
+    ),
+    GeneratorModeGroup(
+        title = "Find something new",
+        modes = listOf(
+            PlaylistGenerationMode.SIMILAR_TRACKS,
+            PlaylistGenerationMode.SIMILAR_ARTISTS,
+            PlaylistGenerationMode.RECOMMENDATIONS,
+            PlaylistGenerationMode.NEVER_HEARD,
+            PlaylistGenerationMode.MIX,
+        ),
+    ),
+    GeneratorModeGroup(
+        title = "By mood or genre",
+        modes = listOf(
+            PlaylistGenerationMode.TAG,
+            PlaylistGenerationMode.TAG_TOP,
+        ),
+    ),
+    GeneratorModeGroup(
+        title = "From your library",
+        modes = listOf(PlaylistGenerationMode.LIBRARY),
+    ),
+)
 
 @Composable
 private fun GeneratorSeedPicker(
@@ -668,7 +782,7 @@ private fun GeneratorSeedPicker(
     onQueryChange: (String) -> Unit,
     onSelectSeed: (Song?) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         GeneratorFieldLabel(label)
         currentSong?.takeIf { PlaylistGenerationRules.canStartMixWithSong(it) }?.let { playing ->
             OutlinedButton(
@@ -701,16 +815,20 @@ private fun GeneratorSeedPicker(
         if (allowOptional && selectedSeed == null) {
             Text(
                 "No seed selected. Mylo will build a mix from your listening and recommendations.",
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         if (seedSearching) LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = scrobbleAccentColor())
         seedSearchError?.let {
-            Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
         }
         if (!seedSearching && seedSearchError == null && seedQuery.trim().length >= 2 && seedResults.isEmpty()) {
-            Text(stringResource(R.string.scrobble_no_tracks_found), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+            Text(
+                stringResource(R.string.scrobble_no_tracks_found),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium,
+            )
         }
         seedResults.forEach { song ->
             GeneratorSeedResult(
@@ -723,12 +841,13 @@ private fun GeneratorSeedPicker(
         selectedSeed?.let {
             Text(
                 "Selected · " + it.title + " — " + it.artist,
-                style = MaterialTheme.typography.labelLarge,
+                style = MaterialTheme.typography.bodyMedium,
                 color = scrobbleAccentColor(),
             )
         }
     }
 }
+
 @Composable
 private fun GeneratorSeedResult(
     song: Song,
@@ -745,21 +864,38 @@ private fun GeneratorSeedResult(
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
-            Modifier.padding(9.dp),
+            Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             AsyncImage(
                 model = song.thumbnailUrl,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.size(44.dp).clip(RoundedCornerShape(10.dp)),
+                modifier = Modifier.size(48.dp).clip(RoundedCornerShape(10.dp)),
             )
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(song.title, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(song.artist, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    song.title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    song.artist,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
-            if (selected) Icon(Icons.Rounded.Check, contentDescription = "Selected", tint = scrobbleAccentColor())
+            if (selected) {
+                Icon(
+                    Icons.Rounded.Check,
+                    contentDescription = stringResource(R.string.selected),
+                    tint = scrobbleAccentColor(),
+                )
+            }
         }
     }
 }
@@ -788,19 +924,49 @@ private fun GeneratorExclusionToggle(
         )
         Text(
             label,
+            style = MaterialTheme.typography.bodyLarge,
             color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
         )
     }
 }
 
 @Composable
+private fun GeneratorHairline() {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(1.dp)
+            .background(MaterialTheme.colorScheme.outlineVariant),
+    )
+}
+
+@Composable
 private fun GeneratorSectionTitle(text: String) {
-    Text(text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+    Text(
+        text,
+        style = MaterialTheme.typography.titleMedium,
+        color = MaterialTheme.colorScheme.onBackground,
+        modifier = Modifier.semantics { heading() },
+    )
+}
+
+@Composable
+private fun GeneratorGroupLabel(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.semantics { heading() },
+    )
 }
 
 @Composable
 private fun GeneratorFieldLabel(text: String) {
-    Text(text, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+    Text(
+        text,
+        style = MaterialTheme.typography.titleMedium,
+        color = MaterialTheme.colorScheme.onSurface,
+    )
 }
 
 @Composable
@@ -817,20 +983,12 @@ private fun GeneratorModeRow(
         PlaylistGenerationMode.SIMILAR_ARTISTS -> Icons.Rounded.PeopleAlt
         PlaylistGenerationMode.TAG -> Icons.Rounded.LocalOffer
         PlaylistGenerationMode.MIX -> Icons.Rounded.Shuffle
-        PlaylistGenerationMode.RECOMMENDATIONS -> Icons.Rounded.AutoAwesome
+        PlaylistGenerationMode.RECOMMENDATIONS -> Icons.Rounded.ThumbUp
         PlaylistGenerationMode.NEVER_HEARD -> Icons.Rounded.Explore
         PlaylistGenerationMode.LIBRARY -> Icons.Rounded.LibraryMusic
         PlaylistGenerationMode.FORGOTTEN_FAVORITES -> Icons.Rounded.History
-        PlaylistGenerationMode.TAG_TOP -> Icons.Rounded.LocalOffer
+        PlaylistGenerationMode.TAG_TOP -> Icons.Rounded.Whatshot
         PlaylistGenerationMode.TOP_ARTISTS_MIX -> Icons.Rounded.Star
-    }
-    val gradientEnabled = LocalScrobbleGradientEnabled.current
-    val iconTileBrush = if (gradientEnabled) {
-        Brush.linearGradient(listOf(Color(0xFF4A3D6B), Color(0xFFB9A7E8)))
-    } else {
-        Brush.linearGradient(
-            listOf(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.primaryContainer),
-        )
     }
     androidx.compose.material3.Surface(
         onClick = onClick,
@@ -841,23 +999,25 @@ private fun GeneratorModeRow(
         modifier = Modifier.fillMaxWidth().alpha(if (enabled) 1f else 0.45f),
     ) {
         Row(
-            Modifier.heightIn(min = 64.dp).padding(horizontal = 4.dp, vertical = 10.dp),
+            Modifier.heightIn(min = 64.dp).padding(horizontal = 4.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Box(
-                Modifier.size(40.dp).clip(RoundedCornerShape(12.dp))
-                    .background(iconTileBrush, RoundedCornerShape(12.dp)),
+                Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(12.dp)),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     icon,
                     contentDescription = null,
-                    tint = if (gradientEnabled) Color.White else MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.size(21.dp),
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.size(20.dp),
                 )
             }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     when (mode) {
                         PlaylistGenerationMode.FORGOTTEN_FAVORITES -> stringResource(R.string.scrobble_mode_forgotten_favorites)
@@ -871,21 +1031,20 @@ private fun GeneratorModeRow(
                 )
                 Text(
                     disabledReason ?: mode.description().removeSuffix("."),
-                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp),
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
                 )
             }
             Icon(
-                Icons.Rounded.ChevronRight,
+                Icons.AutoMirrored.Rounded.ChevronRight,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(24.dp),
             )
         }
     }
 }
+
 
 internal fun playlistGenerationModeLabel(storageValue: String?): String? = when (storageValue) {
     PlaylistGenerationMode.TOP.storageValue -> PlaylistGenerationMode.TOP.label()
