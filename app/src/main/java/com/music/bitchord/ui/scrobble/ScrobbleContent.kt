@@ -51,7 +51,6 @@ import com.music.bitchord.ui.components.ScrobbleErrorState
 import com.music.bitchord.ui.components.SearchField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
-import androidx.compose.material.icons.automirrored.rounded.ChevronRight
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
@@ -1039,7 +1038,7 @@ private fun GeneratorModeRow(
                 )
             }
             Icon(
-                Icons.AutoMirrored.Rounded.ChevronRight,
+                Icons.Rounded.KeyboardArrowRight,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(24.dp),
@@ -1838,7 +1837,7 @@ private fun PlaylistDetailContent(
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Rounded.ChevronLeft, contentDescription = "Back to playlists")
+                    Icon(Icons.Rounded.KeyboardArrowLeft, contentDescription = "Back to playlists")
                 }
                 if (currentTrackDisplayIndex >= 0) {
                     TextButton(
