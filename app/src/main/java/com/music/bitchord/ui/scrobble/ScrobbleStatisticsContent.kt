@@ -7,23 +7,30 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -42,7 +49,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -124,7 +135,8 @@ internal fun ScrobbleStatisticsContent(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 item(key = "statistics-header") {
-                    Row(
+                    Text(
+                        stringResource(R.string.scrobble_title_stats),
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(
@@ -132,25 +144,16 @@ internal fun ScrobbleStatisticsContent(
                                 end = 20.dp,
                                 top = contentPadding.calculateTopPadding() + 8.dp,
                                 bottom = 4.dp,
-                            ),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                state.period.chip,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
-                            Text(
-                                stringResource(R.string.scrobble_title_stats),
-                                style = MaterialTheme.typography.displayLarge,
-                                fontWeight = FontWeight.SemiBold,
-                            )
-                        }
-                    }
+                            .semantics { heading() },
+                        style = MaterialTheme.typography.displayLarge,
+                    )
                 }
 
                 item(key = "statistics-periods") {
+                    // At large font scales the labels stop fitting in five equal slots,
+                    // so the control scrolls sideways instead of clipping them.
+                    val scrollPeriods = LocalDensity.current.fontScale >= 1.3f
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -162,7 +165,10 @@ internal fun ScrobbleStatisticsContent(
                                 color = MaterialTheme.colorScheme.outline.copy(alpha = 0.18f),
                                 shape = RoundedCornerShape(50),
                             )
-                            .padding(4.dp),
+                            .padding(4.dp)
+                            .then(if (scrollPeriods) Modifier.horizontalScroll(rememberScrollState()) else Modifier)
+                            .semantics { contentDescription = "Time period" }
+                            .selectableGroup(),
                         horizontalArrangement = Arrangement.spacedBy(2.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -170,13 +176,14 @@ internal fun ScrobbleStatisticsContent(
                             val selected = state.period == period
                             Box(
                                 modifier = Modifier
-                                    .weight(1f)
+                                    .then(if (scrollPeriods) Modifier.defaultMinSize(minWidth = 96.dp) else Modifier.weight(1f))
                                     .height(48.dp)
                                     .clip(RoundedCornerShape(50))
                                     .background(
                                         if (selected) MaterialTheme.colorScheme.tertiary
                                         else MaterialTheme.colorScheme.surfaceContainerHigh,
                                     )
+                                    .semantics(mergeDescendants = true) {}
                                     .selectable(
                                         selected = selected,
                                         role = Role.RadioButton,
@@ -206,8 +213,8 @@ internal fun ScrobbleStatisticsContent(
                     }
                 }
 
-                if (state.error != null && state.lastFmConnected) {
-                    item(key = "lastfm-retry") {
+                if (state.error != null) {
+                    item(key = "statistics-error") {
                         StatisticsRetryNotice(
                             message = state.error.orEmpty(),
                             onRetry = viewModel::refresh,
@@ -220,22 +227,20 @@ internal fun ScrobbleStatisticsContent(
                         StatisticsTrackSkeletonRow()
                     }
                 } else if (state.tracks.isEmpty()) {
-                    item(key = "empty") {
-                        StatisticsEmptyState(
-                            lastFmConnected = state.lastFmConnected,
-                            onOpenSettings = onOpenSettings,
-                        )
+                    // A failure is shown as the error notice above, never as "no history".
+                    if (state.error == null) {
+                        item(key = "empty") {
+                            StatisticsEmptyState(
+                                lastFmConnected = state.lastFmConnected,
+                                onOpenSettings = onOpenSettings,
+                            )
+                        }
                     }
                 } else {
                     val localSummary = state.localSummary
                     if (localSummary?.isEmpty == false) {
                         item(key = "replay-cards-heading") {
-                            Text(
-                                "Your Replay",
-                                modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
-                            )
+                            StatisticsSectionHeading(stringResource(R.string.your_replay))
                         }
                         item(key = "replay-cards") {
                             ReplayCardRow(
@@ -257,12 +262,14 @@ internal fun ScrobbleStatisticsContent(
                                     onOpenReplay(ReplayStoryPage.INTRO, state.loadedPeriod ?: state.period)
                                 },
                                 colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface),
-                                modifier = Modifier.padding(horizontal = 20.dp),
+                                modifier = Modifier
+                                    .padding(horizontal = 20.dp)
+                                    .heightIn(min = 48.dp),
                             ) {
                                 Icon(
-                                    imageVector = com.music.bitchord.ui.icons.BitChordIcons.Play,
+                                    imageVector = Icons.Rounded.PlayArrow,
                                     contentDescription = null,
-                                    modifier = Modifier.size(18.dp),
+                                    modifier = Modifier.size(20.dp),
                                 )
                                 Spacer(Modifier.width(8.dp))
                                 Text(stringResource(R.string.play_your_replay))
@@ -282,12 +289,7 @@ internal fun ScrobbleStatisticsContent(
                     localSummary?.artists?.take(10)?.forEachIndexed { index, artist ->
                         if (index == 0) {
                             item(key = "top-artists-heading") {
-                                Text(
-                                    "Top artists",
-                                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                )
+                                StatisticsSectionHeading(stringResource(R.string.top_artists))
                             }
                         }
                         item(key = "top-artist-${artist.title.lowercase()}-${artist.browseId.orEmpty()}") {
@@ -302,12 +304,7 @@ internal fun ScrobbleStatisticsContent(
                     localSummary?.albums?.take(10)?.forEachIndexed { index, album ->
                         if (index == 0) {
                             item(key = "top-albums-heading") {
-                                Text(
-                                    "Top albums",
-                                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                )
+                                StatisticsSectionHeading(stringResource(R.string.top_albums))
                             }
                         }
                         item(key = "top-album-${album.title.lowercase()}-${album.subtitle.orEmpty().lowercase()}-${album.browseId.orEmpty()}") {
@@ -320,12 +317,7 @@ internal fun ScrobbleStatisticsContent(
                         }
                     }
                     item(key = "tracks-heading") {
-                        Text(
-                            "Your tracks",
-                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                        )
+                        StatisticsSectionHeading("Your tracks")
                     }
                     items(state.tracks, key = { it.identity }) { track ->
                         MergedStatisticsTrackRow(
@@ -340,6 +332,17 @@ internal fun ScrobbleStatisticsContent(
 }
 
 @Composable
+private fun StatisticsSectionHeading(text: String) {
+    Text(
+        text,
+        modifier = Modifier
+            .padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 8.dp)
+            .semantics { heading() },
+        style = MaterialTheme.typography.titleMedium,
+    )
+}
+
+@Composable
 private fun ReplayInsightRow(
     rank: Int,
     entry: RankedEntry,
@@ -350,17 +353,20 @@ private fun ReplayInsightRow(
     val shape = if (circular) CircleShape else RoundedCornerShape(10.dp)
     val minutes = (entry.ms / 60_000L).coerceAtLeast(0L)
     val duration = if (minutes >= 60) "${minutes / 60}h ${minutes % 60}m" else "${minutes}m"
+    val plays = stringResource(R.string.scrobble_plays_count, entry.plays)
+    val summary = listOfNotNull(entry.subtitle, duration, plays).joinToString(" · ")
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp)
+            .semantics(mergeDescendants = true) { contentDescription = "$rank. ${entry.title}, $summary" }
             .clickable(role = Role.Button, onClick = onClick),
         shape = RoundedCornerShape(16.dp),
         color = colors.surfaceVariant,
         contentColor = colors.onSurface,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -395,7 +401,7 @@ private fun ReplayInsightRow(
             }
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Text(
                     entry.title,
@@ -406,10 +412,10 @@ private fun ReplayInsightRow(
                     color = colors.onSurface,
                 )
                 Text(
-                    listOfNotNull(entry.subtitle, duration, stringResource(R.string.scrobble_plays_count, entry.plays)).joinToString(" · "),
+                    summary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = colors.onSurfaceVariant,
                 )
             }
@@ -436,13 +442,13 @@ private fun StatisticsEmptyState(
     onOpenSettings: () -> Unit,
 ) {
     ScrobbleEmptyState(
-        title = stringResource(R.string.scrobble_no_listening_yet),
+        title = if (lastFmConnected) "No listening history" else "No listening history yet",
         message = if (lastFmConnected) {
             "No listening history for this period."
         } else {
             "Play a few tracks, or connect Last.fm in Settings to bring in your history."
         },
-        modifier = Modifier.padding(horizontal = 28.dp, vertical = 48.dp),
+        modifier = Modifier.padding(horizontal = 24.dp, vertical = 48.dp),
         action = if (!lastFmConnected) {
             {
                 Button(onClick = onOpenSettings, colors = scrobblePrimaryButtonColors()) {
@@ -467,21 +473,13 @@ private fun MergedStatisticsTrackRow(
 ) {
     val colors = MaterialTheme.colorScheme
     val song = track.song
-    val interaction = if (song != null) {
-        Modifier.clickable(role = Role.Button) { onPlaySong(song) }
-    } else {
-        Modifier
-    }
+    val plays = stringResource(R.string.scrobble_plays_count, NumberFormat.getIntegerInstance().format(track.plays))
+    val rowModifier = Modifier
+        .fillMaxWidth()
+        .padding(horizontal = 20.dp)
+        .semantics(mergeDescendants = true) { contentDescription = "${track.title}, ${track.artist}, $plays" }
 
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp)
-            .then(interaction),
-        shape = RoundedCornerShape(16.dp),
-        color = colors.surfaceVariant,
-        contentColor = colors.onSurface,
-    ) {
+    val content: @Composable () -> Unit = {
         Row(
             modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -507,29 +505,45 @@ private fun MergedStatisticsTrackRow(
             }
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Text(
                     track.title,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.titleSmall,
+                    style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
                     track.artist,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = colors.onSurfaceVariant,
                 )
             }
             Text(
                 NumberFormat.getIntegerInstance().format(track.plays),
-                style = MaterialTheme.typography.labelLarge,
+                style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = colors.onSurface,
             )
+        }
+    }
+
+    // Only tappable rows are cards. A track without a song is plain text.
+    if (song != null) {
+        Surface(
+            modifier = rowModifier.clickable(role = Role.Button) { onPlaySong(song) },
+            shape = RoundedCornerShape(16.dp),
+            color = colors.surfaceVariant,
+            contentColor = colors.onSurface,
+        ) {
+            content()
+        }
+    } else {
+        Box(modifier = rowModifier) {
+            content()
         }
     }
 }
