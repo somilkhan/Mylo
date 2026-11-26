@@ -706,7 +706,7 @@ fun ScrobbleGenerateContent(
                                 showGeneratorDialog = false
                             }
                         },
-                        modifier = Modifier.weight(1f).height(52.dp),
+                        modifier = Modifier.weight(1f).heightIn(min = 52.dp),
                         colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface),
                     ) {
                         Text(stringResource(R.string.cancel))
@@ -717,7 +717,7 @@ fun ScrobbleGenerateContent(
                         },
                         colors = scrobblePrimaryButtonColors(),
                         enabled = canGenerate,
-                        modifier = Modifier.weight(1.45f).height(52.dp),
+                        modifier = Modifier.weight(1.45f).heightIn(min = 52.dp),
                         shape = RoundedCornerShape(18.dp),
                     ) {
                         Text(
