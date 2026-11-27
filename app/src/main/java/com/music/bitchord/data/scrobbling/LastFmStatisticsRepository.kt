@@ -3,6 +3,11 @@ package com.music.bitchord.data.scrobbling
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 import java.util.Locale
 
 /**
@@ -13,14 +18,27 @@ import java.util.Locale
  * [days] is the length of the rolling window, used to count the scrobbles in
  * it; null for [OVERALL], whose count is the profile's play count.
  */
-enum class LastFmStatsPeriod(val apiValue: String, val days: Int?) {
-    WEEK("7day", 7),
-    MONTH("1month", 30),
-    QUARTER("3month", 90),
-    HALF_YEAR("6month", 180),
-    YEAR("12month", 365),
-    OVERALL("overall", null),
+enum class LastFmStatsPeriod(val apiValue: String, val days: Int?, val activityBuckets: Int) {
+    WEEK("7day", 7, 7),
+    MONTH("1month", 30, 10),
+    QUARTER("3month", 90, 12),
+    HALF_YEAR("6month", 180, 12),
+    YEAR("12month", 365, 12),
+
+    /** Bucketed by calendar year since the account was made, at most [activityBuckets]. */
+    OVERALL("overall", null, 12),
 }
+
+/**
+ * One bar of the activity chart: the scrobbles in `[start, end]`, in Unix
+ * seconds. A rolling period's buckets tile it exactly, so they add up to the
+ * period's own count.
+ */
+internal data class LastFmActivityBucket(
+    val startEpochSeconds: Long,
+    val endEpochSeconds: Long,
+    val scrobbles: Long,
+)
 
 /** Everything the Stats tab shows for one account and one period. */
 internal data class LastFmStatsSnapshot(
@@ -35,6 +53,10 @@ internal data class LastFmStatsSnapshot(
     val topAlbums: List<LastFM.RankedAlbum>,
     /** Newest first; a now-playing row, if any, comes first. */
     val recent: List<LastFM.RecentTrack>,
+    /** Oldest first. Empty when any slice failed: a chart with holes would mislead. */
+    val activity: List<LastFmActivityBucket> = emptyList(),
+    /** Scrobbles in the window just before this one; null for all time or when unknown. */
+    val previousScrobbles: Long? = null,
 ) {
     /** Nothing scrobbled in the period at all, as opposed to a failed fetch. */
     val isEmpty: Boolean
@@ -84,7 +106,12 @@ internal interface LastFmStatsApi {
     suspend fun topArtists(username: String, period: String, limit: Int): Result<LastFM.PagedResult<LastFM.RankedArtist>>
     suspend fun topTracks(username: String, period: String, limit: Int): Result<LastFM.PagedResult<LastFM.RankedTrack>>
     suspend fun topAlbums(username: String, period: String, limit: Int): Result<LastFM.PagedResult<LastFM.RankedAlbum>>
-    suspend fun recent(username: String, limit: Int, fromEpochSeconds: Long?): Result<LastFM.PagedResult<LastFM.RecentTrack>>
+    suspend fun recent(
+        username: String,
+        limit: Int,
+        fromEpochSeconds: Long?,
+        toEpochSeconds: Long? = null,
+    ): Result<LastFM.PagedResult<LastFM.RecentTrack>>
 }
 
 private object DefaultLastFmStatsApi : LastFmStatsApi {
@@ -95,25 +122,27 @@ private object DefaultLastFmStatsApi : LastFmStatsApi {
         LastFM.getTopTracksChart(username, period, limit)
     override suspend fun topAlbums(username: String, period: String, limit: Int) =
         LastFM.getTopAlbumsChart(username, period, limit)
-    override suspend fun recent(username: String, limit: Int, fromEpochSeconds: Long?) =
-        LastFM.getRecentScrobbles(username, limit, fromEpochSeconds)
+    override suspend fun recent(username: String, limit: Int, fromEpochSeconds: Long?, toEpochSeconds: Long?) =
+        LastFM.getRecentScrobbles(username, limit, fromEpochSeconds, toEpochSeconds)
 }
 
 /**
  * Last.fm statistics for the Stats tab, one period at a time.
  *
- * A snapshot is six small requests made together: the profile, the top
- * artists, tracks and albums for the period (whose totals are the period's
- * distinct counts), the latest scrobbles, and for a rolling period one more
- * one-row request whose total is the number of scrobbles in it. The charts
- * are required; the profile and the recent list only decorate the screen, so
- * a failure there leaves them out instead of failing the whole snapshot.
+ * A snapshot is a handful of small requests made together: the profile, the
+ * top artists, tracks and albums for the period (whose totals are the
+ * period's distinct counts), the latest scrobbles, and one-row history
+ * requests whose totals count the scrobbles in a window: the period itself,
+ * the window before it, and each slice of the activity chart. The charts are
+ * required; everything else only decorates the screen, so a failure there
+ * leaves it out instead of failing the whole snapshot.
  */
 internal class LastFmStatisticsRepository(
     private val api: LastFmStatsApi = DefaultLastFmStatsApi,
     private val cache: LastFmStatsCache = LastFmStatsCache(),
     private val nowEpochSeconds: () -> Long = { System.currentTimeMillis() / 1_000L },
     private val endpoint: () -> String = { LastFM.currentConfig().endpoint },
+    private val zone: () -> ZoneId = { ZoneId.systemDefault() },
 ) {
     fun key(username: String, period: LastFmStatsPeriod): LastFmStatsCacheKey {
         val normalized = username.trim().lowercase(Locale.ROOT)
@@ -145,13 +174,29 @@ internal class LastFmStatisticsRepository(
     }
 
     private suspend fun fetch(username: String, period: LastFmStatsPeriod): LastFmStatsSnapshot = coroutineScope {
+        val now = nowEpochSeconds()
         val profile = async { api.profile(username) }
         val artists = async { api.topArtists(username, period.apiValue, CHART_LIMIT) }
         val tracks = async { api.topTracks(username, period.apiValue, CHART_LIMIT) }
         val albums = async { api.topAlbums(username, period.apiValue, CHART_LIMIT) }
         val recent = async { api.recent(username, RECENT_LIMIT, null) }
         val periodCount = period.days?.let { days ->
-            async { api.recent(username, 1, nowEpochSeconds() - days * SECONDS_PER_DAY) }
+            async { api.recent(username, 1, now - days * SECONDS_PER_DAY) }
+        }
+        val previousCount = period.days?.let { days ->
+            async {
+                api.recent(username, 1, now - 2L * days * SECONDS_PER_DAY, now - days * SECONDS_PER_DAY - 1)
+            }
+        }
+        // Rolling windows are known now; all time waits for the profile's
+        // registration date, so it starts once that has come back.
+        val activity = async {
+            val registered = if (period.days == null) {
+                profile.await().getOrNull()?.registeredAtEpochSeconds ?: 0L
+            } else {
+                0L
+            }
+            countActivity(username, activityWindows(period, now, registered, zone()))
         }
 
         val artistPage = artists.await().getOrThrow()
@@ -188,12 +233,72 @@ internal class LastFmStatisticsRepository(
             topTracks = trackPage.items.filter { it.playCount > 0L && it.artist.isNotBlank() },
             topAlbums = albumPage.items.filter { it.playCount > 0L },
             recent = recent.await().getOrNull()?.items.orEmpty().take(RECENT_LIMIT),
+            activity = activity.await(),
+            previousScrobbles = previousCount?.await()?.getOrNull()?.total,
         )
+    }
+
+    private suspend fun countActivity(
+        username: String,
+        windows: List<LongRange>,
+    ): List<LastFmActivityBucket> = coroutineScope {
+        if (windows.isEmpty()) return@coroutineScope emptyList()
+        // A few at a time: Last.fm answers a burst of a dozen with rate-limit errors.
+        val permits = Semaphore(ACTIVITY_PARALLELISM)
+        val counts = windows.map { window ->
+            async {
+                permits.withPermit {
+                    api.recent(username, 1, window.first, window.last).getOrNull()?.total
+                }
+            }
+        }.map { it.await() }
+        if (counts.any { it == null }) return@coroutineScope emptyList()
+        windows.zip(counts) { window, count -> LastFmActivityBucket(window.first, window.last, count!!) }
     }
 
     companion object {
         const val CHART_LIMIT = 50
         const val RECENT_LIMIT = 10
+        private const val ACTIVITY_PARALLELISM = 4
         private const val SECONDS_PER_DAY = 86_400L
+    }
+}
+
+/**
+ * The activity chart's slices as `start..end` Unix-second ranges, oldest first.
+ *
+ * A rolling period is cut into [LastFmStatsPeriod.activityBuckets] equal
+ * slices that end now, so the bars add up to the period's count. All time
+ * goes by calendar year in [zone], from the year the account was made (its
+ * first bar starting at registration), keeping the latest years when there
+ * are more than fit; without a registration date there is no chart.
+ */
+internal fun activityWindows(
+    period: LastFmStatsPeriod,
+    nowEpochSeconds: Long,
+    registeredEpochSeconds: Long,
+    zone: ZoneId,
+): List<LongRange> {
+    val days = period.days
+    if (days != null) {
+        val start = nowEpochSeconds - days * 86_400L
+        val count = period.activityBuckets
+        val width = (nowEpochSeconds - start) / count
+        return List(count) { index ->
+            val from = start + index * width
+            // Last.fm's from/to are both inclusive, so neighbours must not share a second.
+            val to = if (index == count - 1) nowEpochSeconds else from + width - 1
+            from..to
+        }
+    }
+    if (registeredEpochSeconds <= 0L || registeredEpochSeconds >= nowEpochSeconds) return emptyList()
+    val firstYear = Instant.ofEpochSecond(registeredEpochSeconds).atZone(zone).year
+    val lastYear = Instant.ofEpochSecond(nowEpochSeconds).atZone(zone).year
+    val years = (maxOf(firstYear, lastYear - period.activityBuckets + 1)..lastYear).toList()
+    if (years.size < 2) return emptyList()
+    return years.map { year ->
+        val yearStart = LocalDate.of(year, 1, 1).atStartOfDay(zone).toEpochSecond()
+        val nextYear = LocalDate.of(year + 1, 1, 1).atStartOfDay(zone).toEpochSecond()
+        maxOf(yearStart, registeredEpochSeconds)..minOf(nextYear - 1, nowEpochSeconds)
     }
 }

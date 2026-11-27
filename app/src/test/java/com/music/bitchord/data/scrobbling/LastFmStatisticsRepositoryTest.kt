@@ -87,6 +87,47 @@ class LastFmStatisticsRepositoryTest {
         assertEquals(emptySnapshot(), cache.get(key)?.snapshot)
     }
 
+    @Test
+    fun rollingActivityTilesThePeriodWithoutOverlapAndComparesWithTheWindowBefore() = runBlocking {
+        val api = FakeApi()
+        val repository = LastFmStatisticsRepository(api, LastFmStatsCache { 0L }, { now }, { "https://api" })
+
+        val snapshot = repository.load("zen", LastFmStatsPeriod.MONTH, false).getOrThrow()
+
+        val bars = snapshot.activity
+        assertEquals(10, bars.size)
+        assertEquals(now - 30 * 86_400L, bars.first().startEpochSeconds)
+        assertEquals(now, bars.last().endEpochSeconds)
+        bars.zipWithNext { a, b -> assertEquals(a.endEpochSeconds + 1, b.startEpochSeconds) }
+        assertEquals(30 * 24L, bars.sumOf { it.scrobbles })
+        // The previous 30 days end the second before this window starts.
+        assertEquals((now - 60 * 86_400L)..(now - 30 * 86_400L - 1), api.windows.first { it.last < now - 30 * 86_400L })
+        assertEquals(30 * 24L, snapshot.previousScrobbles)
+    }
+
+    @Test
+    fun oneFailedSliceDropsTheWholeChartButNotTheSnapshot() = runBlocking {
+        val repository = LastFmStatisticsRepository(
+            FakeApi(failActivity = true), LastFmStatsCache { 0L }, { now }, { "https://api" },
+        )
+        val snapshot = repository.load("zen", LastFmStatsPeriod.WEEK, false).getOrThrow()
+        assertTrue(snapshot.activity.isEmpty())
+        assertEquals(412L, snapshot.scrobbles)
+    }
+
+    @Test
+    fun allTimeActivityGoesByCalendarYearFromRegistration() {
+        val zone = java.time.ZoneId.of("UTC")
+        val registered = java.time.LocalDate.of(2021, 6, 15).atStartOfDay(zone).toEpochSecond()
+        val nowUtc = java.time.LocalDate.of(2026, 11, 28).atStartOfDay(zone).toEpochSecond()
+        val years = activityWindows(LastFmStatsPeriod.OVERALL, nowUtc, registered, zone)
+        assertEquals(6, years.size)
+        assertEquals(registered, years.first().first)
+        assertEquals(java.time.LocalDate.of(2022, 1, 1).atStartOfDay(zone).toEpochSecond() - 1, years.first().last)
+        assertEquals(nowUtc, years.last().last)
+        assertTrue(activityWindows(LastFmStatsPeriod.OVERALL, nowUtc, 0L, zone).isEmpty())
+    }
+
     private fun emptySnapshot() = LastFmStatsSnapshot(
         null, 0L, 0L, 0L, 0L, emptyList(), emptyList(), emptyList(), emptyList(),
     )
@@ -94,6 +135,7 @@ class LastFmStatisticsRepositoryTest {
     private class FakeApi(
         val failTracks: Boolean = false,
         val failRecentList: Boolean = false,
+        val failActivity: Boolean = false,
     ) : LastFmStatsApi {
         val chartCalls = AtomicInteger()
 
@@ -128,7 +170,21 @@ class LastFmStatisticsRepositoryTest {
             return Result.success(LastFM.PagedResult(listOf(LastFM.RankedAlbum("A", "Artist A", 5L, null)), 1, 58L))
         }
 
-        override suspend fun recent(username: String, limit: Int, fromEpochSeconds: Long?): Result<LastFM.PagedResult<LastFM.RecentTrack>> {
+        val windows = java.util.concurrent.ConcurrentLinkedQueue<LongRange>()
+
+        override suspend fun recent(
+            username: String,
+            limit: Int,
+            fromEpochSeconds: Long?,
+            toEpochSeconds: Long?,
+        ): Result<LastFM.PagedResult<LastFM.RecentTrack>> {
+            if (fromEpochSeconds != null && toEpochSeconds != null) {
+                windows += fromEpochSeconds..toEpochSeconds
+                if (failActivity && toEpochSeconds == now()) return Result.failure(IllegalStateException("429"))
+                // One scrobble per hour of the window, so slices sum to the period.
+                val count = (toEpochSeconds - fromEpochSeconds + 1) / 3_600L
+                return Result.success(LastFM.PagedResult(emptyList(), 1, count))
+            }
             if (fromEpochSeconds != null) {
                 countFrom = fromEpochSeconds
                 return Result.success(LastFM.PagedResult(emptyList(), 412, 412L))
