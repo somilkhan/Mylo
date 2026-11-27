@@ -75,15 +75,14 @@ jobs:
       - name: Report installed Android platforms
         run: sdkmanager --list | grep -E "platforms;android-|build-tools;" | head -30
 
-      # Same stable debug key as the other dev builds, so an APK from here
-      # installs over the one already on the phone.
-      - name: Write the debug keystore
+      # One stable debug key for every dev build, so an APK from any run
+      # installs over the one already on the phone. Fails the job if the
+      # secret is missing or unusable; see .github/scripts/debug-keystore.sh.
+      - name: Install the stable debug keystore
         env:
           DEBUG_KEYSTORE_BASE64: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
-        run: |
-          [ -n "$DEBUG_KEYSTORE_BASE64" ] || exit 0
-          mkdir -p ~/.android
-          echo "$DEBUG_KEYSTORE_BASE64" | base64 -d > ~/.android/debug.keystore
+          IS_FORK_PR: ${{ github.event.pull_request.head.repo.fork == true }}
+        run: bash .github/scripts/debug-keystore.sh install
 
       - name: Build Android app, TV and Wear OS APKs
         id: build_apks
@@ -93,6 +92,12 @@ jobs:
           LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
           LASTFM_SECRET: ${{ secrets.LASTFM_SECRET }}
         run: ./gradlew --no-daemon --stacktrace :app:assembleDevDebug :tv:assembleDevDebug :wearos:assembleDevDebug
+
+      - name: Check the APKs are signed with the stable debug key
+        if: steps.build_apks.outcome == 'success'
+        env:
+          IS_FORK_PR: ${{ github.event.pull_request.head.repo.fork == true }}
+        run: bash .github/scripts/debug-keystore.sh verify app/build/outputs/apk/dev/debug/*.apk tv/build/outputs/apk/dev/debug/*.apk wearos/build/outputs/apk/dev/debug/*.apk
 
       - name: Run Android unit tests
         id: test_android
