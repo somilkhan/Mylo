@@ -56,6 +56,12 @@ install_keystore() {
   [[ -n "$sha256" ]] || fail "Couldn't read the SHA-256 fingerprint of the debug key."
   printf '%s\n' "$sha256" > "$FINGERPRINT_FILE"
 
+  # The Gradle builds sign debug with this file only when told to; see
+  # signingConfigs in app/, tv/ and wearos/build.gradle.kts.
+  if [[ -n "${GITHUB_ENV:-}" ]]; then
+    echo "MYLO_DEBUG_KEYSTORE=${KEYSTORE}" >> "$GITHUB_ENV"
+  fi
+
   echo "Debug key installed. Certificate SHA-256: ${sha256}"
   if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
     printf '### Debug signing key\nCertificate SHA-256: `%s`\n' "$sha256" >> "$GITHUB_STEP_SUMMARY"
