@@ -85,8 +85,17 @@ verify_apks() {
   apksigner="$(find_apksigner)"
   for apk in "$@"; do
     [[ -f "$apk" ]] || continue
-    actual="$("$apksigner" verify --print-certs "$apk" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -n 1)"
+    local output
+    if ! output="$("$apksigner" verify --print-certs "$apk" 2>&1)"; then
+      echo "$output" >&2
+      fail "$(basename "$apk") failed signature verification."
+    fi
+    # "Signer #1 certificate SHA-256 digest: …" on older build-tools; newer
+    # ones may name the signer differently, so only the field is matched.
+    # Every signer listed has to be the stable key.
+    actual="$(printf '%s\n' "$output" | sed -n 's/^.*certificate SHA-256 digest:[[:space:]]*//p' | sort -u)"
     if [[ "$actual" != "$expected" ]]; then
+      echo "$output" >&2
       fail "$(basename "$apk") is signed with ${actual:-an unreadable certificate}, not the stable debug key ${expected}. It would not install over the existing dev build."
     fi
     echo "OK  $(basename "$apk")  ${actual}"
