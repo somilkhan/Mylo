@@ -75,7 +75,7 @@ internal fun LazyListScope.statsPatternItems(summary: ReplaySummary) {
             val songs = context.replayCount(summary.distinctSongs, R.plurals.replay_song_count)
             PatternCard(
                 icon = Icons.Rounded.LibraryMusic,
-                text = "You played $artists and $songs.",
+                text = stringResource(R.string.scrobble_stats_variety, artists, songs),
             )
         }
     }

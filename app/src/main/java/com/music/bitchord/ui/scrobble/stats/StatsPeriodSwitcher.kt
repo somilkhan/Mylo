@@ -21,10 +21,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.music.bitchord.R
 import com.music.bitchord.data.stats.ReplayPeriod
 
 /**
@@ -38,6 +40,7 @@ internal fun StatsPeriodSwitcher(
 ) {
     val colors = MaterialTheme.colorScheme
     val scrollable = LocalDensity.current.fontScale >= 1.3f
+    val selectorLabel = stringResource(R.string.scrobble_period_selector_label)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -50,7 +53,7 @@ internal fun StatsPeriodSwitcher(
             )
             .padding(4.dp)
             .then(if (scrollable) Modifier.horizontalScroll(rememberScrollState()) else Modifier)
-            .semantics { contentDescription = "Time period" }
+            .semantics { contentDescription = selectorLabel }
             .selectableGroup(),
         horizontalArrangement = Arrangement.spacedBy(2.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -73,7 +76,7 @@ internal fun StatsPeriodSwitcher(
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    text = period.chip,
+                    text = stringResource(periodLabelRes(period)),
                     style = MaterialTheme.typography.labelMedium,
                     color = if (isSelected) colors.onTertiary else colors.onSurfaceVariant,
                     maxLines = 1,
@@ -81,4 +84,11 @@ internal fun StatsPeriodSwitcher(
             }
         }
     }
+}
+
+private fun periodLabelRes(period: ReplayPeriod): Int = when (period) {
+    ReplayPeriod.THIS_WEEK -> R.string.replay_period_weekly
+    ReplayPeriod.THIS_MONTH -> R.string.replay_period_monthly
+    ReplayPeriod.THIS_YEAR -> R.string.replay_period_yearly
+    ReplayPeriod.ALL_TIME -> R.string.replay_period_lifetime
 }

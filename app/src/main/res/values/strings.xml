@@ -1544,4 +1544,16 @@
     <string name="scrobble_not_recorded_yet">Not recorded yet</string>
     <string name="scrobble_percent_summary">%1$s · %2$s</string>
     <string name="scrobble_pinned">Pinned</string>
+    <string name="scrobble_stats_listening_time">Listening time</string>
+    <string name="scrobble_stats_heading_tracks">Your tracks</string>
+    <string name="scrobble_stats_sentence_week">Here is how your week has sounded so far.</string>
+    <string name="scrobble_stats_sentence_month">Here is how your month has sounded so far.</string>
+    <string name="scrobble_stats_sentence_year">Here is how your year has sounded so far.</string>
+    <string name="scrobble_stats_sentence_all_time">Here is everything you have played, from the start.</string>
+    <string name="scrobble_stats_variety">You played %1$s and %2$s.</string>
+    <string name="scrobble_period_selector_label">Time period</string>
+    <string name="scrobble_stats_empty_title">No listening history yet</string>
+    <string name="scrobble_stats_empty_body">Play a few tracks, or connect Last.fm in Settings to bring in your history.</string>
+    <string name="scrobble_stats_empty_title_period">No listening history</string>
+    <string name="scrobble_stats_empty_body_period">Nothing recorded for this period.</string>
 </resources>

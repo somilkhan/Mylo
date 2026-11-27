@@ -3283,8 +3283,6 @@ private fun BitChordApp(
                                         navigator.pop()
                                         navigator.push(AppRoute.Settings)
                                     },
-                                    holder = account?.name.orEmpty(),
-                                    memberSince = replay.memberSince,
                                     onOpenReplay = { page, period ->
                                         setReplayPeriod(period)
                                         replayStory = page
@@ -3292,10 +3290,6 @@ private fun BitChordApp(
                                     onOpenArtist = { id, name ->
                                         navigator.pop()
                                         openByName(id, name, null, BrowseType.ARTIST)
-                                    },
-                                    onOpenAlbum = { id, title, artist, art ->
-                                        navigator.pop()
-                                        openByName(id, title, artist, BrowseType.ALBUM, art)
                                     },
                                     contentPadding = listPadding,
                                 )

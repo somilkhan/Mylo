@@ -1,16 +1,11 @@
 package com.music.bitchord.ui.components
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -19,7 +14,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -84,58 +78,6 @@ internal fun ScrobbleErrorState(
                     Text(stringResource(R.string.retry), color = colors.onErrorContainer)
                 }
             }
-        }
-    }
-}
-
-/** Skeleton placeholder card shown while a scrobble list is loading. */
-@Composable
-internal fun ScrobbleLoadingRow(modifier: Modifier = Modifier) {
-    val colors = MaterialTheme.colorScheme
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .then(modifier),
-        shape = RoundedCornerShape(16.dp),
-        color = colors.surfaceVariant,
-    ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Box(
-                Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(colors.surfaceContainerHighest),
-            )
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Box(
-                    Modifier
-                        .fillMaxWidth(0.62f)
-                        .height(12.dp)
-                        .clip(RoundedCornerShape(50))
-                        .background(colors.surfaceContainerHighest),
-                )
-                Box(
-                    Modifier
-                        .fillMaxWidth(0.38f)
-                        .height(10.dp)
-                        .clip(RoundedCornerShape(50))
-                        .background(colors.surfaceContainerHighest),
-                )
-            }
-            Box(
-                Modifier
-                    .width(30.dp)
-                    .height(10.dp)
-                    .clip(RoundedCornerShape(50))
-                    .background(colors.surfaceContainerHighest),
-            )
         }
     }
 }

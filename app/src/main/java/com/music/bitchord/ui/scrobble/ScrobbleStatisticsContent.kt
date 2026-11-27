@@ -45,11 +45,8 @@ internal fun ScrobbleStatisticsContent(
     reduceMotion: Boolean,
     onPlaySong: (Song) -> Unit,
     onOpenSettings: () -> Unit,
-    holder: String,
-    memberSince: String?,
     onOpenReplay: (ReplayStoryPage, ReplayPeriod) -> Unit,
     onOpenArtist: (String?, String) -> Unit,
-    onOpenAlbum: (String?, String, String?, String?) -> Unit,
     contentPadding: PaddingValues,
     refreshing: Boolean,
     onRefresh: () -> Unit,
@@ -193,12 +190,12 @@ private fun StatisticsEmptyState(
     onOpenSettings: () -> Unit,
 ) {
     ScrobbleEmptyState(
-        title = if (lastFmConnected) "No listening history" else "No listening history yet",
-        message = if (lastFmConnected) {
-            "No listening history for this period."
-        } else {
-            "Play a few tracks, or connect Last.fm in Settings to bring in your history."
-        },
+        title = stringResource(
+            if (lastFmConnected) R.string.scrobble_stats_empty_title_period else R.string.scrobble_stats_empty_title,
+        ),
+        message = stringResource(
+            if (lastFmConnected) R.string.scrobble_stats_empty_body_period else R.string.scrobble_stats_empty_body,
+        ),
         modifier = Modifier.padding(horizontal = 24.dp, vertical = 48.dp),
         action = if (!lastFmConnected) {
             {

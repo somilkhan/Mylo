@@ -58,6 +58,18 @@ class LocaleStringsTest(private val tag: String) {
             "scrobble_mode_forgotten_favorites",
             "scrobble_mode_tag_top",
             "scrobble_mode_top_artists_mix",
+            "scrobble_stats_listening_time",
+            "scrobble_stats_heading_tracks",
+            "scrobble_stats_sentence_week",
+            "scrobble_stats_sentence_month",
+            "scrobble_stats_sentence_year",
+            "scrobble_stats_sentence_all_time",
+            "scrobble_stats_variety",
+            "scrobble_period_selector_label",
+            "scrobble_stats_empty_title",
+            "scrobble_stats_empty_body",
+            "scrobble_stats_empty_title_period",
+            "scrobble_stats_empty_body_period",
         )
 
         private val baseKeys: Set<String> by lazy {

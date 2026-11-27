@@ -28,7 +28,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -64,7 +63,7 @@ internal fun StatsHero(
         StatsPeriodSwitcher(selected = period, onSelect = onPeriodSelect)
         Spacer(Modifier.height(18.dp))
         Text(
-            StatsCopy.LISTENING_TIME,
+            stringResource(R.string.scrobble_stats_listening_time),
             style = MaterialTheme.typography.labelMedium,
             color = colors.onSurfaceVariant,
         )
@@ -89,7 +88,7 @@ internal fun StatsHero(
             )
         }
         Text(
-            StatsCopy.periodSentence(period),
+            periodSentence(period),
             style = MaterialTheme.typography.bodyLarge,
             color = colors.onSurfaceVariant,
             modifier = Modifier.padding(top = 4.dp),
@@ -97,7 +96,7 @@ internal fun StatsHero(
     }
 }
 
-/** Entry to the Replay stories. Red is used here and nowhere else on the tab. */
+/** Entry to the Replay stories. The one filled accent on the tab. */
 @Composable
 internal fun StatsReplayEntry(onClick: () -> Unit) {
     val colors = MaterialTheme.colorScheme
@@ -108,7 +107,7 @@ internal fun StatsReplayEntry(onClick: () -> Unit) {
             .fillMaxWidth()
             .padding(horizontal = 20.dp)
             .heightIn(min = 64.dp)
-            .semantics(mergeDescendants = true) { contentDescription = "$title. $subtitle" }
+            .semantics(mergeDescendants = true) {}
             .clickable(role = Role.Button, onClick = onClick),
         shape = RoundedCornerShape(20.dp),
         color = colors.surfaceVariant,
@@ -140,3 +139,13 @@ internal fun StatsReplayEntry(onClick: () -> Unit) {
         }
     }
 }
+
+@Composable
+private fun periodSentence(period: ReplayPeriod): String = stringResource(
+    when (period) {
+        ReplayPeriod.THIS_WEEK -> R.string.scrobble_stats_sentence_week
+        ReplayPeriod.THIS_MONTH -> R.string.scrobble_stats_sentence_month
+        ReplayPeriod.THIS_YEAR -> R.string.scrobble_stats_sentence_year
+        ReplayPeriod.ALL_TIME -> R.string.scrobble_stats_sentence_all_time
+    },
+)

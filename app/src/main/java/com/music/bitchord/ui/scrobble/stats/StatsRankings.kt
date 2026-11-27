@@ -20,7 +20,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -71,7 +70,7 @@ internal fun LazyListScope.statsTrackItems(
     val shown = tracks.take(TRACK_LIMIT)
     val maxPlays = shown.maxOf { it.plays }.coerceAtLeast(1L)
     item(key = "stats-tracks-heading") {
-        StatsSectionHeading(StatsCopy.TOP_TRACKS)
+        StatsSectionHeading(stringResource(R.string.scrobble_stats_heading_tracks))
     }
     itemsIndexed(
         shown,
@@ -100,9 +99,7 @@ private fun FeaturedArtistCard(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp)
-            .semantics(mergeDescendants = true) {
-                contentDescription = "$topArtist: ${entry.title}, $listened, $plays"
-            }
+            .semantics(mergeDescendants = true) {}
             .clickable(role = Role.Button, onClick = onClick),
         shape = RoundedCornerShape(24.dp),
         color = colors.surfaceVariant,
@@ -159,7 +156,6 @@ private fun CompactArtistRow(
     onClick: () -> Unit,
 ) {
     val context = LocalContext.current
-    val listened = formatListening(context, entry.ms)
     val plays = context.replayCount(entry.plays, R.plurals.replay_play_count)
     RankRow(
         rank = rank,
@@ -175,7 +171,6 @@ private fun CompactArtistRow(
         },
         fraction = entry.ms.toFloat() / maxMs,
         trailing = plays,
-        description = "$rank. ${entry.title}, $listened, $plays",
         onClick = onClick,
     )
 }
@@ -205,7 +200,6 @@ private fun TrackRow(
         },
         fraction = track.plays.toFloat() / maxPlays,
         trailing = plays,
-        description = "$rank. ${track.title}, ${track.artist}, $plays",
         onClick = onRowClick,
     )
 }
@@ -219,7 +213,6 @@ private fun RankRow(
     artwork: @Composable () -> Unit,
     fraction: Float,
     trailing: String,
-    description: String,
     onClick: (() -> Unit)?,
 ) {
     val colors = MaterialTheme.colorScheme
@@ -227,7 +220,7 @@ private fun RankRow(
         .fillMaxWidth()
         .padding(horizontal = 20.dp)
         .heightIn(min = 56.dp)
-        .semantics(mergeDescendants = true) { contentDescription = description }
+        .semantics(mergeDescendants = true) {}
     val rowModifier = if (onClick != null) base.clickable(role = Role.Button, onClick = onClick) else base
     Row(
         modifier = rowModifier.padding(vertical = 8.dp),
