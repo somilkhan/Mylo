@@ -1,39 +1,58 @@
 package com.music.bitchord.data.scrobbling
 
-import com.music.bitchord.data.generate.PlaylistGenerationRules
-import com.music.bitchord.data.stats.ReplayPeriod
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.ensureActive
-import java.time.Instant
-import java.time.ZoneId
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import java.util.Locale
 
-internal data class LastFmStatsPeriodRange(
-    val requestFromEpochSeconds: Long,
-    val requestToEpochSeconds: Long,
-    val startInclusiveEpochSeconds: Long,
-    val endInclusiveEpochSeconds: Long,
-)
+/**
+ * The windows the Stats tab offers: exactly the periods Last.fm charts by, so
+ * every number on the screen is Last.fm's own, never one rebuilt on the phone
+ * from pages of history.
+ *
+ * [days] is the length of the rolling window, used to count the scrobbles in
+ * it; null for [OVERALL], whose count is the profile's play count.
+ */
+enum class LastFmStatsPeriod(val apiValue: String, val days: Int?) {
+    WEEK("7day", 7),
+    MONTH("1month", 30),
+    QUARTER("3month", 90),
+    HALF_YEAR("6month", 180),
+    YEAR("12month", 365),
+    OVERALL("overall", null),
+}
+
+/** Everything the Stats tab shows for one account and one period. */
+internal data class LastFmStatsSnapshot(
+    val profile: LastFM.UserStats?,
+    /** Scrobbles in the period: the whole history for [LastFmStatsPeriod.OVERALL]. */
+    val scrobbles: Long,
+    val artistCount: Long,
+    val albumCount: Long,
+    val trackCount: Long,
+    val topArtists: List<LastFM.RankedArtist>,
+    val topTracks: List<LastFM.RankedTrack>,
+    val topAlbums: List<LastFM.RankedAlbum>,
+    /** Newest first; a now-playing row, if any, comes first. */
+    val recent: List<LastFM.RecentTrack>,
+) {
+    /** Nothing scrobbled in the period at all, as opposed to a failed fetch. */
+    val isEmpty: Boolean
+        get() = scrobbles == 0L && topArtists.isEmpty() && topTracks.isEmpty() && topAlbums.isEmpty()
+}
 
 internal data class LastFmStatsCacheKey(
     val username: String,
     val endpoint: String,
-    val period: ReplayPeriod,
-    val rangeStartEpochSeconds: Long?,
-)
-
-internal data class LastFmStatsQuery(
-    val key: LastFmStatsCacheKey,
-    val range: LastFmStatsPeriodRange?,
+    val period: LastFmStatsPeriod,
 )
 
 internal data class LastFmStatsCacheEntry(
-    val tracks: List<LastFM.RankedTrack>,
+    val snapshot: LastFmStatsSnapshot,
     val fetchedAtMillis: Long,
 )
 
+/** Snapshots for [TTL_MILLIS], so switching periods back and forth costs nothing. */
 internal class LastFmStatsCache(
     private val nowMillis: () -> Long = { System.nanoTime() / 1_000_000L },
 ) {
@@ -50,8 +69,8 @@ internal class LastFmStatsCache(
     }
 
     @Synchronized
-    fun put(key: LastFmStatsCacheKey, tracks: List<LastFM.RankedTrack>) {
-        entries[key] = LastFmStatsCacheEntry(tracks.toList(), nowMillis())
+    fun put(key: LastFmStatsCacheKey, snapshot: LastFmStatsSnapshot) {
+        entries[key] = LastFmStatsCacheEntry(snapshot, nowMillis())
     }
 
     companion object {
@@ -59,189 +78,122 @@ internal class LastFmStatsCache(
     }
 }
 
+/** The Last.fm calls a snapshot is built from; a seam for tests. */
 internal interface LastFmStatsApi {
-    suspend fun topTracks(
-        username: String,
-        page: Int,
-        limit: Int,
-    ): Result<LastFM.PagedResult<LastFM.RankedTrack>>
-
-    suspend fun recentTracks(
-        username: String,
-        from: Long,
-        to: Long,
-        page: Int,
-        limit: Int,
-    ): Result<LastFM.PagedResult<LastFM.RecentTrack>>
+    suspend fun profile(username: String): Result<LastFM.UserStats>
+    suspend fun topArtists(username: String, period: String, limit: Int): Result<LastFM.PagedResult<LastFM.RankedArtist>>
+    suspend fun topTracks(username: String, period: String, limit: Int): Result<LastFM.PagedResult<LastFM.RankedTrack>>
+    suspend fun topAlbums(username: String, period: String, limit: Int): Result<LastFM.PagedResult<LastFM.RankedAlbum>>
+    suspend fun recent(username: String, limit: Int, fromEpochSeconds: Long?): Result<LastFM.PagedResult<LastFM.RecentTrack>>
 }
 
 private object DefaultLastFmStatsApi : LastFmStatsApi {
-    override suspend fun topTracks(
-        username: String,
-        page: Int,
-        limit: Int,
-    ): Result<LastFM.PagedResult<LastFM.RankedTrack>> =
-        LastFM.getTopTracksPage(username, page, limit)
-
-    override suspend fun recentTracks(
-        username: String,
-        from: Long,
-        to: Long,
-        page: Int,
-        limit: Int,
-    ): Result<LastFM.PagedResult<LastFM.RecentTrack>> =
-        LastFM.getRecentTracksPage(username, from, to, page, limit)
+    override suspend fun profile(username: String) = LastFM.getUserStats(username)
+    override suspend fun topArtists(username: String, period: String, limit: Int) =
+        LastFM.getTopArtistsChart(username, period, limit)
+    override suspend fun topTracks(username: String, period: String, limit: Int) =
+        LastFM.getTopTracksChart(username, period, limit)
+    override suspend fun topAlbums(username: String, period: String, limit: Int) =
+        LastFM.getTopAlbumsChart(username, period, limit)
+    override suspend fun recent(username: String, limit: Int, fromEpochSeconds: Long?) =
+        LastFM.getRecentScrobbles(username, limit, fromEpochSeconds)
 }
 
-internal interface LastFmStatsDataSource {
-    suspend fun fetch(
-        username: String,
-        period: ReplayPeriod,
-        range: LastFmStatsPeriodRange?,
-    ): List<LastFM.RankedTrack>
-}
-
-internal class LastFmApiStatsDataSource(
-    private val api: LastFmStatsApi = DefaultLastFmStatsApi,
-    private val pageDelayMillis: Long = 120L,
-) : LastFmStatsDataSource {
-    override suspend fun fetch(
-        username: String,
-        period: ReplayPeriod,
-        range: LastFmStatsPeriodRange?,
-    ): List<LastFM.RankedTrack> =
-        if (period == ReplayPeriod.ALL_TIME) {
-            fetchAllTopTracks(username)
-        } else {
-            fetchAllRecentTracks(username, requireNotNull(range) { "A calendar period needs a date range" })
-        }
-
-    private suspend fun fetchAllTopTracks(username: String): List<LastFM.RankedTrack> {
-        val first = api.topTracks(username, page = 1, limit = TOP_TRACKS_PAGE_SIZE).getOrThrow()
-        val rows = first.items.toMutableList()
-        for (page in 2..first.totalPages) {
-            currentCoroutineContext().ensureActive()
-            if (pageDelayMillis > 0L) delay(pageDelayMillis)
-            rows += api.topTracks(username, page, TOP_TRACKS_PAGE_SIZE).getOrThrow().items
-        }
-        return rows
-            .filter { it.name.isNotBlank() && it.artist.isNotBlank() }
-            .groupBy { PlaylistGenerationRules.trackKey(it.name, it.artist) }
-            .values
-            .mapNotNull { group ->
-                val representative = group.maxByOrNull { it.playCount } ?: return@mapNotNull null
-                representative.copy(
-                    playCount = group.sumOf { it.playCount.coerceAtLeast(0L) },
-                    artworkUrl = group.mapNotNull { it.artworkUrl?.takeIf(String::isNotBlank) }.firstOrNull(),
-                )
-            }
-            .filter { it.playCount > 0L }
-            .sortedByDescending { it.playCount }
-    }
-
-    private suspend fun fetchAllRecentTracks(
-        username: String,
-        range: LastFmStatsPeriodRange,
-    ): List<LastFM.RankedTrack> {
-        val first = api.recentTracks(
-            username,
-            range.requestFromEpochSeconds,
-            range.requestToEpochSeconds,
-            page = 1,
-            limit = RECENT_TRACKS_PAGE_SIZE,
-        ).getOrThrow()
-        val rows = first.items.toMutableList()
-        for (page in 2..first.totalPages) {
-            currentCoroutineContext().ensureActive()
-            if (pageDelayMillis > 0L) delay(pageDelayMillis)
-            rows += api.recentTracks(
-                username,
-                range.requestFromEpochSeconds,
-                range.requestToEpochSeconds,
-                page,
-                RECENT_TRACKS_PAGE_SIZE,
-            ).getOrThrow().items
-        }
-        return rows
-            .filter {
-                it.timestamp in range.startInclusiveEpochSeconds..range.endInclusiveEpochSeconds &&
-                    it.name.isNotBlank() && it.artist.isNotBlank()
-            }
-            .groupBy { PlaylistGenerationRules.trackKey(it.name, it.artist) }
-            .values
-            .mapNotNull { group ->
-                val representative = group.maxByOrNull { it.timestamp } ?: return@mapNotNull null
-                LastFM.RankedTrack(
-                    name = representative.name,
-                    artist = representative.artist,
-                    playCount = group.size.toLong(),
-                    artworkUrl = group.mapNotNull { it.artworkUrl?.takeIf(String::isNotBlank) }.firstOrNull(),
-                )
-            }
-            .sortedByDescending { it.playCount }
-    }
-
-    companion object {
-        const val TOP_TRACKS_PAGE_SIZE = 100
-        const val RECENT_TRACKS_PAGE_SIZE = 200
-    }
-}
-
+/**
+ * Last.fm statistics for the Stats tab, one period at a time.
+ *
+ * A snapshot is six small requests made together: the profile, the top
+ * artists, tracks and albums for the period (whose totals are the period's
+ * distinct counts), the latest scrobbles, and for a rolling period one more
+ * one-row request whose total is the number of scrobbles in it. The charts
+ * are required; the profile and the recent list only decorate the screen, so
+ * a failure there leaves them out instead of failing the whole snapshot.
+ */
 internal class LastFmStatisticsRepository(
-    private val source: LastFmStatsDataSource = LastFmApiStatsDataSource(),
+    private val api: LastFmStatsApi = DefaultLastFmStatsApi,
     private val cache: LastFmStatsCache = LastFmStatsCache(),
-    private val now: () -> Instant = Instant::now,
-    private val zone: () -> ZoneId = ZoneId::systemDefault,
+    private val nowEpochSeconds: () -> Long = { System.currentTimeMillis() / 1_000L },
     private val endpoint: () -> String = { LastFM.currentConfig().endpoint },
 ) {
-    fun query(username: String, period: ReplayPeriod): LastFmStatsQuery {
-        val normalizedUsername = username.trim().lowercase(Locale.ROOT)
-        require(normalizedUsername.isNotEmpty()) { "Last.fm username is missing" }
-        val current = now()
-        val zoneId = zone()
-        val periodStart = period.range(current.atZone(zoneId).toLocalDate())?.first
-        val range = periodStart?.let { startDate ->
-            val startEpoch = startDate.atStartOfDay(zoneId).toEpochSecond()
-            val endEpoch = current.epochSecond
-            LastFmStatsPeriodRange(
-                requestFromEpochSeconds = startEpoch - 1L,
-                requestToEpochSeconds = endEpoch + 1L,
-                startInclusiveEpochSeconds = startEpoch,
-                endInclusiveEpochSeconds = endEpoch,
-            )
-        }
-        return LastFmStatsQuery(
-            key = LastFmStatsCacheKey(
-                username = normalizedUsername,
-                endpoint = endpoint().trim(),
-                period = period,
-                rangeStartEpochSeconds = range?.startInclusiveEpochSeconds,
-            ),
-            range = range,
-        )
+    fun key(username: String, period: LastFmStatsPeriod): LastFmStatsCacheKey {
+        val normalized = username.trim().lowercase(Locale.ROOT)
+        require(normalized.isNotEmpty()) { "Last.fm username is missing" }
+        return LastFmStatsCacheKey(normalized, endpoint().trim(), period)
     }
 
-    fun cached(query: LastFmStatsQuery): LastFmStatsCacheEntry? = cache.get(query.key)
+    fun cached(key: LastFmStatsCacheKey): LastFmStatsSnapshot? = cache.get(key)?.snapshot
 
-    fun isFresh(query: LastFmStatsQuery): Boolean = cache.isFresh(query.key)
+    fun isFresh(key: LastFmStatsCacheKey): Boolean = cache.isFresh(key)
 
-    suspend fun refresh(
+    suspend fun load(
         username: String,
-        query: LastFmStatsQuery,
+        period: LastFmStatsPeriod,
         force: Boolean,
-    ): Result<List<LastFM.RankedTrack>> {
-        val existing = cache.get(query.key)
-        if (!force && existing != null && cache.isFresh(query.key)) {
-            return Result.success(existing.tracks)
-        }
+    ): Result<LastFmStatsSnapshot> {
+        val key = key(username, period)
+        val existing = cache.get(key)
+        if (!force && existing != null && cache.isFresh(key)) return Result.success(existing.snapshot)
         return try {
-            val tracks = source.fetch(username.trim(), query.key.period, query.range)
-            cache.put(query.key, tracks)
-            Result.success(tracks)
+            val snapshot = fetch(username.trim(), period)
+            cache.put(key, snapshot)
+            Result.success(snapshot)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
             Result.failure(error)
         }
+    }
+
+    private suspend fun fetch(username: String, period: LastFmStatsPeriod): LastFmStatsSnapshot = coroutineScope {
+        val profile = async { api.profile(username) }
+        val artists = async { api.topArtists(username, period.apiValue, CHART_LIMIT) }
+        val tracks = async { api.topTracks(username, period.apiValue, CHART_LIMIT) }
+        val albums = async { api.topAlbums(username, period.apiValue, CHART_LIMIT) }
+        val recent = async { api.recent(username, RECENT_LIMIT, null) }
+        val periodCount = period.days?.let { days ->
+            async { api.recent(username, 1, nowEpochSeconds() - days * SECONDS_PER_DAY) }
+        }
+
+        val artistPage = artists.await().getOrThrow()
+        val trackPage = tracks.await().getOrThrow()
+        val albumPage = albums.await().getOrThrow()
+        val user = profile.await().getOrNull()
+        val scrobbles = if (periodCount == null) {
+            // All time is the profile's own play count; without the profile
+            // there is no honest figure to show, so that is a failure.
+            user?.playCount ?: profile.await().getOrThrow().playCount
+        } else {
+            periodCount.await().getOrThrow().total
+        }
+
+        LastFmStatsSnapshot(
+            profile = user,
+            scrobbles = scrobbles,
+            artistCount = if (period == LastFmStatsPeriod.OVERALL && user != null) {
+                maxOf(user.artistCount, artistPage.total)
+            } else {
+                artistPage.total
+            },
+            albumCount = if (period == LastFmStatsPeriod.OVERALL && user != null) {
+                maxOf(user.albumCount, albumPage.total)
+            } else {
+                albumPage.total
+            },
+            trackCount = if (period == LastFmStatsPeriod.OVERALL && user != null) {
+                maxOf(user.trackCount, trackPage.total)
+            } else {
+                trackPage.total
+            },
+            topArtists = artistPage.items.filter { it.playCount > 0L },
+            topTracks = trackPage.items.filter { it.playCount > 0L && it.artist.isNotBlank() },
+            topAlbums = albumPage.items.filter { it.playCount > 0L },
+            recent = recent.await().getOrNull()?.items.orEmpty().take(RECENT_LIMIT),
+        )
+    }
+
+    companion object {
+        const val CHART_LIMIT = 50
+        const val RECENT_LIMIT = 10
+        private const val SECONDS_PER_DAY = 86_400L
     }
 }

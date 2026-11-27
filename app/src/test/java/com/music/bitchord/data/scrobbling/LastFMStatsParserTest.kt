@@ -139,4 +139,51 @@ class LastFMStatsParserTest {
         assertTrue(runCatching { parseLastFmRecentTracksPage("""{"error":6,"message":"User not found"}""") }.isFailure)
     }
 
+
+    @Test
+    fun chartPagesCarryTheirTotalsAndDropLastFmsPlaceholderArt() {
+        val artists = parseLastFmTopArtistsPage(
+            """
+            {"topartists":{"artist":[
+              {"name":"Artist A","playcount":"40","image":[{"#text":"https://lastfm.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png"}]}
+            ],"@attr":{"page":"1","totalPages":"7","total":"312"}}}
+            """.trimIndent(),
+        )
+        assertEquals(312L, artists.total)
+        assertNull(artists.items.single().artworkUrl)
+
+        val albums = parseLastFmTopAlbumsPage(
+            """
+            {"topalbums":{"album":{"name":"Album","artist":{"name":"Artist A"},"playcount":"12","image":[{"#text":"https://img.test/album.jpg"}]},
+             "@attr":{"total":"58"}}}
+            """.trimIndent(),
+        )
+        assertEquals(58L, albums.total)
+        assertEquals("https://img.test/album.jpg", albums.items.single().artworkUrl)
+    }
+
+    @Test
+    fun recentScrobblesKeepTheNowPlayingRowFirstAndReadTheTotal() {
+        val recent = parseLastFmRecentScrobbles(
+            """
+            {"recenttracks":{"track":[
+              {"name":"Live","artist":{"#text":"Artist B"},"album":{"#text":"Record"},"@attr":{"nowplaying":"true"}},
+              {"name":"Earlier","artist":{"#text":"Artist A"},"date":{"uts":"1795082400"}},
+              {"name":"Undated","artist":{"#text":"Artist C"}}
+            ],"@attr":{"total":"18234"}}}
+            """.trimIndent(),
+        )
+        assertEquals(18_234L, recent.total)
+        assertEquals(listOf("Live", "Earlier"), recent.items.map { it.name })
+        assertTrue(recent.items.first().nowPlaying)
+        assertEquals("Record", recent.items.first().album)
+    }
+
+    @Test
+    fun profileReadsWhenTheAccountWasRegistered() {
+        val profile = parseLastFmUserStats(
+            """{"user":{"name":"zen","playcount":"1","registered":{"unixtime":"1420000000","#text":1420000000}}}""",
+        )
+        assertEquals(1_420_000_000L, profile?.registeredAtEpochSeconds)
+    }
 }

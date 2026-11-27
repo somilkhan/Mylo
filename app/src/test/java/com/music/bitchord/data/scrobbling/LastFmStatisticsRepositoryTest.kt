@@ -1,209 +1,142 @@
 package com.music.bitchord.data.scrobbling
 
-import com.music.bitchord.data.generate.PlaylistGenerationRules
-import com.music.bitchord.data.stats.ReplayPeriod
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotEquals
-import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneId
-import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicInteger
 
 class LastFmStatisticsRepositoryTest {
-    private val now = Instant.parse("2026-11-19T10:00:00Z")
-    private val zone = ZoneId.of("Asia/Kolkata")
+    private val now = 1_795_000_000L
 
     @Test
-    fun calendarPeriodsUseLocalBoundariesAndAllTimeUsesTopTracks() {
-        val repository = LastFmStatisticsRepository(
-            source = FakeSource(),
-            cache = LastFmStatsCache { 0L },
-            now = { now },
-            zone = { zone },
-        )
-
-        val week = repository.query(" Zen ", ReplayPeriod.THIS_WEEK)
-        val weekStart = LocalDate.of(2026, 11, 16).atStartOfDay(zone).toEpochSecond()
-        assertEquals(weekStart, week.range?.startInclusiveEpochSeconds)
-        assertEquals(weekStart - 1L, week.range?.requestFromEpochSeconds)
-        assertEquals(now.epochSecond, week.range?.endInclusiveEpochSeconds)
-        assertEquals(now.epochSecond + 1L, week.range?.requestToEpochSeconds)
-
-        val month = repository.query("zen", ReplayPeriod.THIS_MONTH)
-        assertEquals(
-            LocalDate.of(2026, 11, 1).atStartOfDay(zone).toEpochSecond(),
-            month.range?.startInclusiveEpochSeconds,
-        )
-        val year = repository.query("zen", ReplayPeriod.THIS_YEAR)
-        assertEquals(
-            LocalDate.of(2026, 1, 1).atStartOfDay(zone).toEpochSecond(),
-            year.range?.startInclusiveEpochSeconds,
-        )
-        val allTime = repository.query("zen", ReplayPeriod.ALL_TIME)
-        assertEquals(null, allTime.range)
-        assertEquals("zen", allTime.key.username)
-    }
-
-    @Test
-    fun cacheIsScopedToTheConfiguredLastFmEndpoint() = runBlocking {
-        var endpoint = LastFM.DEFAULT_API_ENDPOINT
-        val repository = LastFmStatisticsRepository(
-            source = FakeSource(),
-            cache = LastFmStatsCache { 1_000L },
-            now = { now },
-            zone = { zone },
-            endpoint = { endpoint },
-        )
-        val lastFmQuery = repository.query("zen", ReplayPeriod.ALL_TIME)
-        repository.refresh("zen", lastFmQuery, force = false).getOrThrow()
-        assertTrue(repository.cached(lastFmQuery) != null)
-
-        endpoint = LastFM.LIBREFM_API_ENDPOINT
-        val libreFmQuery = repository.query("zen", ReplayPeriod.ALL_TIME)
-
-        assertNotEquals(lastFmQuery.key, libreFmQuery.key)
-        assertEquals(null, repository.cached(libreFmQuery))
-    }
-
-    @Test
-    fun fiveMinuteCacheSkipsFreshFetchButRetainsExpiredData() = runBlocking {
-        val clock = AtomicLong(1_000L)
-        val source = FakeSource()
-        val repository = LastFmStatisticsRepository(
-            source = source,
-            cache = LastFmStatsCache { clock.get() },
-            now = { now },
-            zone = { zone },
-        )
-        val query = repository.query("zen", ReplayPeriod.ALL_TIME)
-
-        val first = repository.refresh("zen", query, force = false).getOrThrow()
-        assertEquals(1, source.calls)
-        assertEquals(first, repository.refresh("zen", query, force = false).getOrThrow())
-        assertEquals(1, source.calls)
-        assertTrue(repository.isFresh(query))
-
-        clock.addAndGet(LastFmStatsCache.TTL_MILLIS)
-        assertFalse(repository.isFresh(query))
-        assertEquals(first, repository.cached(query)?.tracks)
-    }
-
-    @Test
-    fun forcedRefreshBypassesFreshCacheAndFailurePreservesStaleTracks() = runBlocking {
-        val clock = AtomicLong(1_000L)
-        val source = FakeSource()
-        val repository = LastFmStatisticsRepository(
-            source = source,
-            cache = LastFmStatsCache { clock.get() },
-            now = { now },
-            zone = { zone },
-        )
-        val query = repository.query("zen", ReplayPeriod.ALL_TIME)
-        val first = repository.refresh("zen", query, force = false).getOrThrow()
-        source.tracks = listOf(LastFM.RankedTrack("New", "Artist", 8L, null))
-
-        repository.refresh("zen", query, force = true).getOrThrow()
-        assertEquals(2, source.calls)
-        val fresh = repository.cached(query)?.tracks
-        assertEquals(source.tracks, fresh)
-
-        clock.addAndGet(LastFmStatsCache.TTL_MILLIS)
-        source.failure = IllegalStateException("offline")
-        val result = repository.refresh("zen", query, force = true)
-        assertTrue(result.isFailure)
-        assertEquals(fresh, repository.cached(query)?.tracks)
-        assertFalse(repository.isFresh(query))
-        assertEquals(1, first.size)
-    }
-
-    @Test
-    fun paginatesAllTimeAndCalendarHistoryAndFiltersOutsideTimestamps() = runBlocking {
+    fun rollingPeriodCountsScrobblesSinceItsStartAndUsesChartTotals() = runBlocking {
         val api = FakeApi()
-        val source = LastFmApiStatsDataSource(api = api, pageDelayMillis = 0L)
+        val repository = LastFmStatisticsRepository(api, LastFmStatsCache { 0L }, { now }, { "https://api" })
 
-        val allTime = source.fetch("zen", ReplayPeriod.ALL_TIME, null)
-        assertEquals(listOf(1, 2), api.topPages)
-        assertEquals(5L, allTime.single().playCount)
+        val snapshot = repository.load(" Zen ", LastFmStatsPeriod.WEEK, force = false).getOrThrow()
 
-        val range = LastFmStatsPeriodRange(
-            requestFromEpochSeconds = 999L,
-            requestToEpochSeconds = 2_001L,
-            startInclusiveEpochSeconds = 1_000L,
-            endInclusiveEpochSeconds = 2_000L,
+        assertEquals(now - 7 * 86_400L, api.countFrom)
+        assertEquals(412L, snapshot.scrobbles)
+        assertEquals(31L, snapshot.artistCount)
+        assertEquals(58L, snapshot.albumCount)
+        assertEquals(97L, snapshot.trackCount)
+        assertEquals("7day", api.lastPeriod)
+        assertEquals(listOf("Artist A"), snapshot.topArtists.map { it.name })
+    }
+
+    @Test
+    fun allTimeUsesTheProfilePlayCountAndNeverAPeriodCountRequest() = runBlocking {
+        val api = FakeApi()
+        val repository = LastFmStatisticsRepository(api, LastFmStatsCache { 0L }, { now }, { "https://api" })
+
+        val snapshot = repository.load("zen", LastFmStatsPeriod.OVERALL, force = false).getOrThrow()
+
+        assertEquals(12_000L, snapshot.scrobbles)
+        assertNull(api.countFrom)
+        // The profile's distinct counts win over a chart total that is lower.
+        assertEquals(420L, snapshot.artistCount)
+    }
+
+    @Test
+    fun freshSnapshotIsServedFromCacheUntilForced() = runBlocking {
+        val api = FakeApi()
+        val repository = LastFmStatisticsRepository(api, LastFmStatsCache { 0L }, { now }, { "https://api" })
+
+        repository.load("zen", LastFmStatsPeriod.MONTH, force = false)
+        repository.load("ZEN", LastFmStatsPeriod.MONTH, force = false)
+        assertEquals(1, api.chartCalls.get() / 3)
+
+        repository.load("zen", LastFmStatsPeriod.MONTH, force = true)
+        assertEquals(2, api.chartCalls.get() / 3)
+    }
+
+    @Test
+    fun aFailedChartFailsTheSnapshotButAFailedRecentListOnlyHidesIt() = runBlocking {
+        val failingChart = LastFmStatisticsRepository(
+            FakeApi(failTracks = true), LastFmStatsCache { 0L }, { now }, { "https://api" },
         )
-        val calendar = source.fetch("zen", ReplayPeriod.THIS_WEEK, range)
-        assertEquals(listOf(1, 2), api.recentPages)
-        assertEquals(2, calendar.size)
-        val trackA = calendar.single {
-            PlaylistGenerationRules.trackKey(it.name, it.artist) ==
-                PlaylistGenerationRules.trackKey("Track A", "Artist A")
-        }
-        val trackB = calendar.single {
-            PlaylistGenerationRules.trackKey(it.name, it.artist) ==
-                PlaylistGenerationRules.trackKey("Track B", "Artist B")
-        }
-        assertEquals(2L, trackA.playCount)
-        assertEquals(1L, trackB.playCount)
+        assertTrue(failingChart.load("zen", LastFmStatsPeriod.MONTH, false).isFailure)
+
+        val failingRecent = LastFmStatisticsRepository(
+            FakeApi(failRecentList = true), LastFmStatsCache { 0L }, { now }, { "https://api" },
+        )
+        val snapshot = failingRecent.load("zen", LastFmStatsPeriod.MONTH, false).getOrThrow()
+        assertTrue(snapshot.recent.isEmpty())
     }
 
-    private class FakeSource : LastFmStatsDataSource {
-        var calls = 0
-        var failure: Exception? = null
-        var tracks = listOf(LastFM.RankedTrack("Track", "Artist", 4L, null))
-
-        override suspend fun fetch(
-            username: String,
-            period: ReplayPeriod,
-            range: LastFmStatsPeriodRange?,
-        ): List<LastFM.RankedTrack> {
-            calls++
-            failure?.let { throw it }
-            return tracks
-        }
+    @Test
+    fun cacheKeysSeparateAccountsEndpointsAndPeriods() {
+        val repository = LastFmStatisticsRepository(FakeApi(), LastFmStatsCache { 0L }, { now }, { " https://api " })
+        assertEquals(
+            LastFmStatsCacheKey("zen", "https://api", LastFmStatsPeriod.YEAR),
+            repository.key(" Zen ", LastFmStatsPeriod.YEAR),
+        )
     }
 
-    private class FakeApi : LastFmStatsApi {
-        val topPages = mutableListOf<Int>()
-        val recentPages = mutableListOf<Int>()
+    @Test
+    fun cacheExpiresAfterItsTtl() {
+        var clock = 0L
+        val cache = LastFmStatsCache { clock }
+        val key = LastFmStatsCacheKey("zen", "e", LastFmStatsPeriod.WEEK)
+        cache.put(key, emptySnapshot())
+        assertTrue(cache.isFresh(key))
+        clock = LastFmStatsCache.TTL_MILLIS
+        assertTrue(!cache.isFresh(key))
+        assertEquals(emptySnapshot(), cache.get(key)?.snapshot)
+    }
 
-        override suspend fun topTracks(
-            username: String,
-            page: Int,
-            limit: Int,
-        ): Result<LastFM.PagedResult<LastFM.RankedTrack>> {
-            topPages += page
-            val items = if (page == 1) {
-                listOf(LastFM.RankedTrack("Track A", "Artist A", 2L, null))
-            } else {
-                listOf(LastFM.RankedTrack("track-a", "artist a", 3L, null))
-            }
-            return Result.success(LastFM.PagedResult(items, 2))
+    private fun emptySnapshot() = LastFmStatsSnapshot(
+        null, 0L, 0L, 0L, 0L, emptyList(), emptyList(), emptyList(), emptyList(),
+    )
+
+    private class FakeApi(
+        val failTracks: Boolean = false,
+        val failRecentList: Boolean = false,
+    ) : LastFmStatsApi {
+        val chartCalls = AtomicInteger()
+
+        @Volatile var countFrom: Long? = null
+
+        @Volatile var lastPeriod: String? = null
+
+        override suspend fun profile(username: String) = Result.success(
+            LastFM.UserStats("zen", null, 12_000L, 1_800L, 420L, 690L, null, 1_420_000_000L),
+        )
+
+        override suspend fun topArtists(username: String, period: String, limit: Int): Result<LastFM.PagedResult<LastFM.RankedArtist>> {
+            chartCalls.incrementAndGet()
+            lastPeriod = period
+            return Result.success(
+                LastFM.PagedResult(
+                    listOf(LastFM.RankedArtist("Artist A", 40L, null), LastFM.RankedArtist("Silent", 0L, null)),
+                    1,
+                    31L,
+                ),
+            )
         }
 
-        override suspend fun recentTracks(
-            username: String,
-            from: Long,
-            to: Long,
-            page: Int,
-            limit: Int,
-        ): Result<LastFM.PagedResult<LastFM.RecentTrack>> {
-            recentPages += page
-            val items = when (page) {
-                1 -> listOf(
-                    LastFM.RecentTrack("Track A", "Artist A", null, 2_000L),
-                    LastFM.RecentTrack("Track B", "Artist B", null, 1_500L),
-                    LastFM.RecentTrack("Outside", "Artist C", null, 2_001L),
-                )
-                else -> listOf(
-                    LastFM.RecentTrack("track-a", "artist a", null, 1_000L),
-                    LastFM.RecentTrack("Outside", "Artist C", null, 999L),
-                )
-            }
-            return Result.success(LastFM.PagedResult(items, 2))
+        override suspend fun topTracks(username: String, period: String, limit: Int): Result<LastFM.PagedResult<LastFM.RankedTrack>> {
+            chartCalls.incrementAndGet()
+            if (failTracks) return Result.failure(IllegalStateException("offline"))
+            return Result.success(LastFM.PagedResult(listOf(LastFM.RankedTrack("T", "Artist A", 9L, null)), 1, 97L))
         }
+
+        override suspend fun topAlbums(username: String, period: String, limit: Int): Result<LastFM.PagedResult<LastFM.RankedAlbum>> {
+            chartCalls.incrementAndGet()
+            return Result.success(LastFM.PagedResult(listOf(LastFM.RankedAlbum("A", "Artist A", 5L, null)), 1, 58L))
+        }
+
+        override suspend fun recent(username: String, limit: Int, fromEpochSeconds: Long?): Result<LastFM.PagedResult<LastFM.RecentTrack>> {
+            if (fromEpochSeconds != null) {
+                countFrom = fromEpochSeconds
+                return Result.success(LastFM.PagedResult(emptyList(), 412, 412L))
+            }
+            if (failRecentList) return Result.failure(IllegalStateException("offline"))
+            return Result.success(LastFM.PagedResult(listOf(LastFM.RecentTrack("T", "Artist A", null, now())), 1, 1L))
+        }
+
+        private fun now() = 1_795_000_000L
     }
 }

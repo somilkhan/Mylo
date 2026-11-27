@@ -55,6 +55,8 @@ object LastFM {
         val artistCount: Long,
         val albumCount: Long,
         val avatarUrl: String?,
+        /** When the account was created, in Unix seconds; 0 when Last.fm doesn't say. */
+        val registeredAtEpochSeconds: Long = 0L,
     )
 
     data class RankedTrack(
@@ -69,11 +71,16 @@ object LastFM {
         val artist: String,
         val artworkUrl: String?,
         val timestamp: Long,
+        /** The track Last.fm reports as playing right now; it has no timestamp yet. */
+        val nowPlaying: Boolean = false,
+        val album: String? = null,
     )
 
     data class PagedResult<T>(
         val items: List<T>,
         val totalPages: Int,
+        /** Last.fm's `@attr.total`: every row the query matches, not just this page. */
+        val total: Long = 0L,
     )
 
     data class RankedArtist(
@@ -437,6 +444,62 @@ object LastFM {
         parseLastFmArtistTopTracks(response, fallbackArtist = name)
     }
 
+    /**
+     * One page of a user's top artists, tracks or albums for [period], with
+     * Last.fm's total: how many distinct artists, tracks or albums the period
+     * holds. [method] is one of `user.gettopartists`, `user.gettoptracks` or
+     * `user.gettopalbums`.
+     */
+    private suspend fun <T> topChart(
+        method: String,
+        username: String,
+        period: String,
+        limit: Int,
+        parse: (String) -> PagedResult<T>,
+    ): Result<PagedResult<T>> = statsResult {
+        val user = username.trim()
+        require(user.isNotEmpty()) { "Last.fm username is missing" }
+        require(period in LASTFM_STATS_PERIODS) { "Unsupported Last.fm statistics period" }
+        val response = postAndRead(
+            method,
+            extra = mapOf("user" to user, "period" to period, "limit" to limit.coerceIn(1, 100).toString()),
+        )
+        parse(response)
+    }
+
+    suspend fun getTopArtistsChart(username: String, period: String, limit: Int = 50) =
+        topChart("user.gettopartists", username, period, limit, ::parseLastFmTopArtistsPage)
+
+    suspend fun getTopTracksChart(username: String, period: String, limit: Int = 50) =
+        topChart("user.gettoptracks", username, period, limit, ::parseLastFmTopTracksPage)
+
+    suspend fun getTopAlbumsChart(username: String, period: String, limit: Int = 50) =
+        topChart("user.gettopalbums", username, period, limit, ::parseLastFmTopAlbumsPage)
+
+    /**
+     * The latest scrobbles, newest first, and the track playing now if there
+     * is one. With [fromEpochSeconds] the total is the number of scrobbles
+     * since then, which is how a period's scrobble count is read: Last.fm has
+     * no endpoint that returns it directly.
+     */
+    suspend fun getRecentScrobbles(
+        username: String,
+        limit: Int = 10,
+        fromEpochSeconds: Long? = null,
+    ): Result<PagedResult<RecentTrack>> = statsResult {
+        val user = username.trim()
+        require(user.isNotEmpty()) { "Last.fm username is missing" }
+        val response = postAndRead(
+            "user.getrecenttracks",
+            extra = buildMap {
+                put("user", user)
+                put("limit", limit.coerceIn(1, 200).toString())
+                if (fromEpochSeconds != null) put("from", fromEpochSeconds.toString())
+            },
+        )
+        parseLastFmRecentScrobbles(response)
+    }
+
     private suspend fun <T> statsResult(block: suspend () -> T): Result<T> = try {
         Result.success(block())
     } catch (cancellation: CancellationException) {
@@ -583,6 +646,9 @@ internal fun parseLastFmUserStats(raw: String): LastFM.UserStats? = runCatching 
         artistCount = user.long("artist_count"),
         albumCount = user.long("album_count"),
         avatarUrl = user.artwork(),
+        registeredAtEpochSeconds = (user["registered"] as? JsonObject)?.let { registered ->
+            registered.text("unixtime")?.toLongOrNull() ?: registered.text("#text")?.toLongOrNull()
+        } ?: 0L,
     )
 }.getOrNull()
 
@@ -623,7 +689,7 @@ internal fun parseLastFmTopTracksPage(raw: String): LastFM.PagedResult<LastFM.Ra
         val artist = row["artist"].artistName()?.trim()?.takeIf(String::isNotEmpty) ?: return@mapNotNull null
         LastFM.RankedTrack(name, artist, row.long("playcount"), row.artwork())
     }
-    return LastFM.PagedResult(items, chart.totalPages())
+    return LastFM.PagedResult(items, chart.totalPages(), chart.total())
 }
 
 internal fun parseLastFmRecentTracksPage(raw: String): LastFM.PagedResult<LastFM.RecentTrack> {
@@ -641,6 +707,58 @@ internal fun parseLastFmRecentTracksPage(raw: String): LastFM.PagedResult<LastFM
         LastFM.RecentTrack(name, artist, row.artwork(), timestamp)
     }
     return LastFM.PagedResult(items, chart.totalPages())
+}
+
+/** Latest scrobbles, keeping the now-playing row the history pages drop. */
+internal fun parseLastFmRecentScrobbles(raw: String): LastFM.PagedResult<LastFM.RecentTrack> {
+    val root = Json.parseToJsonElement(raw) as? JsonObject
+        ?: error("Last.fm recent tracks response is not a JSON object")
+    val chart = root["recenttracks"] as? JsonObject
+        ?: error("Last.fm recent tracks response is missing recenttracks")
+    val items = chart.rows("track").mapNotNull { row ->
+        val nowPlaying = (row["@attr"] as? JsonObject)?.text("nowplaying") == "true"
+        val timestamp = (row["date"] as? JsonObject)?.text("uts")?.toLongOrNull()
+        if (!nowPlaying && timestamp == null) return@mapNotNull null
+        val name = row.text("name")?.trim()?.takeIf(String::isNotEmpty) ?: return@mapNotNull null
+        val artist = row["artist"].artistName()?.trim()?.takeIf(String::isNotEmpty) ?: return@mapNotNull null
+        LastFM.RecentTrack(
+            name = name,
+            artist = artist,
+            artworkUrl = row.artwork(),
+            timestamp = timestamp ?: 0L,
+            nowPlaying = nowPlaying,
+            album = row["album"].artistName()?.trim()?.takeIf(String::isNotEmpty),
+        )
+    }
+    // A now-playing row is listed first and sits outside the history, so one
+    // is never let past the first position.
+    val ordered = items.filterIndexed { index, track -> !track.nowPlaying || index == 0 }
+    return LastFM.PagedResult(ordered, chart.totalPages(), chart.total())
+}
+
+internal fun parseLastFmTopArtistsPage(raw: String): LastFM.PagedResult<LastFM.RankedArtist> {
+    val chart = chartObject(raw, "topartists")
+    val items = chart.rows("artist").mapNotNull { row ->
+        val name = row.text("name")?.trim()?.takeIf(String::isNotEmpty) ?: return@mapNotNull null
+        LastFM.RankedArtist(name, row.long("playcount"), row.artwork())
+    }
+    return LastFM.PagedResult(items, chart.totalPages(), chart.total())
+}
+
+internal fun parseLastFmTopAlbumsPage(raw: String): LastFM.PagedResult<LastFM.RankedAlbum> {
+    val chart = chartObject(raw, "topalbums")
+    val items = chart.rows("album").mapNotNull { row ->
+        val name = row.text("name")?.trim()?.takeIf(String::isNotEmpty) ?: return@mapNotNull null
+        val artist = row["artist"].artistName()?.trim().orEmpty()
+        LastFM.RankedAlbum(name, artist, row.long("playcount"), row.artwork())
+    }
+    return LastFM.PagedResult(items, chart.totalPages(), chart.total())
+}
+
+private fun chartObject(raw: String, chartKey: String): JsonObject {
+    val root = Json.parseToJsonElement(raw) as? JsonObject
+        ?: error("Last.fm $chartKey response is not a JSON object")
+    return root[chartKey] as? JsonObject ?: error("Last.fm response is missing $chartKey")
 }
 
 internal fun parseLastFmTopArtists(raw: String): List<LastFM.RankedArtist> =
@@ -678,6 +796,9 @@ private fun JsonObject.rows(key: String): List<JsonObject> = when (val value = t
 private fun JsonObject.totalPages(): Int =
     (this["@attr"] as? JsonObject)?.text("totalPages")?.toIntOrNull()?.coerceAtLeast(1) ?: 1
 
+private fun JsonObject.total(): Long =
+    (this["@attr"] as? JsonObject)?.text("total")?.toLongOrNull()?.coerceAtLeast(0L) ?: 0L
+
 private fun parseLastFmChart(raw: String, chartKey: String, rowKey: String): List<JsonObject> =
     runCatching {
         val root = Json.parseToJsonElement(raw) as? JsonObject ?: return emptyList()
@@ -703,9 +824,18 @@ private fun JsonObject.artwork(): String? {
         else -> emptyList()
     }
     return images.asReversed().firstNotNullOfOrNull { image ->
-        image.text("#text")?.takeIf { it.startsWith("https://") || it.startsWith("http://") }
+        image.text("#text")?.takeIf {
+            (it.startsWith("https://") || it.startsWith("http://")) && LASTFM_PLACEHOLDER_IMAGE !in it
+        }
     }
 }
+
+/**
+ * The grey star Last.fm returns for every artist, and for any track or album
+ * it has no art for. Treated as no artwork, so the app draws its own
+ * placeholder rather than a picture of nothing.
+ */
+private const val LASTFM_PLACEHOLDER_IMAGE = "2a96cbd8b46e442fc41c2b86b821562f"
 
 private fun JsonElement?.artistName(): String? = when (this) {
     is JsonObject -> text("name") ?: text("#text")
