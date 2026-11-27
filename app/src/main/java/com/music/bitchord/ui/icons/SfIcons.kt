@@ -11,6 +11,7 @@ import com.composables.sfsymbols.monochrome.SFArchivebox
 import com.composables.sfsymbols.monochrome.SFArrowDownCircle
 import com.composables.sfsymbols.monochrome.SFArrowDownDocument
 import com.composables.sfsymbols.monochrome.SFArrowRightCircle
+import com.composables.sfsymbols.monochrome.SFArrowUp
 import com.composables.sfsymbols.monochrome.SFArrowTrianglehead2Clockwise
 import com.composables.sfsymbols.monochrome.SFArrowUpArrowDown
 import com.composables.sfsymbols.monochrome.SFArrowUpCircle
@@ -134,6 +135,7 @@ object SfIcons {
     val Appearance: ImageVector by lazy { bold(SfSymbols.Monochrome.SFPaintbrushPointed) }
     val Apps: ImageVector by lazy { bold(SfSymbols.Monochrome.SFSquareGrid2x2) }
     val ArrowBack: ImageVector by lazy { bold(SfSymbols.Monochrome.SFChevronBackward) }
+    val ArrowUp: ImageVector by lazy { bold(SfSymbols.Monochrome.SFArrowUp) }
     val AutoAwesome: ImageVector by lazy { bold(SfSymbols.Monochrome.SFSparkles) }
     val BarChart: ImageVector by lazy { bold(SfSymbols.Monochrome.SFChartBar) }
     val Bluetooth: ImageVector by lazy { bold(SfSymbols.Monochrome.SFHeadphones) }

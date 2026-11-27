@@ -53,7 +53,7 @@ import com.music.bitchord.ui.icons.SfIcons
 import com.music.bitchord.ui.scrobble.stats.StatsAlbumItem
 import com.music.bitchord.ui.scrobble.stats.StatsAlbumShelf
 import com.music.bitchord.ui.scrobble.stats.StatsAvatar
-import com.music.bitchord.ui.scrobble.stats.StatsHero
+import com.music.bitchord.ui.scrobble.stats.StatsDashboard
 import com.music.bitchord.ui.scrobble.stats.StatsMessage
 import com.music.bitchord.ui.scrobble.stats.StatsRankedRow
 import com.music.bitchord.ui.scrobble.stats.StatsRecentRow
@@ -92,6 +92,7 @@ internal fun ScrobbleStatisticsContent(
     val lastFmApiKey by AppSettings.lastfmApiKey.collectAsStateWithLifecycle()
     val lastFmSecret by AppSettings.lastfmSecret.collectAsStateWithLifecycle()
     val lastFmEndpoint by AppSettings.lastfmEndpoint.collectAsStateWithLifecycle()
+    val reduceMotion by AppSettings.reduceAnimation.collectAsStateWithLifecycle()
 
     LaunchedEffect(lastFmEnabled, lastFmUsername, lastFmApiKey, lastFmSecret, lastFmEndpoint) {
         viewModel.onScreenOpened()
@@ -110,13 +111,14 @@ internal fun ScrobbleStatisticsContent(
             state = state,
             actions = actions,
             contentPadding = contentPadding,
+            reduceMotion = reduceMotion,
         )
     }
 }
 
 /**
- * The Stats tab: the account, a period switcher, the period's scrobble count
- * as the page's one large figure, then the charts — artists and tracks as
+ * The Stats tab: the account, a period switcher, a dashboard card with the
+ * period's scrobbles, their change and an activity chart, then the charts — artists and tracks as
  * ranked lists, albums as a shelf of covers — and the latest scrobbles.
  *
  * Stateless, so every state it can be in can be drawn on its own.
@@ -127,6 +129,7 @@ internal fun ScrobbleStatisticsScreen(
     actions: StatsActions,
     contentPadding: PaddingValues,
     nowMillis: Long = System.currentTimeMillis(),
+    reduceMotion: Boolean = false,
 ) {
     val scope = rememberCoroutineScope()
     var resolving by remember { mutableStateOf<String?>(null) }
@@ -206,6 +209,7 @@ internal fun ScrobbleStatisticsScreen(
                     resolving = resolving,
                     onPlay = play,
                     actions = actions,
+                    reduceMotion = reduceMotion,
                 )
             }
         }
@@ -286,19 +290,28 @@ private fun LazyListScope.statsBody(
     resolving: String?,
     onPlay: (String, String) -> Unit,
     actions: StatsActions,
+    reduceMotion: Boolean,
 ) {
-    item(key = "hero") {
-        val joined = snapshot.profile?.registeredAtEpochSeconds?.takeIf { it > 0L }?.let(::yearOf)
-        StatsHero(
+    item(key = "dashboard") {
+        val registered = snapshot.profile?.registeredAtEpochSeconds?.takeIf { it > 0L }
+        val joined = registered?.let(::yearOf)
+        val days = period.days?.toDouble()
+            ?: registered?.let { ((nowMillis / 1_000L - it) / 86_400.0).coerceAtLeast(1.0) }
+        StatsDashboard(
+            period = period,
             scrobbles = snapshot.scrobbles,
             window = when {
                 period != LastFmStatsPeriod.OVERALL -> stringResource(period.window)
                 joined != null -> stringResource(R.string.scrobble_stats_window_overall_since, joined)
                 else -> stringResource(R.string.scrobble_stats_window_overall)
             },
+            previousScrobbles = snapshot.previousScrobbles,
+            activity = snapshot.activity,
+            perDay = days?.let { snapshot.scrobbles / it },
             artists = snapshot.artistCount,
             albums = snapshot.albumCount,
             tracks = snapshot.trackCount,
+            reduceMotion = reduceMotion,
             modifier = Modifier.alpha(alpha),
         )
     }

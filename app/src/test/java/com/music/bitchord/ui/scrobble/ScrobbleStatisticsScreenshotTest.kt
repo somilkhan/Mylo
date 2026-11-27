@@ -63,6 +63,21 @@ class ScrobbleStatisticsScreenshotTest {
 
     @Test fun loaded() = capture("stats_loaded", sampleState())
 
+    @Test fun loadedWeek() = capture("stats_loaded_week", sampleState().let { state ->
+        state.copy(
+            period = LastFmStatsPeriod.WEEK,
+            snapshotPeriod = LastFmStatsPeriod.WEEK,
+            snapshot = state.snapshot!!.copy(
+                scrobbles = 312L,
+                previousScrobbles = 355L,
+                activity = listOf(38L, 52L, 41L, 0L, 67L, 74L, 40L).mapIndexed { i, plays ->
+                    val start = nowSeconds - 7 * 86_400L + i * 86_400L
+                    com.music.bitchord.data.scrobbling.LastFmActivityBucket(start, start + 86_399L, plays)
+                },
+            ),
+        )
+    })
+
     @Test fun notConnected() = capture("stats_not_connected", ScrobbleStatisticsUiState(connected = false))
 
     @Test fun loading() = capture("stats_loading", ScrobbleStatisticsUiState(connected = true, username = "somil", isLoading = true))
@@ -146,6 +161,11 @@ class ScrobbleStatisticsScreenshotTest {
             topTracks = tracks,
             topAlbums = albums,
             recent = recent,
+            activity = listOf(96L, 141L, 118L, 162L, 104L, 87L, 133L, 214L, 158L, 71L).mapIndexed { i, plays ->
+                val start = nowSeconds - 30 * 86_400L + i * 3 * 86_400L
+                com.music.bitchord.data.scrobbling.LastFmActivityBucket(start, start + 3 * 86_400L - 1, plays)
+            },
+            previousScrobbles = 1_146L,
         )
         return ScrobbleStatisticsUiState(
             period = LastFmStatsPeriod.MONTH,

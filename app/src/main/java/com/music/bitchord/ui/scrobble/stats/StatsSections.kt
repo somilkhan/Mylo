@@ -108,68 +108,6 @@ internal fun StatsSectionHeader(
 }
 
 /**
- * The period's scrobble count, large, as the page's one focal point, with
- * the distinct artists, albums and tracks behind it set quietly underneath.
- */
-@Composable
-internal fun StatsHero(
-    scrobbles: Long,
-    window: String,
-    artists: Long,
-    albums: Long,
-    tracks: Long,
-    modifier: Modifier = Modifier,
-) {
-    val format = rememberCountFormat()
-    val breakdown = listOf(
-        pluralStringResource(R.plurals.scrobble_stats_artist_count, artists.toQuantity(), format.format(artists)),
-        pluralStringResource(R.plurals.scrobble_stats_album_count, albums.toQuantity(), format.format(albums)),
-        pluralStringResource(R.plurals.scrobble_stats_track_count, tracks.toQuantity(), format.format(tracks)),
-    ).joinToString("  ·  ")
-    val label = stringResource(R.string.scrobble_stats_scrobbles)
-    val number = format.format(scrobbles)
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = PAGE_GUTTER)
-            .padding(top = 28.dp)
-            .semantics(mergeDescendants = true) {
-                contentDescription = "$number $label, $window. $breakdown"
-            },
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            text = number,
-            style = MaterialTheme.typography.displayLarge.copy(
-                fontSize = 56.sp,
-                lineHeight = 62.sp,
-                letterSpacing = (-1.4).sp,
-                fontWeight = FontWeight.W800,
-                fontFeatureSettings = "tnum",
-            ),
-            color = MaterialTheme.colorScheme.onBackground,
-            maxLines = 1,
-        )
-        Text(
-            text = window,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(14.dp))
-        Text(
-            text = breakdown,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onBackground,
-            maxLines = 2,
-        )
-    }
-}
-
-/**
  * One line of a top-artists or top-tracks chart: rank, name, an optional
  * second line, the play count, and under it all a hairline bar sized against
  * the chart's leader — the only colour on the row.
@@ -559,16 +497,8 @@ internal fun StatsStaleNotice(onRetry: () -> Unit, modifier: Modifier = Modifier
 @Composable
 internal fun StatsSkeleton(modifier: Modifier = Modifier) {
     Column(modifier.fillMaxWidth()) {
-        Column(Modifier.padding(horizontal = PAGE_GUTTER).padding(top = 30.dp)) {
-            ShimmerBox(Modifier.width(84.dp).height(14.dp), RoundedCornerShape(50))
-            Spacer(Modifier.height(14.dp))
-            ShimmerBox(Modifier.width(188.dp).height(44.dp), RoundedCornerShape(10.dp))
-            Spacer(Modifier.height(14.dp))
-            ShimmerBox(Modifier.width(132.dp).height(14.dp), RoundedCornerShape(50))
-            Spacer(Modifier.height(18.dp))
-            ShimmerBox(Modifier.fillMaxWidth(0.82f).height(12.dp), RoundedCornerShape(50))
-        }
-        Spacer(Modifier.height(40.dp))
+        StatsDashboardSkeleton()
+        Spacer(Modifier.height(36.dp))
         ShimmerBox(
             Modifier.padding(horizontal = PAGE_GUTTER).width(124.dp).height(18.dp),
             RoundedCornerShape(50),
