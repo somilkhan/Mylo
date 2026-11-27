@@ -284,6 +284,7 @@ import com.music.bitchord.ui.components.scrobbleFabVisible
 import com.music.bitchord.ui.scrobble.ScrobbleHost
 import com.music.bitchord.ui.scrobble.ScrobbleStatisticsContent
 import com.music.bitchord.ui.scrobble.ScrobbleStatisticsViewModel
+import com.music.bitchord.ui.scrobble.StatsActions
 import com.music.bitchord.ui.scrobble.ScrobbleGenerateViewModel
 import com.music.bitchord.ui.scrobble.ScrobbleHubTheme
 import com.music.bitchord.ui.components.floatingtabbar.rememberFloatingTabBarScrollConnection
@@ -3269,31 +3270,61 @@ private fun BitChordApp(
                                 contentPadding = listPadding,
                             )
                         } else if (pageRoute == AppRoute.Scrobble && scrobbleTab == 0) {
-                            ScrobbleHubTheme(gradientEnabled = scrobbleGradientTheme) {
-                                ScrobbleStatisticsContent(
-                                    viewModel = scrobbleStatisticsViewModel,
-                                    reduceMotion = reducePlayerMotion,
-                                    refreshing = scrobbleStatisticsState.isRefreshing,
-                                    onRefresh = scrobbleStatisticsViewModel::refresh,
-                                    pullState = scrobbleStatisticsPull,
-                                    onPlaySong = { song ->
-                                        playRadio(song, QueueSource(replayLabel, PlaybackSourceType.REPLAY))
-                                    },
-                                    onOpenSettings = {
-                                        navigator.pop()
-                                        navigator.push(AppRoute.Settings)
-                                    },
-                                    onOpenReplay = { page, period ->
-                                        setReplayPeriod(period)
-                                        replayStory = page
-                                    },
-                                    onOpenArtist = { id, name ->
-                                        navigator.pop()
-                                        openByName(id, name, null, BrowseType.ARTIST)
-                                    },
-                                    contentPadding = listPadding,
-                                )
-                            }
+                            ScrobbleStatisticsContent(
+                                viewModel = scrobbleStatisticsViewModel,
+                                refreshing = scrobbleStatisticsState.isRefreshing,
+                                onRefresh = scrobbleStatisticsViewModel::refresh,
+                                pullState = scrobbleStatisticsPull,
+                                actions = remember(scrobbleStatisticsViewModel) {
+                                    StatsActions(
+                                        onPeriodSelect = scrobbleStatisticsViewModel::setPeriod,
+                                        onRetry = scrobbleStatisticsViewModel::refresh,
+                                        onOpenSettings = {
+                                            navigator.pop()
+                                            navigator.push(AppRoute.Settings)
+                                        },
+                                        onOpenProfile = { name ->
+                                            runCatching {
+                                                context.startActivity(
+                                                    Intent(
+                                                        Intent.ACTION_VIEW,
+                                                        Uri.parse("https://www.last.fm/user/${Uri.encode(name)}"),
+                                                    ),
+                                                )
+                                            }
+                                        },
+                                        onOpenArtist = { name ->
+                                            navigator.pop()
+                                            openByName(null, name, null, BrowseType.ARTIST)
+                                        },
+                                        onOpenAlbum = { title, artist ->
+                                            navigator.pop()
+                                            openByName(null, title, artist.takeIf { it.isNotBlank() }, BrowseType.ALBUM)
+                                        },
+                                        onPlayTrack = { title, artist ->
+                                            val song = YtMusicRepository.search("$title $artist", SearchFilter.SONGS)
+                                                .getOrNull()
+                                                ?.firstNotNullOfOrNull { result ->
+                                                    when (result) {
+                                                        is SearchResult.TopTrack -> result.song
+                                                        is SearchResult.Track -> result.song
+                                                        is SearchResult.Browse -> null
+                                                    }
+                                                }
+                                            if (song == null) {
+                                                Toast.makeText(
+                                                    context,
+                                                    context.getString(R.string.couldnt_find, title),
+                                                    Toast.LENGTH_SHORT,
+                                                ).show()
+                                            } else {
+                                                playRadio(song, QueueSource("Last.fm", PlaybackSourceType.QUEUE))
+                                            }
+                                        },
+                                    )
+                                },
+                                contentPadding = listPadding,
+                            )
                         } else if (pageRoute == AppRoute.Replay) {
                             ReplayScreen(
                                 state = replay,

@@ -1571,6 +1571,52 @@
     <string name="scrobble_stats_error_body">Couldn’t refresh statistics. Try again.</string>
     <string name="scrobble_stats_error_lastfm_saved">Last.fm couldn’t refresh. Showing saved statistics.</string>
     <string name="scrobble_stats_error_lastfm_mylo">Last.fm couldn’t refresh. Showing Mylo statistics.</string>
+    <string name="scrobble_stats_period_week">7D</string>
+    <string name="scrobble_stats_period_month">1M</string>
+    <string name="scrobble_stats_period_quarter">3M</string>
+    <string name="scrobble_stats_period_half_year">6M</string>
+    <string name="scrobble_stats_period_year">1Y</string>
+    <string name="scrobble_stats_period_overall">All</string>
+    <string name="scrobble_stats_scrobbles">Scrobbles</string>
+    <string name="scrobble_stats_window_week">in the last 7 days</string>
+    <string name="scrobble_stats_window_month">in the last 30 days</string>
+    <string name="scrobble_stats_window_quarter">in the last 3 months</string>
+    <string name="scrobble_stats_window_half_year">in the last 6 months</string>
+    <string name="scrobble_stats_window_year">in the last 12 months</string>
+    <string name="scrobble_stats_window_overall">since you joined</string>
+    <string name="scrobble_stats_window_overall_since">since %1$s</string>
+    <string name="scrobble_stats_top_artists">Top artists</string>
+    <string name="scrobble_stats_top_tracks">Top tracks</string>
+    <string name="scrobble_stats_top_albums">Top albums</string>
+    <string name="scrobble_stats_recent">Recently scrobbled</string>
+    <string name="scrobble_stats_show_less">Show less</string>
+    <string name="scrobble_stats_profile_since">Last.fm · since %1$s</string>
+    <string name="scrobble_stats_profile">Last.fm</string>
+    <string name="scrobble_stats_open_profile">Open Last.fm profile</string>
+    <string name="scrobble_stats_now_playing">Scrobbling now</string>
+    <string name="scrobble_stats_connect_title">Connect Last.fm</string>
+    <string name="scrobble_stats_connect_body">Stats come straight from Last.fm. Connect your account in Settings to see them.</string>
+    <string name="scrobble_stats_period_empty_title">Nothing scrobbled yet</string>
+    <string name="scrobble_stats_period_empty_body">No scrobbles in this period. Try a longer one.</string>
+    <string name="scrobble_stats_failed_title">Couldn’t load your stats</string>
+    <string name="scrobble_stats_failed_body">Last.fm didn’t answer. Check your connection and try again.</string>
+    <string name="scrobble_stats_stale">Couldn’t refresh. Showing saved stats.</string>
+    <plurals name="scrobble_stats_scrobble_count">
+        <item quantity="one">%1$s scrobble</item>
+        <item quantity="other">%1$s scrobbles</item>
+    </plurals>
+    <plurals name="scrobble_stats_artist_count">
+        <item quantity="one">%1$s artist</item>
+        <item quantity="other">%1$s artists</item>
+    </plurals>
+    <plurals name="scrobble_stats_album_count">
+        <item quantity="one">%1$s album</item>
+        <item quantity="other">%1$s albums</item>
+    </plurals>
+    <plurals name="scrobble_stats_track_count">
+        <item quantity="one">%1$s track</item>
+        <item quantity="other">%1$s tracks</item>
+    </plurals>
     <string name="scrobble_generate_intro">Pick a vibe to build a playlist.</string>
     <string name="scrobble_gen_section_start">Start from</string>
     <string name="scrobble_gen_group_listening">From your listening</string>
