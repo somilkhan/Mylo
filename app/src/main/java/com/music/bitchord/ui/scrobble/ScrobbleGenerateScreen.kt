@@ -643,7 +643,7 @@ private fun ModeTile(
                 role = Role.Button,
                 onClick = onClick,
             )
-            .alpha(if (blocked) 0.45f else 1f)
+            .alpha(if (blocked) 0.45f else if (busy) 0.6f else 1f)
             .padding(16.dp),
     ) {
         Box(
@@ -689,7 +689,7 @@ private fun ModeRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
-            .alpha(if (blocked != null) 0.45f else 1f)
+            .alpha(if (blocked != null) 0.45f else if (busy) 0.6f else 1f)
             .heightIn(min = 64.dp)
             .padding(start = 16.dp, end = 14.dp, top = 12.dp, bottom = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -1085,7 +1085,7 @@ private fun SizeStepper(count: Int, enabled: Boolean, onChange: (Int) -> Unit) {
         ) {
             Column(Modifier.weight(1f)) {
                 Text(
-                    stringResource(R.string.scrobble_tracks_count, count),
+                    stringResource(R.string.scrobble_gen_tracks_label),
                     style = MaterialTheme.typography.bodyLarge,
                     color = colors.onSurface,
                 )

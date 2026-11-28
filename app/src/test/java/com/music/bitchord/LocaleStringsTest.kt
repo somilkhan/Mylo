@@ -54,6 +54,7 @@ class LocaleStringsTest(private val tag: String) {
          * English until translated; remove each entry here when its translations land.
          */
         internal val AWAITING_TRANSLATION = setOf(
+            "scrobble_gen_tracks_label",
             "scrobble_sort_newest",
             "scrobble_sort_oldest",
             "scrobble_sort_name",

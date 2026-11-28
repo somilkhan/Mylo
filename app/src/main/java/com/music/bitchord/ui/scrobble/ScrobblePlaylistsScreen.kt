@@ -360,7 +360,7 @@ fun ScrobblePlaylistsContent(
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-private fun PlaylistList(
+internal fun PlaylistList(
     playlists: List<LocalPlaylist>,
     storageError: String?,
     actionError: String?,

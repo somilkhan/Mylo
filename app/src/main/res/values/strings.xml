@@ -1733,4 +1733,5 @@
     <string name="scrobble_rename_placeholder">Playlist name</string>
     <string name="scrobble_gen_saved_in_playlists">Saved to Playlists</string>
     <string name="scrobble_playlist_empty_body">Search YouTube Music to add your first tracks.</string>
+    <string name="scrobble_gen_tracks_label">Tracks</string>
 </resources>
