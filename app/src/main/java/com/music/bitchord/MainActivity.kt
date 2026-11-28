@@ -3219,7 +3219,6 @@ private fun BitChordApp(
                                 state = historyState,
                                 listState = historyListState,
                                 currentSong = player.song,
-                                isPlaying = player.isPlaying,
                                 onSongClick = { songs, index ->
                                     playFrom(songs, index, QueueSource(historyLabel, PlaybackSourceType.HISTORY))
                                 },
