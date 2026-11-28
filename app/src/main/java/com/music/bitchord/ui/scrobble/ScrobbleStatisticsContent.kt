@@ -159,6 +159,7 @@ internal fun ScrobbleStatisticsContent(
             actions = actions,
             contentPadding = contentPadding,
             reduceMotion = reduceMotion,
+            pageBackdrop = pageBackdrop,
         )
     }
 }
@@ -185,6 +186,7 @@ internal fun ScrobbleStatisticsScreen(
     reduceMotion: Boolean = false,
     initialCollapse: Float = 1f,
     initialMenuOpen: Boolean = false,
+    pageBackdrop: Backdrop? = null,
 ) {
     val effectiveReduceMotion = scrobbleReduceMotion(reduceMotion)
     val scope = rememberCoroutineScope()
