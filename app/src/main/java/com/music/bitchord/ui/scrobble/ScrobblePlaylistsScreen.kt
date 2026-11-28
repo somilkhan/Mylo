@@ -156,14 +156,13 @@ fun ScrobblePlaylistsContent(
     isPlaying: Boolean,
     onPlaySongs: (List<Song>, Int) -> Unit,
     onOpenGenerator: () -> Unit,
-    onPlaylistDetailChanged: (Boolean) -> Unit = {},
+    onOpenPlaylist: (LocalPlaylist) -> Unit,
 ) {
     val playlists by LocalPlaylistStore.playlists.collectAsStateWithLifecycle()
     val storageError by LocalPlaylistStore.loadError.collectAsStateWithLifecycle()
     val generationState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
     var query by rememberSaveable { mutableStateOf("") }
     var sortMode by rememberSaveable { mutableStateOf(LocalPlaylistSortMode.NEWEST) }
     var renameTarget by remember { mutableStateOf<LocalPlaylist?>(null) }
@@ -175,18 +174,6 @@ fun ScrobblePlaylistsContent(
     var renaming by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf(false) }
     val playlistListState = rememberLazyListState()
-
-    val selected = playlists.firstOrNull { it.id == selectedId }
-    LaunchedEffect(selectedId, playlists, storageError) {
-        onPlaylistDetailChanged(selected != null)
-    }
-    DisposableEffect(Unit) {
-        onDispose { onPlaylistDetailChanged(false) }
-    }
-    BackHandler(enabled = selected != null) { selectedId = null }
-    LaunchedEffect(selectedId, playlists, storageError) {
-        if (selectedId != null && selected == null && storageError == null) selectedId = null
-    }
 
     val startRename: (LocalPlaylist) -> Unit = {
         renameText = it.title
@@ -203,82 +190,47 @@ fun ScrobblePlaylistsContent(
         color = MaterialTheme.colorScheme.background,
         contentColor = MaterialTheme.colorScheme.onBackground,
     ) {
-        AnimatedContent(
-            targetState = selected?.id,
-            transitionSpec = {
-                if (reduceMotion) {
-                    fadeIn(tween(120)) togetherWith fadeOut(tween(90))
-                } else if (targetState != null) {
-                    (slideInHorizontally(tween(320)) { it / 5 } + fadeIn(tween(220))) togetherWith
-                        (slideOutHorizontally(tween(320)) { -it / 8 } + fadeOut(tween(160)))
-                } else {
-                    (slideInHorizontally(tween(320)) { -it / 8 } + fadeIn(tween(220))) togetherWith
-                        (slideOutHorizontally(tween(320)) { it / 5 } + fadeOut(tween(160)))
+        PlaylistList(
+            playlists = playlists,
+            storageError = storageError,
+            actionError = actionError,
+            generationState = generationState,
+            query = query,
+            onQueryChange = { query = it },
+            sortMode = sortMode,
+            onSortMode = { sortMode = it },
+            contentPadding = contentPadding,
+            highlightedPlaylistId = highlightedPlaylistId,
+            sharedHandoffFromGenerate = sharedHandoffFromGenerate,
+            reduceMotion = reduceMotion,
+            sharedTransitionScope = sharedTransitionScope,
+            animatedVisibilityScope = animatedVisibilityScope,
+            onRetryStorage = { scope.launch { LocalPlaylistStore.reload() } },
+            onOpen = onOpenPlaylist,
+            onPlay = { onPlaySongs(it.songs, 0) },
+            onGenerateSimilar = viewModel::generateSimilar,
+            onCancelGeneration = viewModel::cancelGeneration,
+            onOpenGenerator = onOpenGenerator,
+            onPin = { playlist ->
+                scope.launch {
+                    actionError = if (LocalPlaylistStore.setPinned(playlist.id, !playlist.isPinned)) null
+                    else context.getString(R.string.scrobble_pin_failed)
                 }
             },
-            label = "playlist page",
-        ) { openId ->
-            val open = playlists.firstOrNull { it.id == openId }
-            if (open != null) {
-                PlaylistDetail(
-                    playlist = open,
-                    hazeState = hazeState,
-                    currentSong = currentSong,
-                    isPlaying = isPlaying,
-                    contentPadding = contentPadding,
-                    generationState = generationState,
-                    onCancelGeneration = viewModel::cancelGeneration,
-                    onGenerateSimilar = viewModel::generateSimilar,
-                    reduceMotion = reduceMotion,
-                    onBack = { selectedId = null },
-                    onPlaySongs = onPlaySongs,
-                    onRename = { startRename(open) },
-                    onDelete = { startDelete(open) },
-                )
-            } else {
-                PlaylistList(
-                    playlists = playlists,
-                    storageError = storageError,
-                    actionError = actionError,
-                    generationState = generationState,
-                    query = query,
-                    onQueryChange = { query = it },
-                    sortMode = sortMode,
-                    onSortMode = { sortMode = it },
-                    contentPadding = contentPadding,
-                    highlightedPlaylistId = highlightedPlaylistId,
-                    sharedHandoffFromGenerate = sharedHandoffFromGenerate,
-                    reduceMotion = reduceMotion,
-                    sharedTransitionScope = sharedTransitionScope,
-                    animatedVisibilityScope = animatedVisibilityScope,
-                    onRetryStorage = { scope.launch { LocalPlaylistStore.reload() } },
-                    onOpen = { selectedId = it.id },
-                    onPlay = { onPlaySongs(it.songs, 0) },
-                    onGenerateSimilar = viewModel::generateSimilar,
-                    onCancelGeneration = viewModel::cancelGeneration,
-                    onOpenGenerator = onOpenGenerator,
-                    onPin = { playlist ->
-                        scope.launch {
-                            actionError = if (LocalPlaylistStore.setPinned(playlist.id, !playlist.isPinned)) null
-                            else context.getString(R.string.scrobble_pin_failed)
-                        }
-                    },
-                    onMove = { playlist, to ->
-                        val from = playlists.indexOfFirst { it.id == playlist.id }
-                        val direction = (to - from).coerceIn(-1, 1)
-                        scope.launch {
-                            actionError = if (from >= 0 && LocalPlaylistStore.movePlaylistBy(playlist.id, direction)) null
-                            else context.getString(R.string.scrobble_order_save_failed)
-                        }
-                    },
-                    onRename = startRename,
-                    onDelete = startDelete,
-                    listState = playlistListState,
-                    hazeState = hazeState,
-                    pageBackdrop = pageBackdrop,
-                )
-            }
-        }
+            onMove = { playlist, to ->
+                val from = playlists.indexOfFirst { it.id == playlist.id }
+                val direction = (to - from).coerceIn(-1, 1)
+                scope.launch {
+                    actionError = if (from >= 0 && LocalPlaylistStore.movePlaylistBy(playlist.id, direction)) null
+                    else context.getString(R.string.scrobble_order_save_failed)
+                }
+            },
+            onRename = startRename,
+            onDelete = startDelete,
+            listState = playlistListState,
+            hazeState = hazeState,
+            pageBackdrop = pageBackdrop,
+        )
     }
 
     renameTarget?.let { target ->
