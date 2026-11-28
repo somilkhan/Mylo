@@ -1144,11 +1144,11 @@ data class ReplayMonthTop(val month: YearMonth, val song: RankedSong)
 data class RankedSong(val song: Song, val ms: Long, val plays: Int)
 
 /** How far back a Replay reaches. */
-enum class ReplayPeriod(val chip: String) {
-    THIS_WEEK("This week"),
-    THIS_MONTH("This month"),
-    THIS_YEAR("This year"),
-    ALL_TIME("All time"),
+enum class ReplayPeriod {
+    THIS_WEEK,
+    THIS_MONTH,
+    THIS_YEAR,
+    ALL_TIME,
     ;
 
     /** The inclusive date range this period covers. Null for ALL_TIME. */

@@ -141,6 +141,7 @@ import com.music.bitchord.data.model.isUnresolvedSpotify
 import com.music.bitchord.data.remote.RemoteArtworkStore
 import com.music.bitchord.data.scrobbling.LastFM
 import com.music.bitchord.data.scrobbling.ListenBrainzManager
+import com.music.bitchord.data.scrobbling.ListenBrainzScrobbleQueue
 import com.music.bitchord.data.scrobbling.ScrobbleManager
 import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.data.settings.AudioQuality
@@ -1205,6 +1206,14 @@ class PlaybackService : MediaLibraryService() {
             // The player this fired on, which is by definition the one the
             // session is currently pointed at.
             val exoPlayer = player ?: return
+            if (state == Player.STATE_READY) {
+                // The duration is only known once the track is ready. Arm the scrobble timer
+                // then, in case the track started with it unknown and plays straight through.
+                scrobbleManager?.onDurationKnown(
+                    song = exoPlayer.currentMediaItem?.toSong(),
+                    durationMs = exoPlayer.duration.takeIf { it > 0 },
+                )
+            }
             if (state == Player.STATE_ENDED) {
                 SleepTimer.cancel()
                 // The queue ran dry, so no transition will ever close the last
@@ -1932,6 +1941,7 @@ class PlaybackService : MediaLibraryService() {
         applySettings(exoPlayer)
         applySettings(sparePlayer)
         observeSettings()
+        ListenBrainzScrobbleQueue.init(this)
         observeScrobbling()
         observeDiscord()
         watchSleepTimer()
@@ -8320,14 +8330,14 @@ class PlaybackService : MediaLibraryService() {
                 manager.useNowPlaying = snapshot.nowPlaying
                 manager.usePrimaryArtistOnly = snapshot.primaryArtistOnly
 
+                // Settings changes must not drive the timer: onSettingsChanged only starts an
+                // untracked, playing song, so a running scrobble timer is never re-armed here.
                 player?.let { exoPlayer ->
-                    if (exoPlayer.isPlaying) {
-                        manager.onPlayerStateChanged(
-                            isPlaying = true,
-                            song = exoPlayer.currentMediaItem?.toSong(),
-                            durationMs = exoPlayer.duration.takeIf { it > 0 },
-                        )
-                    }
+                    manager.onSettingsChanged(
+                        isPlaying = exoPlayer.isPlaying,
+                        song = exoPlayer.currentMediaItem?.toSong(),
+                        durationMs = exoPlayer.duration.takeIf { it > 0 },
+                    )
                 }
             }
         }

@@ -11,6 +11,7 @@ import com.composables.sfsymbols.monochrome.SFArchivebox
 import com.composables.sfsymbols.monochrome.SFArrowDownCircle
 import com.composables.sfsymbols.monochrome.SFArrowDownDocument
 import com.composables.sfsymbols.monochrome.SFArrowRightCircle
+import com.composables.sfsymbols.monochrome.SFArrowUp
 import com.composables.sfsymbols.monochrome.SFArrowTrianglehead2Clockwise
 import com.composables.sfsymbols.monochrome.SFArrowUpArrowDown
 import com.composables.sfsymbols.monochrome.SFArrowUpCircle
@@ -28,6 +29,7 @@ import com.composables.sfsymbols.monochrome.SFCheckmarkIcloud
 import com.composables.sfsymbols.monochrome.SFChevronBackward
 import com.composables.sfsymbols.monochrome.SFChevronRight
 import com.composables.sfsymbols.monochrome.SFCircleLefthalfFilled
+import com.composables.sfsymbols.monochrome.SFChevronUpChevronDown
 import com.composables.sfsymbols.monochrome.SFClock
 import com.composables.sfsymbols.monochrome.SFClockArrowTriangleheadCounterclockwiseRotate90
 import com.composables.sfsymbols.monochrome.SFDocumentOnDocument
@@ -35,6 +37,12 @@ import com.composables.sfsymbols.monochrome.SFDotRadiowavesLeftAndRight
 import com.composables.sfsymbols.monochrome.SFDrop
 import com.composables.sfsymbols.monochrome.SFDropHalffull
 import com.composables.sfsymbols.monochrome.SFEllipsisCircle
+import com.composables.sfsymbols.monochrome.SFMinus
+import com.composables.sfsymbols.monochrome.SFEllipsis
+import com.composables.sfsymbols.monochrome.SFScope
+import com.composables.sfsymbols.monochrome.SFPhoto
+import com.composables.sfsymbols.monochrome.SFArrowDown
+import com.composables.sfsymbols.monochrome.SFPinSlash
 import com.composables.sfsymbols.monochrome.SFExclamationmarkCircle
 import com.composables.sfsymbols.monochrome.SFExclamationmarkTriangle
 import com.composables.sfsymbols.monochrome.SFEyeSlash
@@ -134,6 +142,7 @@ object SfIcons {
     val Appearance: ImageVector by lazy { bold(SfSymbols.Monochrome.SFPaintbrushPointed) }
     val Apps: ImageVector by lazy { bold(SfSymbols.Monochrome.SFSquareGrid2x2) }
     val ArrowBack: ImageVector by lazy { bold(SfSymbols.Monochrome.SFChevronBackward) }
+    val ArrowUp: ImageVector by lazy { bold(SfSymbols.Monochrome.SFArrowUp) }
     val AutoAwesome: ImageVector by lazy { bold(SfSymbols.Monochrome.SFSparkles) }
     val BarChart: ImageVector by lazy { bold(SfSymbols.Monochrome.SFChartBar) }
     val Bluetooth: ImageVector by lazy { bold(SfSymbols.Monochrome.SFHeadphones) }
@@ -143,6 +152,7 @@ object SfIcons {
     val Cached: ImageVector by lazy { bold(SfSymbols.Monochrome.SFArrowTrianglehead2Clockwise) }
     val Check: ImageVector by lazy { bold(SfSymbols.Monochrome.SFCheckmark) }
     val ChevronRight: ImageVector by lazy { bold(SfSymbols.Monochrome.SFChevronRight) }
+    val ChevronUpDown: ImageVector by lazy { bold(SfSymbols.Monochrome.SFChevronUpChevronDown) }
     val Clock: ImageVector by lazy { bold(SfSymbols.Monochrome.SFClock) }
     val Cloud: ImageVector by lazy { bold(SfSymbols.Monochrome.SFIcloud) }
     val CloudUpload: ImageVector by lazy { bold(SfSymbols.Monochrome.SFIcloudAndArrowUp) }
@@ -237,6 +247,14 @@ object SfIcons {
     val Upgrade: ImageVector by lazy { bold(SfSymbols.Monochrome.SFSparkles) }
     val Upload: ImageVector by lazy { bold(SfSymbols.Monochrome.SFArrowUpCircle) }
     val Video: ImageVector by lazy { bold(SfSymbols.Monochrome.SFVideo) }
+
+    // ---- Scrobble ----
+    val Minus: ImageVector by lazy { bold(SfSymbols.Monochrome.SFMinus) }
+    val More: ImageVector by lazy { bold(SfSymbols.Monochrome.SFEllipsis) }
+    val Locate: ImageVector by lazy { bold(SfSymbols.Monochrome.SFScope) }
+    val Photo: ImageVector by lazy { bold(SfSymbols.Monochrome.SFPhoto) }
+    val ArrowDown: ImageVector by lazy { bold(SfSymbols.Monochrome.SFArrowDown) }
+    val Unpin: ImageVector by lazy { bold(SfSymbols.Monochrome.SFPinSlash) }
 
     /** Added to every line, in the symbols' own units: Regular's ~1.7 to Bold's ~2.6. */
     internal const val BOLD_STROKE = 0.9f

@@ -6,6 +6,7 @@ import com.music.bitchord.data.settings.AppSettings
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
@@ -68,6 +69,13 @@ internal object LastFmScrobbleQueue {
             },
             log = { message, error ->
                 if (error == null) Log.w(TAG, message) else Log.w(TAG, message, error)
+            },
+            // Retry on the same queue instance; a backoff wait must not depend on any screen being open.
+            scheduleRetry = { delayMillis ->
+                scope.launch {
+                    delay(delayMillis)
+                    queue?.flush()
+                }
             },
         )
         queue = activeQueue
@@ -166,6 +174,8 @@ internal class DurableLastFmScrobbleQueue(
     private val canFlush: () -> Boolean,
     private val send: suspend (LastFmScrobbleEntry) -> Result<Unit>,
     private val log: (String, Throwable?) -> Unit,
+    private val clock: () -> Long = System::currentTimeMillis,
+    private val scheduleRetry: (delayMillis: Long) -> Unit = {},
 ) {
     private val storageMutex = Mutex()
     private val flushMutex = Mutex()
@@ -186,8 +196,12 @@ internal class DurableLastFmScrobbleQueue(
         }
     }
 
+    private var consecutiveRetryableFailures = 0
+    private var retryNotBeforeMillis = 0L
+
     suspend fun flush() {
         flushMutex.withLock {
+            if (clock() < retryNotBeforeMillis) return
             while (canFlush()) {
                 val entry = readHead() ?: break
                 val result = try {
@@ -198,15 +212,29 @@ internal class DurableLastFmScrobbleQueue(
                     Result.failure(error)
                 }
                 val failure = result.exceptionOrNull()
-                when {
-                    failure == null -> removeHead(entry.id)
-                    failure is CancellationException -> throw failure
-                    failure.isPermanentScrobbleFailure() -> {
+                if (failure == null) {
+                    removeHead(entry.id)
+                    consecutiveRetryableFailures = 0
+                    retryNotBeforeMillis = 0L
+                    continue
+                }
+                if (failure is CancellationException) throw failure
+                when (failure.scrobbleFailureKind()) {
+                    ScrobbleFailureKind.Permanent -> {
                         removeHead(entry.id)
                         log("Dropped permanent Last.fm scrobble failure id=${entry.id}: ${failure.message}", failure)
                     }
-                    else -> {
-                        log("Retained retryable Last.fm scrobble failure at FIFO head id=${entry.id}", failure)
+                    ScrobbleFailureKind.AuthBlocked -> {
+                        // Keep every entry: the session or key must be fixed, then a new session key re-triggers flush.
+                        log("Paused Last.fm queue: session or API key needs attention (${readUnsafe().size} kept)", failure)
+                        break
+                    }
+                    ScrobbleFailureKind.Retryable -> {
+                        consecutiveRetryableFailures++
+                        val delayMillis = retryBackoffMillis(consecutiveRetryableFailures)
+                        retryNotBeforeMillis = clock() + delayMillis
+                        log("Retained retryable Last.fm scrobble failure at FIFO head id=${entry.id}; retry in ${delayMillis / 1000}s", failure)
+                        scheduleRetry(delayMillis)
                         break
                     }
                 }
@@ -259,17 +287,34 @@ internal class DurableLastFmScrobbleQueue(
         )
     }
 
-    private fun Throwable.isPermanentScrobbleFailure(): Boolean = when (this) {
-        is LastFM.ScrobbleRejectedException -> !retryable
-        is LastFM.LastFmException -> when (code) {
-            8, 11, 16, 29, 408, 429 -> false
-            in 500..599 -> false
-            else -> true
-        }
-        else -> false
-    }
-
     internal companion object {
         const val MAX_ENTRIES = 200
+        const val BASE_BACKOFF_MILLIS = 30_000L
+        const val MAX_BACKOFF_MILLIS = 30 * 60_000L
+
+        /** Exponential backoff: 30 s, 60 s, 120 s, ... capped at 30 minutes. */
+        internal fun retryBackoffMillis(consecutiveFailures: Int): Long {
+            val shift = (consecutiveFailures - 1).coerceIn(0, 20)
+            return minOf(BASE_BACKOFF_MILLIS * (1L shl shift), MAX_BACKOFF_MILLIS)
+        }
     }
+}
+
+internal enum class ScrobbleFailureKind { Permanent, AuthBlocked, Retryable }
+
+/**
+ * Last.fm codes: 4 auth failed, 9 invalid session, 10 invalid API key, 26 suspended key.
+ * HTTP 401/403 usually carry these, so they pause the queue rather than dropping data.
+ * Track-level rejections (other codes) are permanent; service, rate-limit and unknown errors retry.
+ */
+internal fun Throwable.scrobbleFailureKind(): ScrobbleFailureKind = when (this) {
+    is LastFM.ScrobbleRejectedException ->
+        if (retryable) ScrobbleFailureKind.Retryable else ScrobbleFailureKind.Permanent
+    is LastFM.LastFmException -> when (code) {
+        4, 9, 10, 26, 401, 403 -> ScrobbleFailureKind.AuthBlocked
+        8, 11, 16, 29, 408, 429 -> ScrobbleFailureKind.Retryable
+        in 500..599 -> ScrobbleFailureKind.Retryable
+        else -> ScrobbleFailureKind.Permanent
+    }
+    else -> ScrobbleFailureKind.Retryable
 }

@@ -3,10 +3,13 @@ package com.music.bitchord.data.spotify
 import android.content.Context
 import android.content.SharedPreferences
 import com.music.bitchord.data.model.Song
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
 import java.util.UUID
@@ -32,6 +35,7 @@ object LocalPlaylistStore {
 
     private lateinit var prefs: SharedPreferences
     private val mutationMutex = Mutex()
+    private val legacyMutationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val _playlists = MutableStateFlow<List<LocalPlaylist>>(emptyList())
     val playlists = _playlists.asStateFlow()
@@ -162,18 +166,30 @@ object LocalPlaylistStore {
     }
 
     suspend fun movePlaylist(id: String, destinationIndex: Int): Boolean = mutate {
+        movePlaylistLocked(id, destinationIndex)
+    }
+
+    /** Shelf up/down actions stay relative to the live order, even during generation. */
+    suspend fun movePlaylistBy(id: String, direction: Int): Boolean = mutate {
+        val cleanId = normalizeId(id)
+        val from = _playlists.value.indexOfFirst { it.id == cleanId || it.browseId == id }
+        if (from < 0) return@mutate false
+        movePlaylistLocked(id, from + direction.coerceIn(-1, 1))
+    }
+
+    private suspend fun movePlaylistLocked(id: String, destinationIndex: Int): Boolean {
         val cleanId = normalizeId(id)
         val current = _playlists.value
         val from = current.indexOfFirst { it.id == cleanId || it.browseId == id }
-        if (from < 0 || current.isEmpty()) return@mutate false
+        if (from < 0 || current.isEmpty()) return false
         val to = destinationIndex.coerceIn(0, current.lastIndex)
-        if (from == to) return@mutate true
+        if (from == to) return true
         val updated = current.toMutableList()
         val moved = updated.removeAt(from)
         updated.add(to, moved)
-        if (!persist(updated)) return@mutate false
+        if (!persist(updated)) return false
         _playlists.value = updated
-        true
+        return true
     }
 
     suspend fun moveSong(id: String, sourceIndex: Int, expectedVideoId: String, direction: Int): Boolean = mutate {
@@ -213,11 +229,26 @@ object LocalPlaylistStore {
      * to say which copy was picked, and they play the same either way.
      */
     fun removeSong(browseId: String, song: Song) {
+        // Preserve the immediate legacy callback when idle, but never overwrite
+        // an add/reorder/save snapshot while a suspending mutation owns the lock.
+        if (mutationMutex.tryLock()) {
+            try {
+                removeLegacySong(browseId, song)
+            } finally {
+                mutationMutex.unlock()
+            }
+        } else {
+            legacyMutationScope.launch { mutate { removeLegacySong(browseId, song) } }
+        }
+    }
+
+    private fun removeLegacySong(browseId: String, song: Song) {
         val updated = _playlists.value.map { playlist ->
             if (playlist.browseId != browseId) return@map playlist
             val index = playlist.songs.indexOfFirst { it.videoId == song.videoId }
             if (index < 0) playlist else playlist.copy(songs = playlist.songs.filterIndexed { i, _ -> i != index })
         }
+        if (updated == _playlists.value) return
         _playlists.value = updated
         persistNow(updated)
     }
@@ -307,8 +338,8 @@ internal fun removePlaylistSong(
  */
 internal fun appendUniquePlaylistSong(existing: List<Song>, candidate: Song): List<Song>? {
     val videoId = candidate.videoId.trim()
-    if (videoId.isEmpty() || candidate.isVideo || existing.any { it.videoId == videoId }) return null
-    return existing + candidate
+    if (videoId.isEmpty() || candidate.isVideo || existing.any { it.videoId.trim() == videoId }) return null
+    return existing + candidate.copy(videoId = videoId)
 }
 
 
@@ -356,7 +387,7 @@ internal object LocalPlaylistExport {
             else -> "txt"
         }
         val invalid = setOf('/', '\\', ':', '*', '?', '"', '<', '>', '|')
-        val safeTitle = title.map { if (it in invalid) '_' else it }
+        val safeTitle = title.map { if (it in invalid || it.isISOControl()) '_' else it }
             .joinToString("").trim().trim('.').take(80).ifBlank { "Playlist" }
         return "$safeTitle.$ext"
     }

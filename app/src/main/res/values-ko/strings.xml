@@ -1333,8 +1333,6 @@
     <string name="bit_perfect_status_unavailable">이 트랙에서 사용할 수 없음(%1$s)</string>
     <string name="scrobble_building_mix">믹스를 만드는 중</string>
     <string name="scrobble_dismiss">닫기</string>
-    <string name="scrobble_playlist_saved">재생목록이 저장됨</string>
-    <string name="scrobble_tracks_steps">곡 · 5곡 단위</string>
     <string name="scrobble_no_tracks_found">곡을 찾을 수 없음</string>
     <string name="scrobble_mixes_subtitle">생성하고 저장한 믹스</string>
     <string name="scrobble_open_generator">생성기 열기</string>
@@ -1346,15 +1344,7 @@
     <string name="scrobble_reset_cover">커버 초기화</string>
     <string name="scrobble_export_playlist">재생목록 내보내기</string>
     <string name="scrobble_remove_from_playlist">재생목록에서 삭제</string>
-    <string name="scrobble_no_listening_yet">아직 들은 곡이 없음</string>
     <string name="scrobble_open_settings">설정 열기</string>
-    <string name="scrobble_save_csv">CSV 저장</string>
-    <string name="scrobble_share_csv">CSV 공유</string>
-    <string name="scrobble_save_m3u">M3U 저장</string>
-    <string name="scrobble_share_m3u">M3U 공유</string>
-    <string name="scrobble_track_concentration">곡 집중도</string>
-    <string name="scrobble_avg_plays_per_track">곡당 평균 재생</string>
-    <string name="scrobble_unique_tracks">고유 곡</string>
     <string name="find_a_playlist">재생목록 찾기</string>
     <string name="no_playlists_match">“%1$s”와(과) 일치하는 재생목록이 없습니다</string>
     <string name="hide_lyrics_preview">가사 숨기기</string>
@@ -1507,18 +1497,11 @@
     <string name="replay_year_unmute">스토리 음소거 해제</string>
     <string name="scrobble_tracks_count">트랙 %1$d개</string>
     <string name="scrobble_playlists_tracks_summary">재생목록 %1$d개 · 트랙 %2$d개</string>
-    <string name="scrobble_created_title">%1$s 생성됨</string>
-    <string name="scrobble_view_all_tracks">트랙 %1$d개 모두 보기</string>
     <string name="scrobble_remove_device_message">%1$s이(가) 이 기기에서 삭제됩니다. 청취 기록에는 영향이 없습니다.</string>
-    <string name="scrobble_created_go_back">%1$s 생성됨. 뒤로 가서 확인하세요.</string>
     <string name="scrobble_added_track">%1$s 추가됨</string>
     <string name="scrobble_playlist_missing">재생목록이 더 이상 없습니다</string>
     <string name="scrobble_track_already_in_playlist">이 트랙은 이미 이 재생목록에 있습니다</string>
     <string name="scrobble_save_track_failed">트랙을 저장하지 못했습니다. 다시 시도하세요.</string>
-    <string name="scrobble_plays_count">%1$s회 재생</string>
     <string name="scrobble_choose_format">%1$s의 형식을 선택하세요.</string>
-    <string name="scrobble_mylo_listening_time">Mylo 청취 시간 · %1$s</string>
-    <string name="scrobble_not_recorded_yet">아직 기록되지 않음</string>
-    <string name="scrobble_percent_summary">%1$s · %2$s</string>
     <string name="scrobble_pinned">고정됨</string>
 </resources>

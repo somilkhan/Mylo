@@ -6,16 +6,18 @@ import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.music.bitchord.data.model.Song
+import com.music.bitchord.ui.components.backdrop.Backdrop
 import dev.chrisbanes.haze.HazeState
 
 /**
  * The Scrobble page's Generate and Playlists tabs.
  *
- * The Stats tab is Mylo's own Replay screen, which the caller renders, and
+ * The Stats tab is the Last.fm account's statistics, which the caller renders, and
  * the tab bar is the app's navigation bar, swapped to the Scrobble tabs while
  * this page is open. [tab] is 1 for Generate and 2 for Playlists.
  *
@@ -31,40 +33,47 @@ fun ScrobbleHost(
     isPlaying: Boolean,
     reduceMotion: Boolean,
     contentPadding: PaddingValues,
+    pageBackdrop: Backdrop? = null,
     onPlaySongs: (List<Song>, Int) -> Unit,
     onTabChange: (Int) -> Unit,
+    onOpenSettings: () -> Unit = {},
 ) {
     val generateViewModel: ScrobbleGenerateViewModel = viewModel()
     val hazeState = remember { HazeState() }
+    val effectiveReduceMotion = scrobbleReduceMotion(reduceMotion)
 
-    SharedTransitionLayout(modifier = Modifier.fillMaxSize()) {
-        AnimatedVisibility(visible = true) {
-            when (tab) {
-                1 -> ScrobbleGenerateContent(
-                    viewModel = generateViewModel,
-                    currentSong = currentSong,
-                    contentPadding = contentPadding,
-                    highlightedPlaylistId = highlightedPlaylistId,
-                    sharedHandoffFromGenerate = sharedHandoffFromGenerate,
-                    reduceMotion = reduceMotion,
-                    sharedTransitionScope = this@SharedTransitionLayout,
-                    animatedVisibilityScope = this@AnimatedVisibility,
-                    onOpenPlaylists = { onTabChange(2) },
-                )
-                2 -> ScrobblePlaylistsContent(
-                    viewModel = generateViewModel,
-                    hazeState = hazeState,
-                    contentPadding = contentPadding,
-                    highlightedPlaylistId = highlightedPlaylistId,
-                    sharedHandoffFromGenerate = sharedHandoffFromGenerate,
-                    reduceMotion = reduceMotion,
-                    sharedTransitionScope = this@SharedTransitionLayout,
-                    animatedVisibilityScope = this@AnimatedVisibility,
-                    currentSong = currentSong,
-                    isPlaying = isPlaying,
-                    onPlaySongs = onPlaySongs,
-                    onOpenGenerator = { onTabChange(1) },
-                )
+    CompositionLocalProvider(LocalScrobbleReduceMotion provides effectiveReduceMotion) {
+        SharedTransitionLayout(modifier = Modifier.fillMaxSize()) {
+            AnimatedVisibility(visible = true) {
+                when (tab) {
+                    1 -> ScrobbleGenerateContent(
+                        viewModel = generateViewModel,
+                        currentSong = currentSong,
+                        contentPadding = contentPadding,
+                        highlightedPlaylistId = highlightedPlaylistId,
+                        sharedHandoffFromGenerate = sharedHandoffFromGenerate,
+                        reduceMotion = effectiveReduceMotion,
+                        sharedTransitionScope = this@SharedTransitionLayout,
+                        animatedVisibilityScope = this@AnimatedVisibility,
+                        onOpenPlaylists = { onTabChange(2) },
+                        onOpenSettings = onOpenSettings,
+                    )
+                    2 -> ScrobblePlaylistsContent(
+                        viewModel = generateViewModel,
+                        hazeState = hazeState,
+                        pageBackdrop = pageBackdrop,
+                        contentPadding = contentPadding,
+                        highlightedPlaylistId = highlightedPlaylistId,
+                        sharedHandoffFromGenerate = sharedHandoffFromGenerate,
+                        reduceMotion = effectiveReduceMotion,
+                        sharedTransitionScope = this@SharedTransitionLayout,
+                        animatedVisibilityScope = this@AnimatedVisibility,
+                        currentSong = currentSong,
+                        isPlaying = isPlaying,
+                        onPlaySongs = onPlaySongs,
+                        onOpenGenerator = { onTabChange(1) },
+                    )
+                }
             }
         }
     }

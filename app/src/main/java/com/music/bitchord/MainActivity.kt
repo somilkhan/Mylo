@@ -158,8 +158,11 @@ import com.music.bitchord.data.model.withoutVideos
 import com.music.bitchord.data.model.UserPlaylist
 import com.music.bitchord.data.model.EntityType
 import com.music.bitchord.data.model.SearchHistoryEntity
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import com.music.bitchord.data.model.durationMillis
 import com.music.bitchord.data.scrobbling.LastFM
@@ -284,8 +287,8 @@ import com.music.bitchord.ui.components.scrobbleFabVisible
 import com.music.bitchord.ui.scrobble.ScrobbleHost
 import com.music.bitchord.ui.scrobble.ScrobbleStatisticsContent
 import com.music.bitchord.ui.scrobble.ScrobbleStatisticsViewModel
+import com.music.bitchord.ui.scrobble.StatsActions
 import com.music.bitchord.ui.scrobble.ScrobbleGenerateViewModel
-import com.music.bitchord.ui.scrobble.ScrobbleHubTheme
 import com.music.bitchord.ui.components.floatingtabbar.rememberFloatingTabBarScrollConnection
 import com.music.bitchord.ui.components.FrostedTopBar
 import com.music.bitchord.ui.components.LastfmLoginAlert
@@ -610,7 +613,6 @@ private fun BitChordApp(
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     // Scrobble's own tab, while its page is open: 0 Stats, 1 Generate, 2 Playlists.
     var scrobbleTab by rememberSaveable { mutableIntStateOf(0) }
-    val scrobbleGradientTheme by AppSettings.scrobbleGradientTheme.collectAsStateWithLifecycle()
     // Explore loads the first time it's shown, not at launch beside Home.
     LaunchedEffect(selectedTab) {
         if (selectedTab == TAB_EXPLORE) viewModel.onExploreShown()
@@ -2651,7 +2653,7 @@ private fun BitChordApp(
     // picture, so they cannot disagree. Read while any of them is on screen —
     // which includes the Library tab, since the cards live at the top of it.
     // See [rememberReplayState].
-    val replayOpen = route == AppRoute.Replay || (scrobbleOpen && scrobbleTab == 0) || replayStory != null || showReplayShare ||
+    val replayOpen = route == AppRoute.Replay || replayStory != null || showReplayShare ||
         (selectedTab == TAB_LIBRARY && detail == null && route == null)
     val replayPageOpen = replayEntryId != null || replayStory != null || showReplayShare
     val (replay, setReplayPeriod) = rememberReplayState(replayOpen, replayPageOpen)
@@ -3247,21 +3249,24 @@ private fun BitChordApp(
                                 )
                             }
                         } else if (pageRoute == AppRoute.Scrobble && scrobbleTab != 0) {
-                            ScrobbleHubTheme(gradientEnabled = scrobbleGradientTheme) {
-                                ScrobbleHost(
-                                    tab = scrobbleTab,
-                                    highlightedPlaylistId = scrobbleHandoffPlaylistId,
-                                    sharedHandoffFromGenerate = scrobbleHandoffFromGenerate,
-                                    currentSong = player.song,
-                                    isPlaying = player.isPlaying,
-                                    reduceMotion = reducePlayerMotion,
-                                    contentPadding = listPadding,
-                                    onPlaySongs = { songs, index ->
-                                        playFrom(songs, index, QueueSource("Scrobble Playlist", PlaybackSourceType.QUEUE))
-                                    },
-                                    onTabChange = onScrobbleTab,
-                                )
-                            }
+                            ScrobbleHost(
+                                tab = scrobbleTab,
+                                highlightedPlaylistId = scrobbleHandoffPlaylistId,
+                                sharedHandoffFromGenerate = scrobbleHandoffFromGenerate,
+                                currentSong = player.song,
+                                isPlaying = player.isPlaying,
+                                reduceMotion = reducePlayerMotion,
+                                contentPadding = listPadding,
+                                pageBackdrop = pageBackdrop,
+                                onPlaySongs = { songs, index ->
+                                    playFrom(songs, index, QueueSource("Scrobble Playlist", PlaybackSourceType.QUEUE))
+                                },
+                                onTabChange = onScrobbleTab,
+                                onOpenSettings = {
+                                    navigator.pop()
+                                    navigator.push(AppRoute.Settings)
+                                },
+                            )
                         } else if (pageRoute == AppRoute.Moods) {
                             MoodGridPage(
                                 gridState = moodsGridState,
@@ -3269,37 +3274,64 @@ private fun BitChordApp(
                                 contentPadding = listPadding,
                             )
                         } else if (pageRoute == AppRoute.Scrobble && scrobbleTab == 0) {
-                            ScrobbleHubTheme(gradientEnabled = scrobbleGradientTheme) {
-                                ScrobbleStatisticsContent(
-                                    viewModel = scrobbleStatisticsViewModel,
-                                    reduceMotion = reducePlayerMotion,
-                                    refreshing = scrobbleStatisticsState.isRefreshing,
-                                    onRefresh = scrobbleStatisticsViewModel::refresh,
-                                    pullState = scrobbleStatisticsPull,
-                                    onPlaySong = { song ->
-                                        playRadio(song, QueueSource(replayLabel, PlaybackSourceType.REPLAY))
-                                    },
-                                    onOpenSettings = {
-                                        navigator.pop()
-                                        navigator.push(AppRoute.Settings)
-                                    },
-                                    holder = account?.name.orEmpty(),
-                                    memberSince = replay.memberSince,
-                                    onOpenReplay = { page, period ->
-                                        setReplayPeriod(period)
-                                        replayStory = page
-                                    },
-                                    onOpenArtist = { id, name ->
-                                        navigator.pop()
-                                        openByName(id, name, null, BrowseType.ARTIST)
-                                    },
-                                    onOpenAlbum = { id, title, artist, art ->
-                                        navigator.pop()
-                                        openByName(id, title, artist, BrowseType.ALBUM, art)
-                                    },
-                                    contentPadding = listPadding,
-                                )
-                            }
+                            ScrobbleStatisticsContent(
+                                viewModel = scrobbleStatisticsViewModel,
+                                refreshing = scrobbleStatisticsState.isRefreshing,
+                                onRefresh = scrobbleStatisticsViewModel::refresh,
+                                pullState = scrobbleStatisticsPull,
+                                pageBackdrop = pageBackdrop,
+                                actions = remember(scrobbleStatisticsViewModel) {
+                                    StatsActions(
+                                        onPeriodSelect = scrobbleStatisticsViewModel::setPeriod,
+                                        onRetry = scrobbleStatisticsViewModel::refresh,
+                                        onOpenSettings = {
+                                            navigator.pop()
+                                            navigator.push(AppRoute.Settings)
+                                        },
+                                        onOpenProfile = { name ->
+                                            runCatching {
+                                                context.startActivity(
+                                                    Intent(
+                                                        Intent.ACTION_VIEW,
+                                                        Uri.parse("https://www.last.fm/user/${Uri.encode(name)}"),
+                                                    ),
+                                                )
+                                            }
+                                        },
+                                        onOpenArtist = { name ->
+                                            navigator.pop()
+                                            openByName(null, name, null, BrowseType.ARTIST)
+                                        },
+                                        onOpenAlbum = { title, artist ->
+                                            navigator.pop()
+                                            openByName(null, title, artist.takeIf { it.isNotBlank() }, BrowseType.ALBUM)
+                                        },
+                                        onPlayTrack = { title, artist ->
+                                            val song = YtMusicRepository.search("$title $artist", SearchFilter.SONGS)
+                                                .getOrNull()
+                                                ?.firstNotNullOfOrNull { result ->
+                                                    when (result) {
+                                                        is SearchResult.TopTrack -> result.song
+                                                        is SearchResult.Track -> result.song
+                                                        is SearchResult.Browse -> null
+                                                    }
+                                                }
+                                            if (song == null) {
+                                                Toast.makeText(
+                                                    context,
+                                                    context.getString(R.string.couldnt_find, title),
+                                                    Toast.LENGTH_SHORT,
+                                                ).show()
+                                            } else {
+                                                playRadio(song, QueueSource("Last.fm", PlaybackSourceType.QUEUE))
+                                            }
+                                        },
+                                        onListModeSelect = scrobbleStatisticsViewModel::setListMode,
+                                        onLoadMoreRecent = scrobbleStatisticsViewModel::loadMoreRecent,
+                                    )
+                                },
+                                contentPadding = listPadding,
+                            )
                         } else if (pageRoute == AppRoute.Replay) {
                             ReplayScreen(
                                 state = replay,
@@ -6160,6 +6192,7 @@ private fun BitChordApp(
                 error = lastfmError,
                 loading = lastfmLoading,
                 onSignIn = {
+                    if (lastfmLoading) return@LastfmLoginAlert
                     lastfmLoading = true
                     lastfmError = null
                     scope.launch {
@@ -6168,20 +6201,18 @@ private fun BitChordApp(
                                 apiKey = AppSettings.lastfmApiKey.value,
                                 secret = AppSettings.lastfmSecret.value,
                             )
-                            LastFM.getMobileSession(usernameInput.trim(), passwordInput)
-                                .onSuccess { auth ->
-                                    AppSettings.setLastfmSessionKey(auth.session.key)
-                                    AppSettings.setLastfmUsername(auth.session.name)
-                                    AppSettings.setLastfmEnabled(true)
-                                    // Stats reloads now that there is a Last.fm account to read.
-                                    scrobbleStatisticsViewModel.onLastFmConnected()
-                                    showLastfmLogin = false
-                                }
-                                .onFailure { e ->
-                                    lastfmError = e.message ?: context.getString(R.string.login_failed)
-                                }
-                        } catch (e: Exception) {
-                            lastfmError = e.message ?: context.getString(R.string.login_failed)
+                            val auth = LastFM.getMobileSession(usernameInput.trim(), passwordInput).getOrThrow()
+                            currentCoroutineContext().ensureActive()
+                            AppSettings.setLastfmSessionKey(auth.session.key)
+                            AppSettings.setLastfmUsername(auth.session.name)
+                            AppSettings.setLastfmEnabled(true)
+                            // Stats reloads now that there is a Last.fm account to read.
+                            scrobbleStatisticsViewModel.onLastFmConnected()
+                            showLastfmLogin = false
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                            lastfmError = context.getString(R.string.login_failed)
                         } finally {
                             lastfmLoading = false
                         }

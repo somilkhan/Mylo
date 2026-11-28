@@ -1483,8 +1483,6 @@
     <string name="bit_perfect_status_unavailable">Für diesen Titel nicht verfügbar (%1$s)</string>
     <string name="scrobble_building_mix">Dein Mix wird erstellt</string>
     <string name="scrobble_dismiss">Verwerfen</string>
-    <string name="scrobble_playlist_saved">Playlist gespeichert</string>
-    <string name="scrobble_tracks_steps">Titel · Schritte von 5</string>
     <string name="scrobble_no_tracks_found">Keine Titel gefunden</string>
     <string name="scrobble_mixes_subtitle">Deine generierten und gespeicherten Mixes</string>
     <string name="scrobble_open_generator">Generator öffnen</string>
@@ -1496,15 +1494,7 @@
     <string name="scrobble_reset_cover">Cover zurücksetzen</string>
     <string name="scrobble_export_playlist">Playlist exportieren</string>
     <string name="scrobble_remove_from_playlist">Aus Playlist entfernen</string>
-    <string name="scrobble_no_listening_yet">Noch nichts gehört</string>
     <string name="scrobble_open_settings">Einstellungen öffnen</string>
-    <string name="scrobble_save_csv">CSV speichern</string>
-    <string name="scrobble_share_csv">CSV teilen</string>
-    <string name="scrobble_save_m3u">M3U speichern</string>
-    <string name="scrobble_share_m3u">M3U teilen</string>
-    <string name="scrobble_track_concentration">Titelkonzentration</string>
-    <string name="scrobble_avg_plays_per_track">Ø Wiedergaben / Titel</string>
-    <string name="scrobble_unique_tracks">Einzigartige Titel</string>
     <string name="find_a_playlist">Playlist finden</string>
     <string name="no_playlists_match">Keine Playlists für „%1$s“</string>
     <string name="hide_lyrics_preview">Songtext ausblenden</string>
@@ -1658,18 +1648,11 @@
     <string name="replay_year_unmute">Geschichte wieder einschalten</string>
     <string name="scrobble_tracks_count">%1$d Titel</string>
     <string name="scrobble_playlists_tracks_summary">%1$d Playlists · %2$d Titel</string>
-    <string name="scrobble_created_title">%1$s erstellt</string>
-    <string name="scrobble_view_all_tracks">Alle %1$d Titel anzeigen</string>
     <string name="scrobble_remove_device_message">%1$s wird von diesem Gerät entfernt. Der Hörverlauf bleibt unverändert.</string>
-    <string name="scrobble_created_go_back">%1$s erstellt. Zurück gehen, um sie anzusehen.</string>
     <string name="scrobble_added_track">%1$s hinzugefügt</string>
     <string name="scrobble_playlist_missing">Playlist existiert nicht mehr</string>
     <string name="scrobble_track_already_in_playlist">Titel ist bereits in dieser Playlist</string>
     <string name="scrobble_save_track_failed">Titel konnte nicht gespeichert werden. Versuch es erneut.</string>
-    <string name="scrobble_plays_count">%1$s Wiedergaben</string>
     <string name="scrobble_choose_format">Format für %1$s wählen.</string>
-    <string name="scrobble_mylo_listening_time">Mylo-Hörzeit · %1$s</string>
-    <string name="scrobble_not_recorded_yet">Noch nicht erfasst</string>
-    <string name="scrobble_percent_summary">%1$s · %2$s</string>
     <string name="scrobble_pinned">Angeheftet</string>
 </resources>

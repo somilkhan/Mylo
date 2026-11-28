@@ -1440,8 +1440,6 @@
     <string name="bit_perfect_status_unavailable">Bu parça için kullanılamıyor (%1$s)</string>
     <string name="scrobble_building_mix">Mix\'in hazırlanıyor</string>
     <string name="scrobble_dismiss">Kapat</string>
-    <string name="scrobble_playlist_saved">Çalma listesi kaydedildi</string>
-    <string name="scrobble_tracks_steps">parça · 5\'er adım</string>
     <string name="scrobble_no_tracks_found">Parça bulunamadı</string>
     <string name="scrobble_mixes_subtitle">Oluşturduğun ve kaydettiğin mixler</string>
     <string name="scrobble_open_generator">Oluşturucuyu aç</string>
@@ -1453,15 +1451,7 @@
     <string name="scrobble_reset_cover">Kapağı sıfırla</string>
     <string name="scrobble_export_playlist">Çalma listesini dışa aktar</string>
     <string name="scrobble_remove_from_playlist">Çalma listesinden kaldır</string>
-    <string name="scrobble_no_listening_yet">Henüz dinleme yok</string>
     <string name="scrobble_open_settings">Ayarları aç</string>
-    <string name="scrobble_save_csv">CSV kaydet</string>
-    <string name="scrobble_share_csv">CSV paylaş</string>
-    <string name="scrobble_save_m3u">M3U kaydet</string>
-    <string name="scrobble_share_m3u">M3U paylaş</string>
-    <string name="scrobble_track_concentration">Parça yoğunluğu</string>
-    <string name="scrobble_avg_plays_per_track">Parça başına ort. dinleme</string>
-    <string name="scrobble_unique_tracks">Benzersiz parçalar</string>
     <string name="find_a_playlist">Çalma listesi bul</string>
     <string name="no_playlists_match">“%1$s” ile eşleşen çalma listesi yok</string>
     <string name="hide_lyrics_preview">Şarkı sözlerini gizle</string>
@@ -1615,18 +1605,11 @@
     <string name="replay_year_unmute">Hikâyenin sesini aç</string>
     <string name="scrobble_tracks_count">%1$d parça</string>
     <string name="scrobble_playlists_tracks_summary">%1$d çalma listesi · %2$d parça</string>
-    <string name="scrobble_created_title">Oluşturuldu: %1$s</string>
-    <string name="scrobble_view_all_tracks">Tüm %1$d parçayı göster</string>
     <string name="scrobble_remove_device_message">%1$s bu cihazdan kaldırılacak. Dinleme geçmişi etkilenmeyecek.</string>
-    <string name="scrobble_created_go_back">Oluşturuldu: %1$s. Görmek için geri dön.</string>
     <string name="scrobble_added_track">%1$s eklendi</string>
     <string name="scrobble_playlist_missing">Çalma listesi artık yok</string>
     <string name="scrobble_track_already_in_playlist">Parça bu çalma listesinde zaten var</string>
     <string name="scrobble_save_track_failed">Parça kaydedilemedi. Tekrar deneyin.</string>
-    <string name="scrobble_plays_count">%1$s dinleme</string>
     <string name="scrobble_choose_format">%1$s için bir biçim seçin.</string>
-    <string name="scrobble_mylo_listening_time">Mylo dinleme süresi · %1$s</string>
-    <string name="scrobble_not_recorded_yet">Henüz kaydedilmedi</string>
-    <string name="scrobble_percent_summary">%1$s · %2$s</string>
     <string name="scrobble_pinned">Sabitlendi</string>
 </resources>

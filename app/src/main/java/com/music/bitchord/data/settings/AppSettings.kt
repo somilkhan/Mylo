@@ -447,9 +447,6 @@ object AppSettings {
     val themeMode = MutableStateFlow(ThemeMode.DARK)
     val appFont = MutableStateFlow(AppFont.DEFAULT)
 
-    /** Approved gradient is the default for the Scrobble Hub only. */
-    val scrobbleGradientTheme = MutableStateFlow(true)
-
     /** Keep playing similar music once the queue runs out. */
     val autoplay = MutableStateFlow(true)
 
@@ -1108,12 +1105,6 @@ object AppSettings {
         appFont.value = runCatching {
             AppFont.valueOf(prefs.getString(KEY_APP_FONT, null) ?: AppFont.DEFAULT.name)
         }.getOrDefault(AppFont.DEFAULT)
-        scrobbleGradientTheme.value = try {
-            prefs.getBoolean(KEY_SCROBBLE_GRADIENT_THEME, true)
-        } catch (error: Exception) {
-            Log.w("AppSettings", "Couldn't read Scrobble gradient theme; using the approved default", error)
-            true
-        }
         autoplay.value = prefs.getBoolean(KEY_AUTOPLAY, true)
         shuffleEnabled.value = prefs.getBoolean(KEY_SHUFFLE_ENABLED, false)
         repeatMode.value = prefs.getInt(KEY_REPEAT_MODE, Player.REPEAT_MODE_OFF)
@@ -1553,18 +1544,6 @@ object AppSettings {
     fun setShowListenTogetherButton(value: Boolean) {
         showListenTogetherButton.value = value
         prefs.edit().putBoolean(KEY_LISTEN_TOGETHER_BUTTON, value).apply()
-    }
-
-    fun setScrobbleGradientTheme(value: Boolean) {
-        try {
-            if (prefs.edit().putBoolean(KEY_SCROBBLE_GRADIENT_THEME, value).commit()) {
-                scrobbleGradientTheme.value = value
-            } else {
-                Log.w("AppSettings", "Couldn't persist Scrobble gradient theme")
-            }
-        } catch (error: Exception) {
-            Log.w("AppSettings", "Couldn't persist Scrobble gradient theme", error)
-        }
     }
 
     fun setThemeMode(value: ThemeMode) {
@@ -2471,7 +2450,6 @@ object AppSettings {
     private const val KEY_EQ_BALANCE = "equalizer_balance"
     private const val KEY_EQ_BANDS = "equalizer_bands"
     private const val KEY_SPEED = "playback_speed"
-    private const val KEY_SCROBBLE_GRADIENT_THEME = "scrobble_gradient_theme"
     private const val KEY_THEME = "theme_mode"
     private const val KEY_APP_FONT = "app_font"
     private const val KEY_AUTOPLAY = "autoplay"

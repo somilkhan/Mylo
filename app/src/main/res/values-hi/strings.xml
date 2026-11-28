@@ -1483,8 +1483,6 @@
     <string name="bit_perfect_status_unavailable">इस ट्रैक के लिए उपलब्ध नहीं (%1$s)</string>
     <string name="scrobble_building_mix">आपका मिक्स बन रहा है</string>
     <string name="scrobble_dismiss">खारिज करें</string>
-    <string name="scrobble_playlist_saved">प्लेलिस्ट सहेजी गई</string>
-    <string name="scrobble_tracks_steps">गाने · 5 के चरण</string>
     <string name="scrobble_no_tracks_found">कोई गाना नहीं मिला</string>
     <string name="scrobble_mixes_subtitle">आपके बनाए और सहेजे गए मिक्स</string>
     <string name="scrobble_open_generator">जनरेटर खोलें</string>
@@ -1496,15 +1494,7 @@
     <string name="scrobble_reset_cover">कवर रीसेट करें</string>
     <string name="scrobble_export_playlist">प्लेलिस्ट निर्यात करें</string>
     <string name="scrobble_remove_from_playlist">प्लेलिस्ट से हटाएं</string>
-    <string name="scrobble_no_listening_yet">अभी तक कुछ नहीं सुना</string>
     <string name="scrobble_open_settings">सेटिंग्स खोलें</string>
-    <string name="scrobble_save_csv">CSV सहेजें</string>
-    <string name="scrobble_share_csv">CSV साझा करें</string>
-    <string name="scrobble_save_m3u">M3U सहेजें</string>
-    <string name="scrobble_share_m3u">M3U साझा करें</string>
-    <string name="scrobble_track_concentration">गानों का संकेंद्रण</string>
-    <string name="scrobble_avg_plays_per_track">औसत प्ले / गाना</string>
-    <string name="scrobble_unique_tracks">अनोखे गाने</string>
     <string name="find_a_playlist">प्लेलिस्ट खोजें</string>
     <string name="no_playlists_match">“%1$s” से कोई प्लेलिस्ट मेल नहीं खाती</string>
     <string name="hide_lyrics_preview">लिरिक्स छिपाएँ</string>
@@ -1658,18 +1648,11 @@
     <string name="replay_year_unmute">कहानी अनम्यूट करें</string>
     <string name="scrobble_tracks_count">%1$d ट्रैक</string>
     <string name="scrobble_playlists_tracks_summary">%1$d प्लेलिस्ट · %2$d ट्रैक</string>
-    <string name="scrobble_created_title">%1$s बनाई गई</string>
-    <string name="scrobble_view_all_tracks">सभी %1$d ट्रैक देखें</string>
     <string name="scrobble_remove_device_message">%1$s इस डिवाइस से हटा दिया जाएगा। सुनने का इतिहास प्रभावित नहीं होगा।</string>
-    <string name="scrobble_created_go_back">%1$s बनाई गई। देखने के लिए वापस जाएँ।</string>
     <string name="scrobble_added_track">%1$s जोड़ा गया</string>
     <string name="scrobble_playlist_missing">प्लेलिस्ट अब मौजूद नहीं है</string>
     <string name="scrobble_track_already_in_playlist">यह ट्रैक इस प्लेलिस्ट में पहले से है</string>
     <string name="scrobble_save_track_failed">ट्रैक सेव नहीं हो सका। फिर से कोशिश करें।</string>
-    <string name="scrobble_plays_count">%1$s बार सुना</string>
     <string name="scrobble_choose_format">%1$s के लिए एक फ़ॉर्मेट चुनें।</string>
-    <string name="scrobble_mylo_listening_time">Mylo पर सुनने का समय · %1$s</string>
-    <string name="scrobble_not_recorded_yet">अभी तक दर्ज नहीं</string>
-    <string name="scrobble_percent_summary">%1$s · %2$s</string>
     <string name="scrobble_pinned">पिन किया गया</string>
 </resources>

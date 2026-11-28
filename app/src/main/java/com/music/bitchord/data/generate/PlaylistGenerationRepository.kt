@@ -1,9 +1,11 @@
 package com.music.bitchord.data.generate
 
 import android.content.Context
+import androidx.annotation.StringRes
+import com.music.bitchord.R
 import com.music.bitchord.auth.SignedIn
-import com.music.bitchord.data.ListeningHistory
 import com.music.bitchord.data.scrobbling.LastFM
+import com.music.bitchord.data.scrobbling.LastFmStatsPeriod
 import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.data.YtMusicRepository
 import com.music.bitchord.data.innertube.InnertubeParser
@@ -11,10 +13,7 @@ import com.music.bitchord.data.model.SearchFilter
 import com.music.bitchord.data.model.SearchResult
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.spotify.LocalPlaylistStore
-import com.music.bitchord.data.stats.ListeningStats
-import com.music.bitchord.data.stats.ReplayPeriod
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.supervisorScope
@@ -22,10 +21,9 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.withContext
 import java.util.Locale
 
-/** The nine generator modes, mapped onto Mylo's existing data sources. */
+/** The generator modes, mapped onto Mylo's existing data sources and Last.fm. */
 enum class PlaylistGenerationMode(val storageValue: String) {
     TOP("top"),
     RECENT("recent"),
@@ -36,12 +34,16 @@ enum class PlaylistGenerationMode(val storageValue: String) {
     RECOMMENDATIONS("recommendations"),
     NEVER_HEARD("never-heard"),
     LIBRARY("library"),
+    FORGOTTEN_FAVORITES("forgotten-favorites"),
+    TAG_TOP("tag-top"),
+    TOP_ARTISTS_MIX("top-artists-mix"),
 }
 
 data class PlaylistGenerationRequest(
     val mode: PlaylistGenerationMode,
     val count: Int = 25,
-    val period: ReplayPeriod = ReplayPeriod.ALL_TIME,
+    /** The Last.fm chart window for Top tracks and Top artists mix. */
+    val period: LastFmStatsPeriod = LastFmStatsPeriod.OVERALL,
     val seedTrack: Song? = null,
     val seedArtist: String = "",
     val tag: String = "",
@@ -64,90 +66,93 @@ class PlaylistGenerationRepository(context: Context) {
         request: PlaylistGenerationRequest,
         onProgress: (String) -> Unit = {},
     ): List<Song> {
+        val accounts = GenerationAccountSnapshot(appContext)
         val target = request.count.coerceIn(MIN_TRACKS, MAX_TRACKS)
         val raw = when (request.mode) {
             PlaylistGenerationMode.TOP -> {
-                onProgress("Reading your Mylo Replay…")
-                ListeningStats.summary(request.period).songs.map { it.song }
+                val username = lastFmUsernameOrThrow()
+                onProgress(message(R.string.scrobble_gen_progress_top))
+                val top = LastFM.getTopTracks(username, period = request.period.apiValue, limit = 100).getOrThrow()
+                onProgress(message(R.string.scrobble_gen_progress_resolving))
+                resolveLastFmTracks(top.take(LastFmGenerationRules.MAX_RESOLVE_CANDIDATES))
             }
             PlaylistGenerationMode.RECENT -> {
-                onProgress("Reading your recent listening…")
-                withContext(Dispatchers.IO) {
-                    ListeningHistory.read(appContext).map { it.song }
-                }
+                val username = lastFmUsernameOrThrow()
+                onProgress(message(R.string.scrobble_gen_progress_recent))
+                val recent = lastFmRecentTracks(username, LastFmGenerationRules.MAX_RESOLVE_CANDIDATES)
+                onProgress(message(R.string.scrobble_gen_progress_resolving))
+                resolveLastFmTracks(recent)
             }
             PlaylistGenerationMode.SIMILAR_TRACKS -> {
                 val seed = request.seedTrack
-                    ?: throw IllegalArgumentException("Choose a track first")
-                require(PlaylistGenerationRules.canStartMixWithSong(seed)) {
-                    "This track cannot start a mix. Choose a playable YouTube Music song."
-                }
+                    ?: throw GenerationException(R.string.scrobble_gen_error_seed)
+                requireGeneration(PlaylistGenerationRules.canStartMixWithSong(seed), R.string.scrobble_gen_error_song_no_mix)
                 similarTrackCandidates(seed, target, onProgress)
             }
             PlaylistGenerationMode.SIMILAR_ARTISTS -> {
                 val artist = request.seedArtist.trim()
-                require(artist.isNotEmpty()) { "Enter an artist name" }
-                onProgress("Finding artists similar to $artist…")
+                requireGeneration(artist.isNotEmpty(), R.string.scrobble_gen_error_artist)
+                onProgress(message(R.string.scrobble_gen_progress_similar_artist, artist))
 
                 // LastWave's source is artist.getsimilar -> each similar artist's top tracks.
                 // Mylo resolves those names through its existing YouTube Music artist pages,
                 // so every returned row is already playable and retains Mylo's Song model.
-                val similarArtists = if ((AppSettings.lastfmEnabled.value && LastFM.isInitialized())) {
+                val similarArtists = if ((LastFM.isInitialized())) {
                     LastFM.getSimilarArtists(artist, limit = 20).getOrNull().orEmpty().take(8)
                 } else {
                     emptyList()
                 }
                 val artistNames = similarArtists.ifEmpty { listOf(artist) }
-                onProgress("Loading tracks from ${artistNames.size} artists…")
+                onProgress(message(R.string.scrobble_gen_progress_artists_loaded, artistNames.size))
                 val tracks = PlaylistGenerationRules.interleave(artistPagePools(artistNames))
                 if (tracks.isNotEmpty()) tracks else {
                     // A failed Last.fm graph or unresolvable similar artists must not
                     // break the old exact-artist path.
                     val exact = artistPagePools(listOf(artist)).flatten()
-                    exact.ifEmpty { throw IllegalStateException("Couldn't find that artist or similar artists") }
+                    exact.ifEmpty { throw GenerationException(R.string.scrobble_gen_error_artist_not_found) }
                 }
             }
             PlaylistGenerationMode.TAG -> {
                 val tag = request.tag.trim()
-                require(tag.isNotEmpty()) { "Enter a mood or genre" }
-                onProgress("Finding music for $tag…")
-                val category = YtMusicRepository.moodAndGenres().getOrNull().orEmpty()
-                    .asSequence()
-                    .flatMap { it.items.asSequence() }
-                    .firstOrNull { it.title.equals(tag, ignoreCase = true) }
-                val categorySongs = category?.let { mood ->
-                    YtMusicRepository.moodGenreShelves(mood.browseId, mood.params).getOrThrow()
-                        .flatMap { shelf -> shelf.items.mapNotNull(::shelfItemSong) }
-                }.orEmpty()
-                if (categorySongs.isNotEmpty()) categorySongs else {
-                    YtMusicRepository.search(tag, SearchFilter.SONGS).getOrThrow()
-                        .mapNotNull { result ->
-                            when (result) {
-                                is SearchResult.TopTrack -> result.song
-                                is SearchResult.Track -> result.song
-                                is SearchResult.Browse -> null
-                            }
-                        }
-                }
+                requireGeneration(tag.isNotEmpty(), R.string.scrobble_gen_error_tag)
+                onProgress(message(R.string.scrobble_gen_progress_tag, tag))
+                tagSongsFromYtMusic(tag)
+            }
+            PlaylistGenerationMode.TAG_TOP -> {
+                val tag = request.tag.trim()
+                requireGeneration(tag.isNotEmpty(), R.string.scrobble_gen_error_tag)
+                onProgress(message(R.string.scrobble_gen_progress_tag_top, tag))
+                requireGeneration(LastFM.isInitialized(), R.string.scrobble_gen_needs_lastfm)
+                val lastFmTracks = LastFM.getTagTopTracks(tag, limit = LastFmGenerationRules.TAG_TRACK_LIMIT)
+                    .getOrThrow()
+                // A Last.fm chart must never silently turn into a different YouTube genre source.
+                resolveLastFmTracks(lastFmTracks.take(LastFmGenerationRules.MAX_RESOLVE_CANDIDATES))
+            }
+            PlaylistGenerationMode.FORGOTTEN_FAVORITES -> {
+                onProgress(message(R.string.scrobble_gen_progress_forgotten))
+                forgottenFavoriteCandidates(onProgress)
+            }
+            PlaylistGenerationMode.TOP_ARTISTS_MIX -> {
+                onProgress(message(R.string.scrobble_gen_progress_top_artists))
+                topArtistsMixCandidates(request.period, onProgress)
             }
             PlaylistGenerationMode.MIX -> {
-                onProgress("Building a mix from your listening…")
+                onProgress(message(R.string.scrobble_gen_progress_mix))
                 val signals = loadTasteSignals()
                 val seeds = (
                     listOfNotNull(request.seedTrack) +
                         signals.lastFmSeeds.take(4) +
-                        signals.replaySongs.take(4) +
                         signals.recentSongs.take(4) +
                         signals.accountHistory.take(3) +
                         signals.likedSongs.take(3)
                     )
-                    .filter { it.videoId.isNotBlank() && !it.isVideo }
+                    .filter { it.videoId.isNotBlank() && !it.isVideo && it.localUri == null }
                     .distinctBy { it.videoId }
                     .take(6)
 
-                onProgress("Finding radio from your listening…")
+                onProgress(message(R.string.scrobble_gen_progress_taste_radio))
                 val discovery = radioFromSeeds(seeds)
-                onProgress("Blending recommendations and your library…")
+                onProgress(message(R.string.scrobble_gen_progress_blending))
                 val remote = supervisorScope {
                     val picks = async { YtMusicRepository.quickPicks().getOrNull().orEmpty() }
                     val home = async { homeSongs() }
@@ -156,7 +161,7 @@ class PlaylistGenerationRepository(context: Context) {
                 PlaylistGenerationRules.weightedBlend(
                     pools = listOf(
                         (discovery + remote.first) to 4,
-                        (signals.likedSongs + signals.accountHistory + signals.lastFmSeeds + signals.recentSongs + signals.replaySongs) to 3,
+                        (signals.likedSongs + signals.accountHistory + signals.lastFmSeeds + signals.recentSongs) to 3,
                         remote.second to 1,
                     ),
                     limit = target,
@@ -164,20 +169,19 @@ class PlaylistGenerationRepository(context: Context) {
                 )
             }
             PlaylistGenerationMode.RECOMMENDATIONS -> {
-                onProgress("Building recommendations from your listening…")
+                onProgress(message(R.string.scrobble_gen_progress_recommendations))
                 val signals = loadTasteSignals()
                 val seeds = (
                     signals.lastFmSeeds.take(6) +
-                        signals.replaySongs.take(6) +
                         signals.recentSongs.take(6) +
                         signals.accountHistory.take(4) +
                         signals.likedSongs.take(4)
                     )
-                    .filter { it.videoId.isNotBlank() && !it.isVideo }
+                    .filter { it.videoId.isNotBlank() && !it.isVideo && it.localUri == null }
                     .distinctBy { it.videoId }
                     .take(6)
 
-                onProgress("Finding tracks related to your taste…")
+                onProgress(message(R.string.scrobble_gen_progress_taste_related))
                 val discovery = radioFromSeeds(seeds)
                 val remote = supervisorScope {
                     val picks = async { YtMusicRepository.quickPicks().getOrNull().orEmpty() }
@@ -192,7 +196,7 @@ class PlaylistGenerationRepository(context: Context) {
                     limit = target,
                     maxPerArtist = 2,
                 )
-                val heard = signals.lastFmSeeds + signals.replaySongs + signals.recentSongs +
+                val heard = signals.lastFmSeeds + signals.recentSongs +
                     signals.accountHistory + signals.likedSongs
                 val fresh = PlaylistGenerationRules.excludeHeard(
                     candidates = candidates,
@@ -205,30 +209,52 @@ class PlaylistGenerationRepository(context: Context) {
             }
             PlaylistGenerationMode.NEVER_HEARD -> neverHeardCandidates(onProgress)
             PlaylistGenerationMode.LIBRARY -> {
-                onProgress("Reading your YouTube Music library…")
-                val library = YtMusicRepository.library().getOrThrow()
-                library.likedSongs + library.librarySongs
+                onProgress(message(R.string.scrobble_gen_progress_library))
+                requireYouTubeAccount()
+                supervisorScope {
+                    val liked = async { completeLibraryFeed(YtMusicRepository.LIKED_MUSIC) }
+                    val added = async { completeLibraryFeed(LIBRARY_SONGS_BROWSE_ID) }
+                    liked.await() + added.await()
+                }
             }
         }
 
         currentCoroutineContext().ensureActive()
         var candidates = PlaylistGenerationRules.deduplicate(raw)
 
-        // NEVER_HEARD candidates were filtered against local and account history
+        // NEVER_HEARD candidates were filtered against Last.fm and account history
         // before this point. Do not fetch the same histories a second time here.
 
         val libraryPage = if (request.excludeLiked || request.excludeLibrary) {
-            onProgress("Applying your selected library exclusions…")
-            YtMusicRepository.library().getOrThrow()
+            onProgress(message(R.string.scrobble_gen_progress_exclusions))
+            requireYouTubeAccount()
+            generationExclusionRead {
+                supervisorScope {
+                    val liked = async {
+                        completeLibraryFeed(YtMusicRepository.LIKED_MUSIC)
+                    }
+                    val added = async {
+                        if (request.excludeLibrary) completeLibraryFeed(LIBRARY_SONGS_BROWSE_ID) else emptyList()
+                    }
+                    val likedSongs = liked.await()
+                    val likedIds = likedSongs.mapTo(HashSet()) { it.videoId }
+                    // Match LibraryPage: liked tracks are a separate opt-in, not library-only rows.
+                    likedSongs to added.await().filterNot { it.videoId in likedIds }
+                }
+            }
         } else {
             null
         }
         val explicitExclusions = buildList {
             if (request.excludeSavedPlaylists) {
+                requireGeneration(
+                    LocalPlaylistStore.loadError.value == null,
+                    R.string.scrobble_gen_error_exclusions_unavailable,
+                )
                 addAll(LocalPlaylistStore.playlists.value.flatMap { it.songs })
             }
-            if (request.excludeLiked) addAll(libraryPage?.likedSongs.orEmpty())
-            if (request.excludeLibrary) addAll(libraryPage?.librarySongs.orEmpty())
+            if (request.excludeLiked) addAll(libraryPage?.first.orEmpty())
+            if (request.excludeLibrary) addAll(libraryPage?.second.orEmpty())
         }
         if (explicitExclusions.isNotEmpty()) {
             candidates = PlaylistGenerationRules.excludeHeard(
@@ -241,7 +267,14 @@ class PlaylistGenerationRepository(context: Context) {
         currentCoroutineContext().ensureActive()
         // Never Heard must not silently bias against saved playlists. It only
         // excludes them when the explicit excludeSavedPlaylists option is set.
-        val savedSongs = if (request.mode == PlaylistGenerationMode.NEVER_HEARD) {
+        // Last.fm charts/recent modes retain their source order rather than moving saved rows back.
+        val savedSongs = if (
+            request.mode in setOf(
+                PlaylistGenerationMode.NEVER_HEARD, PlaylistGenerationMode.FORGOTTEN_FAVORITES,
+                PlaylistGenerationMode.TOP, PlaylistGenerationMode.RECENT,
+                PlaylistGenerationMode.TOP_ARTISTS_MIX, PlaylistGenerationMode.TAG_TOP,
+            )
+        ) {
             emptyList()
         } else {
             LocalPlaylistStore.playlists.value.flatMap { it.songs }
@@ -253,8 +286,9 @@ class PlaylistGenerationRepository(context: Context) {
             limit = target,
         )
         if (result.isEmpty()) {
-            throw IllegalStateException("No tracks found for this generation. Try another mode or seed.")
+            throw GenerationException(R.string.scrobble_gen_error_no_tracks)
         }
+        accounts.ensureUnchanged()
         return result
     }
 
@@ -267,10 +301,11 @@ class PlaylistGenerationRepository(context: Context) {
         count: Int = 30,
         onProgress: (String) -> Unit = {},
     ): List<Song> {
+        val accounts = GenerationAccountSnapshot(appContext)
         val target = count.coerceIn(MIN_TRACKS, MAX_TRACKS)
         val minSize = minOf(MIN_SIMILAR_MIX_SIZE, target)
         val sourceTracks = PlaylistGenerationRules.deduplicate(sourceSongs)
-        require(sourceTracks.isNotEmpty()) { "This playlist has no playable tracks to use as seeds." }
+        requireGeneration(sourceTracks.isNotEmpty(), R.string.scrobble_gen_error_playlist_no_seeds)
 
         val sourceVideoIds = sourceSongs.mapTo(HashSet()) { it.videoId }
         val sourceTrackKeys = sourceSongs.mapTo(HashSet(), PlaylistGenerationRules::trackKey)
@@ -279,9 +314,9 @@ class PlaylistGenerationRepository(context: Context) {
             .distinctBy { it.lowercase(Locale.ROOT) }
             .take(3)
         val seedTracks = sourceTracks.filter { it.title.isNotBlank() && it.artist.isNotBlank() }.take(4)
-        onProgress("Finding artists and tracks related to this playlist…")
+        onProgress(message(R.string.scrobble_gen_progress_playlist_related))
 
-        val similarArtistNames = if ((AppSettings.lastfmEnabled.value && LastFM.isInitialized())) {
+        val similarArtistNames = if ((LastFM.isInitialized())) {
             supervisorScope {
                 sourceArtists.map { artist ->
                     async {
@@ -293,7 +328,7 @@ class PlaylistGenerationRepository(context: Context) {
             emptyList()
         }
 
-        onProgress("Building related-song radio and artist pools…")
+        onProgress(message(R.string.scrobble_gen_progress_related_pools))
         val similarArtistTracks = PlaylistGenerationRules.interleave(artistPagePools(similarArtistNames))
         val directArtistTracks = PlaylistGenerationRules.interleave(artistPagePools(sourceArtists))
         val radioTracks = radioFromSeeds(seedTracks.take(3))
@@ -315,21 +350,21 @@ class PlaylistGenerationRepository(context: Context) {
                 maxPerArtist = 3,
             )
 
-        var candidates = curate(basePools)
-        var fallbackTracks = emptyList<Song>()
+        val widenedPools = basePools.toMutableList()
+        var candidates = curate(widenedPools)
         if (candidates.size < minSize) {
-            onProgress("Widening the mix with YouTube Music recommendations…")
+            onProgress(message(R.string.scrobble_gen_progress_widening))
             val remote = supervisorScope {
                 val picks = async { YtMusicRepository.quickPicks().getOrNull().orEmpty() }
                 val home = async { homeSongs() }
                 picks.await() + home.await()
             }
-            fallbackTracks = remote
-            candidates = curate(basePools + (remote to 1))
+            widenedPools += remote to 1
+            candidates = curate(widenedPools)
         }
 
-        if (candidates.size < minSize && (AppSettings.lastfmEnabled.value && LastFM.isInitialized())) {
-            onProgress("Exploring more similar artists…")
+        if (candidates.size < minSize && (LastFM.isInitialized())) {
+            onProgress(message(R.string.scrobble_gen_progress_more_artists))
             val extraNames = supervisorScope {
                 sourceArtists.take(2).map { artist ->
                     async {
@@ -338,11 +373,12 @@ class PlaylistGenerationRepository(context: Context) {
                 }.awaitAll().flatten().distinctBy { it.lowercase(Locale.ROOT) }
             }
             val extraTracks = PlaylistGenerationRules.interleave(artistPagePools(extraNames))
-            candidates = curate(basePools + (extraTracks to 2) + (fallbackTracks to 1))
+            widenedPools += extraTracks to 2
+            candidates = curate(widenedPools)
         }
 
         if (candidates.size < minSize) {
-            onProgress("Adding a wider mood and genre discovery pool…")
+            onProgress(message(R.string.scrobble_gen_progress_mood_pool))
             val moods = YtMusicRepository.moodAndGenres().getOrNull().orEmpty()
                 .flatMap { it.items }
                 .shuffled()
@@ -355,7 +391,8 @@ class PlaylistGenerationRepository(context: Context) {
                     }
                 }.awaitAll().flatten()
             }
-            candidates = curate(basePools + (moodTracks to 1) + (fallbackTracks to 1))
+            widenedPools += moodTracks to 1
+            candidates = curate(widenedPools)
         }
 
         currentCoroutineContext().ensureActive()
@@ -367,16 +404,19 @@ class PlaylistGenerationRepository(context: Context) {
             limit = target,
         )
         if (result.size < minSize) {
-            throw IllegalStateException(
-                "Not enough new tracks found to build a ${minSize}-track mix. Try another source playlist.",
-            )
+            throw GenerationException(R.string.scrobble_gen_error_similar_too_small, minSize)
         }
+        accounts.ensureUnchanged()
         return result
     }
 
+    /**
+     * What the mixes start from: Last.fm's all-time top tracks and the latest
+     * scrobbles, both found on YouTube Music, and when signed in the account's
+     * history and likes. Nothing is read from Mylo's own play log.
+     */
     private data class TasteSignals(
         val lastFmSeeds: List<Song>,
-        val replaySongs: List<Song>,
         val recentSongs: List<Song>,
         val accountHistory: List<Song>,
         val likedSongs: List<Song>,
@@ -384,18 +424,16 @@ class PlaylistGenerationRepository(context: Context) {
 
     private suspend fun loadTasteSignals(): TasteSignals {
         val lastFmSeeds = resolveLastFmTasteSeeds()
-        val replay = try {
-            ListeningStats.summary(ReplayPeriod.ALL_TIME).songs.take(12).map { it.song }
-        } catch (cancellation: CancellationException) {
-            throw cancellation
-        } catch (_: Exception) {
-            emptyList()
-        }
-        val recent = try {
-            withContext(Dispatchers.IO) { ListeningHistory.read(appContext).map { it.song }.take(30) }
-        } catch (cancellation: CancellationException) {
-            throw cancellation
-        } catch (_: Exception) {
+        val username = AppSettings.lastfmUsername.value.trim()
+        val recent = if (username.isNotEmpty() && AppSettings.lastfmEnabled.value && LastFM.isInitialized()) {
+            try {
+                resolveLastFmTracks(lastFmRecentTracks(username, limit = 8))
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Exception) {
+                emptyList()
+            }
+        } else {
             emptyList()
         }
         val (history, liked) = if (SignedIn.state(appContext).value) {
@@ -407,16 +445,192 @@ class PlaylistGenerationRepository(context: Context) {
         } else {
             emptyList<Song>() to emptyList()
         }
-        return TasteSignals(lastFmSeeds, replay, recent, history, liked)
+        return TasteSignals(lastFmSeeds, recent, history, liked)
+    }
+
+    /** The latest distinct scrobbled tracks, newest first, as chart rows to resolve. */
+    private suspend fun lastFmRecentTracks(username: String, limit: Int): List<LastFM.RankedTrack> {
+        val recent = LastFM.getRecentScrobbles(username, limit = 200).getOrThrow().items
+        return recent
+            .filter { !it.nowPlaying && it.timestamp > 0L && it.name.isNotBlank() && it.artist.isNotBlank() }
+            .distinctBy { LastFmGenerationRules.trackKey(it.artist, it.name) }
+            .take(limit)
+            .map { LastFM.RankedTrack(it.name, it.artist, 0L, it.artworkUrl) }
     }
 
     private suspend fun resolveLastFmTasteSeeds(): List<Song> {
         val username = AppSettings.lastfmUsername.value.trim()
-        if (username.isEmpty() || !(AppSettings.lastfmEnabled.value && LastFM.isInitialized())) return emptyList()
+        if (username.isEmpty() || !AppSettings.lastfmEnabled.value || !LastFM.isInitialized()) return emptyList()
         val topTracks = LastFM.getTopTracks(username, period = "overall", limit = 20)
             .getOrNull().orEmpty().take(6)
+        return resolveLastFmTracks(topTracks)
+    }
+
+    /**
+     * LastWave's one-song radio flow: expand the tapped seed through YouTube
+     * Music radio, branch once from a related result when the first pool is
+     * thin, then use Last.fm similar tracks as a secondary source. Optional
+     * sources are isolated so one failed request cannot discard other results.
+     */
+    private suspend fun similarTrackCandidates(
+        seed: Song,
+        target: Int,
+        onProgress: (String) -> Unit,
+    ): List<Song> = supervisorScope {
+        onProgress(message(R.string.scrobble_gen_progress_seed_related, seed.title))
+        val primary = radioFromSeeds(listOf(seed))
+        val branchSeed = primary.firstOrNull { it.videoId != seed.videoId && !it.isVideo }
+        val branch = if (primary.size < 40 && branchSeed != null) {
+            onProgress(message(R.string.scrobble_gen_progress_expanding))
+            radioFromSeeds(listOf(branchSeed))
+        } else {
+            emptyList()
+        }
+        val radioTracks = PlaylistGenerationRules.deduplicate(primary + branch)
+        val lastFmTracks = if (radioTracks.size < target && (LastFM.isInitialized())) {
+            onProgress(message(R.string.scrobble_gen_progress_more_tracks))
+            resolveLastFmSimilarTracks(seed, target)
+        } else {
+            emptyList()
+        }
+        val curated = PlaylistGenerationRules.curateSimilarTracks(
+            candidates = radioTracks + lastFmTracks,
+            seed = seed,
+            limit = target,
+        )
+        if (curated.isEmpty()) {
+            throw GenerationException(R.string.scrobble_gen_error_no_similar, seed.title)
+        }
+        curated
+    }
+
+    /** Resolve Last.fm names only when YouTube Music confirms the same title and artist. */
+    private suspend fun resolveLastFmSimilarTracks(seed: Song, target: Int): List<Song> {
+        val similar = LastFM.getSimilarTracks(
+            track = seed.title,
+            artist = seed.artist,
+            limit = minOf(100, target * 3),
+        ).getOrNull().orEmpty()
+        return resolveLastFmTracks(similar.take(LastFmGenerationRules.MAX_RESOLVE_CANDIDATES))
+    }
+
+    private suspend fun tagSongsFromYtMusic(tag: String): List<Song> {
+        val category = YtMusicRepository.moodAndGenres().getOrNull().orEmpty()
+            .asSequence()
+            .flatMap { it.items.asSequence() }
+            .firstOrNull { it.title.equals(tag, ignoreCase = true) }
+        val categorySongs = category?.let { mood ->
+            YtMusicRepository.moodGenreShelves(mood.browseId, mood.params).getOrThrow()
+                .flatMap { shelf -> shelf.items.mapNotNull(::shelfItemSong) }
+        }.orEmpty()
+        return if (categorySongs.isNotEmpty()) categorySongs else {
+            YtMusicRepository.search(tag, SearchFilter.SONGS).getOrThrow()
+                .mapNotNull { result ->
+                    when (result) {
+                        is SearchResult.TopTrack -> result.song
+                        is SearchResult.Track -> result.song
+                        is SearchResult.Browse -> null
+                    }
+                }
+        }
+    }
+
+    private fun message(@StringRes resource: Int, vararg arguments: Any): String =
+        appContext.getString(resource, *arguments)
+
+    private fun requireYouTubeAccount() {
+        requireGeneration(SignedIn.state(appContext).value, R.string.scrobble_gen_sign_in_to_use)
+    }
+
+    private suspend fun completeLibraryFeed(browseId: String): List<Song> = completeGenerationSongFeed(
+        first = YtMusicRepository.browseSongs(browseId).getOrThrow(),
+        loadNext = { YtMusicRepository.moreSongs(it).getOrThrow() },
+    )
+
+    private fun lastFmUsernameOrThrow(): String {
+        val username = AppSettings.lastfmUsername.value.trim()
+        requireGeneration(
+            username.isNotEmpty() && AppSettings.lastfmEnabled.value && LastFM.isInitialized(),
+            R.string.scrobble_gen_needs_lastfm,
+        )
+        return username
+    }
+
+    /** Your 12-month top tracks, minus anything scrobbled in the last 30 days. */
+    private suspend fun forgottenFavoriteCandidates(onProgress: (String) -> Unit): List<Song> {
+        val username = lastFmUsernameOrThrow()
+        val top = LastFM.getTopTracks(
+            username,
+            period = LastFmGenerationRules.FORGOTTEN_PERIOD,
+            limit = LastFmGenerationRules.FORGOTTEN_TRACK_LIMIT,
+        ).getOrThrow()
+        onProgress(message(R.string.scrobble_gen_progress_recent_window))
+        val (from, to) = LastFmGenerationRules.recentWindowSeconds(System.currentTimeMillis())
+        val recentKeys = recentTrackKeys(username, from, to)
+        val forgotten = LastFmGenerationRules.excludeRecent(top, recentKeys) {
+            LastFmGenerationRules.trackKey(it.artist, it.name)
+        }
+        onProgress(message(R.string.scrobble_gen_progress_resolving))
+        return resolveLastFmTracks(forgotten.take(LastFmGenerationRules.MAX_RESOLVE_CANDIDATES))
+    }
+
+    private suspend fun recentTrackKeys(username: String, from: Long, to: Long): Set<String> {
+        val keys = HashSet<String>()
+        var page = 1
+        var totalPages = 1
+        while (page <= totalPages && page <= LastFmGenerationRules.MAX_RECENT_PAGES) {
+            currentCoroutineContext().ensureActive()
+            val result = LastFM.getRecentTracksPage(
+                username,
+                from = from,
+                to = to,
+                page = page,
+                limit = LastFmGenerationRules.RECENT_PAGE_SIZE,
+            ).getOrThrow()
+            result.items.mapTo(keys) { LastFmGenerationRules.trackKey(it.artist, it.name) }
+            totalPages = result.totalPages
+            page++
+        }
+        requireGeneration(page > totalPages, R.string.scrobble_gen_error_history_incomplete)
+        return keys
+    }
+
+    /** Last.fm top artists, their top tracks (at most 3 requests in flight), interleaved and deduped. */
+    private suspend fun topArtistsMixCandidates(period: LastFmStatsPeriod, onProgress: (String) -> Unit): List<Song> {
+        val username = lastFmUsernameOrThrow()
+        val artists = LastFM.getTopArtists(
+            username,
+            period = period.apiValue,
+            limit = LastFmGenerationRules.TOP_ARTIST_COUNT,
+        ).getOrThrow().take(LastFmGenerationRules.TOP_ARTIST_COUNT)
+        if (artists.isEmpty()) return emptyList()
+
+        onProgress(message(R.string.scrobble_gen_progress_top_artist_tracks, artists.size))
+        val requestGate = Semaphore(LastFmGenerationRules.ARTIST_REQUEST_CONCURRENCY)
+        val pools = supervisorScope {
+            artists.map { artist ->
+                async {
+                    requestGate.withPermit {
+                        LastFM.getArtistTopTracks(artist.name, limit = LastFmGenerationRules.ARTIST_TRACKS_PER_ARTIST)
+                            .getOrNull().orEmpty()
+                    }
+                }
+            }.awaitAll()
+        }
+        val mixed = LastFmGenerationRules.interleaveUnique(
+            pools = pools,
+            key = { LastFmGenerationRules.trackKey(it.artist, it.name) },
+            cap = LastFmGenerationRules.MIX_TRACK_CAP,
+        )
+        onProgress(message(R.string.scrobble_gen_progress_resolving))
+        return resolveLastFmTracks(mixed)
+    }
+
+    /** Resolves Last.fm names to playable rows, keeping only exact YouTube Music title and artist matches. */
+    private suspend fun resolveLastFmTracks(tracks: List<LastFM.RankedTrack>): List<Song> {
+        if (tracks.isEmpty()) return emptyList()
         return supervisorScope {
-            topTracks.map { track ->
+            tracks.map { track ->
                 async {
                     similarTrackSearchGate.withPermit {
                         try {
@@ -444,79 +658,6 @@ class PlaylistGenerationRepository(context: Context) {
         }
     }
 
-    /**
-     * LastWave's one-song radio flow: expand the tapped seed through YouTube
-     * Music radio, branch once from a related result when the first pool is
-     * thin, then use Last.fm similar tracks as a secondary source. Optional
-     * sources are isolated so one failed request cannot discard other results.
-     */
-    private suspend fun similarTrackCandidates(
-        seed: Song,
-        target: Int,
-        onProgress: (String) -> Unit,
-    ): List<Song> = supervisorScope {
-        onProgress("Finding tracks related to ${seed.title}…")
-        val primary = radioFromSeeds(listOf(seed))
-        val branchSeed = primary.firstOrNull { it.videoId != seed.videoId && !it.isVideo }
-        val branch = if (primary.size < 40 && branchSeed != null) {
-            onProgress("Expanding discovery from related tracks…")
-            radioFromSeeds(listOf(branchSeed))
-        } else {
-            emptyList()
-        }
-        val radioTracks = PlaylistGenerationRules.deduplicate(primary + branch)
-        val lastFmTracks = if (radioTracks.size < target && (AppSettings.lastfmEnabled.value && LastFM.isInitialized())) {
-            onProgress("Looking for more similar tracks…")
-            resolveLastFmSimilarTracks(seed, target)
-        } else {
-            emptyList()
-        }
-        val curated = PlaylistGenerationRules.curateSimilarTracks(
-            candidates = radioTracks + lastFmTracks,
-            seed = seed,
-            limit = target,
-        )
-        if (curated.isEmpty()) {
-            throw IllegalStateException("No similar tracks found for \"${seed.title}\". Try another song.")
-        }
-        curated
-    }
-
-    /** Resolve Last.fm names only when YouTube Music confirms the same title and artist. */
-    private suspend fun resolveLastFmSimilarTracks(seed: Song, target: Int): List<Song> {
-        val similar = LastFM.getSimilarTracks(
-            track = seed.title,
-            artist = seed.artist,
-            limit = minOf(100, target * 3),
-        ).getOrNull().orEmpty()
-        if (similar.isEmpty()) return emptyList()
-        return supervisorScope {
-            similar.map { track ->
-                async {
-                    try {
-                        val expected = PlaylistGenerationRules.trackKey(
-                            Song(videoId = "", title = track.name, artist = track.artist, thumbnailUrl = track.artworkUrl),
-                        )
-                        YtMusicRepository.search("${track.name} ${track.artist}", SearchFilter.SONGS)
-                            .getOrNull().orEmpty()
-                            .mapNotNull { result ->
-                                when (result) {
-                                    is SearchResult.TopTrack -> result.song
-                                    is SearchResult.Track -> result.song
-                                    is SearchResult.Browse -> null
-                                }
-                            }
-                            .firstOrNull { PlaylistGenerationRules.trackKey(it) == expected }
-                    } catch (cancellation: CancellationException) {
-                        throw cancellation
-                    } catch (_: Exception) {
-                        null
-                    }
-                }
-            }.awaitAll().filterNotNull()
-        }
-    }
-
     private suspend fun artistPagePools(artists: List<String>): List<List<Song>> = supervisorScope {
         artists.distinctBy { it.trim().lowercase(Locale.ROOT) }.map { artist ->
             async {
@@ -535,7 +676,7 @@ class PlaylistGenerationRepository(context: Context) {
 
     private suspend fun radioFromSeeds(seeds: List<Song>): List<Song> {
         val distinctSeeds = seeds.asSequence()
-            .filter { it.videoId.isNotBlank() && !it.isVideo }
+            .filter { it.videoId.isNotBlank() && !it.isVideo && it.localUri == null }
             .distinctBy { it.videoId }
             .take(6)
             .toList()
@@ -557,12 +698,16 @@ class PlaylistGenerationRepository(context: Context) {
     }
 
     private suspend fun neverHeardCandidates(onProgress: (String) -> Unit): List<Song> {
-        onProgress("Checking your listening history…")
-        val heard = heardTracks()
-        val heardIds = heard.mapTo(HashSet()) { it.videoId }
-        val heardKeys = heard.mapTo(HashSet(), PlaylistGenerationRules::trackKey)
+        val username = lastFmUsernameOrThrow()
+        onProgress(message(R.string.scrobble_gen_progress_scrobbled))
+        val heardKeys = heardTrackKeys(username)
+        val account = if (SignedIn.state(appContext).value) {
+            generationExclusionRead { YtMusicRepository.history().getOrThrow() }
+        } else emptyList()
+        val heardIds = account.mapTo(HashSet()) { it.videoId }
+        account.mapTo(heardKeys, PlaylistGenerationRules::trackKey)
         currentCoroutineContext().ensureActive()
-        onProgress("Finding music you haven't played…")
+        onProgress(message(R.string.scrobble_gen_progress_unheard))
         val quickPicks = YtMusicRepository.quickPicks(heardIds).getOrNull().orEmpty()
         val home = homeSongs()
         return PlaylistGenerationRules.excludeHeard(
@@ -572,21 +717,37 @@ class PlaylistGenerationRepository(context: Context) {
         )
     }
 
-    /**
-     * The local event log includes two-second skips; Replay adds counted plays.
-     * When signed in, include the account's YouTube Music history as well.
-     */
-    private suspend fun heardTracks(): List<Song> {
-        val local = withContext(Dispatchers.IO) {
-            ListeningHistory.read(appContext).map { it.song }
+    /** Complete all-time Last.fm identity, bounded and fail-closed rather than a partial chart. */
+    private suspend fun heardTrackKeys(username: String): HashSet<String> = supervisorScope {
+        val first = generationExclusionRead {
+            LastFM.getTopTracksPage(username, page = 1, limit = 100).getOrThrow()
         }
-        val replay = ListeningStats.summary(ReplayPeriod.ALL_TIME).songs.map { it.song }
-        val account = if (SignedIn.state(appContext).value) {
-            YtMusicRepository.history().getOrThrow()
-        } else {
-            emptyList()
+        requireGeneration(first.totalPages <= HEARD_CHART_PAGES, R.string.scrobble_gen_error_history_incomplete)
+        val gate = Semaphore(LastFmGenerationRules.ARTIST_REQUEST_CONCURRENCY)
+        val charts = (2..first.totalPages).map { page ->
+            async {
+                gate.withPermit {
+                    generationExclusionRead {
+                        LastFM.getTopTracksPage(username, page = page, limit = 100).getOrThrow()
+                    }
+                }
+            }
         }
-        return local + replay + account
+        val recent = async {
+            generationExclusionRead { LastFM.getRecentScrobbles(username, limit = 200).getOrThrow().items }
+        }
+        val remaining = charts.awaitAll()
+        val allTracks = first.items + remaining.flatMap { it.items }
+        requireGeneration(
+            remaining.all { it.totalPages == first.totalPages } && allTracks.size.toLong() >= first.total,
+            R.string.scrobble_gen_error_history_incomplete,
+        )
+        val keys = HashSet<String>()
+        allTracks.mapTo(keys) {
+            PlaylistGenerationRules.trackKey(it.name, it.artist)
+        }
+        recent.await().mapTo(keys) { PlaylistGenerationRules.trackKey(it.name, it.artist) }
+        keys
     }
 
     private suspend fun homeSongs(): List<Song> =
@@ -607,6 +768,8 @@ class PlaylistGenerationRepository(context: Context) {
         const val MIN_TRACKS = 5
         private const val MIN_SIMILAR_MIX_SIZE = 20
         const val MAX_TRACKS = 35
+        private const val HEARD_CHART_PAGES = 50
+        private const val LIBRARY_SONGS_BROWSE_ID = "FEmusic_liked_videos"
     }
 }
 
@@ -623,12 +786,12 @@ internal object PlaylistGenerationRules {
 
     fun deduplicate(candidates: List<Song>): List<Song> =
         candidates.asSequence()
-            .filter { it.videoId.isNotBlank() && !it.isVideo }
+            .filter { it.videoId.isNotBlank() && !it.isVideo && it.localUri == null }
             .distinctBy { it.videoId }
             .toList()
 
     /**
-     * LastWave's weighted mix curation, adapted to Mylo's local Replay and
+     * LastWave's weighted mix curation, adapted to Mylo's Last.fm and
      * YouTube Music sources. The highest-weight source owns duplicate identity;
      * artist diversity is relaxed only when needed to fill the requested pool.
      */
@@ -717,7 +880,9 @@ internal object PlaylistGenerationRules {
         val distinctTitles = LinkedHashMap<String, Song>()
         deduplicate(candidates).forEach { candidate ->
             val title = cleanSimilarTitle(candidate.title)
-            if (title.isBlank() || title == seedTitle || trackKey(candidate) == trackKey(seed)) return@forEach
+            if (candidate.videoId == seed.videoId || title.isBlank() || title == seedTitle ||
+                trackKey(candidate) == trackKey(seed)
+            ) return@forEach
             if (title !in distinctTitles) distinctTitles[title] = candidate
         }
         val unique = distinctTitles.values.toList()

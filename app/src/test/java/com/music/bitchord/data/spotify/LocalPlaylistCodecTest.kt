@@ -168,6 +168,37 @@ class LocalPlaylistCodecTest {
     }
 
     @Test
+    fun addedSongIdsAreNormalizedBeforeStoringAndCheckingDuplicates() {
+        val candidate = Song(" next ", "Next", "Artist", null)
+        assertEquals("next", appendUniquePlaylistSong(emptyList(), candidate)!!.single().videoId)
+        assertNull(appendUniquePlaylistSong(listOf(candidate), candidate.copy(videoId = "next")))
+        assertNull(appendUniquePlaylistSong(listOf(candidate.copy(videoId = "next")), candidate))
+    }
+
+    @Test
+    fun exportFilenameReplacesControlCharacters() {
+        assertEquals("Late_night_mix.csv", LocalPlaylistExport.fileName("Late\nnight\tmix", "csv"))
+        assertEquals("Mix_.m3u", LocalPlaylistExport.fileName("Mix\u0000", "m3u"))
+    }
+
+    @Test
+    fun duplicateTrackRemovalAndMoveRetainTheSelectedOccurrence() {
+        val a = Song("a", "A", "Artist", null)
+        val b = Song("b", "B", "Artist", null)
+        assertEquals(listOf(a, b), removePlaylistSong(listOf(a, b, a), 2, "a"))
+        assertEquals(listOf(a, a, b), movePlaylistSong(listOf(a, b, a), 2, "a", -1))
+    }
+
+    @Test
+    fun staleTrackIndexesResolveByIdentityWithoutDiscardingOtherChanges() {
+        val a = Song("a", "A", "Artist", null)
+        val b = Song("b", "B", "Artist", null)
+        val c = Song("c", "C", "Artist", null)
+        assertEquals(listOf(c, a), removePlaylistSong(listOf(c, a, b), 1, "b"))
+        assertEquals(listOf(c, b, a), movePlaylistSong(listOf(c, a, b), 1, "b", -1))
+    }
+
+    @Test
     fun csvExportQuotesFieldsAndEscapesEmbeddedQuotes() {
         val playlist = LocalPlaylist(
             id = "export",

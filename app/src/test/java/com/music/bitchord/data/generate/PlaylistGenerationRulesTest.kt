@@ -11,7 +11,10 @@ class PlaylistGenerationRulesTest {
         val first = song("same", "First")
         val duplicate = song("same", "Duplicate")
         val result = PlaylistGenerationRules.deduplicate(
-            listOf(first, duplicate, song("", "Missing id"), song("video", "Video").copy(isVideo = true)),
+            listOf(
+                first, duplicate, song("", "Missing id"), song("video", "Video").copy(isVideo = true),
+                song("local-id", "Local track").copy(localUri = "file:///music.mp3"),
+            ),
         )
 
         assertEquals(listOf(first), result)
@@ -166,6 +169,16 @@ class PlaylistGenerationRulesTest {
         assertEquals(listOf("a1", "a2", "b1", "c1"), result.map { it.videoId })
     }
 
+    @Test
+    fun similarTrackCurationRejectsSeedVideoEvenWhenMetadataChanged() {
+        val seed = song("seed", "Original title", "Original artist")
+        val renamedSeed = song("seed", "Different title", "Different artist")
+        val related = song("related", "Another track", "Related artist")
+        assertEquals(
+            listOf(related),
+            PlaylistGenerationRules.curateSimilarTracks(listOf(renamedSeed, related), seed, 5),
+        )
+    }
 
     @Test
     fun trackIdentityNormalizesCaseWhitespaceAndPunctuation() {

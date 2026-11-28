@@ -1466,8 +1466,6 @@
     <string name="bit_perfect_status_unavailable">ไม่พร้อมใช้งานสำหรับแทร็กนี้ (%1$s)</string>
     <string name="scrobble_building_mix">กำลังสร้างมิกซ์ของคุณ</string>
     <string name="scrobble_dismiss">ปิด</string>
-    <string name="scrobble_playlist_saved">บันทึกเพลย์ลิสต์แล้ว</string>
-    <string name="scrobble_tracks_steps">เพลง · ทีละ 5</string>
     <string name="scrobble_no_tracks_found">ไม่พบเพลง</string>
     <string name="scrobble_mixes_subtitle">มิกซ์ที่สร้างและบันทึกไว้</string>
     <string name="scrobble_open_generator">เปิดเครื่องสร้าง</string>
@@ -1479,15 +1477,7 @@
     <string name="scrobble_reset_cover">รีเซ็ตปก</string>
     <string name="scrobble_export_playlist">ส่งออกเพลย์ลิสต์</string>
     <string name="scrobble_remove_from_playlist">นำออกจากเพลย์ลิสต์</string>
-    <string name="scrobble_no_listening_yet">ยังไม่มีการฟัง</string>
     <string name="scrobble_open_settings">เปิดการตั้งค่า</string>
-    <string name="scrobble_save_csv">บันทึก CSV</string>
-    <string name="scrobble_share_csv">แชร์ CSV</string>
-    <string name="scrobble_save_m3u">บันทึก M3U</string>
-    <string name="scrobble_share_m3u">แชร์ M3U</string>
-    <string name="scrobble_track_concentration">ความเข้มข้นของเพลง</string>
-    <string name="scrobble_avg_plays_per_track">จำนวนเล่นเฉลี่ย / เพลง</string>
-    <string name="scrobble_unique_tracks">เพลงที่ไม่ซ้ำกัน</string>
     <string name="find_a_playlist">ค้นหาเพลย์ลิสต์</string>
     <string name="no_playlists_match">ไม่มีเพลย์ลิสต์ที่ตรงกับ “%1$s”</string>
     <string name="hide_lyrics_preview">ซ่อนเนื้อเพลง</string>
@@ -1640,18 +1630,11 @@
     <string name="replay_year_unmute">เปิดเสียงเรื่องราว</string>
     <string name="scrobble_tracks_count">%1$d เพลง</string>
     <string name="scrobble_playlists_tracks_summary">%1$d เพลย์ลิสต์ · %2$d เพลง</string>
-    <string name="scrobble_created_title">สร้าง %1$s แล้ว</string>
-    <string name="scrobble_view_all_tracks">ดูทั้ง %1$d เพลง</string>
     <string name="scrobble_remove_device_message">%1$s จะถูกลบออกจากอุปกรณ์นี้ ประวัติการฟังจะไม่ได้รับผลกระทบ</string>
-    <string name="scrobble_created_go_back">สร้าง %1$s แล้ว กลับไปดูได้เลย</string>
     <string name="scrobble_added_track">เพิ่ม %1$s แล้ว</string>
     <string name="scrobble_playlist_missing">ไม่พบเพลย์ลิสต์นี้แล้ว</string>
     <string name="scrobble_track_already_in_playlist">เพลงนี้อยู่ในเพลย์ลิสต์นี้แล้ว</string>
     <string name="scrobble_save_track_failed">บันทึกเพลงไม่สำเร็จ ลองอีกครั้ง</string>
-    <string name="scrobble_plays_count">%1$s ครั้ง</string>
     <string name="scrobble_choose_format">เลือกรูปแบบสำหรับ %1$s</string>
-    <string name="scrobble_mylo_listening_time">เวลาฟังใน Mylo · %1$s</string>
-    <string name="scrobble_not_recorded_yet">ยังไม่ได้บันทึก</string>
-    <string name="scrobble_percent_summary">%1$s · %2$s</string>
     <string name="scrobble_pinned">ปักหมุดแล้ว</string>
 </resources>

@@ -4,13 +4,16 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.music.bitchord.data.scrobbling.LastFM
 import com.music.bitchord.data.scrobbling.LastFmStatisticsRepository
+import com.music.bitchord.data.scrobbling.LastFmStatsCacheKey
+import com.music.bitchord.data.scrobbling.LastFmStatsPeriod
+import com.music.bitchord.data.scrobbling.LastFmStatsSnapshot
+import com.music.bitchord.data.scrobbling.statsConfigurationFingerprint
 import com.music.bitchord.data.settings.AppSettings
-import com.music.bitchord.data.stats.ListeningStats
-import com.music.bitchord.data.stats.ReplayPeriod
-import com.music.bitchord.data.stats.ReplaySummary
-import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -18,199 +21,241 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
 
-internal data class ScrobbleStatisticsUiState(
-    val period: ReplayPeriod = ReplayPeriod.ALL_TIME,
-    val localSummary: ReplaySummary? = null,
-    val tracks: List<MergedStatisticsTrack> = emptyList(),
-    val lastFmConnected: Boolean = false,
-    val isLoading: Boolean = true,
-    val isRefreshing: Boolean = false,
-    val error: String? = null,
-    val showingStaleLastFmData: Boolean = false,
-    val loadedPeriod: ReplayPeriod? = null,
-)
+/** The history is independent of the selected Last.fm chart period. */
+internal enum class StatsListMode { RECENT, TOP_TRACKS, TOP_ARTISTS, TOP_ALBUMS }
 
-/**
- * Selects only data that belongs to the requested period. During a period
- * transition the last completed period remains visible as stale content; its
- * local rows must not be merged with a new period's remote cache.
- */
-internal fun existingStatisticsTracksForPeriod(
-    snapshot: ScrobbleStatisticsUiState,
-    period: ReplayPeriod,
-    cachedTracks: List<LastFM.RankedTrack>,
-    connected: Boolean,
-): List<MergedStatisticsTrack> = when {
-    snapshot.loadedPeriod == period -> mergeStatisticsTracks(
-        snapshot.localSummary?.songs.orEmpty(),
-        cachedTracks,
-        connected,
-    )
-    snapshot.loadedPeriod != null -> snapshot.tracks
-    else -> mergeStatisticsTracks(emptyList(), cachedTracks, connected)
+/** A failed request keeps loaded rows and remembers the exact page to retry. */
+internal data class RecentFeed(
+    val items: List<LastFM.RecentTrack> = emptyList(),
+    val page: Int = 0,
+    val totalPages: Int = 0,
+    val loading: Boolean = false,
+    val failed: Boolean = false,
+    val failedPage: Int? = null,
+    /** Fixed for a paging session so newly arriving scrobbles do not shift later pages. */
+    val toEpochSeconds: Long? = null,
+) {
+    val loaded: Boolean get() = page > 0
+    val canLoadMore: Boolean get() = loaded && page < totalPages
+    val nextPage: Int get() = failedPage ?: if (loaded) page + 1 else 1
 }
 
+/** Every figure is Last.fm's, never blended with Mylo's local play log. */
+internal data class ScrobbleStatisticsUiState(
+    val period: LastFmStatsPeriod = LastFmStatsPeriod.MONTH,
+    val connected: Boolean = false,
+    val username: String = "",
+    val snapshot: LastFmStatsSnapshot? = null,
+    val snapshotPeriod: LastFmStatsPeriod? = null,
+    val isLoading: Boolean = false,
+    val isRefreshing: Boolean = false,
+    val failed: Boolean = false,
+    val listMode: StatsListMode = StatsListMode.RECENT,
+    val recent: RecentFeed = RecentFeed(),
+) {
+    /** Earlier-period data may stay dimmed, but never data from another account/config. */
+    val isSwitchingPeriod: Boolean get() = snapshot != null && snapshotPeriod != period
+    val showSkeleton: Boolean get() = connected && snapshot == null && !failed
+}
 
-class ScrobbleStatisticsViewModel : ViewModel() {
-    private val repository = LastFmStatisticsRepository()
+/** Includes settings and runtime identity, without retaining raw credentials in request keys. */
+internal data class StatsAccount(val username: String, val connected: Boolean, val configuration: String) {
+    val identity: Pair<String, String> get() = username.trim().lowercase(Locale.ROOT) to configuration
+}
+
+class ScrobbleStatisticsViewModel internal constructor(
+    private val repository: LastFmStatisticsRepository,
+    private val accountProvider: () -> StatsAccount,
+    private val ioDispatcher: CoroutineDispatcher,
+    private val prepareAccount: () -> Unit = {},
+) : ViewModel() {
+    constructor() : this(
+        LastFmStatisticsRepository(), ::currentStatsAccount, Dispatchers.IO, ::configureStatsAccount,
+    )
+
     private val _state = MutableStateFlow(ScrobbleStatisticsUiState())
     internal val state = _state.asStateFlow()
-
     private var loadJob: Job? = null
-    private var activeRequestKey: String? = null
+    private var activeKey: LastFmStatsCacheKey? = null
+    private var recentJob: Job? = null
+    private var shownAccount: StatsAccount? = null
+    private var loadGeneration = 0L
+    private var recentGeneration = 0L
 
     fun onScreenOpened() = load(force = false)
-
     fun onAccountChanged() = load(force = false)
-
-    /** The first account fetch starts immediately after Settings completes the connection. */
     fun onLastFmConnected() = load(force = true)
 
     fun onScreenClosed() {
-        loadJob?.cancel()
-        loadJob = null
-        activeRequestKey = null
-        _state.update { it.copy(isRefreshing = false) }
+        cancelSnapshot()
+        cancelRecent()
+        _state.update {
+            it.copy(isRefreshing = false, isLoading = false, recent = it.recent.copy(loading = false))
+        }
     }
 
-    fun setPeriod(period: ReplayPeriod) {
+    internal fun setPeriod(period: LastFmStatsPeriod) {
         if (_state.value.period == period) return
-        _state.update {
-            it.copy(
-                period = period,
-                isLoading = it.tracks.isEmpty() && it.localSummary == null,
-                isRefreshing = it.tracks.isNotEmpty() || it.localSummary != null,
-                error = null,
-                showingStaleLastFmData = false,
-            )
-        }
+        _state.update { it.copy(period = period, failed = false) }
         load(force = false)
+    }
+
+    internal fun setListMode(mode: StatsListMode) {
+        _state.update { it.copy(listMode = mode) }
     }
 
     fun refresh() = load(force = true)
 
-    private fun load(force: Boolean) {
-        val snapshot = _state.value
-        val period = snapshot.period
-        val username = AppSettings.lastfmUsername.value.trim()
-        val connected = AppSettings.lastfmEnabled.value &&
-            username.isNotEmpty() &&
-            LastFM.isInitialized()
-        val query = if (connected) repository.query(username, period) else null
-        val cached = query?.let(repository::cached)
-        val cachedTracks = cached?.tracks.orEmpty()
-        val cacheFresh = query?.let(repository::isFresh) == true
-        val remotePending = connected && query != null && (force || !cacheFresh)
-        val runtime = LastFM.currentConfig()
-        val requestKey = listOf(
-            period.name,
-            connected.toString(),
-            username.lowercase(Locale.ROOT),
-            runtime.endpoint,
-            31 * runtime.apiKey.hashCode() + runtime.secret.hashCode(),
-        ).joinToString("|")
+    /** Explicit retry is allowed even if a failed refresh was of an already-complete feed. */
+    fun loadMoreRecent() {
+        val feed = _state.value.recent
+        if (feed.loading || (feed.loaded && !feed.canLoadMore && !feed.failed)) return
+        loadRecent(feed.nextPage)
+    }
 
-        if (!force && loadJob?.isActive == true && activeRequestKey == requestKey) return
-
-        val samePeriodData = snapshot.loadedPeriod == period
-        val existingTracks = existingStatisticsTracksForPeriod(
-            snapshot = snapshot,
-            period = period,
-            cachedTracks = cachedTracks,
-            connected = connected,
-        )
-        val hasExistingData = existingTracks.isNotEmpty()
-
+    private fun cancelSnapshot() {
+        loadGeneration++
         loadJob?.cancel()
-        activeRequestKey = requestKey
-        _state.update {
-            it.copy(
-                lastFmConnected = connected,
-                tracks = existingTracks,
-                isLoading = existingTracks.isEmpty() && !samePeriodData,
-                isRefreshing = force || (remotePending && hasExistingData) ||
-                    (!samePeriodData && hasExistingData),
-                error = null,
-                showingStaleLastFmData = false,
-            )
-        }
+        loadJob = null
+        activeKey = null
+    }
 
-        loadJob = viewModelScope.launch {
-            try {
-                val local = withContext(Dispatchers.IO) {
-                    ListeningStats.summary(period)
-                }
-                if (_state.value.period != period) return@launch
+    private fun cancelRecent() {
+        recentGeneration++
+        recentJob?.cancel()
+        recentJob = null
+    }
 
-                val mergedWithCache = mergeStatisticsTracks(local.songs, cachedTracks, connected)
-                val hasData = mergedWithCache.isNotEmpty()
-                _state.update {
-                    if (it.period != period) it else it.copy(
-                        localSummary = local,
-                        loadedPeriod = period,
-                        tracks = mergedWithCache,
-                        isLoading = remotePending && !hasData,
-                        isRefreshing = force || (remotePending && hasData),
-                    )
-                }
+    private fun isCurrentAccount(account: StatsAccount): Boolean {
+        val current = accountProvider()
+        return current.connected && current.identity == account.identity && shownAccount?.identity == account.identity
+    }
 
-                if (remotePending && query != null) {
-                    val result = withContext(Dispatchers.IO) {
-                        repository.refresh(username, query, force)
-                    }
-                    if (_state.value.period != period) return@launch
-
-                    result.fold(
-                        onSuccess = { remoteTracks ->
-                            _state.update {
-                                if (it.period != period) it else it.copy(
-                                    tracks = mergeStatisticsTracks(local.songs, remoteTracks, true),
-                                    isLoading = false,
-                                    isRefreshing = false,
-                                    error = null,
-                                    showingStaleLastFmData = false,
-                                )
-                            }
-                        },
-                        onFailure = {
-                            val stale = repository.cached(query)
-                            val hasStaleTracks = !stale?.tracks.isNullOrEmpty()
-                            _state.update { current ->
-                                if (current.period != period) current else current.copy(
-                                    tracks = mergeStatisticsTracks(local.songs, stale?.tracks.orEmpty(), true),
-                                    isLoading = false,
-                                    isRefreshing = false,
-                                    error = if (hasStaleTracks) {
-                                        "Last.fm couldn't refresh. Showing saved statistics."
-                                    } else {
-                                        "Last.fm couldn't refresh. Showing Mylo statistics."
-                                    },
-                                    showingStaleLastFmData = hasStaleTracks,
-                                )
-                            }
-                        },
-                    )
-                } else {
-                    _state.update {
-                        if (it.period != period) it else it.copy(
-                            isLoading = false,
-                            isRefreshing = false,
-                            error = null,
-                            showingStaleLastFmData = false,
+    private fun loadRecent(page: Int) {
+        val account = shownAccount?.takeIf { isCurrentAccount(it) } ?: return
+        cancelRecent()
+        val generation = recentGeneration
+        val cutoff = if (page == 1) repository.recentCutoff() else _state.value.recent.toEpochSeconds
+        _state.update { it.copy(recent = it.recent.copy(loading = true, failed = false, failedPage = null)) }
+        recentJob = viewModelScope.launch {
+            val result = withContext(ioDispatcher) { repository.recentPage(account.username, page, cutoff) }
+            currentCoroutineContext().ensureActive()
+            if (generation != recentGeneration || !isCurrentAccount(account)) return@launch
+            _state.update { current ->
+                val feed = current.recent
+                result.fold(
+                    onSuccess = { response ->
+                        current.copy(
+                            recent = RecentFeed(
+                                items = mergeRecentTracks(if (page == 1) emptyList() else feed.items, response.items),
+                                page = page,
+                                totalPages = response.totalPages.coerceAtLeast(page),
+                                toEpochSeconds = cutoff,
+                            ),
                         )
-                    }
-                }
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (error: Exception) {
-                _state.update {
-                    if (it.period != period) it else it.copy(
-                        isLoading = false,
-                        isRefreshing = false,
-                        error = if (connected) "Statistics couldn't refresh. Please try again." else null,
-                    )
-                }
+                    },
+                    onFailure = {
+                        current.copy(recent = feed.copy(loading = false, failed = true, failedPage = page))
+                    },
+                )
             }
         }
     }
+
+    private fun load(force: Boolean) {
+        // Settings changes can reach this screen before playback/queue collectors
+        // configure LastFM. Synchronize once, not as a side effect of a result guard.
+        prepareAccount()
+        val account = accountProvider()
+        val period = _state.value.period
+        if (!account.connected) {
+            cancelSnapshot()
+            cancelRecent()
+            shownAccount = null
+            _state.value = ScrobbleStatisticsUiState(period = period, listMode = _state.value.listMode)
+            return
+        }
+
+        val key = repository.key(account.username, period)
+        if (!force && loadJob?.isActive == true && activeKey == key && shownAccount?.identity == account.identity) return
+        val accountChanged = shownAccount?.identity != account.identity
+        // Invalidate the old request BEFORE the fresh-cache early return.
+        cancelSnapshot()
+        if (accountChanged) cancelRecent()
+        shownAccount = account
+        val generation = loadGeneration
+        val cached = repository.cached(key)
+        val fresh = repository.isFresh(key)
+        _state.update { current ->
+            val shown = cached ?: current.snapshot.takeUnless { accountChanged }
+            current.copy(
+                connected = true,
+                username = account.username,
+                snapshot = shown,
+                snapshotPeriod = if (cached != null) period else if (accountChanged) null else current.snapshotPeriod,
+                isLoading = shown == null,
+                isRefreshing = force,
+                failed = false,
+                recent = if (accountChanged) RecentFeed() else current.recent,
+            )
+        }
+        if (force || accountChanged || (!_state.value.recent.loaded && !_state.value.recent.loading)) loadRecent(1)
+        if (!force && cached != null && fresh) {
+            _state.update { it.copy(isLoading = false, isRefreshing = false) }
+            return
+        }
+
+        activeKey = key
+        loadJob = viewModelScope.launch {
+            val result = withContext(ioDispatcher) { repository.load(account.username, period, force) }
+            currentCoroutineContext().ensureActive()
+            if (generation != loadGeneration || _state.value.period != period || !isCurrentAccount(account)) return@launch
+            result.fold(
+                onSuccess = { snapshot ->
+                    _state.update {
+                        it.copy(snapshot = snapshot, snapshotPeriod = period, isLoading = false, isRefreshing = false, failed = false)
+                    }
+                },
+                onFailure = {
+                    _state.update { current ->
+                        val stale = repository.cached(key)
+                        current.copy(
+                            snapshot = stale ?: current.snapshot?.takeIf { current.snapshotPeriod == period },
+                            snapshotPeriod = if (stale != null) period else current.snapshotPeriod?.takeIf { it == period },
+                            isLoading = false,
+                            isRefreshing = false,
+                            failed = true,
+                        )
+                    }
+                },
+            )
+        }
+    }
+}
+
+private fun statsSettingsConfig(): LastFM.RuntimeConfig? = runCatching {
+    val apiKey = AppSettings.lastfmApiKey.value.trim()
+    val secret = AppSettings.lastfmSecret.value.trim()
+    require(apiKey.isNotEmpty() && secret.isNotEmpty())
+    LastFM.RuntimeConfig(
+        LastFM.normalizeEndpoint(AppSettings.lastfmEndpoint.value.ifBlank { LastFM.DEFAULT_API_ENDPOINT }),
+        apiKey, secret, AppSettings.lastfmSessionKey.value.takeIf { it.isNotBlank() },
+    )
+}.getOrNull()
+
+private fun configureStatsAccount() {
+    if (!AppSettings.lastfmEnabled.value || AppSettings.lastfmUsername.value.isBlank()) return
+    val config = statsSettingsConfig() ?: return
+    if (LastFM.currentConfig() != config) LastFM.configure(config.endpoint, config.apiKey, config.secret, config.sessionKey)
+}
+
+private fun currentStatsAccount(): StatsAccount {
+    val username = AppSettings.lastfmUsername.value.trim()
+    val settings = statsSettingsConfig()
+    val runtime = LastFM.currentConfig()
+    return StatsAccount(
+        username = username,
+        connected = AppSettings.lastfmEnabled.value && username.isNotEmpty() && settings != null && runtime == settings,
+        configuration = statsConfigurationFingerprint(runtime),
+    )
 }

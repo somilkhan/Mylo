@@ -1461,8 +1461,6 @@
     <string name="bit_perfect_status_unavailable">このトラックでは利用できません（%1$s）</string>
     <string name="scrobble_building_mix">ミックスを作成中</string>
     <string name="scrobble_dismiss">閉じる</string>
-    <string name="scrobble_playlist_saved">プレイリストを保存しました</string>
-    <string name="scrobble_tracks_steps">曲 · 5曲ずつ</string>
     <string name="scrobble_no_tracks_found">曲が見つかりません</string>
     <string name="scrobble_mixes_subtitle">生成して保存したミックス</string>
     <string name="scrobble_open_generator">ジェネレーターを開く</string>
@@ -1474,15 +1472,7 @@
     <string name="scrobble_reset_cover">カバーをリセット</string>
     <string name="scrobble_export_playlist">プレイリストを書き出す</string>
     <string name="scrobble_remove_from_playlist">プレイリストから削除</string>
-    <string name="scrobble_no_listening_yet">まだ再生履歴がありません</string>
     <string name="scrobble_open_settings">設定を開く</string>
-    <string name="scrobble_save_csv">CSVを保存</string>
-    <string name="scrobble_share_csv">CSVを共有</string>
-    <string name="scrobble_save_m3u">M3Uを保存</string>
-    <string name="scrobble_share_m3u">M3Uを共有</string>
-    <string name="scrobble_track_concentration">曲の集中度</string>
-    <string name="scrobble_avg_plays_per_track">平均再生回数 / 曲</string>
-    <string name="scrobble_unique_tracks">ユニークな曲</string>
     <string name="find_a_playlist">プレイリストを検索</string>
     <string name="no_playlists_match">「%1$s」に一致するプレイリストはありません</string>
     <string name="hide_lyrics_preview">歌詞を非表示</string>
@@ -1635,18 +1625,11 @@
     <string name="replay_year_unmute">ストーリーのミュートを解除</string>
     <string name="scrobble_tracks_count">%1$d曲</string>
     <string name="scrobble_playlists_tracks_summary">プレイリスト %1$d 件 · %2$d曲</string>
-    <string name="scrobble_created_title">作成: %1$s</string>
-    <string name="scrobble_view_all_tracks">%1$d曲をすべて表示</string>
     <string name="scrobble_remove_device_message">%1$s はこの端末から削除されます。再生履歴には影響しません。</string>
-    <string name="scrobble_created_go_back">%1$s を作成しました。戻って確認してください。</string>
     <string name="scrobble_added_track">%1$s を追加しました</string>
     <string name="scrobble_playlist_missing">プレイリストが存在しません</string>
     <string name="scrobble_track_already_in_playlist">このトラックは既にこのプレイリストにあります</string>
     <string name="scrobble_save_track_failed">トラックを保存できませんでした。もう一度お試しください。</string>
-    <string name="scrobble_plays_count">%1$s 回再生</string>
     <string name="scrobble_choose_format">%1$s の形式を選択してください。</string>
-    <string name="scrobble_mylo_listening_time">Mylo での再生時間 · %1$s</string>
-    <string name="scrobble_not_recorded_yet">まだ記録されていません</string>
-    <string name="scrobble_percent_summary">%1$s · %2$s</string>
     <string name="scrobble_pinned">ピン留め中</string>
 </resources>

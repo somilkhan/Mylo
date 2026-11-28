@@ -1,105 +1,245 @@
 package com.music.bitchord.ui.scrobble
 
-import android.content.ClipData
-import android.content.Intent
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
+import android.text.format.DateFormat
+import android.text.format.DateUtils
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyItemScope
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.ui.res.stringResource
-import com.music.bitchord.R
+import androidx.compose.material3.pulltorefresh.PullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.core.content.FileProvider
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil3.compose.AsyncImage
-import com.music.bitchord.data.model.Song
+import com.music.bitchord.R
+import com.music.bitchord.data.scrobbling.LastFmStatsPeriod
+import com.music.bitchord.data.scrobbling.LastFmStatsSnapshot
 import com.music.bitchord.data.settings.AppSettings
-import com.music.bitchord.data.spotify.LocalPlaylist
-import com.music.bitchord.data.spotify.LocalPlaylistExport
-import com.music.bitchord.ui.components.AlertAction
-import com.music.bitchord.ui.components.AlertRule
-import com.music.bitchord.ui.components.AlertScaffold
+import com.music.bitchord.ui.components.IosMenuPopover
+import com.music.bitchord.ui.components.backdrop.Backdrop
+import com.music.bitchord.ui.components.IosMenuRow
+import com.music.bitchord.ui.components.PAGE_GUTTER
+import com.music.bitchord.ui.components.PillSegmentedControl
 import com.music.bitchord.ui.components.PullToRefresh
-import androidx.compose.material3.pulltorefresh.PullToRefreshState
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
-import com.music.bitchord.data.stats.RankedEntry
-import com.music.bitchord.data.stats.ReplayPeriod
-import com.music.bitchord.ui.replay.ReplayCardRow
-import com.music.bitchord.ui.replay.ReplayStoryPage
-import com.music.bitchord.ui.replay.cards
-import java.io.File
-import java.text.NumberFormat
+import com.music.bitchord.ui.icons.SfIcons
+import com.music.bitchord.ui.scrobble.stats.StatsAvatar
+import com.music.bitchord.ui.scrobble.stats.StatsDashboard
+import com.music.bitchord.ui.scrobble.stats.StatsDayHeader
+import com.music.bitchord.ui.scrobble.stats.StatsListEmpty
+import com.music.bitchord.ui.scrobble.stats.StatsListFooter
+import com.music.bitchord.ui.scrobble.stats.StatsListHeader
+import com.music.bitchord.ui.scrobble.stats.StatsListRow
+import com.music.bitchord.ui.scrobble.stats.StatsListSkeleton
+import com.music.bitchord.ui.scrobble.stats.StatsMessage
+import com.music.bitchord.ui.scrobble.stats.StatsPlays
+import com.music.bitchord.ui.scrobble.stats.StatsSkeleton
+import com.music.bitchord.ui.scrobble.stats.StatsStaleNotice
+import com.music.bitchord.ui.scrobble.stats.StatsWhen
+import com.music.bitchord.ui.scrobble.stats.rememberCountFormat
+import com.music.bitchord.ui.scrobble.stats.toQuantity
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.launch
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.TextStyle
+import java.time.temporal.ChronoUnit
+
+/** What a tap on the Stats tab asks the app to do; none of it is the tab's own business. */
+internal class StatsActions(
+    val onPeriodSelect: (LastFmStatsPeriod) -> Unit,
+    val onRetry: () -> Unit,
+    val onOpenSettings: () -> Unit,
+    val onOpenProfile: (String) -> Unit,
+    val onOpenArtist: (String) -> Unit,
+    val onOpenAlbum: (title: String, artist: String) -> Unit,
+    /** Finds the track on YouTube Music and plays it; returns once it has. */
+    val onPlayTrack: suspend (title: String, artist: String) -> Unit,
+    val onListModeSelect: (StatsListMode) -> Unit = {},
+    /** The next page of the history, or the first again after it failed. */
+    val onLoadMoreRecent: () -> Unit = {},
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ScrobbleStatisticsContent(
     viewModel: ScrobbleStatisticsViewModel,
-    reduceMotion: Boolean,
-    onPlaySong: (Song) -> Unit,
-    onOpenSettings: () -> Unit,
-    holder: String,
-    memberSince: String?,
-    onOpenReplay: (ReplayStoryPage, ReplayPeriod) -> Unit,
-    onOpenArtist: (String?, String) -> Unit,
-    onOpenAlbum: (String?, String, String?, String?) -> Unit,
+    actions: StatsActions,
     contentPadding: PaddingValues,
     refreshing: Boolean,
     onRefresh: () -> Unit,
     pullState: PullToRefreshState,
+    pageBackdrop: Backdrop? = null,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val context = LocalContext.current
     val lastFmEnabled by AppSettings.lastfmEnabled.collectAsStateWithLifecycle()
     val lastFmUsername by AppSettings.lastfmUsername.collectAsStateWithLifecycle()
     val lastFmApiKey by AppSettings.lastfmApiKey.collectAsStateWithLifecycle()
     val lastFmSecret by AppSettings.lastfmSecret.collectAsStateWithLifecycle()
     val lastFmEndpoint by AppSettings.lastfmEndpoint.collectAsStateWithLifecycle()
+    val lastFmSession by AppSettings.lastfmSessionKey.collectAsStateWithLifecycle()
+    val reduceMotion by AppSettings.reduceAnimation.collectAsStateWithLifecycle()
 
-    LaunchedEffect(lastFmEnabled, lastFmUsername, lastFmApiKey, lastFmSecret, lastFmEndpoint) {
+    LaunchedEffect(viewModel, lastFmEnabled, lastFmUsername, lastFmApiKey, lastFmSecret, lastFmEndpoint, lastFmSession) {
         viewModel.onScreenOpened()
     }
     DisposableEffect(viewModel) {
         onDispose { viewModel.onScreenClosed() }
+    }
+
+    PullToRefresh(
+        refreshing = refreshing,
+        onRefresh = onRefresh,
+        state = pullState,
+        modifier = Modifier.fillMaxSize(),
+    ) {
+        ScrobbleStatisticsScreen(
+            state = state,
+            actions = actions,
+            contentPadding = contentPadding,
+            reduceMotion = reduceMotion,
+            pageBackdrop = pageBackdrop,
+        )
+    }
+}
+
+/**
+ * The Stats tab: the account and a period switcher, the period's dashboard,
+ * and under it one list — the scrobble history by day, or the period's top
+ * tracks, artists or albums — picked from a menu on the list's heading.
+ *
+ * Scrolling the list folds the dashboard into one line first; it opens again
+ * once the list is back at its top, or on a tap. Between the two it settles to
+ * whichever end it is nearer when the finger lifts.
+ *
+ * Stateless, so every state it can be in can be drawn on its own;
+ * [initialCollapse] and [initialMenuOpen] let a test draw it folded, or with
+ * the list menu up.
+ */
+@Composable
+internal fun ScrobbleStatisticsScreen(
+    state: ScrobbleStatisticsUiState,
+    actions: StatsActions,
+    contentPadding: PaddingValues,
+    nowMillis: Long = System.currentTimeMillis(),
+    reduceMotion: Boolean = false,
+    initialCollapse: Float = 1f,
+    initialMenuOpen: Boolean = false,
+    pageBackdrop: Backdrop? = null,
+) {
+    val effectiveReduceMotion = scrobbleReduceMotion(reduceMotion)
+    val scope = rememberCoroutineScope()
+    var resolving by remember { mutableStateOf<String?>(null) }
+    val play: (String, String) -> Unit = { title, artist ->
+        val key = "$title\u0000$artist"
+        if (resolving == null) {
+            resolving = key
+            scope.launch {
+                try {
+                    actions.onPlayTrack(title, artist)
+                } finally {
+                    resolving = null
+                }
+            }
+        }
+    }
+    val anchorView = LocalView.current
+    val snapshot = state.snapshot
+    val contentAlpha by animateFloatAsState(
+        targetValue = if (state.isSwitchingPeriod) 0.45f else 1f,
+        animationSpec = if (effectiveReduceMotion) snap() else spring(),
+        label = "stats period switch",
+    )
+    val listState = rememberLazyListState()
+    val fold = rememberDashboardFold(initialCollapse, effectiveReduceMotion)
+    val dashboard = snapshot?.takeIf { state.connected }
+    val hasDashboard = dashboard != null
+    LaunchedEffect(hasDashboard) { if (!hasDashboard) fold.reset() }
+
+    val pinned by remember {
+        derivedStateOf { listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0 }
+    }
+    var menuOpen by remember { mutableStateOf(initialMenuOpen) }
+    var menuAnchor by remember { mutableStateOf<Rect?>(null) }
+    LaunchedEffect(state.listMode) {
+        if (listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0) listState.scrollToItem(0)
+    }
+    if (state.listMode == StatsListMode.RECENT && state.connected && snapshot != null &&
+        state.recent.canLoadMore && !state.recent.loading && !state.recent.failed
+    ) {
+        // Restart after each completed page, even if the viewport still fits
+        // all loaded rows. A failed page waits for the explicit Retry action.
+        LaunchedEffect(listState, state.recent.page) {
+            snapshotFlow {
+                val info = listState.layoutInfo
+                val last = info.visibleItemsInfo.lastOrNull()?.index ?: 0
+                info.totalItemsCount > 0 && last >= info.totalItemsCount - LOAD_AHEAD
+            }
+                .distinctUntilChanged()
+                .filter { it }
+                .collect { actions.onLoadMoreRecent() }
+        }
     }
 
     Surface(
@@ -107,607 +247,565 @@ internal fun ScrobbleStatisticsContent(
         color = MaterialTheme.colorScheme.background,
         contentColor = MaterialTheme.colorScheme.onBackground,
     ) {
-        PullToRefresh(
-            refreshing = refreshing,
-            onRefresh = onRefresh,
-            state = pullState,
-            modifier = Modifier.fillMaxSize(),
-        ) {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(
-                    bottom = contentPadding.calculateBottomPadding() + 24.dp,
-                ),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+        Box(Modifier.fillMaxSize()) {
+            Column(Modifier.fillMaxSize().nestedScroll(fold.connection)) {
+                StatsHeader(
+                    topPadding = contentPadding.calculateTopPadding(),
+                    state = state,
+                    onOpenProfile = actions.onOpenProfile,
+                )
+                if (state.connected) {
+                    PeriodSwitcher(state.period, actions.onPeriodSelect)
+                    if (state.failed && snapshot != null) StatsStaleNotice(onRetry = actions.onRetry)
+                }
+                if (dashboard != null) {
+                    Dashboard(
+                        snapshot = dashboard,
+                        period = state.snapshotPeriod ?: state.period,
+                        nowMillis = nowMillis,
+                        reduceMotion = effectiveReduceMotion,
+                        fold = fold,
+                        modifier = Modifier.alpha(contentAlpha),
+                    )
+                }
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    contentPadding = PaddingValues(bottom = contentPadding.calculateBottomPadding() + 32.dp),
+                ) {
+                    when {
+                        !state.connected -> item(key = "connect") {
+                            StatsMessage(
+                                icon = SfIcons.BarChart,
+                                title = stringResource(R.string.scrobble_stats_connect_title),
+                                body = stringResource(R.string.scrobble_stats_connect_body),
+                                action = stringResource(R.string.scrobble_open_settings),
+                                onAction = actions.onOpenSettings,
+                            )
+                        }
+                        snapshot == null && state.failed -> item(key = "failed") {
+                            StatsMessage(
+                                icon = SfIcons.ErrorOutline,
+                                title = stringResource(R.string.scrobble_stats_failed_title),
+                                body = stringResource(R.string.scrobble_stats_failed_body),
+                                action = stringResource(R.string.retry),
+                                onAction = actions.onRetry,
+                            )
+                        }
+                        snapshot == null -> item(key = "skeleton") { StatsSkeleton(reduceMotion = effectiveReduceMotion) }
+                        else -> statsList(
+                            state = state,
+                            snapshot = snapshot,
+                            alpha = contentAlpha,
+                            nowMillis = nowMillis,
+                            resolving = resolving,
+                            onPlay = play,
+                            actions = actions,
+                            reduceMotion = effectiveReduceMotion,
+                            menuOpen = menuOpen,
+                            pinned = { pinned },
+                            onOpenMenu = { menuOpen = true },
+                            onAnchor = { menuAnchor = it.toScreenCoordinates(anchorView) },
+                        )
+                    }
+                }
+            }
+
+            if (menuOpen) Dialog(
+                onDismissRequest = { menuOpen = false },
+                properties = DialogProperties(usePlatformDefaultWidth = false),
             ) {
-                item(key = "statistics-header") {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(
-                                start = 20.dp,
-                                end = 20.dp,
-                                top = contentPadding.calculateTopPadding() + 8.dp,
-                                bottom = 4.dp,
-                            ),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                state.period.chip,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Text(
-                                stringResource(R.string.scrobble_title_stats),
-                                style = MaterialTheme.typography.displayLarge,
-                                fontWeight = FontWeight.SemiBold,
-                            )
-                        }
-                    }
-                }
-
-                item(key = "statistics-periods") {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(start = 20.dp, end = 20.dp, top = 8.dp)
-                            .clip(RoundedCornerShape(50))
-                            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                            .border(
-                                width = 1.dp,
-                                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.18f),
-                                shape = RoundedCornerShape(50),
-                            )
-                            .padding(4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(2.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        ReplayPeriod.entries.forEach { period ->
-                            val selected = state.period == period
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(48.dp)
-                                    .clip(RoundedCornerShape(50))
-                                    .background(
-                                        if (selected) MaterialTheme.colorScheme.tertiary
-                                        else MaterialTheme.colorScheme.surfaceContainerHigh,
-                                    )
-                                    .selectable(
-                                        selected = selected,
-                                        role = Role.RadioButton,
-                                        onClick = { viewModel.setPeriod(period) },
-                                    )
-                                    .padding(horizontal = 4.dp),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(
-                                    text = period.chip,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = if (selected) MaterialTheme.colorScheme.onTertiary
-                                    else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                )
-                            }
-                        }
-                    }
-                }
-
-                if (state.loadedPeriod != null && state.loadedPeriod != state.period) {
-                    item(key = "statistics-period-loading") {
-                        androidx.compose.material3.LinearProgressIndicator(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
-                            color = scrobbleAccentColor(),
-                        )
-                    }
-                }
-
-                if (state.error != null && state.lastFmConnected) {
-                    item(key = "lastfm-retry") {
-                        StatisticsRetryNotice(
-                            message = state.error.orEmpty(),
-                            onRetry = viewModel::refresh,
-                        )
-                    }
-                }
-
-                if (state.isLoading) {
-                    items(5, key = { "skeleton-$it" }) {
-                        StatisticsTrackSkeletonRow()
-                    }
-                } else if (state.tracks.isEmpty()) {
-                    item(key = "empty") {
-                        StatisticsEmptyState(
-                            lastFmConnected = state.lastFmConnected,
-                            onOpenSettings = onOpenSettings,
-                        )
-                    }
-                } else {
-                    val localSummary = state.localSummary
-                    if (localSummary?.isEmpty == false) {
-                        item(key = "replay-cards-heading") {
-                            Text(
-                                "Your Replay",
-                                modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
-                            )
-                        }
-                        item(key = "replay-cards") {
-                            ReplayCardRow(
-                                cards = localSummary.cards(context),
-                                holder = holder,
-                                memberSince = memberSince,
-                                onCardClick = { page ->
-                                    onOpenReplay(page, state.loadedPeriod ?: state.period)
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                                contentPadding = PaddingValues(horizontal = 20.dp),
-                                animateSummary = localSummary,
-                                reduceMotion = reduceMotion,
-                            )
-                        }
-                        item(key = "replay-action") {
-                            TextButton(
-                                onClick = {
-                                    onOpenReplay(ReplayStoryPage.INTRO, state.loadedPeriod ?: state.period)
-                                },
-                                colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface),
-                                modifier = Modifier.padding(horizontal = 20.dp),
-                            ) {
+                IosMenuPopover(
+                    item = state.listMode,
+                    anchor = menuAnchor,
+                    onDismiss = { menuOpen = false },
+                    backdrop = pageBackdrop,
+                    screenCoordinates = true,
+                ) { current ->
+                StatsListMode.entries.forEach { mode ->
+                    IosMenuRow(
+                        label = stringResource(mode.label),
+                        icon = mode.icon,
+                        onClick = {
+                            menuOpen = false
+                            actions.onListModeSelect(mode)
+                        },
+                        trailing = if (mode == current) {
+                            {
                                 Icon(
-                                    imageVector = com.music.bitchord.ui.icons.BitChordIcons.Play,
+                                    imageVector = SfIcons.Check,
                                     contentDescription = null,
-                                    modifier = Modifier.size(18.dp),
-                                )
-                                Spacer(Modifier.width(8.dp))
-                                Text(stringResource(R.string.play_your_replay))
-                            }
-                        }
-                    }
-
-                    item(key = "concentration") {
-                        TrackConcentrationCard(
-                            trackPlays = state.tracks.map { it.plays },
-                            localListeningMs = localSummary?.totalMs ?: 0L,
-                            reduceMotion = reduceMotion,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-
-                    localSummary?.artists?.take(10)?.forEachIndexed { index, artist ->
-                        if (index == 0) {
-                            item(key = "top-artists-heading") {
-                                Text(
-                                    "Top artists",
-                                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.SemiBold,
+                                    tint = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.padding(start = 10.dp).size(16.dp),
                                 )
                             }
-                        }
-                        item(key = "top-artist-${artist.title.lowercase()}-${artist.browseId.orEmpty()}") {
-                            ReplayInsightRow(
-                                rank = index + 1,
-                                entry = artist,
-                                circular = true,
-                                onClick = { onOpenArtist(artist.browseId, artist.title) },
-                            )
-                        }
-                    }
-                    localSummary?.albums?.take(10)?.forEachIndexed { index, album ->
-                        if (index == 0) {
-                            item(key = "top-albums-heading") {
-                                Text(
-                                    "Top albums",
-                                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                )
-                            }
-                        }
-                        item(key = "top-album-${album.title.lowercase()}-${album.subtitle.orEmpty().lowercase()}-${album.browseId.orEmpty()}") {
-                            ReplayInsightRow(
-                                rank = index + 1,
-                                entry = album,
-                                circular = false,
-                                onClick = { onOpenAlbum(album.browseId, album.title, album.subtitle, album.artworkUrl) },
-                            )
-                        }
-                    }
-                    item(key = "tracks-heading") {
-                        Text(
-                            "Your tracks",
-                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    }
-                    items(state.tracks, key = { it.identity }) { track ->
-                        MergedStatisticsTrackRow(
-                            track = track,
-                            onPlaySong = onPlaySong,
-                        )
-                    }
+                        } else {
+                            null
+                        },
+                    )
+                }
                 }
             }
         }
     }
 }
 
-@Composable
-private fun ReplayInsightRow(
-    rank: Int,
-    entry: RankedEntry,
-    circular: Boolean,
-    onClick: () -> Unit,
+/**
+ * How far the dashboard is folded, 0 open to 1 folded, and the nested scroll
+ * that drives it: a scroll up folds the card before the list moves, a scroll
+ * down past the list's top opens it, and a lift between the two settles it.
+ */
+@Stable
+internal class DashboardFold(
+    initial: Float,
+    private val scope: CoroutineScope,
+    private var reduceMotion: Boolean,
 ) {
-    val colors = MaterialTheme.colorScheme
-    val shape = if (circular) CircleShape else RoundedCornerShape(10.dp)
-    val minutes = (entry.ms / 60_000L).coerceAtLeast(0L)
-    val duration = if (minutes >= 60) "${minutes / 60}h ${minutes % 60}m" else "${minutes}m"
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp)
-            .clickable(role = Role.Button, onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
-        color = colors.surfaceVariant,
-        contentColor = colors.onSurface,
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Text(
-                rank.toString(),
-                modifier = Modifier.width(20.dp),
-                style = MaterialTheme.typography.labelMedium,
-                color = colors.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-            )
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(shape)
-                    .background(colors.surfaceContainerHighest),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (!entry.artworkUrl.isNullOrBlank()) {
-                    AsyncImage(
-                        model = entry.artworkUrl,
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop,
-                    )
-                } else {
-                    Text(
-                        entry.title.take(1).uppercase(),
-                        color = colors.onSurfaceVariant,
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                }
-            }
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                Text(
-                    entry.title,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    color = colors.onSurface,
-                )
-                Text(
-                    listOfNotNull(entry.subtitle, duration, stringResource(R.string.scrobble_plays_count, entry.plays)).joinToString(" · "),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = colors.onSurfaceVariant,
-                )
-            }
+    var fraction by mutableFloatStateOf(initial.coerceIn(0f, 1f))
+        private set
+
+    /** The card's open height less its folded one, in px: the scroll it takes to fold. */
+    var distance = 0f
+    private var settling: Job? = null
+
+    fun expand() = settle(0f)
+    fun collapse() = settle(1f)
+
+    fun reset() {
+        cancel()
+        fraction = 1f
+    }
+
+    fun cancel() {
+        settling?.cancel()
+        settling = null
+    }
+
+    fun setReduceMotion(reduce: Boolean) {
+        if (reduceMotion == reduce) return
+        val wasSettling = settling?.isActive == true
+        cancel()
+        reduceMotion = reduce
+        if (reduce && wasSettling) fraction = if (fraction < 0.5f) 0f else 1f
+    }
+
+    private fun settle(target: Float, velocity: Float = 0f) {
+        cancel()
+        if (fraction == target) return
+        if (reduceMotion) {
+            fraction = target
+            return
+        }
+        settling = scope.launch {
+            animate(
+                initialValue = fraction,
+                targetValue = target,
+                initialVelocity = velocity,
+                animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 500f),
+            ) { value, _ -> fraction = value.coerceIn(0f, 1f) }
         }
     }
-}
 
-
-@Composable
-private fun StatisticsRetryNotice(
-    message: String,
-    onRetry: () -> Unit,
-) {
-    val colors = MaterialTheme.colorScheme
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp),
-        shape = RoundedCornerShape(16.dp),
-        color = colors.errorContainer,
-        contentColor = colors.onErrorContainer,
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Text(message, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
-            TextButton(onClick = onRetry, colors = scrobbleTextButtonColors(colors.onErrorContainer)) {
-                Text(stringResource(R.string.retry), color = colors.onErrorContainer)
-            }
+    /** Folds or opens the card by a scroll of [deltaY] px; returns the part it used. */
+    private fun take(deltaY: Float): Float {
+        if (distance <= 0f) return 0f
+        val next = (fraction - deltaY / distance).coerceIn(0f, 1f)
+        val used = (fraction - next) * distance
+        if (next != fraction) {
+            settling?.cancel()
+            fraction = next
         }
+        return used
     }
-}
 
-@Composable
-private fun StatisticsEmptyState(
-    lastFmConnected: Boolean,
-    onOpenSettings: () -> Unit,
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 28.dp, vertical = 48.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Text(stringResource(R.string.scrobble_no_listening_yet), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-        Text(
-            if (lastFmConnected) {
-                "No listening history for this period."
+    val connection = object : NestedScrollConnection {
+        override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset =
+            if (available.y < 0f) Offset(0f, take(available.y)) else Offset.Zero
+
+        override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset =
+            if (available.y > 0f && fraction < 1f && source == NestedScrollSource.UserInput) {
+                Offset(0f, take(available.y))
             } else {
-                "Play a few tracks, or connect Last.fm in Settings to bring in your history."
-            },
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
-        if (!lastFmConnected) {
-            Button(onClick = onOpenSettings, colors = scrobblePrimaryButtonColors()) {
-                Text(stringResource(R.string.scrobble_open_settings))
+                Offset.Zero
             }
+
+        override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
+            if (fraction > 0f && fraction < 1f) {
+                // A fling down the list had no room for opens the card;
+                // otherwise it goes to whichever end it is nearer.
+                val target = if (available.y > 0f || fraction < 0.5f) 0f else 1f
+                settle(target, velocity = if (distance > 0f) -available.y / distance else 0f)
+            }
+            return Velocity.Zero
         }
     }
 }
 
 @Composable
-private fun StatisticsTrackSkeletonRow() {
-    val colors = MaterialTheme.colorScheme
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp),
-        shape = RoundedCornerShape(16.dp),
-        color = colors.surfaceVariant,
-    ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Box(
-                Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(colors.surfaceContainerHighest),
-            )
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Box(
-                    Modifier
-                        .fillMaxWidth(0.62f)
-                        .height(12.dp)
-                        .clip(RoundedCornerShape(50))
-                        .background(colors.surfaceContainerHighest),
-                )
-                Box(
-                    Modifier
-                        .fillMaxWidth(0.38f)
-                        .height(10.dp)
-                        .clip(RoundedCornerShape(50))
-                        .background(colors.surfaceContainerHighest),
-                )
-            }
-            Box(
-                Modifier
-                    .width(30.dp)
-                    .height(10.dp)
-                    .clip(RoundedCornerShape(50))
-                    .background(colors.surfaceContainerHighest),
-            )
-        }
-    }
+private fun rememberDashboardFold(initial: Float, reduceMotion: Boolean): DashboardFold {
+    val scope = rememberCoroutineScope()
+    val fold = remember { DashboardFold(initial, scope, reduceMotion) }
+    LaunchedEffect(fold, reduceMotion) { fold.setReduceMotion(reduceMotion) }
+    DisposableEffect(fold) { onDispose { fold.cancel() } }
+    return fold
 }
 
 @Composable
-private fun MergedStatisticsTrackRow(
-    track: MergedStatisticsTrack,
-    onPlaySong: (Song) -> Unit,
+private fun Dashboard(
+    snapshot: LastFmStatsSnapshot,
+    period: LastFmStatsPeriod,
+    nowMillis: Long,
+    reduceMotion: Boolean,
+    fold: DashboardFold,
+    modifier: Modifier = Modifier,
 ) {
-    val colors = MaterialTheme.colorScheme
-    val song = track.song
-    val interaction = if (song != null) {
-        Modifier.clickable(role = Role.Button) { onPlaySong(song) }
-    } else {
-        Modifier
-    }
+    val registered = snapshot.profile?.registeredAtEpochSeconds?.takeIf { it > 0L }
+    val joined = registered?.let(::yearOf)
+    val days = period.days?.toDouble()
+        ?: registered?.let { ((nowMillis / 1_000L - it) / 86_400.0).coerceAtLeast(1.0) }
+    StatsDashboard(
+        period = period,
+        scrobbles = snapshot.scrobbles,
+        window = when {
+            period != LastFmStatsPeriod.OVERALL -> stringResource(period.window)
+            joined != null -> stringResource(R.string.scrobble_stats_window_overall_since, joined)
+            else -> stringResource(R.string.scrobble_stats_window_overall)
+        },
+        previousScrobbles = snapshot.previousScrobbles,
+        activity = snapshot.activity,
+        perDay = days?.let { snapshot.scrobbles / it },
+        artists = snapshot.artistCount,
+        albums = snapshot.albumCount,
+        tracks = snapshot.trackCount,
+        reduceMotion = reduceMotion,
+        collapse = { fold.fraction },
+        onExpand = fold::expand,
+        onCollapse = fold::collapse,
+        onFoldDistance = { fold.distance = it },
+        modifier = modifier,
+    )
+}
 
-    Surface(
+@Composable
+private fun StatsHeader(
+    topPadding: androidx.compose.ui.unit.Dp,
+    state: ScrobbleStatisticsUiState,
+    onOpenProfile: (String) -> Unit,
+) {
+    val profile = state.snapshot?.profile
+    val name = profile?.username ?: state.username
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp)
-            .then(interaction),
-        shape = RoundedCornerShape(16.dp),
-        color = colors.surfaceVariant,
-        contentColor = colors.onSurface,
+            .padding(start = 20.dp, end = PAGE_GUTTER, top = topPadding + 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Box(
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = stringResource(R.string.scrobble_title_stats),
+                style = MaterialTheme.typography.displayLarge,
+                color = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.semantics { heading() },
+            )
+            if (state.connected && name.isNotBlank()) {
+                val since = profile?.registeredAtEpochSeconds?.takeIf { it > 0L }?.let(::yearOf)
+                Text(
+                    text = listOf(
+                        name,
+                        since?.let { stringResource(R.string.scrobble_stats_profile_since, it) }
+                            ?: stringResource(R.string.scrobble_stats_profile),
+                    ).joinToString(" · "),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        if (state.connected && name.isNotBlank()) {
+            val description = stringResource(R.string.scrobble_stats_open_profile)
+            StatsAvatar(
+                url = profile?.avatarUrl,
+                name = name,
+                size = 40.dp,
                 modifier = Modifier
+                    .padding(start = 12.dp)
                     .size(48.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(colors.surfaceContainerHighest),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (!track.artworkUrl.isNullOrBlank()) {
-                    AsyncImage(
-                        model = track.artworkUrl,
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop,
-                    )
-                } else {
-                    Text("♫", color = colors.onSurfaceVariant, style = MaterialTheme.typography.titleMedium)
+                    .clip(CircleShape)
+                    .clickable(role = Role.Button) { onOpenProfile(name) }
+                    .padding(4.dp)
+                    .semantics { contentDescription = description },
+            )
+        }
+    }
+}
+
+@Composable
+private fun PeriodSwitcher(selected: LastFmStatsPeriod, onSelect: (LastFmStatsPeriod) -> Unit) {
+    val periods = LastFmStatsPeriod.entries
+    val labels = periods.map { stringResource(it.shortLabel) }
+    PillSegmentedControl(
+        options = labels,
+        selectedIndex = periods.indexOf(selected),
+        onSelect = { onSelect(periods[it]) },
+        modifier = Modifier.padding(horizontal = PAGE_GUTTER).padding(top = 14.dp),
+    )
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+private fun LazyListScope.statsList(
+    state: ScrobbleStatisticsUiState,
+    snapshot: LastFmStatsSnapshot,
+    alpha: Float,
+    nowMillis: Long,
+    resolving: String?,
+    onPlay: (String, String) -> Unit,
+    actions: StatsActions,
+    reduceMotion: Boolean,
+    menuOpen: Boolean,
+    pinned: () -> Boolean,
+    onOpenMenu: () -> Unit,
+    onAnchor: (Rect) -> Unit,
+) {
+    val mode = state.listMode
+    stickyHeader(key = "list-header") {
+        StatsListHeader(
+            title = stringResource(mode.label),
+            icon = mode.icon,
+            menuOpen = menuOpen,
+            pinned = pinned(),
+            onOpenMenu = onOpenMenu,
+            onAnchor = onAnchor,
+            reduceMotion = reduceMotion,
+        )
+    }
+
+    // Rows fade in and out when the list or the period changes; nothing
+    // slides, and with reduced motion nothing animates.
+    val itemModifier: LazyItemScope.() -> Modifier = {
+        if (reduceMotion) {
+            Modifier
+        } else {
+            Modifier.animateItem(fadeInSpec = tween(220), placementSpec = null, fadeOutSpec = tween(120))
+        }
+    }
+    fun busy(title: String, artist: String) = resolving == "$title\u0000$artist"
+
+    when (mode) {
+        StatsListMode.RECENT -> {
+            val feed = state.recent
+            when {
+                !feed.loaded && feed.failed -> item(key = "recent-failed") {
+                    StatsListFooter(loading = false, failed = true, onRetry = actions.onLoadMoreRecent, reduceMotion = reduceMotion)
+                }
+                !feed.loaded -> item(key = "recent-skeleton") { StatsListSkeleton(reduceMotion = reduceMotion) }
+                feed.items.isEmpty() -> item(key = "recent-empty") {
+                    StatsListEmpty(stringResource(R.string.scrobble_stats_recent_empty))
+                }
+                else -> {
+                    val zone = ZoneId.systemDefault()
+                    val today = Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate()
+                    val entries = groupRecentByDay(feed.items, zone, today)
+                    items(entries, key = { it.key }, contentType = { it::class.simpleName }) { entry ->
+                        when (entry) {
+                            is RecentEntry.Day -> StatsDayHeader(
+                                text = dayLabel(entry.date, today),
+                                modifier = itemModifier(),
+                            )
+                            is RecentEntry.Scrobble -> {
+                                val track = entry.track
+                                val trailing = if (track.nowPlaying) {
+                                    stringResource(R.string.scrobble_stats_now_playing)
+                                } else {
+                                    timeOfDay(track.timestamp * 1_000L)
+                                }
+                                StatsListRow(
+                                    title = track.name,
+                                    subtitle = track.artist,
+                                    artworkUrl = track.artworkUrl,
+                                    placeholder = SfIcons.MusicNote,
+                                    description = "${track.name}, ${track.artist}, $trailing",
+                                    onClick = { onPlay(track.name, track.artist) },
+                                    modifier = itemModifier(),
+                                ) {
+                                    StatsWhen(trailing, track.nowPlaying, busy(track.name, track.artist), reduceMotion)
+                                }
+                            }
+                        }
+                    }
                 }
             }
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
+            if (feed.loaded && (feed.loading || feed.failed || feed.canLoadMore)) {
+                item(key = "recent-footer") {
+                    StatsListFooter(
+                        loading = feed.loading,
+                        failed = feed.failed,
+                        onRetry = actions.onLoadMoreRecent,
+                        reduceMotion = reduceMotion,
+                    )
+                }
+            }
+        }
+
+        StatsListMode.TOP_TRACKS -> ranked(
+            rows = snapshot.topTracks,
+            key = { "track:${it.name}:${it.artist}" },
+            alpha = alpha,
+            itemModifier = itemModifier,
+        ) { rank, track, modifier ->
+            val plays = pluralStringResource(
+                R.plurals.scrobble_stats_scrobble_count,
+                track.playCount.toQuantity(),
+                rememberCountFormat().format(track.playCount),
+            )
+            StatsListRow(
+                title = track.name,
+                subtitle = track.artist,
+                artworkUrl = track.artworkUrl,
+                placeholder = SfIcons.MusicNote,
+                description = "$rank, ${track.name}, ${track.artist}, $plays",
+                onClick = { onPlay(track.name, track.artist) },
+                rank = rank,
+                modifier = modifier,
             ) {
-                Text(
-                    track.title,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    track.artist,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = colors.onSurfaceVariant,
-                )
+                StatsPlays(track.playCount, busy(track.name, track.artist), reduceMotion)
             }
-            Text(
-                NumberFormat.getIntegerInstance().format(track.plays),
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.SemiBold,
-                color = colors.onSurface,
+        }
+
+        StatsListMode.TOP_ARTISTS -> ranked(
+            rows = snapshot.topArtists,
+            key = { "artist:${it.name}" },
+            alpha = alpha,
+            itemModifier = itemModifier,
+        ) { rank, artist, modifier ->
+            val plays = pluralStringResource(
+                R.plurals.scrobble_stats_scrobble_count,
+                artist.playCount.toQuantity(),
+                rememberCountFormat().format(artist.playCount),
             )
+            StatsListRow(
+                title = artist.name,
+                subtitle = null,
+                artworkUrl = artist.artworkUrl,
+                placeholder = SfIcons.Artist,
+                description = "$rank, ${artist.name}, $plays",
+                onClick = { actions.onOpenArtist(artist.name) },
+                rank = rank,
+                round = true,
+                modifier = modifier,
+            ) {
+                StatsPlays(artist.playCount)
+            }
+        }
+
+        StatsListMode.TOP_ALBUMS -> ranked(
+            rows = snapshot.topAlbums,
+            key = { "album:${it.name}:${it.artist}" },
+            alpha = alpha,
+            itemModifier = itemModifier,
+        ) { rank, album, modifier ->
+            val plays = pluralStringResource(
+                R.plurals.scrobble_stats_scrobble_count,
+                album.playCount.toQuantity(),
+                rememberCountFormat().format(album.playCount),
+            )
+            StatsListRow(
+                title = album.name,
+                subtitle = album.artist,
+                artworkUrl = album.artworkUrl,
+                placeholder = SfIcons.Album,
+                description = "$rank, ${album.name}, ${album.artist}, $plays",
+                onClick = { actions.onOpenAlbum(album.name, album.artist) },
+                rank = rank,
+                modifier = modifier,
+            ) {
+                StatsPlays(album.playCount)
+            }
         }
     }
 }
 
-
-@Composable
-@OptIn(ExperimentalHazeMaterialsApi::class)
-internal fun ScrobblePlaylistExportDialog(
-    playlist: LocalPlaylist,
-    hazeState: HazeState,
-    onDismiss: () -> Unit,
-    onMessage: (String) -> Unit,
+/** A ranked list for the period, dimmed with the dashboard while another period loads. */
+private fun <T> LazyListScope.ranked(
+    rows: List<T>,
+    key: (T) -> String,
+    alpha: Float,
+    itemModifier: LazyItemScope.() -> Modifier,
+    row: @Composable (rank: Int, item: T, modifier: Modifier) -> Unit,
 ) {
-    val context = LocalContext.current
-    val csvSaveLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("text/csv"),
-    ) { uri ->
-        if (uri != null) {
-            runCatching {
-                context.contentResolver.openOutputStream(uri)?.use {
-                    it.write(LocalPlaylistExport.csv(playlist).toByteArray(Charsets.UTF_8))
-                } ?: error("Couldn't open the selected file")
-            }.onSuccess { onMessage("CSV saved") }
-                .onFailure { onMessage(it.message ?: "Couldn't save CSV") }
+    if (rows.isEmpty()) {
+        item(key = "ranked-empty") {
+            StatsListEmpty(stringResource(R.string.scrobble_stats_list_period_empty))
         }
-        onDismiss()
+        return
     }
-    val m3uSaveLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("audio/x-mpegurl"),
-    ) { uri ->
-        if (uri != null) {
-            runCatching {
-                context.contentResolver.openOutputStream(uri)?.use {
-                    it.write(LocalPlaylistExport.m3u(playlist).toByteArray(Charsets.UTF_8))
-                } ?: error("Couldn't open the selected file")
-            }.onSuccess { onMessage("M3U saved") }
-                .onFailure { onMessage(it.message ?: "Couldn't save M3U") }
-        }
-        onDismiss()
-    }
-
-    fun share(csv: Boolean) {
-        val content = if (csv) LocalPlaylistExport.csv(playlist) else LocalPlaylistExport.m3u(playlist)
-        val extension = if (csv) "csv" else "m3u"
-        val mimeType = if (csv) "text/csv" else "audio/x-mpegurl"
-        runCatching {
-            val directory = File(context.cacheDir, "shared/playlist_exports")
-            if (!directory.exists() && !directory.mkdirs()) error("Couldn't prepare the export file")
-            val file = File(directory, "${playlist.id}-${LocalPlaylistExport.fileName(playlist.title, extension)}")
-            file.writeText(content, Charsets.UTF_8)
-            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-            val intent = Intent(Intent.ACTION_SEND).apply {
-                type = mimeType
-                putExtra(Intent.EXTRA_STREAM, uri)
-                clipData = ClipData.newRawUri("Playlist export", uri)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-            context.startActivity(Intent.createChooser(intent, "Share playlist"))
-        }.onSuccess { onMessage("Ready to share") }
-            .onFailure { onMessage(it.message ?: "Couldn't share playlist") }
-    }
-
-    AlertScaffold(hazeState = hazeState, onDismiss = onDismiss) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 19.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(5.dp),
-        ) {
-            Text(
-                "Export playlist",
-                style = MaterialTheme.typography.bodyLarge.copy(fontSize = 17.sp, fontWeight = FontWeight.W600),
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Text(
-                stringResource(R.string.scrobble_choose_format, playlist.title),
-                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp, lineHeight = 17.sp),
-                color = MaterialTheme.colorScheme.onSurface,
-                textAlign = TextAlign.Center,
-            )
-        }
-        AlertRule()
-        AlertAction(
-            label = stringResource(R.string.scrobble_save_csv),
-            emphasised = true,
-            contentColor = scrobbleAccentColor(),
-            onClick = { csvSaveLauncher.launch(LocalPlaylistExport.fileName(playlist.title, "csv")) },
-        )
-        AlertRule()
-        AlertAction(
-            label = stringResource(R.string.scrobble_share_csv),
-            emphasised = false,
-            contentColor = MaterialTheme.colorScheme.onSurface,
-            onClick = { share(true); onDismiss() },
-        )
-        AlertRule()
-        AlertAction(
-            label = stringResource(R.string.scrobble_save_m3u),
-            emphasised = true,
-            contentColor = scrobbleAccentColor(),
-            onClick = { m3uSaveLauncher.launch(LocalPlaylistExport.fileName(playlist.title, "m3u")) },
-        )
-        AlertRule()
-        AlertAction(
-            label = stringResource(R.string.scrobble_share_m3u),
-            emphasised = false,
-            contentColor = MaterialTheme.colorScheme.onSurface,
-            onClick = { share(false); onDismiss() },
-        )
-        AlertRule()
-        AlertAction(
-            label = stringResource(R.string.done),
-            emphasised = false,
-            contentColor = MaterialTheme.colorScheme.onSurface,
-            onClick = onDismiss,
-        )
+    itemsIndexed(rows, key = { index, item -> "$index:${key(item)}" }) { index, item ->
+        row(index + 1, item, itemModifier().alpha(alpha))
     }
 }
+
+/** "Today", "Yesterday", a weekday for the rest of the week, then the date. */
+@Composable
+private fun dayLabel(date: LocalDate, today: LocalDate): String {
+    val locale = LocalConfiguration.current.locales[0]
+    val daysAgo = ChronoUnit.DAYS.between(date, today)
+    return when {
+        daysAgo == 0L -> stringResource(R.string.scrobble_stats_today)
+        daysAgo == 1L -> stringResource(R.string.scrobble_stats_yesterday)
+        daysAgo in 2L..6L -> date.dayOfWeek.getDisplayName(TextStyle.FULL_STANDALONE, locale)
+        else -> remember(date, locale, today.year) {
+            val skeleton = if (date.year == today.year) "MMMMd" else "yMMMMd"
+            DateTimeFormatter.ofPattern(DateFormat.getBestDateTimePattern(locale, skeleton), locale).format(date)
+        }
+    }
+}
+
+/** "21:04" or "9:04 PM", as the device tells time. */
+@Composable
+private fun timeOfDay(atMillis: Long): String {
+    val context = LocalContext.current
+    val configuration = LocalConfiguration.current
+    return remember(atMillis, context, configuration) { DateUtils.formatDateTime(context, atMillis, DateUtils.FORMAT_SHOW_TIME) }
+}
+
+private val StatsListMode.label: Int
+    get() = when (this) {
+        StatsListMode.RECENT -> R.string.scrobble_stats_list_recent
+        StatsListMode.TOP_TRACKS -> R.string.scrobble_stats_top_tracks
+        StatsListMode.TOP_ARTISTS -> R.string.scrobble_stats_top_artists
+        StatsListMode.TOP_ALBUMS -> R.string.scrobble_stats_top_albums
+    }
+
+private val StatsListMode.icon: ImageVector
+    get() = when (this) {
+        StatsListMode.RECENT -> SfIcons.Clock
+        StatsListMode.TOP_TRACKS -> SfIcons.MusicNote
+        StatsListMode.TOP_ARTISTS -> SfIcons.Artist
+        StatsListMode.TOP_ALBUMS -> SfIcons.Album
+    }
+
+internal val LastFmStatsPeriod.shortLabel: Int
+    get() = when (this) {
+        LastFmStatsPeriod.WEEK -> R.string.scrobble_stats_period_week
+        LastFmStatsPeriod.MONTH -> R.string.scrobble_stats_period_month
+        LastFmStatsPeriod.QUARTER -> R.string.scrobble_stats_period_quarter
+        LastFmStatsPeriod.HALF_YEAR -> R.string.scrobble_stats_period_half_year
+        LastFmStatsPeriod.YEAR -> R.string.scrobble_stats_period_year
+        LastFmStatsPeriod.OVERALL -> R.string.scrobble_stats_period_overall
+    }
+
+private val LastFmStatsPeriod.window: Int
+    get() = when (this) {
+        LastFmStatsPeriod.WEEK -> R.string.scrobble_stats_window_week
+        LastFmStatsPeriod.MONTH -> R.string.scrobble_stats_window_month
+        LastFmStatsPeriod.QUARTER -> R.string.scrobble_stats_window_quarter
+        LastFmStatsPeriod.HALF_YEAR -> R.string.scrobble_stats_window_half_year
+        LastFmStatsPeriod.YEAR -> R.string.scrobble_stats_window_year
+        LastFmStatsPeriod.OVERALL -> R.string.scrobble_stats_window_overall
+    }
+
+private fun yearOf(epochSeconds: Long): String =
+    Instant.ofEpochSecond(epochSeconds).atZone(ZoneId.systemDefault()).year.toString()
+
+/** Rows from the end of the loaded history at which the next page is asked for. */
+private const val LOAD_AHEAD = 12

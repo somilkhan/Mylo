@@ -1460,8 +1460,6 @@
     <string name="bit_perfect_status_unavailable">Tidak tersedia untuk trek ini (%1$s)</string>
     <string name="scrobble_building_mix">Menyiapkan mix kamu</string>
     <string name="scrobble_dismiss">Tutup</string>
-    <string name="scrobble_playlist_saved">Playlist disimpan</string>
-    <string name="scrobble_tracks_steps">lagu · langkah 5</string>
     <string name="scrobble_no_tracks_found">Lagu tidak ditemukan</string>
     <string name="scrobble_mixes_subtitle">Mix yang dibuat dan disimpan</string>
     <string name="scrobble_open_generator">Buka generator</string>
@@ -1473,15 +1471,7 @@
     <string name="scrobble_reset_cover">Atur ulang sampul</string>
     <string name="scrobble_export_playlist">Ekspor playlist</string>
     <string name="scrobble_remove_from_playlist">Hapus dari playlist</string>
-    <string name="scrobble_no_listening_yet">Belum ada yang diputar</string>
     <string name="scrobble_open_settings">Buka Pengaturan</string>
-    <string name="scrobble_save_csv">Simpan CSV</string>
-    <string name="scrobble_share_csv">Bagikan CSV</string>
-    <string name="scrobble_save_m3u">Simpan M3U</string>
-    <string name="scrobble_share_m3u">Bagikan M3U</string>
-    <string name="scrobble_track_concentration">Konsentrasi lagu</string>
-    <string name="scrobble_avg_plays_per_track">Rata-rata putar / lagu</string>
-    <string name="scrobble_unique_tracks">Lagu unik</string>
     <string name="find_a_playlist">Cari playlist</string>
     <string name="no_playlists_match">Tidak ada playlist yang cocok dengan “%1$s”</string>
     <string name="hide_lyrics_preview">Sembunyikan lirik</string>
@@ -1634,18 +1624,11 @@
     <string name="replay_year_unmute">Bunyikan cerita</string>
     <string name="scrobble_tracks_count">%1$d lagu</string>
     <string name="scrobble_playlists_tracks_summary">%1$d playlist · %2$d lagu</string>
-    <string name="scrobble_created_title">Dibuat: %1$s</string>
-    <string name="scrobble_view_all_tracks">Lihat semua %1$d lagu</string>
     <string name="scrobble_remove_device_message">%1$s akan dihapus dari perangkat ini. Riwayat pemutaran tidak terpengaruh.</string>
-    <string name="scrobble_created_go_back">Dibuat: %1$s. Kembali untuk melihatnya.</string>
     <string name="scrobble_added_track">Ditambahkan: %1$s</string>
     <string name="scrobble_playlist_missing">Playlist sudah tidak ada</string>
     <string name="scrobble_track_already_in_playlist">Lagu sudah ada di playlist ini</string>
     <string name="scrobble_save_track_failed">Gagal menyimpan lagu. Coba lagi.</string>
-    <string name="scrobble_plays_count">%1$s putaran</string>
     <string name="scrobble_choose_format">Pilih format untuk %1$s.</string>
-    <string name="scrobble_mylo_listening_time">Waktu mendengarkan di Mylo · %1$s</string>
-    <string name="scrobble_not_recorded_yet">Belum tercatat</string>
-    <string name="scrobble_percent_summary">%1$s · %2$s</string>
     <string name="scrobble_pinned">Disematkan</string>
 </resources>

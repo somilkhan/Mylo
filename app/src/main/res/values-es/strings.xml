@@ -1455,8 +1455,6 @@
     <string name="bit_perfect_status_unavailable">No disponible para esta pista (%1$s)</string>
     <string name="scrobble_building_mix">Preparando tu mix</string>
     <string name="scrobble_dismiss">Descartar</string>
-    <string name="scrobble_playlist_saved">Playlist guardada</string>
-    <string name="scrobble_tracks_steps">canciones · pasos de 5</string>
     <string name="scrobble_no_tracks_found">No se encontraron canciones</string>
     <string name="scrobble_mixes_subtitle">Tus mezclas generadas y guardadas</string>
     <string name="scrobble_open_generator">Abrir generador</string>
@@ -1468,15 +1466,7 @@
     <string name="scrobble_reset_cover">Restablecer portada</string>
     <string name="scrobble_export_playlist">Exportar playlist</string>
     <string name="scrobble_remove_from_playlist">Quitar de la playlist</string>
-    <string name="scrobble_no_listening_yet">Aún no hay escuchas</string>
     <string name="scrobble_open_settings">Abrir ajustes</string>
-    <string name="scrobble_save_csv">Guardar CSV</string>
-    <string name="scrobble_share_csv">Compartir CSV</string>
-    <string name="scrobble_save_m3u">Guardar M3U</string>
-    <string name="scrobble_share_m3u">Compartir M3U</string>
-    <string name="scrobble_track_concentration">Concentración de canciones</string>
-    <string name="scrobble_avg_plays_per_track">Reproducciones medias / canción</string>
-    <string name="scrobble_unique_tracks">Canciones únicas</string>
     <string name="find_a_playlist">Buscar una lista</string>
     <string name="no_playlists_match">Ninguna lista coincide con «%1$s»</string>
     <string name="hide_lyrics_preview">Ocultar letra</string>
@@ -1630,18 +1620,11 @@
     <string name="replay_year_unmute">Reactivar la historia</string>
     <string name="scrobble_tracks_count">%1$d pistas</string>
     <string name="scrobble_playlists_tracks_summary">%1$d listas · %2$d pistas</string>
-    <string name="scrobble_created_title">Creada: %1$s</string>
-    <string name="scrobble_view_all_tracks">Ver las %1$d pistas</string>
     <string name="scrobble_remove_device_message">%1$s se eliminará de este dispositivo. El historial de escucha no se ve afectado.</string>
-    <string name="scrobble_created_go_back">Creada: %1$s. Vuelve atrás para verla.</string>
     <string name="scrobble_added_track">Añadida: %1$s</string>
     <string name="scrobble_playlist_missing">La lista ya no existe</string>
     <string name="scrobble_track_already_in_playlist">La pista ya está en esta lista</string>
     <string name="scrobble_save_track_failed">No se pudo guardar la pista. Inténtalo de nuevo.</string>
-    <string name="scrobble_plays_count">%1$s reproducciones</string>
     <string name="scrobble_choose_format">Elige un formato para %1$s.</string>
-    <string name="scrobble_mylo_listening_time">Tiempo de escucha en Mylo · %1$s</string>
-    <string name="scrobble_not_recorded_yet">Aún no registrado</string>
-    <string name="scrobble_percent_summary">%1$s · %2$s</string>
     <string name="scrobble_pinned">Fijada</string>
 </resources>

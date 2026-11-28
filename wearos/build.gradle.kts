@@ -63,6 +63,23 @@ android {
     }
 
     signingConfigs {
+        // CI's stable debug key, installed by .github/scripts/debug-keystore.sh,
+        // so every dev APK from CI installs over the last one. Named explicitly
+        // because AGP on the runner doesn't read ~/.android/debug.keystore and
+        // otherwise signs each run with a key of its own. Unset on a local
+        // machine, where AGP's own debug keystore is used as before.
+        providers.environmentVariable("MYLO_DEBUG_KEYSTORE").orNull?.takeIf { it.isNotBlank() }?.let { path ->
+            val ciDebugStore = file(path)
+            if (!ciDebugStore.isFile) {
+                throw GradleException("MYLO_DEBUG_KEYSTORE is $path, but no keystore is there.")
+            }
+            getByName("debug") {
+                storeFile = ciDebugStore
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
+        }
         // The phone's keystore, found the same way app/build.gradle.kts finds it.
         val store = signing.getProperty("storeFile")?.let { rootProject.file(it) }
         if (store != null && store.exists()) {

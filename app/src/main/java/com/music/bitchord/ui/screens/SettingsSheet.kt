@@ -178,6 +178,9 @@ import com.music.bitchord.data.stats.Backup
 import com.music.bitchord.playback.AudioCache
 import com.music.bitchord.ui.player.fullBleedArtworkAvailable
 import com.music.bitchord.ui.scrobble.ScrobbleStatisticsViewModel
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 import java.util.Locale
@@ -328,7 +331,6 @@ fun SettingsScreen(
     }
 
     // Scrobbling states
-    val scrobbleGradientTheme by AppSettings.scrobbleGradientTheme.collectAsStateWithLifecycle()
     val lastfmEnabled by AppSettings.lastfmEnabled.collectAsStateWithLifecycle()
     val lastfmUsername by AppSettings.lastfmUsername.collectAsStateWithLifecycle()
     val lastfmSessionKey by AppSettings.lastfmSessionKey.collectAsStateWithLifecycle()
@@ -1139,21 +1141,6 @@ fun SettingsScreen(
                     subtitle = appFont.description(),
                     value = appFont.localizedLabel(),
                     onClick = { onOpenChoice(SettingsChoiceKind.FONT) },
-                )
-            }
-            val scrobbleGradientThemeTitle = "Scrobble gradient theme"
-            row(scrobbleGradientThemeTitle, "statistics", "generate", "playlists", "gradient") {
-                SettingsRow(
-                    icon = SfIcons.Gradient,
-                    title = scrobbleGradientThemeTitle,
-                    subtitle = "Use the approved gradient on Statistics, Generate and Playlists",
-                    trailing = {
-                        IosSwitch(
-                            checked = scrobbleGradientTheme,
-                            onCheckedChange = AppSettings::setScrobbleGradientTheme,
-                        )
-                    },
-                    onClick = { AppSettings.setScrobbleGradientTheme(!scrobbleGradientTheme) },
                 )
             }
             val reduceAnimationTitle = stringResource(R.string.reduce_animation)
@@ -2191,6 +2178,7 @@ fun SettingsScreen(
                         onValueChange = { usernameInput = it },
                         label = { Text(stringResource(R.string.username)) },
                         singleLine = true,
+                        enabled = !lastfmLoading,
                         modifier = Modifier.fillMaxWidth(),
                     )
                     Spacer(Modifier.height(8.dp))
@@ -2199,6 +2187,11 @@ fun SettingsScreen(
                         onValueChange = { passwordInput = it },
                         label = { Text(stringResource(R.string.password)) },
                         singleLine = true,
+                        enabled = !lastfmLoading,
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Password,
+                        ),
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
@@ -2206,6 +2199,7 @@ fun SettingsScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
+                        if (lastfmLoading) return@TextButton
                         lastfmLoading = true
                         lastfmError = null
                         scrobbleScope.launch {
@@ -2215,19 +2209,17 @@ fun SettingsScreen(
                                     apiKey = AppSettings.lastfmApiKey.value,
                                     secret = AppSettings.lastfmSecret.value,
                                 )
-                                LastFM.getMobileSession(usernameInput.trim(), passwordInput)
-                                    .onSuccess { auth ->
-                                        AppSettings.setLastfmSessionKey(auth.session.key)
-                                        AppSettings.setLastfmUsername(auth.session.name)
-                                        AppSettings.setLastfmEnabled(true)
-                                        scrobbleStatisticsViewModel.onLastFmConnected()
-                                        showLastfmLoginDialog = false
-                                    }
-                                    .onFailure { e ->
-                                        lastfmError = e.message ?: context.getString(R.string.login_failed)
-                                    }
-                            } catch (e: Exception) {
-                                lastfmError = e.message ?: context.getString(R.string.login_failed)
+                                val auth = LastFM.getMobileSession(usernameInput.trim(), passwordInput).getOrThrow()
+                                currentCoroutineContext().ensureActive()
+                                AppSettings.setLastfmSessionKey(auth.session.key)
+                                AppSettings.setLastfmUsername(auth.session.name)
+                                AppSettings.setLastfmEnabled(true)
+                                scrobbleStatisticsViewModel.onLastFmConnected()
+                                showLastfmLoginDialog = false
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (_: Exception) {
+                                lastfmError = context.getString(R.string.login_failed)
                             } finally {
                                 lastfmLoading = false
                             }

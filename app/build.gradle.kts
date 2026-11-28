@@ -135,6 +135,23 @@ android {
     }
 
     signingConfigs {
+        // CI's stable debug key, installed by .github/scripts/debug-keystore.sh,
+        // so every dev APK from CI installs over the last one. Named explicitly
+        // because AGP on the runner doesn't read ~/.android/debug.keystore and
+        // otherwise signs each run with a key of its own. Unset on a local
+        // machine, where AGP's own debug keystore is used as before.
+        providers.environmentVariable("MYLO_DEBUG_KEYSTORE").orNull?.takeIf { it.isNotBlank() }?.let { path ->
+            val ciDebugStore = file(path)
+            if (!ciDebugStore.isFile) {
+                throw GradleException("MYLO_DEBUG_KEYSTORE is $path, but no keystore is there.")
+            }
+            getByName("debug") {
+                storeFile = ciDebugStore
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
+        }
         // Both halves have to be there, not just the properties file: it *names*
         // the keystore rather than containing it, and both are gitignored
         // separately, so a checkout can easily end up with the one and not the
@@ -233,6 +250,9 @@ android {
             // so a test of that layer fails on the logging rather than on the
             // logic it was written to check.
             isReturnDefaultValues = true
+            // Robolectric screenshot tests render real Compose screens, which
+            // need the merged resources (strings, fonts, drawables).
+            isIncludeAndroidResources = true
         }
     }
 }
@@ -468,6 +488,10 @@ dependencies {
     // the OkHttp version already on the runtime classpath.
     testImplementation("com.squareup.okhttp3:mockwebserver:5.3.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+    testImplementation("org.robolectric:robolectric:4.14.1")
+    testImplementation(composeBom)
+    testImplementation("androidx.compose.ui:ui-test-junit4")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.7.0")
 }

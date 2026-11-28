@@ -23,4 +23,5 @@
     <!-- Other devices' listening and what this one last uploaded: Drive sync's, and re-fetched from Drive. -->
     <exclude domain="file" path="listening-peers/" />
     <exclude domain="file" path="listening-synced/" />
+    <exclude domain="file" path="lastfm-scrobble-queue.json" />
 </full-backup-content>

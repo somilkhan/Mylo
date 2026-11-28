@@ -936,6 +936,7 @@ private fun ReleaseHeader(
     onToggleLibrary: (() -> Unit)?,
     /** The Cached songs folder's: saves every track on it to Downloads. Null hides it. */
     onDownloadAll: (() -> Unit)? = null,
+    topPadding: Dp = topBarContentPadding(),
 ) {
     val (credit, meta) = page.headerLines(songs.size, songs.playtime())
     // Every row on a release carries the same credit — see [pageCredit] — so
@@ -951,7 +952,7 @@ private fun ReleaseHeader(
         modifier = Modifier
             .fillMaxWidth()
             // Clear of the floating bar, which only a full-bleed sleeve runs under.
-            .padding(top = if (bleed) 0.dp else topBarContentPadding(), bottom = 18.dp),
+            .padding(top = if (bleed) 0.dp else topPadding, bottom = 18.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         if (bleed) {
@@ -2578,6 +2579,7 @@ internal fun LocalPlaylistReleaseHeader(
             onShuffle = onShuffle,
             onArtistClick = null,
             onToggleLibrary = null,
+            topPadding = 0.dp,
         )
     }
 }
