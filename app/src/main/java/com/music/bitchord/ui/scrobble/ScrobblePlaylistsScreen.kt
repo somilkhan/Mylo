@@ -623,7 +623,7 @@ internal fun PlaylistList(
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
         // Keep the menu above app navigation while sampling the same live page backdrop.
-        IosMenuPopover(item = sortMode, anchor = sortAnchor, onDismiss = { sortOpen = false }, backdrop = pageBackdrop, screenCoordinates = true) { current ->
+        IosMenuPopover(item = sortMode, anchor = sortAnchor, onDismiss = { sortOpen = false }, backdrop = pageBackdrop, screenCoordinates = true, bottomClearance = ScrobbleChromeClearance) { current ->
         LocalPlaylistSortMode.entries.forEach { mode ->
             IosMenuRow(
                 label = stringResource(mode.labelRes),
@@ -656,7 +656,7 @@ internal fun PlaylistList(
             }
         }
     }
-    IosMenuPopover(item = currentRowMenu, anchor = rowAnchor, onDismiss = { rowMenu = null }, hazeState = hazeState) { menu ->
+    IosMenuPopover(item = currentRowMenu, anchor = rowAnchor, onDismiss = { rowMenu = null }, hazeState = hazeState, bottomClearance = ScrobbleChromeClearance) { menu ->
         val playlist = menu.playlist
         val close = { rowMenu = null }
         IosMenuRow(
@@ -944,14 +944,18 @@ internal fun PlaylistDetail(
                         },
                     )
                 }
-                ScrobbleSecondaryButton(
-                    label = stringResource(if (adding) R.string.scrobble_add_tracks_done else R.string.scrobble_add_tracks),
-                    onClick = {
-                        if (adding) finishAdding() else adding = true
-                    },
-                    compact = true,
-                    modifier = Modifier.padding(horizontal = 4.dp).liquidGlassRim(CircleShape),
-                )
+                // Adding is entered from the playlist's own ⋮ — the bar keeps a
+                // single way out of the mode and nothing else, so the ⋮ stays the
+                // last control before the edge and the bar does not carry a
+                // second, competing primary action.
+                if (adding) {
+                    ScrobbleSecondaryButton(
+                        label = stringResource(R.string.scrobble_add_tracks_done),
+                        onClick = { finishAdding() },
+                        compact = true,
+                        modifier = Modifier.padding(horizontal = 4.dp).liquidGlassRim(CircleShape),
+                    )
+                }
                 ScrobbleIconButton(
                     icon = SfIcons.More,
                     description = stringResource(R.string.scrobble_more_options, playlist.title),
@@ -976,11 +980,19 @@ internal fun PlaylistDetail(
                 Modifier.padding(horizontal = PAGE_GUTTER),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                notice?.let {
+                notice?.let { current ->
+                    // A confirmation is a moment, not a permanent caption: it goes
+                    // on its own after a few seconds instead of staying under the
+                    // header until some other action replaces it. Errors stay
+                    // longer, because they are the one thing worth reading twice.
+                    LaunchedEffect(current) {
+                        delay(if (current.error) 6_000 else 3_000)
+                        if (notice === current) notice = null
+                    }
                     Text(
-                        it.text,
+                        current.text,
                         style = MaterialTheme.typography.bodySmall,
-                        color = if (it.error) colors.error else colors.onSurfaceVariant,
+                        color = if (current.error) colors.error else colors.onSurfaceVariant,
                         modifier = Modifier.padding(top = 8.dp),
                     )
                 }
@@ -1115,8 +1127,20 @@ internal fun PlaylistDetail(
         }
     }
 
-    IosMenuPopover(item = playlist.takeIf { menuOpen }, anchor = menuAnchor, onDismiss = { menuOpen = false }, hazeState = hazeState) { current ->
+    IosMenuPopover(item = playlist.takeIf { menuOpen }, anchor = menuAnchor, onDismiss = { menuOpen = false }, hazeState = hazeState, bottomClearance = ScrobbleChromeClearance) { current ->
         val close = { menuOpen = false }
+        // The playlist's own actions live here, adding first: it is the one
+        // thing this page exists to do, and it used to sit in the bar as a
+        // pill beside this button, competing with it.
+        IosMenuRow(
+            label = stringResource(R.string.scrobble_add_tracks),
+            icon = SfIcons.AddToPlaylist,
+            onClick = {
+                close()
+                adding = true
+            },
+        )
+        IosMenuSeparator()
         IosMenuRow(
             label = stringResource(R.string.scrobble_change_cover),
             icon = SfIcons.Photo,
@@ -1182,7 +1206,7 @@ internal fun PlaylistDetail(
         )
     }
 
-    IosMenuPopover(item = trackMenu, anchor = trackAnchor, onDismiss = { trackMenu = null }, hazeState = hazeState) { menu ->
+    IosMenuPopover(item = trackMenu, anchor = trackAnchor, onDismiss = { trackMenu = null }, hazeState = hazeState, bottomClearance = ScrobbleChromeClearance) { menu ->
         val close = { trackMenu = null }
         IosMenuRow(
             label = stringResource(R.string.scrobble_move_up),

@@ -2550,11 +2550,14 @@ internal fun LocalPlaylistReleaseHeader(
     onPlay: () -> Unit,
     onShuffle: () -> Unit,
 ) {
-    val page = remember(playlistId, title, thumbnailUrl, songs) {
+    // Mylo's own word for it, in the user's language, rather than a literal
+    // that only ever read correctly in English.
+    val subtitle = stringResource(R.string.playlist).replaceFirstChar { it.titlecase() }
+    val page = remember(playlistId, title, thumbnailUrl, songs, subtitle) {
         DetailPage(
             browseId = "local:playlist:$playlistId",
             title = title,
-            subtitle = "Playlist",
+            subtitle = subtitle,
             thumbnailUrl = thumbnailUrl,
             songs = UiState.Success(songs),
             type = BrowseType.PLAYLIST,

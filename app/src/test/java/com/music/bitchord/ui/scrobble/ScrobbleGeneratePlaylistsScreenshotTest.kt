@@ -182,6 +182,12 @@ class ScrobbleGeneratePlaylistsScreenshotTest {
     }) { detail(detailPlaylist) }
 
     @Test fun playlistDetailAddBackStaysOnDetail() = capture("playlist_detail_add_tracks", verify = {
+        // Adding is entered from the playlist's own ⋮, beside the page's other
+        // actions, rather than from a pill in the bar.
+        compose.onNodeWithContentDescription(
+            compose.activity.getString(R.string.scrobble_more_options, detailPlaylist.title),
+        ).performClick()
+        compose.mainClock.advanceTimeBy(600)
         compose.onNodeWithText(text(R.string.scrobble_add_tracks)).performClick()
         compose.mainClock.advanceTimeBy(600)
         compose.onNodeWithText(text(R.string.scrobble_search_youtube_placeholder)).performScrollTo().assertIsDisplayed()

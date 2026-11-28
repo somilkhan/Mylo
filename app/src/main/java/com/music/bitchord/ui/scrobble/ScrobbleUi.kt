@@ -460,3 +460,10 @@ internal fun ScrobbleGroup(
         }
     }
 }
+
+/**
+ * How much chrome sits over the foot of a Scrobble page: the floating tab bar,
+ * and the mini player riding above it while something is playing. Menus opened
+ * from these pages keep clear of it instead of landing on the tab bar.
+ */
+internal val ScrobbleChromeClearance = 96.dp
