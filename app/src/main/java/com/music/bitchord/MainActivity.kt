@@ -3255,7 +3255,7 @@ private fun BitChordApp(
                                     contentPadding = listPadding,
                                 )
                             }
-                        } else if (pageRoute == AppRoute.Scrobble && scrobbleTab != 0 && detail?.browseId != scrobbleNativePlaylistId) {
+                        } else if (pageRoute == AppRoute.Scrobble && scrobbleTab != 0 && !(scrobbleNativePlaylistId != null && detail?.browseId == scrobbleNativePlaylistId)) {
                             ScrobbleHost(
                                 tab = scrobbleTab,
                                 highlightedPlaylistId = scrobbleHandoffPlaylistId,
@@ -4218,7 +4218,7 @@ private fun BitChordApp(
                         is AppRoute.SettingsChoice -> stringResource(route.choice.title)
                         AppRoute.EqualizerPresets -> stringResource(R.string.equalizer_preset)
                         AppRoute.Replay -> stringResource(R.string.replay)
-                        AppRoute.Scrobble -> if (detail?.browseId == scrobbleNativePlaylistId) detail.title else when (scrobbleTab) {
+                        AppRoute.Scrobble -> detail?.takeIf { scrobbleNativePlaylistId != null && it.browseId == scrobbleNativePlaylistId }?.title ?: when (scrobbleTab) {
                             0 -> stringResource(R.string.scrobble_title_stats)
                             1 -> stringResource(R.string.scrobble_tab_generate)
                             else -> stringResource(R.string.scrobble_tab_playlists)
@@ -4246,7 +4246,7 @@ private fun BitChordApp(
                             // stays out of the way until that has been scrolled off.
                             route == AppRoute.Replay -> replayScrolled
                             // As Mylo: the bar's title comes up once the page's own header scrolls off.
-                            route == AppRoute.Scrobble -> if (detail?.browseId == scrobbleNativePlaylistId) detailScrolled else scrobbleNavBarScroll.isInline
+                            route == AppRoute.Scrobble -> if (scrobbleNativePlaylistId != null && detail?.browseId == scrobbleNativePlaylistId) detailScrolled else scrobbleNavBarScroll.isInline
                             route != null -> true
                             detail != null && detailActiveShelf != null -> true
                             detail != null -> detailScrolled
