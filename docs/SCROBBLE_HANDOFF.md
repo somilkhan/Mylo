@@ -8,7 +8,7 @@ Updated 2026-11-28. This is the authoritative resume point for the next contribu
 - Branch: `feat/scrobble-screen`
 - Working tree at handoff: clean
 - Verified continuation baseline: `1f494445faadd7f6335e96d4752761062e343b2e` (HEAD matched origin; clean before edits).
-- Latest pushed HEAD: `d3c3ec4c72b7e5bd23e1e677ed770a9060f910fe` (handoff update; code checkpoint immediately before it is `8f17239fc381d5dcfb0119873ef68c0ed4b5cc2c`).
+- Latest code/test checkpoint: `f9bb276ca29585a80ac1f80f22e0532aa12842e5` (successful final Android regression/build checkpoint; subsequent change is this documentation update only).
 - Pull request already open: `https://github.com/somilkhan/Mylo/pull/15`
 - Do not create a replacement project, rename packages, or switch away from this branch.
 - The branch contains the pre-existing stable CI debug-keystore signing fixes. Do not commit keystores, secrets, or local.properties.
@@ -21,6 +21,8 @@ Updated 2026-11-28. This is the authoritative resume point for the next contribu
 - `38029159` — completes playlist detail coverage/edit safety, cover URI cleanup and validation, IO-bound exports, stale-index/search fixes, transaction regressions, and the real Compose/Robolectric detail screenshot fixtures. It also saves `docs/audits/SCROBBLE_PLAYLISTS.md`.
 - `8f17239f` — compact Stats dashboard and shared Scrobble control accessibility/reduced-motion hardening; pushed to this branch.
 - `d3c3ec4c` — documents exact pushed checkpoint and validation limits; documentation-only.
+- `30e6c06d` / `13192c15` — make busy primary controls explicitly disabled in semantics; import the Compose `disabled` semantic. Production and test Kotlin compile locally.
+- `fc042a4c` / `b0ac37fe` / `a9aadc4a` / `f9bb276c` — refine the busy-control regression test to avoid manual clock/content-replacement flakiness; compare control dimensions, not absolute position. Final CI test passes.
 
 The earlier redesign commits remain the product baseline: Stats is Last.fm-only with dashboard folding/history paging; Scrobble has no gradient hub theme and no Replay entry; Generate and Playlists use the redesigned Mylo style.
 
@@ -41,6 +43,8 @@ Locale checkpoint `bd5a4fb6397944903ab6fca36b59db62b591d4ca` is pushed. Actual A
 Checkpoint `8f17239fc381d5dcfb0119873ef68c0ed4b5cc2c` is pushed. The Stats overview is compact by default (roughly 150dp target; exact rendered height is pending screenshot inspection), shows summary metrics, and expands/collapses the full chart on demand. Recent remains the default list. Stats cache/account/cancellation/paging/date/reduced-motion fixes and focused regression/screenshot fixtures are added. Shared controls preserve 48dp touch targets, subtle `.96–.97` pointer feedback, reduced-motion/system-scale handling, selected/busy semantics, and minimal existing glass rim. Focused audits: `docs/audits/SCROBBLE_STATISTICS.md`, `docs/audits/SCROBBLE_SHARED_UI.md`, and `docs/audits/SCROBBLE_INTEGRATION.md`.
 
 Validation limits as of checkpoint: the exact-a820 CI run verified the **LocaleStringsTest passes** (57 tests, zero failures) and uploaded actual production Stats/Generate screenshots, but its full suite had one unrelated `SourcesTest` failure. A local Gradle run first caught and fixed icon/API-test import errors, then a misplaced Stats list-mode brace. The serialized fresh-source quality gate has restarted; until its completion is recorded, do not claim Stats/shared Compose tests or full unit tests pass. No CI, APK build, physical-device, real Last.fm, ListenBrainz, TalkBack, keyboard, export-provider, or GPU-blur verification is claimed for `8f17239`.
+
+Final verification: `f9bb276ca29585a80ac1f80f22e0532aa12842e5` is on `origin/feat/scrobble-screen`, with a clean tree at handoff. Android CI run `46104648528` **passed** on that exact commit, including all 1,507 Android unit tests (0 failures, 1 skipped) and evidence upload. TV run `46104648520` and Check run `46104648647` also **passed** on the same commit. Local production and unit-test Kotlin compilation passed. The local full Robolectric suite remains **not verified** on this ARM64 sandbox: it reports unsupported Linux aarch64 native runtime. Earlier transient Maven Central 429 and test-harness failures were resolved by retry/fixes; they are superseded by the successful exact-commit CI run. No physical-device, live provider, TalkBack, export-provider, or GPU-blur verification is claimed.
 
 This continuation's sandbox is ARM64 and newly provisioned: JDK 17 is `/usr/lib/jvm/java-17-openjdk-arm64`, SDK is `/home/ubuntu/Android/Sdk`. The prior handoff's amd64 JDK path and installed-tool claims describe its old sandbox, not this one. Stable CI signing remains unchanged.
 
