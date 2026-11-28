@@ -19,6 +19,7 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.music.bitchord.data.model.Song
+import com.music.bitchord.data.spotify.LocalPlaylist
 import com.music.bitchord.ui.components.backdrop.Backdrop
 import dev.chrisbanes.haze.HazeState
 
@@ -49,7 +50,7 @@ fun ScrobbleHost(
     onPlaySongs: (List<Song>, Int) -> Unit,
     onTabChange: (Int) -> Unit,
     onOpenSettings: () -> Unit = {},
-    onPlaylistDetailChanged: (Boolean) -> Unit = {},
+    onOpenPlaylist: (LocalPlaylist) -> Unit,
 ) {
     val generateViewModel: ScrobbleGenerateViewModel = viewModel()
     val hazeState = remember { HazeState() }
@@ -93,7 +94,7 @@ fun ScrobbleHost(
                         isPlaying = isPlaying,
                         onPlaySongs = onPlaySongs,
                         onOpenGenerator = { onTabChange(1) },
-                        onPlaylistDetailChanged = onPlaylistDetailChanged,
+                        onOpenPlaylist = onOpenPlaylist,
                     )
                 }
             }
