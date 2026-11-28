@@ -64,6 +64,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.music.bitchord.R
 import com.music.bitchord.data.scrobbling.LastFmStatsPeriod
@@ -303,11 +305,15 @@ internal fun ScrobbleStatisticsScreen(
                 }
             }
 
-            IosMenuPopover(
-                item = state.listMode.takeIf { menuOpen },
-                anchor = menuAnchor,
-                onDismiss = { menuOpen = false },
-            ) { current ->
+            if (menuOpen) Dialog(
+                onDismissRequest = { menuOpen = false },
+                properties = DialogProperties(usePlatformDefaultWidth = false),
+            ) {
+                IosMenuPopover(
+                    item = state.listMode,
+                    anchor = menuAnchor,
+                    onDismiss = { menuOpen = false },
+                ) { current ->
                 StatsListMode.entries.forEach { mode ->
                     IosMenuRow(
                         label = stringResource(mode.label),
@@ -329,6 +335,7 @@ internal fun ScrobbleStatisticsScreen(
                             null
                         },
                     )
+                }
                 }
             }
         }

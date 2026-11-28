@@ -64,6 +64,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.music.bitchord.R
 import com.music.bitchord.data.YtMusicRepository
@@ -610,7 +612,14 @@ internal fun PlaylistList(
         }
     }
 
-    IosMenuPopover(item = sortMode.takeIf { sortOpen }, anchor = sortAnchor, onDismiss = { sortOpen = false }, hazeState = hazeState) { current ->
+    if (sortOpen) Dialog(
+        onDismissRequest = { sortOpen = false },
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        // Keep this menu in a window above the app-level navigation/player bars.
+        // A dialog window cannot sample the page's Haze source, so use the shared
+        // menu's deliberate opaque-glass fallback instead of a half-frosted slab.
+        IosMenuPopover(item = sortMode, anchor = sortAnchor, onDismiss = { sortOpen = false }) { current ->
         LocalPlaylistSortMode.entries.forEach { mode ->
             IosMenuRow(
                 label = stringResource(mode.labelRes),
@@ -632,6 +641,7 @@ internal fun PlaylistList(
                     null
                 },
             )
+        }
         }
     }
 
