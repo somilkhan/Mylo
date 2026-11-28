@@ -55,6 +55,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -72,6 +73,7 @@ import com.music.bitchord.data.scrobbling.LastFmStatsPeriod
 import com.music.bitchord.data.scrobbling.LastFmStatsSnapshot
 import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.ui.components.IosMenuPopover
+import com.music.bitchord.ui.components.backdrop.Backdrop
 import com.music.bitchord.ui.components.IosMenuRow
 import com.music.bitchord.ui.components.PAGE_GUTTER
 import com.music.bitchord.ui.components.PillSegmentedControl
@@ -128,6 +130,7 @@ internal fun ScrobbleStatisticsContent(
     refreshing: Boolean,
     onRefresh: () -> Unit,
     pullState: PullToRefreshState,
+    pageBackdrop: Backdrop? = null,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val lastFmEnabled by AppSettings.lastfmEnabled.collectAsStateWithLifecycle()
@@ -199,6 +202,7 @@ internal fun ScrobbleStatisticsScreen(
             }
         }
     }
+    val anchorView = LocalView.current
     val snapshot = state.snapshot
     val contentAlpha by animateFloatAsState(
         targetValue = if (state.isSwitchingPeriod) 0.45f else 1f,
@@ -299,7 +303,7 @@ internal fun ScrobbleStatisticsScreen(
                             menuOpen = menuOpen,
                             pinned = { pinned },
                             onOpenMenu = { menuOpen = true },
-                            onAnchor = { menuAnchor = it },
+                            onAnchor = { menuAnchor = it.toScreenCoordinates(anchorView) },
                         )
                     }
                 }
@@ -313,6 +317,8 @@ internal fun ScrobbleStatisticsScreen(
                     item = state.listMode,
                     anchor = menuAnchor,
                     onDismiss = { menuOpen = false },
+                    backdrop = pageBackdrop,
+                    screenCoordinates = true,
                 ) { current ->
                 StatsListMode.entries.forEach { mode ->
                     IosMenuRow(

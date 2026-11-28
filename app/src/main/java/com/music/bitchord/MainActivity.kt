@@ -3257,6 +3257,7 @@ private fun BitChordApp(
                                 isPlaying = player.isPlaying,
                                 reduceMotion = reducePlayerMotion,
                                 contentPadding = listPadding,
+                                pageBackdrop = pageBackdrop,
                                 onPlaySongs = { songs, index ->
                                     playFrom(songs, index, QueueSource("Scrobble Playlist", PlaybackSourceType.QUEUE))
                                 },
@@ -3278,6 +3279,7 @@ private fun BitChordApp(
                                 refreshing = scrobbleStatisticsState.isRefreshing,
                                 onRefresh = scrobbleStatisticsViewModel::refresh,
                                 pullState = scrobbleStatisticsPull,
+                                pageBackdrop = pageBackdrop,
                                 actions = remember(scrobbleStatisticsViewModel) {
                                     StatsActions(
                                         onPeriodSelect = scrobbleStatisticsViewModel::setPeriod,

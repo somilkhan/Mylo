@@ -59,6 +59,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
@@ -83,6 +84,7 @@ import com.music.bitchord.ui.components.IosMenuPopover
 import com.music.bitchord.ui.components.IosMenuRow
 import com.music.bitchord.ui.components.IosMenuSeparator
 import com.music.bitchord.ui.components.PAGE_GUTTER
+import com.music.bitchord.ui.components.backdrop.Backdrop
 import com.music.bitchord.ui.components.PillTextField
 import com.music.bitchord.ui.components.SearchField
 import com.music.bitchord.ui.components.SongRow
@@ -142,6 +144,7 @@ private class RowMenu(val playlist: LocalPlaylist, val index: Int)
 fun ScrobblePlaylistsContent(
     viewModel: ScrobbleGenerateViewModel,
     hazeState: HazeState,
+    pageBackdrop: Backdrop?,
     contentPadding: PaddingValues,
     highlightedPlaylistId: String?,
     sharedHandoffFromGenerate: Boolean,
@@ -264,6 +267,7 @@ fun ScrobblePlaylistsContent(
                     onDelete = startDelete,
                     listState = playlistListState,
                     hazeState = hazeState,
+                    pageBackdrop = pageBackdrop,
                 )
             }
         }
@@ -431,8 +435,10 @@ internal fun PlaylistList(
     onDelete: (LocalPlaylist) -> Unit,
     listState: LazyListState = rememberLazyListState(),
     hazeState: HazeState? = null,
+    pageBackdrop: Backdrop? = null,
 ) {
     val colors = MaterialTheme.colorScheme
+    val anchorView = LocalView.current
     var sortOpen by remember { mutableStateOf(false) }
     var sortAnchor by remember { mutableStateOf<Rect?>(null) }
     var rowMenu by remember { mutableStateOf<RowMenu?>(null) }
@@ -464,7 +470,7 @@ internal fun PlaylistList(
                             description = stringResource(R.string.scrobble_sort_playlists),
                             onClick = { sortOpen = true },
                             active = sortOpen,
-                            onAnchor = { sortAnchor = it },
+                            onAnchor = { sortAnchor = it.toScreenCoordinates(anchorView) },
                         )
                     }
                     ScrobbleIconButton(
@@ -616,10 +622,8 @@ internal fun PlaylistList(
         onDismissRequest = { sortOpen = false },
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
-        // Keep this menu in a window above the app-level navigation/player bars.
-        // A dialog window cannot sample the page's Haze source, so use the shared
-        // menu's deliberate opaque-glass fallback instead of a half-frosted slab.
-        IosMenuPopover(item = sortMode, anchor = sortAnchor, onDismiss = { sortOpen = false }) { current ->
+        // Keep the menu above app navigation while sampling the same live page backdrop.
+        IosMenuPopover(item = sortMode, anchor = sortAnchor, onDismiss = { sortOpen = false }, backdrop = pageBackdrop, screenCoordinates = true) { current ->
         LocalPlaylistSortMode.entries.forEach { mode ->
             IosMenuRow(
                 label = stringResource(mode.labelRes),

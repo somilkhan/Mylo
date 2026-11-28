@@ -11,6 +11,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.music.bitchord.data.model.Song
+import com.music.bitchord.ui.components.backdrop.Backdrop
 import dev.chrisbanes.haze.HazeState
 
 /**
@@ -32,6 +33,7 @@ fun ScrobbleHost(
     isPlaying: Boolean,
     reduceMotion: Boolean,
     contentPadding: PaddingValues,
+    pageBackdrop: Backdrop? = null,
     onPlaySongs: (List<Song>, Int) -> Unit,
     onTabChange: (Int) -> Unit,
     onOpenSettings: () -> Unit = {},
@@ -59,6 +61,7 @@ fun ScrobbleHost(
                     2 -> ScrobblePlaylistsContent(
                         viewModel = generateViewModel,
                         hazeState = hazeState,
+                        pageBackdrop = pageBackdrop,
                         contentPadding = contentPadding,
                         highlightedPlaylistId = highlightedPlaylistId,
                         sharedHandoffFromGenerate = sharedHandoffFromGenerate,

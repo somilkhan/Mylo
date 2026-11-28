@@ -1,5 +1,6 @@
 package com.music.bitchord.ui.components
 
+import android.view.View
 import android.provider.Settings
 import com.music.bitchord.ui.player.PlayerBackHandler
 import com.music.bitchord.ui.player.additiveChrome
@@ -68,6 +69,7 @@ import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
@@ -433,6 +435,8 @@ fun <T : Any> IosMenuPopover(
     onDismiss: () -> Unit,
     backdrop: Backdrop? = null,
     hazeState: HazeState? = null,
+    /** Anchor and overlay use screen-space coordinates when shown in a separate window. */
+    screenCoordinates: Boolean = false,
     content: @Composable (T) -> Unit,
 ) {
     var last by remember { mutableStateOf<Pair<T, Rect?>?>(null) }
@@ -496,12 +500,21 @@ fun <T : Any> IosMenuPopover(
     val plain by AppSettings.disableBlendEffects.collectAsStateWithLifecycle()
     val scrim = Color.Black.copy(alpha = if (dark) 0.30f else 0.14f)
     val insets = WindowInsets.safeDrawing
+    val overlayView = LocalView.current
     var overlayOffset by remember { mutableStateOf(Offset.Zero) }
 
     Layout(
         modifier = Modifier
             .fillMaxSize()
-            .onGloballyPositioned { overlayOffset = it.positionInWindow() }
+            .onGloballyPositioned { coordinates ->
+                overlayOffset = coordinates.positionInWindow() + if (screenCoordinates) {
+                    val screen = IntArray(2)
+                    val window = IntArray(2)
+                    overlayView.getLocationOnScreen(screen)
+                    overlayView.getLocationInWindow(window)
+                    Offset((screen[0] - window[0]).toFloat(), (screen[1] - window[1]).toFloat())
+                } else Offset.Zero
+            }
             // Nothing under the menu moves while it is up: a drag that the
             // rows didn't take would otherwise reach the sheet the player is
             // in and pull the whole player down. Taps still go through.

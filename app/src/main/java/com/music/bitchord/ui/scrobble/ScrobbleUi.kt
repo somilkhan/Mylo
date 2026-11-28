@@ -1,5 +1,6 @@
 package com.music.bitchord.ui.scrobble
 
+import android.view.View
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.animateFloatAsState
@@ -39,6 +40,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.MotionDurationScale
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -72,6 +74,15 @@ import java.util.Locale
  */
 
 internal val ScrobbleCardShape = RoundedCornerShape(24.dp)
+
+/** Converts Compose window-local anchor bounds into screen coordinates for a full-window popup. */
+internal fun Rect.toScreenCoordinates(view: View): Rect {
+    val screen = IntArray(2)
+    val window = IntArray(2)
+    view.getLocationOnScreen(screen)
+    view.getLocationInWindow(window)
+    return translate(Offset((screen[0] - window[0]).toFloat(), (screen[1] - window[1]).toFloat()))
+}
 
 /** Host-owned policy; standalone controls still honor the app and system preferences. */
 internal val LocalScrobbleReduceMotion = staticCompositionLocalOf { false }
