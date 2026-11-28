@@ -1704,6 +1704,9 @@ private fun BitChordApp(
     // Playlists can run its arrival motion. Cleared with the page.
     var scrobbleHandoffPlaylistId by remember { mutableStateOf<String?>(null) }
     var scrobbleHandoffFromGenerate by remember { mutableStateOf(false) }
+    // A local playlist opened from the Library enters the same Scrobble detail
+    // surface as a playlist opened from the Playlists tab.
+    var scrobbleOpenPlaylistId by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(scrobbleOpen) {
         scrobbleHandoffPlaylistId = null
         scrobbleHandoffFromGenerate = false
@@ -2401,6 +2404,16 @@ private fun BitChordApp(
     // card opens the same way from either.
     val onLibraryItemClick: (ShelfItem) -> Unit = { item ->
         item.browseId?.let { id ->
+            // Scrobble-owned local playlists have a dedicated editor/detail
+            // experience. Keep one source of truth by opening that surface
+            // rather than a second, generic Library release page.
+            if (localPlaylists.any { it.browseId == id }) {
+                scrobbleTab = 2
+                scrobbleOpenPlaylistId = id
+                scrobblePlaylistDetailOpen = true
+                navigator.push(AppRoute.Scrobble)
+                return@let
+            }
             if (id == SPOTIFY_BROWSE_ID) {
                 navigator.push(AppRoute.Spotify)
                 return@let
@@ -3274,6 +3287,10 @@ private fun BitChordApp(
                                     navigator.push(AppRoute.Settings)
                                 },
                                 onPlaylistDetailChanged = { scrobblePlaylistDetailOpen = it },
+                                openPlaylistId = scrobbleOpenPlaylistId,
+                                onPlaylistOpenConsumed = { id ->
+                                    if (scrobbleOpenPlaylistId == id) scrobbleOpenPlaylistId = null
+                                },
                             )
                         } else if (pageRoute == AppRoute.Moods) {
                             MoodGridPage(
