@@ -49,6 +49,7 @@ fun ScrobbleHost(
     onPlaySongs: (List<Song>, Int) -> Unit,
     onTabChange: (Int) -> Unit,
     onOpenSettings: () -> Unit = {},
+    onPlaylistDetailChanged: (Boolean) -> Unit = {},
 ) {
     val generateViewModel: ScrobbleGenerateViewModel = viewModel()
     val hazeState = remember { HazeState() }
@@ -92,6 +93,7 @@ fun ScrobbleHost(
                         isPlaying = isPlaying,
                         onPlaySongs = onPlaySongs,
                         onOpenGenerator = { onTabChange(1) },
+                        onPlaylistDetailChanged = onPlaylistDetailChanged,
                     )
                 }
             }
