@@ -119,6 +119,16 @@ internal val LocalPlaylistSortMode.labelRes: Int
 private fun LocalPlaylist.cover(): String? = customCoverUri?.takeIf { it.isNotBlank() }
     ?: songs.firstOrNull { !it.thumbnailUrl.isNullOrBlank() }?.thumbnailUrl
 
+/** A persisted URI grant belongs to the app, not to an individual playlist. */
+private fun releaseUnusedCover(context: android.content.Context, savedUri: String?) {
+    if (savedUri == null || LocalPlaylistStore.playlists.value.any { it.customCoverUri == savedUri }) return
+    runCatching {
+        context.contentResolver.releasePersistableUriPermission(
+            Uri.parse(savedUri), Intent.FLAG_GRANT_READ_URI_PERMISSION,
+        )
+    }
+}
+
 private fun LocalPlaylist.canSeedSimilar(): Boolean = songs.any { it.videoId.isNotBlank() && !it.isVideo }
 
 /** A row menu, and where it hangs from. */
@@ -328,7 +338,6 @@ fun ScrobblePlaylistsContent(
                                 val cover = LocalPlaylistStore.getPlaylist(target.id)?.customCoverUri
                                 if (LocalPlaylistStore.deletePlaylist(target.id)) {
                                     releaseUnusedCover(context, cover)
-                                    if (selectedId == target.id) selectedId = null
                                     deleteTarget = null
                                     deleteError = null
                                 } else {
