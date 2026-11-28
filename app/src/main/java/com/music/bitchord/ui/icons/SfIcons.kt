@@ -29,6 +29,7 @@ import com.composables.sfsymbols.monochrome.SFCheckmarkIcloud
 import com.composables.sfsymbols.monochrome.SFChevronBackward
 import com.composables.sfsymbols.monochrome.SFChevronRight
 import com.composables.sfsymbols.monochrome.SFCircleLefthalfFilled
+import com.composables.sfsymbols.monochrome.SFChevronUpChevronDown
 import com.composables.sfsymbols.monochrome.SFClock
 import com.composables.sfsymbols.monochrome.SFClockArrowTriangleheadCounterclockwiseRotate90
 import com.composables.sfsymbols.monochrome.SFDocumentOnDocument
@@ -145,6 +146,7 @@ object SfIcons {
     val Cached: ImageVector by lazy { bold(SfSymbols.Monochrome.SFArrowTrianglehead2Clockwise) }
     val Check: ImageVector by lazy { bold(SfSymbols.Monochrome.SFCheckmark) }
     val ChevronRight: ImageVector by lazy { bold(SfSymbols.Monochrome.SFChevronRight) }
+    val ChevronUpDown: ImageVector by lazy { bold(SfSymbols.Monochrome.SFChevronUpChevronDown) }
     val Clock: ImageVector by lazy { bold(SfSymbols.Monochrome.SFClock) }
     val Cloud: ImageVector by lazy { bold(SfSymbols.Monochrome.SFIcloud) }
     val CloudUpload: ImageVector by lazy { bold(SfSymbols.Monochrome.SFIcloudAndArrowUp) }

@@ -48,7 +48,7 @@ import java.io.File
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @ConscryptMode(ConscryptMode.Mode.OFF)
-@Config(sdk = [35], application = Application::class, qualifiers = "w393dp-h2400dp-night-xxhdpi")
+@Config(sdk = [35], application = Application::class, qualifiers = "w393dp-h852dp-night-xxhdpi")
 class ScrobbleStatisticsScreenshotTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
 
@@ -62,6 +62,18 @@ class ScrobbleStatisticsScreenshotTest {
     private val nowSeconds = now / 1000
 
     @Test fun loaded() = capture("stats_loaded", sampleState())
+
+    @Test fun recentFolded() = capture("stats_recent_folded", sampleState(), collapse = 1f)
+
+    @Test fun topTracks() = capture("stats_top_tracks", sampleState().copy(listMode = StatsListMode.TOP_TRACKS), collapse = 1f)
+
+    @Test fun topArtists() = capture("stats_top_artists", sampleState().copy(listMode = StatsListMode.TOP_ARTISTS), collapse = 1f)
+
+    @Test fun topAlbums() = capture("stats_top_albums", sampleState().copy(listMode = StatsListMode.TOP_ALBUMS))
+
+    @Test fun listMenu() = capture("stats_list_menu", sampleState(), collapse = 1f, menuOpen = true)
+
+    @Test fun halfFolded() = capture("stats_half_folded", sampleState(), collapse = 0.5f)
 
     @Test fun loadedWeek() = capture("stats_loaded_week", sampleState().let { state ->
         state.copy(
@@ -83,7 +95,12 @@ class ScrobbleStatisticsScreenshotTest {
     @Test fun loading() = capture("stats_loading", ScrobbleStatisticsUiState(connected = true, username = "somil", isLoading = true))
 
     @OptIn(ExperimentalCoilApi::class)
-    private fun capture(name: String, state: ScrobbleStatisticsUiState) {
+    private fun capture(
+        name: String,
+        state: ScrobbleStatisticsUiState,
+        collapse: Float = 0f,
+        menuOpen: Boolean = false,
+    ) {
         // Shimmer and the now-playing bars animate forever; drive the clock by hand.
         compose.mainClock.autoAdvance = false
         compose.setContent {
@@ -100,6 +117,8 @@ class ScrobbleStatisticsScreenshotTest {
                             actions = StatsActions({}, {}, {}, {}, {}, { _, _ -> }, { _, _ -> }),
                             contentPadding = PaddingValues(top = 56.dp, bottom = 120.dp),
                             nowMillis = now,
+                            initialCollapse = collapse,
+                            initialMenuOpen = menuOpen,
                         )
                     }
                 }
@@ -144,12 +163,20 @@ class ScrobbleStatisticsScreenshotTest {
             "In Rainbows" to "Radiohead", "Rumours" to "Fleetwood Mac", "AM" to "Arctic Monkeys",
             "Blonde" to "Frank Ocean", "Currents" to "Tame Impala",
         ).mapIndexed { i, (t, a) -> LastFM.RankedAlbum(t, a, 120L - i * 17, "sample://album/$i") }
+        val hour = 3_600L
+        val day = 86_400L
         val recent = listOf(
             LastFM.RecentTrack("Nude", "Radiohead", "sample://album/0", 0L, nowPlaying = true, album = "In Rainbows"),
             LastFM.RecentTrack("Go Your Own Way", "Fleetwood Mac", "sample://album/1", nowSeconds - 240),
             LastFM.RecentTrack("Ivy", "Frank Ocean", "sample://album/3", nowSeconds - 1_500),
-            LastFM.RecentTrack("Let It Happen", "Tame Impala", "sample://album/4", nowSeconds - 7_400),
-            LastFM.RecentTrack("Arabella", "Arctic Monkeys", "sample://album/2", nowSeconds - 90_000),
+            LastFM.RecentTrack("Let It Happen", "Tame Impala", "sample://album/4", nowSeconds - 2 * hour),
+            LastFM.RecentTrack("Arabella", "Arctic Monkeys", "sample://album/2", nowSeconds - day - hour),
+            LastFM.RecentTrack("Reckoner", "Radiohead", "sample://album/0", nowSeconds - day - 3 * hour),
+            LastFM.RecentTrack("Self Control", "Frank Ocean", "sample://album/3", nowSeconds - day - 4 * hour),
+            LastFM.RecentTrack("Holocene", "Bon Iver", "sample://album/5", nowSeconds - 3 * day),
+            LastFM.RecentTrack("Dreams", "Fleetwood Mac", "sample://album/1", nowSeconds - 3 * day - hour),
+            LastFM.RecentTrack("Digital Love", "Daft Punk", "sample://album/6", nowSeconds - 9 * day),
+            LastFM.RecentTrack("Weird Fishes/Arpeggi", "Radiohead", "sample://album/0", nowSeconds - 9 * day - hour),
         )
         val snapshot = LastFmStatsSnapshot(
             profile = LastFM.UserStats("somil", "Somil", 48_213L, 6_120L, 1_402L, 2_310L, null, 1_420_000_000L),
@@ -160,7 +187,6 @@ class ScrobbleStatisticsScreenshotTest {
             topArtists = artists,
             topTracks = tracks,
             topAlbums = albums,
-            recent = recent,
             activity = listOf(96L, 141L, 118L, 162L, 104L, 87L, 133L, 214L, 158L, 71L).mapIndexed { i, plays ->
                 val start = nowSeconds - 30 * 86_400L + i * 3 * 86_400L
                 com.music.bitchord.data.scrobbling.LastFmActivityBucket(start, start + 3 * 86_400L - 1, plays)
@@ -173,6 +199,7 @@ class ScrobbleStatisticsScreenshotTest {
             username = "somil",
             snapshot = snapshot,
             snapshotPeriod = LastFmStatsPeriod.MONTH,
+            recent = RecentFeed(items = recent, page = 1, totalPages = 1),
         )
     }
 }

@@ -3321,6 +3321,8 @@ private fun BitChordApp(
                                                 playRadio(song, QueueSource("Last.fm", PlaybackSourceType.QUEUE))
                                             }
                                         },
+                                        onListModeSelect = scrobbleStatisticsViewModel::setListMode,
+                                        onLoadMoreRecent = scrobbleStatisticsViewModel::loadMoreRecent,
                                     )
                                 },
                                 contentPadding = listPadding,

@@ -1,22 +1,31 @@
 package com.music.bitchord.ui.scrobble
 
+import android.text.format.DateFormat
 import android.text.format.DateUtils
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -25,44 +34,72 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.music.bitchord.R
 import com.music.bitchord.data.scrobbling.LastFmStatsPeriod
 import com.music.bitchord.data.scrobbling.LastFmStatsSnapshot
 import com.music.bitchord.data.settings.AppSettings
+import com.music.bitchord.ui.components.IosMenuPopover
+import com.music.bitchord.ui.components.IosMenuRow
 import com.music.bitchord.ui.components.PAGE_GUTTER
 import com.music.bitchord.ui.components.PillSegmentedControl
 import com.music.bitchord.ui.components.PullToRefresh
 import com.music.bitchord.ui.icons.SfIcons
-import com.music.bitchord.ui.scrobble.stats.StatsAlbumItem
-import com.music.bitchord.ui.scrobble.stats.StatsAlbumShelf
 import com.music.bitchord.ui.scrobble.stats.StatsAvatar
 import com.music.bitchord.ui.scrobble.stats.StatsDashboard
+import com.music.bitchord.ui.scrobble.stats.StatsDayHeader
+import com.music.bitchord.ui.scrobble.stats.StatsListEmpty
+import com.music.bitchord.ui.scrobble.stats.StatsListFooter
+import com.music.bitchord.ui.scrobble.stats.StatsListHeader
+import com.music.bitchord.ui.scrobble.stats.StatsListRow
+import com.music.bitchord.ui.scrobble.stats.StatsListSkeleton
 import com.music.bitchord.ui.scrobble.stats.StatsMessage
-import com.music.bitchord.ui.scrobble.stats.StatsRankedRow
-import com.music.bitchord.ui.scrobble.stats.StatsRecentRow
-import com.music.bitchord.ui.scrobble.stats.StatsSectionHeader
+import com.music.bitchord.ui.scrobble.stats.StatsPlays
 import com.music.bitchord.ui.scrobble.stats.StatsSkeleton
 import com.music.bitchord.ui.scrobble.stats.StatsStaleNotice
+import com.music.bitchord.ui.scrobble.stats.StatsWhen
+import com.music.bitchord.ui.scrobble.stats.rememberCountFormat
+import com.music.bitchord.ui.scrobble.stats.toQuantity
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.TextStyle
+import java.time.temporal.ChronoUnit
 
 /** What a tap on the Stats tab asks the app to do; none of it is the tab's own business. */
 internal class StatsActions(
@@ -74,6 +111,9 @@ internal class StatsActions(
     val onOpenAlbum: (title: String, artist: String) -> Unit,
     /** Finds the track on YouTube Music and plays it; returns once it has. */
     val onPlayTrack: suspend (title: String, artist: String) -> Unit,
+    val onListModeSelect: (StatsListMode) -> Unit = {},
+    /** The next page of the history, or the first again after it failed. */
+    val onLoadMoreRecent: () -> Unit = {},
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -117,11 +157,17 @@ internal fun ScrobbleStatisticsContent(
 }
 
 /**
- * The Stats tab: the account, a period switcher, a dashboard card with the
- * period's scrobbles, their change and an activity chart, then the charts — artists and tracks as
- * ranked lists, albums as a shelf of covers — and the latest scrobbles.
+ * The Stats tab: the account and a period switcher, the period's dashboard,
+ * and under it one list — the scrobble history by day, or the period's top
+ * tracks, artists or albums — picked from a menu on the list's heading.
  *
- * Stateless, so every state it can be in can be drawn on its own.
+ * Scrolling the list folds the dashboard into one line first; it opens again
+ * once the list is back at its top, or on a tap. Between the two it settles to
+ * whichever end it is nearer when the finger lifts.
+ *
+ * Stateless, so every state it can be in can be drawn on its own;
+ * [initialCollapse] and [initialMenuOpen] let a test draw it folded, or with
+ * the list menu up.
  */
 @Composable
 internal fun ScrobbleStatisticsScreen(
@@ -130,6 +176,8 @@ internal fun ScrobbleStatisticsScreen(
     contentPadding: PaddingValues,
     nowMillis: Long = System.currentTimeMillis(),
     reduceMotion: Boolean = false,
+    initialCollapse: Float = 0f,
+    initialMenuOpen: Boolean = false,
 ) {
     val scope = rememberCoroutineScope()
     var resolving by remember { mutableStateOf<String?>(null) }
@@ -151,69 +199,252 @@ internal fun ScrobbleStatisticsScreen(
         targetValue = if (state.isSwitchingPeriod) 0.45f else 1f,
         label = "stats period switch",
     )
+    val listState = rememberLazyListState()
+    val fold = rememberDashboardFold(initialCollapse, reduceMotion)
+    val dashboard = snapshot?.takeIf { state.connected }
+    val hasDashboard = dashboard != null
+    LaunchedEffect(hasDashboard) { if (!hasDashboard) fold.reset() }
+
+    val pinned by remember {
+        derivedStateOf { listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0 }
+    }
+    var menuOpen by remember { mutableStateOf(initialMenuOpen) }
+    var menuAnchor by remember { mutableStateOf<Rect?>(null) }
+    LaunchedEffect(state.listMode) {
+        if (listState.firstVisibleItemIndex > 0) listState.scrollToItem(0)
+    }
+    if (state.listMode == StatsListMode.RECENT) {
+        LaunchedEffect(listState) {
+            snapshotFlow {
+                val info = listState.layoutInfo
+                val last = info.visibleItemsInfo.lastOrNull()?.index ?: 0
+                info.totalItemsCount > 0 && last >= info.totalItemsCount - LOAD_AHEAD
+            }
+                .distinctUntilChanged()
+                .filter { it }
+                .collect { actions.onLoadMoreRecent() }
+        }
+    }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background,
         contentColor = MaterialTheme.colorScheme.onBackground,
     ) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = contentPadding.calculateBottomPadding() + 32.dp),
-        ) {
-            item(key = "header") {
+        Box(Modifier.fillMaxSize()) {
+            Column(Modifier.fillMaxSize().nestedScroll(fold.connection)) {
                 StatsHeader(
                     topPadding = contentPadding.calculateTopPadding(),
                     state = state,
                     onOpenProfile = actions.onOpenProfile,
                 )
-            }
-
-            if (!state.connected) {
-                item(key = "connect") {
-                    StatsMessage(
-                        icon = SfIcons.BarChart,
-                        title = stringResource(R.string.scrobble_stats_connect_title),
-                        body = stringResource(R.string.scrobble_stats_connect_body),
-                        action = stringResource(R.string.scrobble_open_settings),
-                        onAction = actions.onOpenSettings,
+                if (state.connected) {
+                    PeriodSwitcher(state.period, actions.onPeriodSelect)
+                    if (state.failed && snapshot != null) StatsStaleNotice(onRetry = actions.onRetry)
+                }
+                if (dashboard != null) {
+                    Dashboard(
+                        snapshot = dashboard,
+                        period = state.snapshotPeriod ?: state.period,
+                        nowMillis = nowMillis,
+                        reduceMotion = reduceMotion,
+                        fold = fold,
+                        modifier = Modifier.alpha(contentAlpha),
                     )
                 }
-                return@LazyColumn
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    contentPadding = PaddingValues(bottom = contentPadding.calculateBottomPadding() + 32.dp),
+                ) {
+                    when {
+                        !state.connected -> item(key = "connect") {
+                            StatsMessage(
+                                icon = SfIcons.BarChart,
+                                title = stringResource(R.string.scrobble_stats_connect_title),
+                                body = stringResource(R.string.scrobble_stats_connect_body),
+                                action = stringResource(R.string.scrobble_open_settings),
+                                onAction = actions.onOpenSettings,
+                            )
+                        }
+                        snapshot == null && state.failed -> item(key = "failed") {
+                            StatsMessage(
+                                icon = SfIcons.ErrorOutline,
+                                title = stringResource(R.string.scrobble_stats_failed_title),
+                                body = stringResource(R.string.scrobble_stats_failed_body),
+                                action = stringResource(R.string.retry),
+                                onAction = actions.onRetry,
+                            )
+                        }
+                        snapshot == null -> item(key = "skeleton") { StatsSkeleton() }
+                        else -> statsList(
+                            state = state,
+                            snapshot = snapshot,
+                            alpha = contentAlpha,
+                            nowMillis = nowMillis,
+                            resolving = resolving,
+                            onPlay = play,
+                            actions = actions,
+                            reduceMotion = reduceMotion,
+                            menuOpen = menuOpen,
+                            pinned = { pinned },
+                            onOpenMenu = { menuOpen = true },
+                            onAnchor = { menuAnchor = it },
+                        )
+                    }
+                }
             }
 
-            item(key = "periods") {
-                PeriodSwitcher(state.period, actions.onPeriodSelect)
-            }
-
-            if (state.failed && snapshot != null) {
-                item(key = "stale") { StatsStaleNotice(onRetry = actions.onRetry) }
-            }
-
-            when {
-                snapshot == null && state.failed -> item(key = "failed") {
-                    StatsMessage(
-                        icon = SfIcons.ErrorOutline,
-                        title = stringResource(R.string.scrobble_stats_failed_title),
-                        body = stringResource(R.string.scrobble_stats_failed_body),
-                        action = stringResource(R.string.retry),
-                        onAction = actions.onRetry,
+            IosMenuPopover(
+                item = state.listMode.takeIf { menuOpen },
+                anchor = menuAnchor,
+                onDismiss = { menuOpen = false },
+            ) { current ->
+                StatsListMode.entries.forEach { mode ->
+                    IosMenuRow(
+                        label = stringResource(mode.label),
+                        icon = mode.icon,
+                        onClick = {
+                            menuOpen = false
+                            actions.onListModeSelect(mode)
+                        },
+                        trailing = if (mode == current) {
+                            {
+                                Icon(
+                                    imageVector = SfIcons.Check,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.padding(start = 10.dp).size(16.dp),
+                                )
+                            }
+                        } else {
+                            null
+                        },
                     )
                 }
-                snapshot == null -> item(key = "skeleton") { StatsSkeleton() }
-                else -> statsBody(
-                    snapshot = snapshot,
-                    period = state.snapshotPeriod ?: state.period,
-                    alpha = contentAlpha,
-                    nowMillis = nowMillis,
-                    resolving = resolving,
-                    onPlay = play,
-                    actions = actions,
-                    reduceMotion = reduceMotion,
-                )
             }
         }
     }
+}
+
+/**
+ * How far the dashboard is folded, 0 open to 1 folded, and the nested scroll
+ * that drives it: a scroll up folds the card before the list moves, a scroll
+ * down past the list's top opens it, and a lift between the two settles it.
+ */
+@Stable
+private class DashboardFold(
+    initial: Float,
+    private val scope: CoroutineScope,
+    private val reduceMotion: Boolean,
+) {
+    var fraction by mutableFloatStateOf(initial)
+        private set
+
+    /** The card's open height less its folded one, in px: the scroll it takes to fold. */
+    var distance = 0f
+    private var settling: Job? = null
+
+    fun expand() = settle(0f)
+
+    fun reset() {
+        settling?.cancel()
+        fraction = 0f
+    }
+
+    private fun settle(target: Float, velocity: Float = 0f) {
+        settling?.cancel()
+        if (fraction == target) return
+        settling = scope.launch {
+            if (reduceMotion) {
+                fraction = target
+            } else {
+                animate(
+                    initialValue = fraction,
+                    targetValue = target,
+                    initialVelocity = velocity,
+                    animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 500f),
+                ) { value, _ -> fraction = value }
+            }
+        }
+    }
+
+    /** Folds or opens the card by a scroll of [deltaY] px; returns the part it used. */
+    private fun take(deltaY: Float): Float {
+        if (distance <= 0f) return 0f
+        val next = (fraction - deltaY / distance).coerceIn(0f, 1f)
+        val used = (fraction - next) * distance
+        if (next != fraction) {
+            settling?.cancel()
+            fraction = next
+        }
+        return used
+    }
+
+    val connection = object : NestedScrollConnection {
+        override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset =
+            if (available.y < 0f) Offset(0f, take(available.y)) else Offset.Zero
+
+        override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset =
+            if (available.y > 0f && source == NestedScrollSource.UserInput) {
+                Offset(0f, take(available.y))
+            } else {
+                Offset.Zero
+            }
+
+        override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
+            if (fraction > 0f && fraction < 1f) {
+                // A fling down the list had no room for opens the card;
+                // otherwise it goes to whichever end it is nearer.
+                val target = if (available.y > 0f || fraction < 0.5f) 0f else 1f
+                settle(target, velocity = if (distance > 0f) -available.y / distance else 0f)
+            } else if (available.y > 0f && fraction > 0f) {
+                settle(0f)
+            }
+            return Velocity.Zero
+        }
+    }
+}
+
+@Composable
+private fun rememberDashboardFold(initial: Float, reduceMotion: Boolean): DashboardFold {
+    val scope = rememberCoroutineScope()
+    return remember(reduceMotion) { DashboardFold(initial, scope, reduceMotion) }
+}
+
+@Composable
+private fun Dashboard(
+    snapshot: LastFmStatsSnapshot,
+    period: LastFmStatsPeriod,
+    nowMillis: Long,
+    reduceMotion: Boolean,
+    fold: DashboardFold,
+    modifier: Modifier = Modifier,
+) {
+    val registered = snapshot.profile?.registeredAtEpochSeconds?.takeIf { it > 0L }
+    val joined = registered?.let(::yearOf)
+    val days = period.days?.toDouble()
+        ?: registered?.let { ((nowMillis / 1_000L - it) / 86_400.0).coerceAtLeast(1.0) }
+    StatsDashboard(
+        period = period,
+        scrobbles = snapshot.scrobbles,
+        window = when {
+            period != LastFmStatsPeriod.OVERALL -> stringResource(period.window)
+            joined != null -> stringResource(R.string.scrobble_stats_window_overall_since, joined)
+            else -> stringResource(R.string.scrobble_stats_window_overall)
+        },
+        previousScrobbles = snapshot.previousScrobbles,
+        activity = snapshot.activity,
+        perDay = days?.let { snapshot.scrobbles / it },
+        artists = snapshot.artistCount,
+        albums = snapshot.albumCount,
+        tracks = snapshot.trackCount,
+        reduceMotion = reduceMotion,
+        collapse = { fold.fraction },
+        onExpand = fold::expand,
+        onFoldDistance = { fold.distance = it },
+        modifier = modifier,
+    )
 }
 
 @Composable
@@ -278,171 +509,238 @@ private fun PeriodSwitcher(selected: LastFmStatsPeriod, onSelect: (LastFmStatsPe
         options = labels,
         selectedIndex = periods.indexOf(selected),
         onSelect = { onSelect(periods[it]) },
-        modifier = Modifier.padding(horizontal = PAGE_GUTTER).padding(top = 18.dp),
+        modifier = Modifier.padding(horizontal = PAGE_GUTTER).padding(top = 14.dp),
     )
 }
 
-private fun LazyListScope.statsBody(
+@OptIn(ExperimentalFoundationApi::class)
+private fun LazyListScope.statsList(
+    state: ScrobbleStatisticsUiState,
     snapshot: LastFmStatsSnapshot,
-    period: LastFmStatsPeriod,
     alpha: Float,
     nowMillis: Long,
     resolving: String?,
     onPlay: (String, String) -> Unit,
     actions: StatsActions,
     reduceMotion: Boolean,
+    menuOpen: Boolean,
+    pinned: () -> Boolean,
+    onOpenMenu: () -> Unit,
+    onAnchor: (Rect) -> Unit,
 ) {
-    item(key = "dashboard") {
-        val registered = snapshot.profile?.registeredAtEpochSeconds?.takeIf { it > 0L }
-        val joined = registered?.let(::yearOf)
-        val days = period.days?.toDouble()
-            ?: registered?.let { ((nowMillis / 1_000L - it) / 86_400.0).coerceAtLeast(1.0) }
-        StatsDashboard(
-            period = period,
-            scrobbles = snapshot.scrobbles,
-            window = when {
-                period != LastFmStatsPeriod.OVERALL -> stringResource(period.window)
-                joined != null -> stringResource(R.string.scrobble_stats_window_overall_since, joined)
-                else -> stringResource(R.string.scrobble_stats_window_overall)
-            },
-            previousScrobbles = snapshot.previousScrobbles,
-            activity = snapshot.activity,
-            perDay = days?.let { snapshot.scrobbles / it },
-            artists = snapshot.artistCount,
-            albums = snapshot.albumCount,
-            tracks = snapshot.trackCount,
-            reduceMotion = reduceMotion,
-            modifier = Modifier.alpha(alpha),
+    val mode = state.listMode
+    stickyHeader(key = "list-header") {
+        StatsListHeader(
+            title = stringResource(mode.label),
+            icon = mode.icon,
+            menuOpen = menuOpen,
+            pinned = pinned(),
+            onOpenMenu = onOpenMenu,
+            onAnchor = onAnchor,
         )
     }
 
-    if (snapshot.isEmpty) {
-        item(key = "empty") {
-            StatsMessage(
-                icon = SfIcons.GraphicEq,
-                title = stringResource(R.string.scrobble_stats_period_empty_title),
-                body = stringResource(R.string.scrobble_stats_period_empty_body),
-                modifier = Modifier.alpha(alpha),
-            )
-        }
-    } else {
-        if (snapshot.topArtists.isNotEmpty()) {
-            item(key = "artists") {
-                ExpandableChart(
-                    title = stringResource(R.string.scrobble_stats_top_artists),
-                    period = period,
-                    count = snapshot.topArtists.size,
-                    modifier = Modifier.alpha(alpha),
-                ) { shown ->
-                    val leader = snapshot.topArtists.first().playCount.coerceAtLeast(1L)
-                    snapshot.topArtists.take(shown).forEachIndexed { index, artist ->
-                        StatsRankedRow(
-                            rank = index + 1,
-                            title = artist.name,
-                            subtitle = null,
-                            plays = artist.playCount,
-                            fraction = artist.playCount.toFloat() / leader,
-                            onClick = { actions.onOpenArtist(artist.name) },
-                        )
-                    }
-                }
-            }
-        }
-
-        if (snapshot.topTracks.isNotEmpty()) {
-            item(key = "tracks") {
-                ExpandableChart(
-                    title = stringResource(R.string.scrobble_stats_top_tracks),
-                    period = period,
-                    count = snapshot.topTracks.size,
-                    modifier = Modifier.alpha(alpha),
-                ) { shown ->
-                    val leader = snapshot.topTracks.first().playCount.coerceAtLeast(1L)
-                    snapshot.topTracks.take(shown).forEachIndexed { index, track ->
-                        StatsRankedRow(
-                            rank = index + 1,
-                            title = track.name,
-                            subtitle = track.artist,
-                            plays = track.playCount,
-                            fraction = track.playCount.toFloat() / leader,
-                            onClick = { onPlay(track.name, track.artist) },
-                            busy = resolving == "${track.name}\u0000${track.artist}",
-                        )
-                    }
-                }
-            }
-        }
-
-        if (snapshot.topAlbums.isNotEmpty()) {
-            item(key = "albums") {
-                Column(Modifier.alpha(alpha)) {
-                    StatsSectionHeader(stringResource(R.string.scrobble_stats_top_albums))
-                    Spacer(Modifier.height(4.dp))
-                    StatsAlbumShelf(
-                        albums = snapshot.topAlbums.take(ALBUM_SHELF_SIZE).map {
-                            StatsAlbumItem(it.name, it.artist, it.playCount, it.artworkUrl)
-                        },
-                        onClick = { actions.onOpenAlbum(it.title, it.artist) },
-                    )
-                }
-            }
+    // Rows fade in and out when the list or the period changes; nothing
+    // slides, and with reduced motion nothing animates.
+    val itemModifier: LazyItemScope.() -> Modifier = {
+        if (reduceMotion) {
+            Modifier
+        } else {
+            Modifier.animateItem(fadeInSpec = tween(220), placementSpec = null, fadeOutSpec = tween(120))
         }
     }
+    fun busy(title: String, artist: String) = resolving == "$title\u0000$artist"
 
-    if (snapshot.recent.isNotEmpty()) {
-        item(key = "recent-header") {
-            StatsSectionHeader(stringResource(R.string.scrobble_stats_recent))
+    when (mode) {
+        StatsListMode.RECENT -> {
+            val feed = state.recent
+            when {
+                !feed.loaded && feed.failed -> item(key = "recent-failed") {
+                    StatsListFooter(loading = false, failed = true, onRetry = actions.onLoadMoreRecent)
+                }
+                !feed.loaded -> item(key = "recent-skeleton") { StatsListSkeleton() }
+                feed.items.isEmpty() -> item(key = "recent-empty") {
+                    StatsListEmpty(stringResource(R.string.scrobble_stats_recent_empty))
+                }
+                else -> {
+                    val zone = ZoneId.systemDefault()
+                    val today = Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate()
+                    val entries = groupRecentByDay(feed.items, zone, today)
+                    items(entries, key = { it.key }, contentType = { it::class.simpleName }) { entry ->
+                        when (entry) {
+                            is RecentEntry.Day -> StatsDayHeader(
+                                text = dayLabel(entry.date, today),
+                                modifier = itemModifier(),
+                            )
+                            is RecentEntry.Scrobble -> {
+                                val track = entry.track
+                                val trailing = if (track.nowPlaying) {
+                                    stringResource(R.string.scrobble_stats_now_playing)
+                                } else {
+                                    timeOfDay(track.timestamp * 1_000L)
+                                }
+                                StatsListRow(
+                                    title = track.name,
+                                    subtitle = track.artist,
+                                    artworkUrl = track.artworkUrl,
+                                    placeholder = SfIcons.MusicNote,
+                                    description = "${track.name}, ${track.artist}, $trailing",
+                                    onClick = { onPlay(track.name, track.artist) },
+                                    modifier = itemModifier(),
+                                ) {
+                                    StatsWhen(trailing, track.nowPlaying, busy(track.name, track.artist))
+                                }
+                            }
+                        }
+                    }
+                    if (feed.loading || feed.failed || feed.canLoadMore) {
+                        item(key = "recent-footer") {
+                            StatsListFooter(
+                                loading = !feed.failed,
+                                failed = feed.failed,
+                                onRetry = actions.onLoadMoreRecent,
+                            )
+                        }
+                    }
+                }
+            }
         }
-        itemsIndexed(
-            snapshot.recent,
-            key = { index, track -> "recent:$index:${track.timestamp}:${track.name}" },
-        ) { _, track ->
-            StatsRecentRow(
+
+        StatsListMode.TOP_TRACKS -> ranked(
+            rows = snapshot.topTracks,
+            key = { "track:${it.name}:${it.artist}" },
+            alpha = alpha,
+            itemModifier = itemModifier,
+        ) { rank, track, modifier ->
+            val plays = pluralStringResource(
+                R.plurals.scrobble_stats_scrobble_count,
+                track.playCount.toQuantity(),
+                rememberCountFormat().format(track.playCount),
+            )
+            StatsListRow(
                 title = track.name,
-                artist = track.artist,
+                subtitle = track.artist,
                 artworkUrl = track.artworkUrl,
-                trailing = if (track.nowPlaying) {
-                    stringResource(R.string.scrobble_stats_now_playing)
-                } else {
-                    relativeTime(track.timestamp * 1_000L, nowMillis)
-                },
-                nowPlaying = track.nowPlaying,
+                placeholder = SfIcons.MusicNote,
+                description = "$rank, ${track.name}, ${track.artist}, $plays",
                 onClick = { onPlay(track.name, track.artist) },
-                busy = resolving == "${track.name}\u0000${track.artist}",
+                rank = rank,
+                modifier = modifier,
+            ) {
+                StatsPlays(track.playCount, busy(track.name, track.artist))
+            }
+        }
+
+        StatsListMode.TOP_ARTISTS -> ranked(
+            rows = snapshot.topArtists,
+            key = { "artist:${it.name}" },
+            alpha = alpha,
+            itemModifier = itemModifier,
+        ) { rank, artist, modifier ->
+            val plays = pluralStringResource(
+                R.plurals.scrobble_stats_scrobble_count,
+                artist.playCount.toQuantity(),
+                rememberCountFormat().format(artist.playCount),
             )
+            StatsListRow(
+                title = artist.name,
+                subtitle = null,
+                artworkUrl = artist.artworkUrl,
+                placeholder = SfIcons.Artist,
+                description = "$rank, ${artist.name}, $plays",
+                onClick = { actions.onOpenArtist(artist.name) },
+                rank = rank,
+                round = true,
+                modifier = modifier,
+            ) {
+                StatsPlays(artist.playCount)
+            }
+        }
+
+        StatsListMode.TOP_ALBUMS -> ranked(
+            rows = snapshot.topAlbums,
+            key = { "album:${it.name}:${it.artist}" },
+            alpha = alpha,
+            itemModifier = itemModifier,
+        ) { rank, album, modifier ->
+            val plays = pluralStringResource(
+                R.plurals.scrobble_stats_scrobble_count,
+                album.playCount.toQuantity(),
+                rememberCountFormat().format(album.playCount),
+            )
+            StatsListRow(
+                title = album.name,
+                subtitle = album.artist,
+                artworkUrl = album.artworkUrl,
+                placeholder = SfIcons.Album,
+                description = "$rank, ${album.name}, ${album.artist}, $plays",
+                onClick = { actions.onOpenAlbum(album.name, album.artist) },
+                rank = rank,
+                modifier = modifier,
+            ) {
+                StatsPlays(album.playCount)
+            }
         }
     }
 }
 
-/**
- * A chart that shows its top [COLLAPSED_ROWS] and opens to everything Last.fm
- * returned. Folds again when the period changes.
- */
-@Composable
-private fun ExpandableChart(
-    title: String,
-    period: LastFmStatsPeriod,
-    count: Int,
-    modifier: Modifier = Modifier,
-    rows: @Composable (shown: Int) -> Unit,
+/** A ranked list for the period, dimmed with the dashboard while another period loads. */
+private fun <T> LazyListScope.ranked(
+    rows: List<T>,
+    key: (T) -> String,
+    alpha: Float,
+    itemModifier: LazyItemScope.() -> Modifier,
+    row: @Composable (rank: Int, item: T, modifier: Modifier) -> Unit,
 ) {
-    var expanded by rememberSaveable(period) { mutableStateOf(false) }
-    val expandable = count > COLLAPSED_ROWS
-    Column(modifier) {
-        StatsSectionHeader(
-            title = title,
-            action = if (!expandable) {
-                null
-            } else if (expanded) {
-                stringResource(R.string.scrobble_stats_show_less)
-            } else {
-                stringResource(R.string.show_all)
-            },
-            onAction = if (expandable) ({ expanded = !expanded }) else null,
-        )
-        rows(if (expanded) count else minOf(count, COLLAPSED_ROWS))
+    if (rows.isEmpty()) {
+        item(key = "ranked-empty") {
+            StatsListEmpty(stringResource(R.string.scrobble_stats_list_period_empty))
+        }
+        return
+    }
+    itemsIndexed(rows, key = { index, item -> "$index:${key(item)}" }) { index, item ->
+        row(index + 1, item, itemModifier().alpha(alpha))
     }
 }
+
+/** "Today", "Yesterday", a weekday for the rest of the week, then the date. */
+@Composable
+private fun dayLabel(date: LocalDate, today: LocalDate): String {
+    val locale = LocalConfiguration.current.locales[0]
+    val daysAgo = ChronoUnit.DAYS.between(date, today)
+    return when {
+        daysAgo <= 0L -> stringResource(R.string.scrobble_stats_today)
+        daysAgo == 1L -> stringResource(R.string.scrobble_stats_yesterday)
+        daysAgo < 7L -> date.dayOfWeek.getDisplayName(TextStyle.FULL_STANDALONE, locale)
+        else -> remember(date, locale, today.year) {
+            val skeleton = if (date.year == today.year) "MMMMd" else "yMMMMd"
+            DateTimeFormatter.ofPattern(DateFormat.getBestDateTimePattern(locale, skeleton), locale).format(date)
+        }
+    }
+}
+
+/** "21:04" or "9:04 PM", as the device tells time. */
+@Composable
+private fun timeOfDay(atMillis: Long): String {
+    val context = LocalContext.current
+    return remember(atMillis) { DateUtils.formatDateTime(context, atMillis, DateUtils.FORMAT_SHOW_TIME) }
+}
+
+private val StatsListMode.label: Int
+    get() = when (this) {
+        StatsListMode.RECENT -> R.string.scrobble_stats_list_recent
+        StatsListMode.TOP_TRACKS -> R.string.scrobble_stats_top_tracks
+        StatsListMode.TOP_ARTISTS -> R.string.scrobble_stats_top_artists
+        StatsListMode.TOP_ALBUMS -> R.string.scrobble_stats_top_albums
+    }
+
+private val StatsListMode.icon: ImageVector
+    get() = when (this) {
+        StatsListMode.RECENT -> SfIcons.Clock
+        StatsListMode.TOP_TRACKS -> SfIcons.MusicNote
+        StatsListMode.TOP_ARTISTS -> SfIcons.Artist
+        StatsListMode.TOP_ALBUMS -> SfIcons.Album
+    }
 
 private val LastFmStatsPeriod.shortLabel: Int
     get() = when (this) {
@@ -467,14 +765,5 @@ private val LastFmStatsPeriod.window: Int
 private fun yearOf(epochSeconds: Long): String =
     Instant.ofEpochSecond(epochSeconds).atZone(ZoneId.systemDefault()).year.toString()
 
-/** "5 min. ago", "Yesterday", "12 Nov" — the platform's own wording, in the user's language. */
-private fun relativeTime(atMillis: Long, nowMillis: Long): String =
-    DateUtils.getRelativeTimeSpanString(
-        atMillis,
-        nowMillis,
-        DateUtils.MINUTE_IN_MILLIS,
-        DateUtils.FORMAT_ABBREV_RELATIVE or DateUtils.FORMAT_ABBREV_MONTH,
-    ).toString()
-
-private const val COLLAPSED_ROWS = 5
-private const val ALBUM_SHELF_SIZE = 20
+/** Rows from the end of the loaded history at which the next page is asked for. */
+private const val LOAD_AHEAD = 12

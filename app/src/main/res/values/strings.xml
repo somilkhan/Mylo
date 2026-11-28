@@ -1588,8 +1588,13 @@
     <string name="scrobble_stats_top_artists">Top artists</string>
     <string name="scrobble_stats_top_tracks">Top tracks</string>
     <string name="scrobble_stats_top_albums">Top albums</string>
-    <string name="scrobble_stats_recent">Recently scrobbled</string>
-    <string name="scrobble_stats_show_less">Show less</string>
+    <string name="scrobble_stats_list_recent">Recent</string>
+    <string name="scrobble_stats_list_change">Change list</string>
+    <string name="scrobble_stats_yesterday">Yesterday</string>
+    <string name="scrobble_stats_show_dashboard">Show dashboard</string>
+    <string name="scrobble_stats_load_more_failed">Couldn’t load more scrobbles.</string>
+    <string name="scrobble_stats_recent_empty">No scrobbles on this account yet.</string>
+    <string name="scrobble_stats_list_period_empty">Nothing in this period.</string>
     <string name="scrobble_stats_profile_since">Last.fm · since %1$s</string>
     <string name="scrobble_stats_profile">Last.fm</string>
     <string name="scrobble_stats_activity">Activity</string>
@@ -1620,6 +1625,14 @@
     <plurals name="scrobble_stats_scrobble_count">
         <item quantity="one">%1$s scrobble</item>
         <item quantity="other">%1$s scrobbles</item>
+    </plurals>
+    <plurals name="scrobble_stats_collapsed_caption">
+        <item quantity="one">scrobble %1$s</item>
+        <item quantity="other">scrobbles %1$s</item>
+    </plurals>
+    <plurals name="scrobble_stats_plays_unit">
+        <item quantity="one">play</item>
+        <item quantity="other">plays</item>
     </plurals>
     <plurals name="scrobble_stats_artist_count">
         <item quantity="one">%1$s artist</item>
