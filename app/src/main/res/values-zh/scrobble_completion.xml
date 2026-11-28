@@ -216,4 +216,24 @@
     <string name="scrobble_track_order_failed">无法保存曲目顺序，请重试。</string>
     <string name="scrobble_track_remove_failed">无法移除曲目，请重试。</string>
     <string name="scrobble_unpin">取消置顶</string>
+
+    <!-- Stats plurals: keep printf arguments aligned with the default catalogue. -->
+    <plurals name="scrobble_stats_scrobble_count">
+        <item quantity="other">%1$s 条播放记录</item>
+    </plurals>
+    <plurals name="scrobble_stats_collapsed_caption">
+        <item quantity="other">条播放记录 %1$s</item>
+    </plurals>
+    <plurals name="scrobble_stats_plays_unit">
+        <item quantity="other">次播放</item>
+    </plurals>
+    <plurals name="scrobble_stats_artist_count">
+        <item quantity="other">%1$s 位艺人</item>
+    </plurals>
+    <plurals name="scrobble_stats_album_count">
+        <item quantity="other">%1$s 张专辑</item>
+    </plurals>
+    <plurals name="scrobble_stats_track_count">
+        <item quantity="other">%1$s 首曲目</item>
+    </plurals>
 </resources>

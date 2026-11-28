@@ -216,4 +216,30 @@
     <string name="scrobble_track_order_failed">Impossible d’enregistrer l’ordre des titres. Réessayez.</string>
     <string name="scrobble_track_remove_failed">Impossible de supprimer le titre. Réessayez.</string>
     <string name="scrobble_unpin">Désépingler</string>
+
+    <!-- Stats plurals: keep printf arguments aligned with the default catalogue. -->
+    <plurals name="scrobble_stats_scrobble_count">
+        <item quantity="one">%1$s scrobble</item>
+        <item quantity="other">%1$s scrobbles</item>
+    </plurals>
+    <plurals name="scrobble_stats_collapsed_caption">
+        <item quantity="one">scrobble %1$s</item>
+        <item quantity="other">scrobbles %1$s</item>
+    </plurals>
+    <plurals name="scrobble_stats_plays_unit">
+        <item quantity="one">écoute</item>
+        <item quantity="other">écoutes</item>
+    </plurals>
+    <plurals name="scrobble_stats_artist_count">
+        <item quantity="one">%1$s artiste</item>
+        <item quantity="other">%1$s artistes</item>
+    </plurals>
+    <plurals name="scrobble_stats_album_count">
+        <item quantity="one">%1$s album</item>
+        <item quantity="other">%1$s albums</item>
+    </plurals>
+    <plurals name="scrobble_stats_track_count">
+        <item quantity="one">%1$s titre</item>
+        <item quantity="other">%1$s titres</item>
+    </plurals>
 </resources>

@@ -216,4 +216,24 @@
     <string name="scrobble_track_order_failed">Không thể lưu thứ tự bài hát. Hãy thử lại.</string>
     <string name="scrobble_track_remove_failed">Không thể xóa bài hát. Hãy thử lại.</string>
     <string name="scrobble_unpin">Bỏ ghim</string>
+
+    <!-- Stats plurals: keep printf arguments aligned with the default catalogue. -->
+    <plurals name="scrobble_stats_scrobble_count">
+        <item quantity="other">%1$s lượt nghe</item>
+    </plurals>
+    <plurals name="scrobble_stats_collapsed_caption">
+        <item quantity="other">lượt nghe %1$s</item>
+    </plurals>
+    <plurals name="scrobble_stats_plays_unit">
+        <item quantity="other">lượt phát</item>
+    </plurals>
+    <plurals name="scrobble_stats_artist_count">
+        <item quantity="other">%1$s nghệ sĩ</item>
+    </plurals>
+    <plurals name="scrobble_stats_album_count">
+        <item quantity="other">%1$s album</item>
+    </plurals>
+    <plurals name="scrobble_stats_track_count">
+        <item quantity="other">%1$s bài hát</item>
+    </plurals>
 </resources>

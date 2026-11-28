@@ -216,4 +216,42 @@
     <string name="scrobble_track_order_failed">Не удалось сохранить порядок треков. Попробуйте ещё раз.</string>
     <string name="scrobble_track_remove_failed">Не удалось удалить трек. Попробуйте ещё раз.</string>
     <string name="scrobble_unpin">Открепить</string>
+
+    <!-- Stats plurals: keep printf arguments aligned with the default catalogue. -->
+    <plurals name="scrobble_stats_scrobble_count">
+        <item quantity="one">%1$s скроббл</item>
+        <item quantity="few">%1$s скроббла</item>
+        <item quantity="many">%1$s скробблов</item>
+        <item quantity="other">%1$s скроббла</item>
+    </plurals>
+    <plurals name="scrobble_stats_collapsed_caption">
+        <item quantity="one">скроббл %1$s</item>
+        <item quantity="few">скроббла %1$s</item>
+        <item quantity="many">скробблов %1$s</item>
+        <item quantity="other">скроббла %1$s</item>
+    </plurals>
+    <plurals name="scrobble_stats_plays_unit">
+        <item quantity="one">прослушивание</item>
+        <item quantity="few">прослушивания</item>
+        <item quantity="many">прослушиваний</item>
+        <item quantity="other">прослушивания</item>
+    </plurals>
+    <plurals name="scrobble_stats_artist_count">
+        <item quantity="one">%1$s исполнитель</item>
+        <item quantity="few">%1$s исполнителя</item>
+        <item quantity="many">%1$s исполнителей</item>
+        <item quantity="other">%1$s исполнителя</item>
+    </plurals>
+    <plurals name="scrobble_stats_album_count">
+        <item quantity="one">%1$s альбом</item>
+        <item quantity="few">%1$s альбома</item>
+        <item quantity="many">%1$s альбомов</item>
+        <item quantity="other">%1$s альбома</item>
+    </plurals>
+    <plurals name="scrobble_stats_track_count">
+        <item quantity="one">%1$s трек</item>
+        <item quantity="few">%1$s трека</item>
+        <item quantity="many">%1$s треков</item>
+        <item quantity="other">%1$s трека</item>
+    </plurals>
 </resources>

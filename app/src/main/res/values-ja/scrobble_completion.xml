@@ -216,4 +216,24 @@
     <string name="scrobble_track_order_failed">曲順を保存できませんでした。もう一度お試しください。</string>
     <string name="scrobble_track_remove_failed">曲を削除できませんでした。もう一度お試しください。</string>
     <string name="scrobble_unpin">ピン留めを解除</string>
+
+    <!-- Stats plurals: keep printf arguments aligned with the default catalogue. -->
+    <plurals name="scrobble_stats_scrobble_count">
+        <item quantity="other">%1$s スクロブル</item>
+    </plurals>
+    <plurals name="scrobble_stats_collapsed_caption">
+        <item quantity="other">スクロブル %1$s</item>
+    </plurals>
+    <plurals name="scrobble_stats_plays_unit">
+        <item quantity="other">回再生</item>
+    </plurals>
+    <plurals name="scrobble_stats_artist_count">
+        <item quantity="other">%1$s アーティスト</item>
+    </plurals>
+    <plurals name="scrobble_stats_album_count">
+        <item quantity="other">%1$s アルバム</item>
+    </plurals>
+    <plurals name="scrobble_stats_track_count">
+        <item quantity="other">%1$s 曲</item>
+    </plurals>
 </resources>

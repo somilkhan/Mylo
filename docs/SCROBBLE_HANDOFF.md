@@ -7,7 +7,8 @@ Updated 2026-11-28. This is the authoritative resume point for the next contribu
 - Repository: `https://github.com/somilkhan/Mylo.git`
 - Branch: `feat/scrobble-screen`
 - Working tree at handoff: clean
-- Remote HEAD: `38029159abda68739235b0d96c310cab4022e458`
+- Verified continuation baseline: `1f494445faadd7f6335e96d4752761062e343b2e` (HEAD matched origin; clean before edits).
+- Latest checkpoint: the commit containing the 28 November localization audit; resolve its exact SHA with `git log -1 --format=%H -- docs/audits/SCROBBLE_LOCALIZATION.md`.
 - Pull request already open: `https://github.com/somilkhan/Mylo/pull/15`
 - Do not create a replacement project, rename packages, or switch away from this branch.
 - The branch contains the pre-existing stable CI debug-keystore signing fixes. Do not commit keystores, secrets, or local.properties.
@@ -28,6 +29,12 @@ Generation now resolves provider progress/errors through Android resources, fail
 Playlist detail now has real production-composable screenshots for populated/current playback/light theme/empty/duplicate tracks/anchored menu/export/add-mode Back/play-back callbacks. Playlist mutations are serialized and failure-safe; rename/delete/add/reorder/remove/cover operations do not publish false success, duplicate IDs are normalized, searches are cancellation-aware, exports run off the main thread and use safe deterministic cache filenames, and cover URI grants are released only when no stored playlist still references them.
 
 Every current non-English locale has the completed scrobble catalogue in a dedicated `scrobble_completion.xml`. `LocaleStringsTest` now reads split resource files and checks missing keys and printf placeholder parity. Existing translations are preserved rather than replaced.
+
+## Current localization checkpoint
+
+The fresh continuation confirmed the Android failure on the exact baseline: Check run `46097428907` completed 1,455 tests with 17 failures and one skip. Six Stats **plural** keys were missing from all 19 locale folders; the old lead XML validator checked only strings. The additive correction supplies 114 plural resources, without exemptions or replacement of existing copy. All 19 folders pass XML/key/duplicate-name/string-and-plural printf checks. Read `docs/audits/SCROBBLE_LOCALIZATION.md` for the root cause and current evidence. Android Gradle verification is pending at this checkpoint; do not call static resource checks an Android unit-test pass.
+
+This continuation's sandbox is ARM64 and newly provisioned: JDK 17 is `/usr/lib/jvm/java-17-openjdk-arm64`, SDK is `/home/ubuntu/Android/Sdk`. The prior handoff's amd64 JDK path and installed-tool claims describe its old sandbox, not this one. Stable CI signing remains unchanged.
 
 ## Validation evidence and exact limits
 

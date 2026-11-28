@@ -216,4 +216,36 @@
     <string name="scrobble_track_order_failed">לא ניתן לשמור את סדר הרצועות. יש לנסות שוב.</string>
     <string name="scrobble_track_remove_failed">לא ניתן להסיר את הרצועה. יש לנסות שוב.</string>
     <string name="scrobble_unpin">ביטול נעיצה</string>
+
+    <!-- Stats plurals: keep printf arguments aligned with the default catalogue. -->
+    <plurals name="scrobble_stats_scrobble_count">
+        <item quantity="one">%1$s סקרובל</item>
+        <item quantity="two">%1$s סקרובלים</item>
+        <item quantity="other">%1$s סקרובלים</item>
+    </plurals>
+    <plurals name="scrobble_stats_collapsed_caption">
+        <item quantity="one">סקרובל %1$s</item>
+        <item quantity="two">סקרובלים %1$s</item>
+        <item quantity="other">סקרובלים %1$s</item>
+    </plurals>
+    <plurals name="scrobble_stats_plays_unit">
+        <item quantity="one">השמעה</item>
+        <item quantity="two">השמעות</item>
+        <item quantity="other">השמעות</item>
+    </plurals>
+    <plurals name="scrobble_stats_artist_count">
+        <item quantity="one">%1$s אמן</item>
+        <item quantity="two">%1$s אמנים</item>
+        <item quantity="other">%1$s אמנים</item>
+    </plurals>
+    <plurals name="scrobble_stats_album_count">
+        <item quantity="one">%1$s אלבום</item>
+        <item quantity="two">%1$s אלבומים</item>
+        <item quantity="other">%1$s אלבומים</item>
+    </plurals>
+    <plurals name="scrobble_stats_track_count">
+        <item quantity="one">%1$s שיר</item>
+        <item quantity="two">%1$s שירים</item>
+        <item quantity="other">%1$s שירים</item>
+    </plurals>
 </resources>

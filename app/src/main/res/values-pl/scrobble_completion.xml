@@ -216,4 +216,42 @@
     <string name="scrobble_track_order_failed">Nie udało się zapisać kolejności utworów. Spróbuj ponownie.</string>
     <string name="scrobble_track_remove_failed">Nie udało się usunąć utworu. Spróbuj ponownie.</string>
     <string name="scrobble_unpin">Odepnij</string>
+
+    <!-- Stats plurals: keep printf arguments aligned with the default catalogue. -->
+    <plurals name="scrobble_stats_scrobble_count">
+        <item quantity="one">%1$s scrobble</item>
+        <item quantity="few">%1$s scrobble</item>
+        <item quantity="many">%1$s scrobbli</item>
+        <item quantity="other">%1$s scrobbla</item>
+    </plurals>
+    <plurals name="scrobble_stats_collapsed_caption">
+        <item quantity="one">scrobble %1$s</item>
+        <item quantity="few">scrobble %1$s</item>
+        <item quantity="many">scrobbli %1$s</item>
+        <item quantity="other">scrobbla %1$s</item>
+    </plurals>
+    <plurals name="scrobble_stats_plays_unit">
+        <item quantity="one">odtworzenie</item>
+        <item quantity="few">odtworzenia</item>
+        <item quantity="many">odtworzeń</item>
+        <item quantity="other">odtworzenia</item>
+    </plurals>
+    <plurals name="scrobble_stats_artist_count">
+        <item quantity="one">%1$s wykonawca</item>
+        <item quantity="few">%1$s wykonawców</item>
+        <item quantity="many">%1$s wykonawców</item>
+        <item quantity="other">%1$s wykonawcy</item>
+    </plurals>
+    <plurals name="scrobble_stats_album_count">
+        <item quantity="one">%1$s album</item>
+        <item quantity="few">%1$s albumy</item>
+        <item quantity="many">%1$s albumów</item>
+        <item quantity="other">%1$s albumu</item>
+    </plurals>
+    <plurals name="scrobble_stats_track_count">
+        <item quantity="one">%1$s utwór</item>
+        <item quantity="few">%1$s utwory</item>
+        <item quantity="many">%1$s utworów</item>
+        <item quantity="other">%1$s utworu</item>
+    </plurals>
 </resources>

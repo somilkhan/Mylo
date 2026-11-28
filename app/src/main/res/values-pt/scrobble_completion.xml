@@ -216,4 +216,30 @@
     <string name="scrobble_track_order_failed">Não foi possível salvar a ordem das faixas. Tente novamente.</string>
     <string name="scrobble_track_remove_failed">Não foi possível remover a faixa. Tente novamente.</string>
     <string name="scrobble_unpin">Desafixar</string>
+
+    <!-- Stats plurals: keep printf arguments aligned with the default catalogue. -->
+    <plurals name="scrobble_stats_scrobble_count">
+        <item quantity="one">%1$s scrobble</item>
+        <item quantity="other">%1$s scrobbles</item>
+    </plurals>
+    <plurals name="scrobble_stats_collapsed_caption">
+        <item quantity="one">scrobble %1$s</item>
+        <item quantity="other">scrobbles %1$s</item>
+    </plurals>
+    <plurals name="scrobble_stats_plays_unit">
+        <item quantity="one">reprodução</item>
+        <item quantity="other">reproduções</item>
+    </plurals>
+    <plurals name="scrobble_stats_artist_count">
+        <item quantity="one">%1$s artista</item>
+        <item quantity="other">%1$s artistas</item>
+    </plurals>
+    <plurals name="scrobble_stats_album_count">
+        <item quantity="one">%1$s álbum</item>
+        <item quantity="other">%1$s álbuns</item>
+    </plurals>
+    <plurals name="scrobble_stats_track_count">
+        <item quantity="one">%1$s faixa</item>
+        <item quantity="other">%1$s faixas</item>
+    </plurals>
 </resources>

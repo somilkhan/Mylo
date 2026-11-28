@@ -216,4 +216,24 @@
     <string name="scrobble_track_order_failed">Urutan lagu tidak dapat disimpan. Coba lagi.</string>
     <string name="scrobble_track_remove_failed">Lagu tidak dapat dihapus. Coba lagi.</string>
     <string name="scrobble_unpin">Lepas sematan</string>
+
+    <!-- Stats plurals: keep printf arguments aligned with the default catalogue. -->
+    <plurals name="scrobble_stats_scrobble_count">
+        <item quantity="other">%1$s scrobble</item>
+    </plurals>
+    <plurals name="scrobble_stats_collapsed_caption">
+        <item quantity="other">scrobble %1$s</item>
+    </plurals>
+    <plurals name="scrobble_stats_plays_unit">
+        <item quantity="other">pemutaran</item>
+    </plurals>
+    <plurals name="scrobble_stats_artist_count">
+        <item quantity="other">%1$s artis</item>
+    </plurals>
+    <plurals name="scrobble_stats_album_count">
+        <item quantity="other">%1$s album</item>
+    </plurals>
+    <plurals name="scrobble_stats_track_count">
+        <item quantity="other">%1$s lagu</item>
+    </plurals>
 </resources>

@@ -216,4 +216,30 @@
     <string name="scrobble_track_order_failed">ट्रैक का क्रम सहेजा नहीं जा सका। फिर से कोशिश करें।</string>
     <string name="scrobble_track_remove_failed">ट्रैक हटाया नहीं जा सका। फिर से कोशिश करें।</string>
     <string name="scrobble_unpin">पिन हटाएँ</string>
+
+    <!-- Stats plurals: keep printf arguments aligned with the default catalogue. -->
+    <plurals name="scrobble_stats_scrobble_count">
+        <item quantity="one">%1$s स्क्रॉबल</item>
+        <item quantity="other">%1$s स्क्रॉबल</item>
+    </plurals>
+    <plurals name="scrobble_stats_collapsed_caption">
+        <item quantity="one">स्क्रॉबल %1$s</item>
+        <item quantity="other">स्क्रॉबल %1$s</item>
+    </plurals>
+    <plurals name="scrobble_stats_plays_unit">
+        <item quantity="one">प्ले</item>
+        <item quantity="other">प्ले</item>
+    </plurals>
+    <plurals name="scrobble_stats_artist_count">
+        <item quantity="one">%1$s कलाकार</item>
+        <item quantity="other">%1$s कलाकार</item>
+    </plurals>
+    <plurals name="scrobble_stats_album_count">
+        <item quantity="one">%1$s एल्बम</item>
+        <item quantity="other">%1$s एल्बम</item>
+    </plurals>
+    <plurals name="scrobble_stats_track_count">
+        <item quantity="one">%1$s ट्रैक</item>
+        <item quantity="other">%1$s ट्रैक</item>
+    </plurals>
 </resources>

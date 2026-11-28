@@ -216,4 +216,24 @@
     <string name="scrobble_track_order_failed">บันทึกลำดับเพลงไม่สำเร็จ โปรดลองอีกครั้ง</string>
     <string name="scrobble_track_remove_failed">นำเพลงออกไม่สำเร็จ โปรดลองอีกครั้ง</string>
     <string name="scrobble_unpin">เลิกปักหมุด</string>
+
+    <!-- Stats plurals: keep printf arguments aligned with the default catalogue. -->
+    <plurals name="scrobble_stats_scrobble_count">
+        <item quantity="other">%1$s สครอบเบิล</item>
+    </plurals>
+    <plurals name="scrobble_stats_collapsed_caption">
+        <item quantity="other">สครอบเบิล %1$s</item>
+    </plurals>
+    <plurals name="scrobble_stats_plays_unit">
+        <item quantity="other">ครั้ง</item>
+    </plurals>
+    <plurals name="scrobble_stats_artist_count">
+        <item quantity="other">ศิลปิน %1$s คน</item>
+    </plurals>
+    <plurals name="scrobble_stats_album_count">
+        <item quantity="other">%1$s อัลบั้ม</item>
+    </plurals>
+    <plurals name="scrobble_stats_track_count">
+        <item quantity="other">%1$s เพลง</item>
+    </plurals>
 </resources>
