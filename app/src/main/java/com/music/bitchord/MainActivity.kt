@@ -2407,9 +2407,10 @@ private fun BitChordApp(
             // Scrobble-owned local playlists have a dedicated editor/detail
             // experience. Keep one source of truth by opening that surface
             // rather than a second, generic Library release page.
-            if (localPlaylists.any { it.browseId == id }) {
+            val scrobblePlaylist = localPlaylists.firstOrNull { it.browseId == id }
+            if (scrobblePlaylist != null) {
                 scrobbleTab = 2
-                scrobbleOpenPlaylistId = id
+                scrobbleOpenPlaylistId = scrobblePlaylist.id
                 scrobblePlaylistDetailOpen = true
                 navigator.push(AppRoute.Scrobble)
                 return@let
@@ -4203,7 +4204,7 @@ private fun BitChordApp(
                     )
                 }
 
-                if (!scrobblePlaylistDetailOpen) {
+                if (!(scrobbleOpen && scrobblePlaylistDetailOpen)) {
                     FrostedTopBar(
                     title = when (route) {
                         AppRoute.Spotify -> stringResource(R.string.spotify)
