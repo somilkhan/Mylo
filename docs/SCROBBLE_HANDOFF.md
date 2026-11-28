@@ -8,7 +8,7 @@ Updated 2026-11-28. This is the authoritative resume point for the next contribu
 - Branch: `feat/scrobble-screen`
 - Working tree at handoff: clean
 - Verified continuation baseline: `1f494445faadd7f6335e96d4752761062e343b2e` (HEAD matched origin; clean before edits).
-- Latest checkpoint: the commit containing the 28 November localization audit; resolve its exact SHA with `git log -1 --format=%H -- docs/audits/SCROBBLE_LOCALIZATION.md`.
+- Latest pushed checkpoint: `8f17239fc381d5dcfb0119873ef68c0ed4b5cc2c` (compact Statistics and shared-control quality pass; see the follow-up handoff commit for validation state).
 - Pull request already open: `https://github.com/somilkhan/Mylo/pull/15`
 - Do not create a replacement project, rename packages, or switch away from this branch.
 - The branch contains the pre-existing stable CI debug-keystore signing fixes. Do not commit keystores, secrets, or local.properties.
@@ -35,6 +35,10 @@ Every current non-English locale has the completed scrobble catalogue in a dedic
 The fresh continuation confirmed the Android failure on the exact baseline: Check run `46097428907` completed 1,455 tests with 17 failures and one skip. Six Stats **plural** keys were missing from all 19 locale folders; the old lead XML validator checked only strings. The additive correction supplies 114 plural resources, without exemptions or replacement of existing copy. All 19 folders pass XML/key/duplicate-name/string-and-plural printf checks. Read `docs/audits/SCROBBLE_LOCALIZATION.md` for the root cause and current evidence. Android Gradle verification is pending at this checkpoint; do not call static resource checks an Android unit-test pass.
 
 Locale checkpoint `bd5a4fb6397944903ab6fca36b59db62b591d4ca` is pushed. Actual AAPT2 compilation of all production resources passed, as did dependency resolution. The focused Gradle test is running. The next focused integration unit masks the secondary Settings password field, removes raw Last.fm sign-in diagnostics, preserves cancellation before account success, and retains real screenshot/JUnit artifacts in existing CI. Signing configuration/scripts are untouched. Its static diff and workflow checks pass; read `docs/audits/SCROBBLE_INTEGRATION.md`. No device/provider behavior is asserted verified.
+
+Checkpoint `8f17239fc381d5dcfb0119873ef68c0ed4b5cc2c` is pushed. The Stats overview is compact by default (roughly 150dp target; exact rendered height is pending screenshot inspection), shows summary metrics, and expands/collapses the full chart on demand. Recent remains the default list. Stats cache/account/cancellation/paging/date/reduced-motion fixes and focused regression/screenshot fixtures are added. Shared controls preserve 48dp touch targets, subtle `.96–.97` pointer feedback, reduced-motion/system-scale handling, selected/busy semantics, and minimal existing glass rim. Focused audits: `docs/audits/SCROBBLE_STATISTICS.md`, `docs/audits/SCROBBLE_SHARED_UI.md`, and `docs/audits/SCROBBLE_INTEGRATION.md`.
+
+Validation limits as of checkpoint: the exact-a820 CI run verified the **LocaleStringsTest passes** (57 tests, zero failures) and uploaded actual production Stats/Generate screenshots, but its full suite had one unrelated `SourcesTest` failure. A local Gradle run first caught and fixed icon/API-test import errors, then a misplaced Stats list-mode brace. The serialized fresh-source quality gate has restarted; until its completion is recorded, do not claim Stats/shared Compose tests or full unit tests pass. No CI, APK build, physical-device, real Last.fm, ListenBrainz, TalkBack, keyboard, export-provider, or GPU-blur verification is claimed for `8f17239`.
 
 This continuation's sandbox is ARM64 and newly provisioned: JDK 17 is `/usr/lib/jvm/java-17-openjdk-arm64`, SDK is `/home/ubuntu/Android/Sdk`. The prior handoff's amd64 JDK path and installed-tool claims describe its old sandbox, not this one. Stable CI signing remains unchanged.
 
