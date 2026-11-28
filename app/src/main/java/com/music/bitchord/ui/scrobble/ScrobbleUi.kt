@@ -205,6 +205,7 @@ internal fun ScrobblePrimaryButton(
                 onClick = onClick,
             )
             .semantics(mergeDescendants = true) {
+                if (!actionable) disabled()
                 if (busy) {
                     contentDescription = label
                     progressBarRangeInfo = ProgressBarRangeInfo.Indeterminate
