@@ -177,7 +177,9 @@ fun ScrobblePlaylistsContent(
     val playlistListState = rememberLazyListState()
 
     val selected = playlists.firstOrNull { it.id == selectedId }
-    LaunchedEffect(selectedId) { onPlaylistDetailChanged(selectedId != null) }
+    LaunchedEffect(selectedId, playlists, storageError) {
+        onPlaylistDetailChanged(selected != null)
+    }
     DisposableEffect(Unit) {
         onDispose { onPlaylistDetailChanged(false) }
     }
