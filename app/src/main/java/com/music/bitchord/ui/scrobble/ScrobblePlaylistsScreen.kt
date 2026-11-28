@@ -91,7 +91,6 @@ import com.music.bitchord.ui.components.SearchField
 import com.music.bitchord.ui.components.SongRow
 import com.music.bitchord.ui.components.liquidGlassRim
 import com.music.bitchord.ui.icons.SfIcons
-import com.music.bitchord.ui.screens.LocalPlaylistReleaseHeader
 import com.music.bitchord.ui.scrobble.stats.Artwork
 import com.music.bitchord.ui.scrobble.stats.StatsMessage
 import dev.chrisbanes.haze.HazeState
@@ -127,8 +126,8 @@ private class RowMenu(val playlist: LocalPlaylist, val index: Int)
 
 /**
  * The Playlists tab: every playlist Generate saved, plus any made by hand,
- * as a plain list in the Library's style. Opening one swaps the list for its
- * page; everything else — sort, pin, rename, delete — is in a menu.
+ * as a plain list in the Library's style. Opening one uses Mylo's native
+ * release-detail navigation; sort, pin, rename and delete stay in this tab.
  */
 @OptIn(ExperimentalHazeMaterialsApi::class)
 @Composable
@@ -142,8 +141,6 @@ fun ScrobblePlaylistsContent(
     reduceMotion: Boolean,
     sharedTransitionScope: SharedTransitionScope,
     animatedVisibilityScope: AnimatedVisibilityScope,
-    currentSong: Song?,
-    isPlaying: Boolean,
     onPlaySongs: (List<Song>, Int) -> Unit,
     onOpenGenerator: () -> Unit,
     onOpenPlaylist: (LocalPlaylist) -> Unit,
