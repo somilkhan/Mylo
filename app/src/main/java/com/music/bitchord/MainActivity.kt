@@ -613,9 +613,6 @@ private fun BitChordApp(
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     // Scrobble's own tab, while its page is open: 0 Stats, 1 Generate, 2 Playlists.
     var scrobbleTab by rememberSaveable { mutableIntStateOf(0) }
-    // A playlist opened inside Scrobble owns its own release-style toolbar.
-    // The activity bar must step out while that nested page is visible.
-    var scrobblePlaylistDetailOpen by remember { mutableStateOf(false) }
     // Explore loads the first time it's shown, not at launch beside Home.
     LaunchedEffect(selectedTab) {
         if (selectedTab == TAB_EXPLORE) viewModel.onExploreShown()
@@ -2629,11 +2626,7 @@ private fun BitChordApp(
     // so a fixed number only ever lines up on the one device it was picked on.
     // See [topBarContentPadding].
     val listPadding = PaddingValues(
-        top = if (scrobblePlaylistDetailOpen) {
-            with(LocalDensity.current) { WindowInsets.statusBars.getTop(this).toDp() }
-        } else {
-            topBarContentPadding()
-        },
+        top = topBarContentPadding(),
         bottom = if (player.song != null) 210.dp else 140.dp,
     )
 
@@ -3273,7 +3266,19 @@ private fun BitChordApp(
                                     navigator.pop()
                                     navigator.push(AppRoute.Settings)
                                 },
-                                onPlaylistDetailChanged = { scrobblePlaylistDetailOpen = it },
+                                onOpenPlaylist = { playlist ->
+                                    // Leave Scrobble and open the playlist through Mylo's
+                                    // existing release-page navigation and DetailScreen.
+                                    navigator.pop()
+                                    viewModel.openDetail(
+                                        browseId = playlist.browseId,
+                                        title = playlist.title,
+                                        subtitle = context.getString(R.string.local_playlist_subtitle, playlist.songs.size),
+                                        thumbnailUrl = playlist.customCoverUri
+                                            ?: playlist.songs.firstOrNull { !it.thumbnailUrl.isNullOrBlank() }?.thumbnailUrl,
+                                        type = BrowseType.PLAYLIST,
+                                    )
+                                },
                             )
                         } else if (pageRoute == AppRoute.Moods) {
                             MoodGridPage(
@@ -4186,8 +4191,7 @@ private fun BitChordApp(
                     )
                 }
 
-                if (!(scrobbleOpen && scrobblePlaylistDetailOpen)) {
-                    FrostedTopBar(
+                FrostedTopBar(
                     title = when (route) {
                         AppRoute.Spotify -> stringResource(R.string.spotify)
                         AppRoute.Downloads -> stringResource(R.string.downloads)
@@ -4541,8 +4545,7 @@ private fun BitChordApp(
                             )
                         }
                     },
-                    )
-                }
+                )
 
                 // Drawn before the bars so their own glass reads on top of it.
                 BottomFadeScrim(
