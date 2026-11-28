@@ -124,24 +124,24 @@ class ScrobbleControlsTest {
     }
 
     @Test fun busyPrimaryRetainsItsNameWidthAndIndeterminateDisabledState() {
-        val busy = mutableStateOf(false)
         var clicks = 0
         content {
             Column {
-                Box(Modifier.size(48.dp).clickable { busy.value = true }.testTag("set-busy"))
+                ScrobblePrimaryButton(
+                    "Generate playlist", { clicks++ }, Modifier.testTag("normal"),
+                    busy = false, compact = true,
+                )
                 ScrobblePrimaryButton(
                     "Generate playlist", { clicks++ }, Modifier.testTag("primary"),
-                    busy = busy.value, compact = true,
+                    busy = true, compact = true,
                 )
             }
         }
+        val normalBounds = compose.onNodeWithTag("normal").fetchSemanticsNode().boundsInRoot
         val node = compose.onNodeWithTag("primary")
-        node.assertIsEnabled()
-        val initialBounds = node.fetchSemanticsNode().boundsInRoot
-        compose.onNodeWithTag("set-busy").performClick()
         node.assertIsNotEnabled().assertContentDescriptionEquals("Generate playlist")
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.ProgressBarRangeInfo, ProgressBarRangeInfo.Indeterminate))
-        assertEquals(initialBounds, node.fetchSemanticsNode().boundsInRoot)
+        assertEquals(normalBounds, node.fetchSemanticsNode().boundsInRoot)
         node.performTouchInput { click() }
         compose.runOnIdle { assertEquals(0, clicks) }
     }
