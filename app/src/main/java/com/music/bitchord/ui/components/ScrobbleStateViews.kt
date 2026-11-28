@@ -1,5 +1,6 @@
 package com.music.bitchord.ui.components
 
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -19,7 +20,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.music.bitchord.R
-import com.music.bitchord.ui.scrobble.scrobbleTextButtonColors
 
 /** Centered title, message and optional action for an empty scrobble list. */
 @Composable
@@ -73,7 +73,7 @@ internal fun ScrobbleErrorState(
                 TextButton(
                     onClick = onRetry,
                     modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp),
-                    colors = scrobbleTextButtonColors(colors.onErrorContainer),
+                    colors = ButtonDefaults.textButtonColors(),
                 ) {
                     Text(stringResource(R.string.retry), color = colors.onErrorContainer)
                 }

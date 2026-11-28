@@ -144,7 +144,7 @@ internal fun ScrobblePlaylistExportDialog(
         AlertAction(
             label = stringResource(R.string.save),
             emphasised = true,
-            contentColor = scrobbleAccentColor(),
+            contentColor = MaterialTheme.colorScheme.primary,
             onClick = {
                 if (csvSelected) {
                     csvSaveLauncher.launch(LocalPlaylistExport.fileName(playlist.title, "csv"))

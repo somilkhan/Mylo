@@ -1,5 +1,7 @@
 package com.music.bitchord.ui.scrobble
 
+import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.ButtonDefaults
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.BackHandler
@@ -310,12 +312,12 @@ fun ScrobbleGenerateContent(
                             Spacer(Modifier.weight(1f))
                             TextButton(
                                 onClick = viewModel::cancelGeneration,
-                                colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSecondaryContainer),
+                                colors = ButtonDefaults.textButtonColors(),
                             ) {
                                 Text(stringResource(R.string.cancel))
                             }
                         }
-                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = scrobbleAccentColor())
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.primary)
                         Text(
                             uiState.progress.ifBlank { "Finding tracks that fit…" },
                             style = MaterialTheme.typography.bodyMedium,
@@ -358,7 +360,7 @@ fun ScrobbleGenerateContent(
                                 TextButton(
                                     onClick = viewModel::dismissError,
                                     modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp),
-                                    colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onErrorContainer),
+                                    colors = ButtonDefaults.textButtonColors(),
                                 ) {
                                     Text(stringResource(R.string.scrobble_dismiss))
                                 }
@@ -418,7 +420,7 @@ fun ScrobbleGenerateContent(
                         }
                         TextButton(
                             onClick = onOpenPlaylists,
-                            colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSecondaryContainer),
+                            colors = ButtonDefaults.textButtonColors(),
                         ) {
                             Text(stringResource(R.string.open))
                         }
@@ -641,7 +643,7 @@ fun ScrobbleGenerateContent(
                                 Text(
                                     count.toString(),
                                     style = MaterialTheme.typography.headlineMedium,
-                                    color = scrobbleAccentColor(),
+                                    color = MaterialTheme.colorScheme.primary,
                                 )
                                 Text(
                                     stringResource(R.string.scrobble_tracks_steps),
@@ -673,7 +675,7 @@ fun ScrobbleGenerateContent(
                 }
 
                 if (uiState.isGenerating) {
-                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = scrobbleAccentColor())
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.primary)
                     Text(
                         uiState.progress.ifBlank { "Finding tracks that fit…" },
                         style = MaterialTheme.typography.bodyMedium,
@@ -707,7 +709,7 @@ fun ScrobbleGenerateContent(
                             }
                         },
                         modifier = Modifier.weight(1f).heightIn(min = 52.dp),
-                        colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface),
+                        colors = ButtonDefaults.textButtonColors(),
                     ) {
                         Text(stringResource(R.string.cancel))
                     }
@@ -715,7 +717,7 @@ fun ScrobbleGenerateContent(
                         onClick = {
                             viewModel.generate(generationRequest)
                         },
-                        colors = scrobblePrimaryButtonColors(),
+                        colors = ButtonDefaults.buttonColors(),
                         enabled = canGenerate,
                         modifier = Modifier.weight(1.45f).heightIn(min = 52.dp),
                         shape = RoundedCornerShape(18.dp),
@@ -794,7 +796,7 @@ private fun GeneratorSeedPicker(
                 },
                 enabled = enabled,
                 modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-                colors = scrobbleOutlinedButtonColors(MaterialTheme.colorScheme.onSurface),
+                colors = ButtonDefaults.outlinedButtonColors(),
             ) {
                 Text(
                     when {
@@ -821,7 +823,7 @@ private fun GeneratorSeedPicker(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        if (seedSearching) LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = scrobbleAccentColor())
+        if (seedSearching) LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.primary)
         seedSearchError?.let {
             Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
         }
@@ -844,7 +846,7 @@ private fun GeneratorSeedPicker(
             Text(
                 "Selected · " + it.title + " — " + it.artist,
                 style = MaterialTheme.typography.bodyMedium,
-                color = scrobbleAccentColor(),
+                color = MaterialTheme.colorScheme.primary,
             )
         }
     }
@@ -895,7 +897,7 @@ private fun GeneratorSeedResult(
                 Icon(
                     Icons.Rounded.Check,
                     contentDescription = stringResource(R.string.selected),
-                    tint = scrobbleAccentColor(),
+                    tint = MaterialTheme.colorScheme.primary,
                 )
             }
         }
@@ -922,7 +924,7 @@ private fun GeneratorExclusionToggle(
             checked = checked,
             onCheckedChange = onCheckedChange,
             enabled = enabled,
-            colors = scrobbleCheckboxColors(),
+            colors = CheckboxDefaults.colors(),
         )
         Text(
             label,
@@ -1191,7 +1193,7 @@ fun ScrobblePlaylistsContent(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        TextButton(onClick = onOpenGenerator, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface)) {
+                        TextButton(onClick = onOpenGenerator, colors = ButtonDefaults.textButtonColors()) {
                             Icon(Icons.Rounded.AutoAwesome, contentDescription = null, modifier = Modifier.size(20.dp))
                             Spacer(Modifier.width(8.dp))
                             Text(stringResource(R.string.scrobble_tab_generate))
@@ -1235,7 +1237,7 @@ fun ScrobblePlaylistsContent(
                 item(key = "similar_playlist_saved") {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(stringResource(R.string.scrobble_created_title, saved.title), modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurface)
-                        TextButton(onClick = { selectedId = saved.id }, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface)) { Text(stringResource(R.string.open)) }
+                        TextButton(onClick = { selectedId = saved.id }, colors = ButtonDefaults.textButtonColors()) { Text(stringResource(R.string.open)) }
                     }
                 }
             }
@@ -1248,9 +1250,9 @@ fun ScrobblePlaylistsContent(
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = scrobbleAccentColor())
+                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.primary)
                             Text(generationState.progress, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            TextButton(onClick = viewModel::cancelGeneration, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSecondaryContainer)) { Text(stringResource(R.string.cancel)) }
+                            TextButton(onClick = viewModel::cancelGeneration, colors = ButtonDefaults.textButtonColors()) { Text(stringResource(R.string.cancel)) }
                         }
                     }
                 }
@@ -1291,7 +1293,7 @@ fun ScrobblePlaylistsContent(
                                 title = "No playlists yet",
                                 message = "Create your first mix from the Generator.",
                                 action = {
-                                    Button(onClick = onOpenGenerator, colors = scrobblePrimaryButtonColors(), shape = RoundedCornerShape(16.dp)) {
+                                    Button(onClick = onOpenGenerator, colors = ButtonDefaults.buttonColors(), shape = RoundedCornerShape(16.dp)) {
                                         Icon(Icons.Rounded.AutoAwesome, contentDescription = null)
                                         Spacer(Modifier.width(8.dp))
                                         Text(stringResource(R.string.scrobble_open_generator))
@@ -1351,7 +1353,7 @@ fun ScrobblePlaylistsContent(
                         if (playlist.songs.isNotEmpty()) {
                             TextButton(
                                 onClick = { expandedPlaylistId = if (expandedPlaylistId == playlist.id) null else playlist.id },
-                                colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface),
+                                colors = ButtonDefaults.textButtonColors(),
                                 modifier = Modifier.align(Alignment.End),
                             ) {
                                 Text(if (expandedPlaylistId == playlist.id) "Hide preview" else "Preview tracks")
@@ -1381,7 +1383,7 @@ fun ScrobblePlaylistsContent(
                                             Text((trackIndex + 1).toString(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                         }
                                     }
-                                    TextButton(onClick = { selectedId = playlist.id }, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface)) {
+                                    TextButton(onClick = { selectedId = playlist.id }, colors = ButtonDefaults.textButtonColors()) {
                                         Text(stringResource(R.string.scrobble_view_all_tracks, playlist.songs.size))
                                     }
                                 }
@@ -1424,7 +1426,7 @@ fun ScrobblePlaylistsContent(
             AlertRule()
             AlertAction(
                 label = stringResource(R.string.save),
-                contentColor = scrobbleAccentColor(),
+                contentColor = MaterialTheme.colorScheme.primary,
                 emphasised = true,
                 onClick = {
                     val clean = renameText.trim()
@@ -1554,7 +1556,7 @@ private fun PlaylistRow(
         Modifier
     }
     val rowShape = RoundedCornerShape(18.dp)
-    val gradientEnabled = LocalScrobbleGradientEnabled.current
+    val gradientEnabled = false
     val rowContent: @Composable () -> Unit = {
             Surface(
                 modifier = Modifier
@@ -1850,7 +1852,7 @@ private fun PlaylistDetailContent(
                                 listState.animateScrollToItem(precedingItems + currentTrackDisplayIndex)
                             }
                         },
-                        colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface),
+                        colors = ButtonDefaults.textButtonColors(),
                     ) {
                         Icon(Icons.Rounded.MyLocation, contentDescription = null)
                         Spacer(Modifier.width(4.dp))
@@ -1867,7 +1869,7 @@ private fun PlaylistDetailContent(
                             addTrackMessage = null
                         }
                     },
-                    colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface),
+                    colors = ButtonDefaults.textButtonColors(),
                 ) { Text(if (addTracksExpanded) "Done" else "Add tracks") }
                 Box {
                     IconButton(onClick = { detailMenuExpanded = true }) {
@@ -1963,7 +1965,7 @@ private fun PlaylistDetailContent(
             }
             trackActionMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
             generationState.savedPlaylist?.takeIf { it.generationMode == "similar-playlist" }?.let {
-                Text(stringResource(R.string.scrobble_created_go_back, it.title), style = MaterialTheme.typography.bodySmall, color = scrobbleAccentColor())
+                Text(stringResource(R.string.scrobble_created_go_back, it.title), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
             }
             exportMessage?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall, color = if (it.startsWith("Couldn't")) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
@@ -1977,9 +1979,9 @@ private fun PlaylistDetailContent(
         if (generationState.isGenerating) {
             item(key = "similar_generation_progress") {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = scrobbleAccentColor())
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.primary)
                     Text(generationState.progress, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    TextButton(onClick = viewModel::cancelGeneration, colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSecondaryContainer)) { Text(stringResource(R.string.cancel)) }
+                    TextButton(onClick = viewModel::cancelGeneration, colors = ButtonDefaults.textButtonColors()) { Text(stringResource(R.string.cancel)) }
                 }
             }
         }
@@ -1998,13 +2000,13 @@ private fun PlaylistDetailContent(
                     onSubmit = {},
                     placeholder = "Search YouTube Music",
                 )
-                if (addTrackLoading) LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = scrobbleAccentColor())
+                if (addTrackLoading) LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.primary)
                 addTrackError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                 addTrackMessage?.let {
                     Text(
                         it,
                         color = if (addTrackIsError) MaterialTheme.colorScheme.error
-                        else scrobbleAccentColor(),
+                        else MaterialTheme.colorScheme.primary,
                     )
                 }
                 if (!addTrackLoading && addTrackError == null && addTrackQuery.trim().length >= 2 && addTrackResults.isEmpty()) {
@@ -2038,7 +2040,7 @@ private fun PlaylistDetailContent(
                     val alreadyAdded = song.videoId in existingVideoIds
                     TextButton(
                         enabled = !alreadyAdded,
-                        colors = scrobbleTextButtonColors(MaterialTheme.colorScheme.onSurface),
+                        colors = ButtonDefaults.textButtonColors(),
                         onClick = {
                             scope.launch {
                                 val added = LocalPlaylistStore.addSongIfAbsent(playlist.id, song)
@@ -2078,7 +2080,7 @@ private fun PlaylistDetailContent(
                     onMore = { trackMenuExpanded = true },
                     isCurrent = isCurrentTrack,
                     isPlaying = isCurrentTrack && isPlaying,
-                    activeTint = scrobbleAccentColor(),
+                    activeTint = MaterialTheme.colorScheme.primary,
                 )
                 DropdownMenu(
                     expanded = trackMenuExpanded,
