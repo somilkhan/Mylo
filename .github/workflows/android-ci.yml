@@ -51,11 +51,14 @@ jobs:
         with:
           ref: ${{ steps.pr_head.outputs.sha || github.sha }}
 
-      - name: Set up JDK 17
+      # InnerTubeX ships TokenProvider bytecode compiled for Java 21 (class
+      # version 65). Robolectric loads it while BitChordApplication starts,
+      # so the test JVM must be Java 21 even though app bytecode targets 17.
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: "21"
           cache: gradle
 
       - name: Set up Android SDK
@@ -132,10 +135,10 @@ jobs:
           retention-days: 3
 
       - name: Report APK artifact upload failure
-        if: always() && ((github.event_name == 'workflow_dispatch' && inputs.build_apks) || (github.event_name == 'issue_comment' && github.event.issue.pull_request && github.event.comment.body == '/build-apk' && github.event.comment.user.login == 'somilkhan')) && steps.build_apks.outcome == 'success' && steps.upload_apks.outcome == 'failure'
+        if: always() && ((github.event_name == 'workflow_dispatch' && inputs.build_apks) || (github.event_name == 'issue_comment' && github.event.comment.body == '/build-apk' && github.event.comment.user.login == 'somilkhan') && steps.build_apks.outcome == 'success' && steps.upload_apks.outcome == 'failure'
         shell: bash
         run: |
-          echo "::warning::Android build succeeded, but GitHub could not store the APK artifacts. Check Actions artifact storage quota."
+          echo "::warning::Android build succeeded, but GitHub could not store the APK artifacts. Check repository Actions artifact storage quota."
           {
             echo "### APK artifacts unavailable"
             echo "Android/TV/Wear OS APKs built, but artifact upload failed. Android unit-test outcome: ${{ steps.test_android.outcome }}. Check the repository's GitHub Actions storage quota."
@@ -174,9 +177,6 @@ jobs:
       run:
         working-directory: web
     steps:
-      - name: Check out source
-        uses: actions/checkout@v4
-
       - name: Enable Corepack
         run: corepack enable
 
