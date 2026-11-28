@@ -157,8 +157,6 @@ fun ScrobblePlaylistsContent(
     onPlaySongs: (List<Song>, Int) -> Unit,
     onOpenGenerator: () -> Unit,
     onPlaylistDetailChanged: (Boolean) -> Unit = {},
-    openPlaylistId: String? = null,
-    onPlaylistOpenConsumed: (String) -> Unit = {},
 ) {
     val playlists by LocalPlaylistStore.playlists.collectAsStateWithLifecycle()
     val storageError by LocalPlaylistStore.loadError.collectAsStateWithLifecycle()
@@ -166,12 +164,6 @@ fun ScrobblePlaylistsContent(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
-    LaunchedEffect(openPlaylistId) {
-        openPlaylistId?.let { id ->
-            if (playlists.any { it.id == id }) selectedId = id
-            onPlaylistOpenConsumed(id)
-        }
-    }
     var query by rememberSaveable { mutableStateOf("") }
     var sortMode by rememberSaveable { mutableStateOf(LocalPlaylistSortMode.NEWEST) }
     var renameTarget by remember { mutableStateOf<LocalPlaylist?>(null) }
