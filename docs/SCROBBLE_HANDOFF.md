@@ -8,7 +8,7 @@ Updated 2026-11-28. This is the authoritative resume point for the next contribu
 - Branch: `feat/scrobble-screen`
 - Working tree at handoff: clean
 - Verified continuation baseline: `1f494445faadd7f6335e96d4752761062e343b2e` (HEAD matched origin; clean before edits).
-- Latest pushed checkpoint: `8f17239fc381d5dcfb0119873ef68c0ed4b5cc2c` (compact Statistics and shared-control quality pass; see the follow-up handoff commit for validation state).
+- Latest pushed HEAD: `d3c3ec4c72b7e5bd23e1e677ed770a9060f910fe` (handoff update; code checkpoint immediately before it is `8f17239fc381d5dcfb0119873ef68c0ed4b5cc2c`).
 - Pull request already open: `https://github.com/somilkhan/Mylo/pull/15`
 - Do not create a replacement project, rename packages, or switch away from this branch.
 - The branch contains the pre-existing stable CI debug-keystore signing fixes. Do not commit keystores, secrets, or local.properties.
@@ -19,6 +19,8 @@ Updated 2026-11-28. This is the authoritative resume point for the next contribu
 - `c3ba1642` — localizes generation progress/errors, hardens Last.fm/YouTube source rules, bounds exclusion paging, protects against account changes and cancellation races, and adds 4,085 generated translations across 19 existing locale folders with format-token checks.
 - `25638515` — saves the generation audit and its explicit verification gates.
 - `38029159` — completes playlist detail coverage/edit safety, cover URI cleanup and validation, IO-bound exports, stale-index/search fixes, transaction regressions, and the real Compose/Robolectric detail screenshot fixtures. It also saves `docs/audits/SCROBBLE_PLAYLISTS.md`.
+- `8f17239f` — compact Stats dashboard and shared Scrobble control accessibility/reduced-motion hardening; pushed to this branch.
+- `d3c3ec4c` — documents exact pushed checkpoint and validation limits; documentation-only.
 
 The earlier redesign commits remain the product baseline: Stats is Last.fm-only with dashboard folding/history paging; Scrobble has no gradient hub theme and no Replay entry; Generate and Playlists use the redesigned Mylo style.
 
