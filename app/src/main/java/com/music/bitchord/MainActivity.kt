@@ -613,6 +613,9 @@ private fun BitChordApp(
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     // Scrobble's own tab, while its page is open: 0 Stats, 1 Generate, 2 Playlists.
     var scrobbleTab by rememberSaveable { mutableIntStateOf(0) }
+    // Identifies the native playlist page opened over Scrobble, without mistaking
+    // a detail page that was already open before Scrobble for this overlay.
+    var scrobbleNativePlaylistId by rememberSaveable { mutableStateOf<String?>(null) }
     // Explore loads the first time it's shown, not at launch beside Home.
     LaunchedEffect(selectedTab) {
         if (selectedTab == TAB_EXPLORE) viewModel.onExploreShown()
@@ -3055,8 +3058,9 @@ private fun BitChordApp(
     val goBack: () -> Unit = {
         // A native playlist opened from Scrobble sits above the Scrobble route.
         // Close that release first so Back returns to the same playlist list.
-        if (scrobbleOpen && detail != null) {
+        if (scrobbleOpen && scrobbleNativePlaylistId != null && detail?.browseId == scrobbleNativePlaylistId) {
             viewModel.closeDetail()
+            scrobbleNativePlaylistId = null
         } else if (scrobbleOpen && scrobbleTab != 0) {
             // Scrobble's Generate or Playlists tab steps back to Stats first.
             scrobbleTab = 0
@@ -3251,7 +3255,7 @@ private fun BitChordApp(
                                     contentPadding = listPadding,
                                 )
                             }
-                        } else if (pageRoute == AppRoute.Scrobble && scrobbleTab != 0 && detail == null) {
+                        } else if (pageRoute == AppRoute.Scrobble && scrobbleTab != 0 && detail?.browseId != scrobbleNativePlaylistId) {
                             ScrobbleHost(
                                 tab = scrobbleTab,
                                 highlightedPlaylistId = scrobbleHandoffPlaylistId,
@@ -3269,8 +3273,9 @@ private fun BitChordApp(
                                     navigator.push(AppRoute.Settings)
                                 },
                                 onOpenPlaylist = { playlist ->
-                                    // Leave Scrobble and open the playlist through Mylo's
-                                    // existing release-page navigation and DetailScreen.
+                                    // Open above Scrobble using Mylo's existing playlist
+                                    // navigation and native DetailScreen.
+                                    scrobbleNativePlaylistId = playlist.browseId
                                     viewModel.openDetail(
                                         browseId = playlist.browseId,
                                         title = playlist.title,
@@ -4213,7 +4218,7 @@ private fun BitChordApp(
                         is AppRoute.SettingsChoice -> stringResource(route.choice.title)
                         AppRoute.EqualizerPresets -> stringResource(R.string.equalizer_preset)
                         AppRoute.Replay -> stringResource(R.string.replay)
-                        AppRoute.Scrobble -> if (detail != null) detail.title else when (scrobbleTab) {
+                        AppRoute.Scrobble -> if (detail?.browseId == scrobbleNativePlaylistId) detail.title else when (scrobbleTab) {
                             0 -> stringResource(R.string.scrobble_title_stats)
                             1 -> stringResource(R.string.scrobble_tab_generate)
                             else -> stringResource(R.string.scrobble_tab_playlists)
@@ -4241,7 +4246,7 @@ private fun BitChordApp(
                             // stays out of the way until that has been scrolled off.
                             route == AppRoute.Replay -> replayScrolled
                             // As Mylo: the bar's title comes up once the page's own header scrolls off.
-                            route == AppRoute.Scrobble -> if (detail != null) detailScrolled else scrobbleNavBarScroll.isInline
+                            route == AppRoute.Scrobble -> if (detail?.browseId == scrobbleNativePlaylistId) detailScrolled else scrobbleNavBarScroll.isInline
                             route != null -> true
                             detail != null && detailActiveShelf != null -> true
                             detail != null -> detailScrolled
