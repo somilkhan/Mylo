@@ -24,6 +24,30 @@ import java.util.Locale
  * loads — it stays on screen, dimmed by the caller, rather than blanking to a
  * skeleton on every switch. [snapshotPeriod] says which period it is.
  */
+/** What the list under the dashboard shows. */
+internal enum class StatsListMode {
+    /** The scrobble history, newest first, grouped by day; not tied to the period. */
+    RECENT,
+    TOP_TRACKS,
+    TOP_ARTISTS,
+    TOP_ALBUMS,
+}
+
+/**
+ * The scrobble history, paged in as the list nears its end. [failed] is the
+ * last page request; the rows already loaded stay.
+ */
+internal data class RecentFeed(
+    val items: List<LastFM.RecentTrack> = emptyList(),
+    val page: Int = 0,
+    val totalPages: Int = 0,
+    val loading: Boolean = false,
+    val failed: Boolean = false,
+) {
+    val loaded: Boolean get() = page > 0
+    val canLoadMore: Boolean get() = loaded && page < totalPages
+}
+
 internal data class ScrobbleStatisticsUiState(
     val period: LastFmStatsPeriod = LastFmStatsPeriod.MONTH,
     val connected: Boolean = false,
@@ -34,6 +58,8 @@ internal data class ScrobbleStatisticsUiState(
     val isRefreshing: Boolean = false,
     /** The last fetch failed. With a [snapshot] it is shown as saved data. */
     val failed: Boolean = false,
+    val listMode: StatsListMode = StatsListMode.RECENT,
+    val recent: RecentFeed = RecentFeed(),
 ) {
     /** A snapshot from another period is showing while [period] loads. */
     val isSwitchingPeriod: Boolean
@@ -51,6 +77,7 @@ class ScrobbleStatisticsViewModel : ViewModel() {
 
     private var loadJob: Job? = null
     private var activeKey: String? = null
+    private var recentJob: Job? = null
 
     fun onScreenOpened() = load(force = false)
 
@@ -72,7 +99,53 @@ class ScrobbleStatisticsViewModel : ViewModel() {
         load(force = false)
     }
 
+    internal fun setListMode(mode: StatsListMode) {
+        _state.update { it.copy(listMode = mode) }
+    }
+
     fun refresh() = load(force = true)
+
+    /** The next page of history, once the Recent list nears its last loaded row. */
+    fun loadMoreRecent() {
+        val feed = _state.value.recent
+        if (feed.loading || (!feed.canLoadMore && feed.loaded)) return
+        loadRecent(page = if (feed.loaded) feed.page + 1 else 1)
+    }
+
+    private fun loadRecent(page: Int) {
+        val username = _state.value.username.takeIf { it.isNotBlank() } ?: return
+        recentJob?.cancel()
+        _state.update { it.copy(recent = it.recent.copy(loading = true, failed = false)) }
+        recentJob = viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) { repository.recentPage(username, page) }
+            if (!_state.value.username.equals(username, ignoreCase = true)) return@launch
+            _state.update { current ->
+                val feed = current.recent
+                result.fold(
+                    onSuccess = { pageResult ->
+                        val merged = if (page <= 1) {
+                            pageResult.items
+                        } else {
+                            // Scrobbles that arrived since page one push rows
+                            // across the page boundary; don't list them twice.
+                            val seen = feed.items.mapTo(HashSet()) { it.timestamp to it.name }
+                            feed.items + pageResult.items.filterNot { (it.timestamp to it.name) in seen }
+                        }
+                        current.copy(
+                            recent = RecentFeed(
+                                items = merged,
+                                page = page,
+                                totalPages = pageResult.totalPages,
+                                loading = false,
+                                failed = false,
+                            ),
+                        )
+                    },
+                    onFailure = { current.copy(recent = feed.copy(loading = false, failed = true)) },
+                )
+            }
+        }
+    }
 
     private fun load(force: Boolean) {
         val period = _state.value.period
@@ -80,8 +153,13 @@ class ScrobbleStatisticsViewModel : ViewModel() {
         val connected = AppSettings.lastfmEnabled.value && username.isNotEmpty() && LastFM.isInitialized()
         if (!connected) {
             loadJob?.cancel()
+            recentJob?.cancel()
             activeKey = null
-            _state.value = ScrobbleStatisticsUiState(period = period, connected = false)
+            _state.value = ScrobbleStatisticsUiState(
+                period = period,
+                connected = false,
+                listMode = _state.value.listMode,
+            )
             return
         }
 
@@ -113,8 +191,10 @@ class ScrobbleStatisticsViewModel : ViewModel() {
                 isLoading = shown == null,
                 isRefreshing = force,
                 failed = false,
+                recent = if (accountChanged) RecentFeed() else current.recent,
             )
         }
+        if (force || accountChanged || !_state.value.recent.loaded) loadRecent(page = 1)
         if (!force && cached != null && fresh) {
             _state.update { it.copy(isLoading = false, isRefreshing = false) }
             return

@@ -51,8 +51,6 @@ internal data class LastFmStatsSnapshot(
     val topArtists: List<LastFM.RankedArtist>,
     val topTracks: List<LastFM.RankedTrack>,
     val topAlbums: List<LastFM.RankedAlbum>,
-    /** Newest first; a now-playing row, if any, comes first. */
-    val recent: List<LastFM.RecentTrack>,
     /** Oldest first. Empty when any slice failed: a chart with holes would mislead. */
     val activity: List<LastFmActivityBucket> = emptyList(),
     /** Scrobbles in the window just before this one; null for all time or when unknown. */
@@ -111,6 +109,7 @@ internal interface LastFmStatsApi {
         limit: Int,
         fromEpochSeconds: Long?,
         toEpochSeconds: Long? = null,
+        page: Int = 1,
     ): Result<LastFM.PagedResult<LastFM.RecentTrack>>
 }
 
@@ -122,8 +121,8 @@ private object DefaultLastFmStatsApi : LastFmStatsApi {
         LastFM.getTopTracksChart(username, period, limit)
     override suspend fun topAlbums(username: String, period: String, limit: Int) =
         LastFM.getTopAlbumsChart(username, period, limit)
-    override suspend fun recent(username: String, limit: Int, fromEpochSeconds: Long?, toEpochSeconds: Long?) =
-        LastFM.getRecentScrobbles(username, limit, fromEpochSeconds, toEpochSeconds)
+    override suspend fun recent(username: String, limit: Int, fromEpochSeconds: Long?, toEpochSeconds: Long?, page: Int) =
+        LastFM.getRecentScrobbles(username, limit, fromEpochSeconds, toEpochSeconds, page)
 }
 
 /**
@@ -131,7 +130,7 @@ private object DefaultLastFmStatsApi : LastFmStatsApi {
  *
  * A snapshot is a handful of small requests made together: the profile, the
  * top artists, tracks and albums for the period (whose totals are the
- * period's distinct counts), the latest scrobbles, and one-row history
+ * period's distinct counts), and one-row history
  * requests whose totals count the scrobbles in a window: the period itself,
  * the window before it, and each slice of the activity chart. The charts are
  * required; everything else only decorates the screen, so a failure there
@@ -179,7 +178,6 @@ internal class LastFmStatisticsRepository(
         val artists = async { api.topArtists(username, period.apiValue, CHART_LIMIT) }
         val tracks = async { api.topTracks(username, period.apiValue, CHART_LIMIT) }
         val albums = async { api.topAlbums(username, period.apiValue, CHART_LIMIT) }
-        val recent = async { api.recent(username, RECENT_LIMIT, null) }
         val periodCount = period.days?.let { days ->
             async { api.recent(username, 1, now - days * SECONDS_PER_DAY) }
         }
@@ -232,10 +230,21 @@ internal class LastFmStatisticsRepository(
             topArtists = artistPage.items.filter { it.playCount > 0L },
             topTracks = trackPage.items.filter { it.playCount > 0L && it.artist.isNotBlank() },
             topAlbums = albumPage.items.filter { it.playCount > 0L },
-            recent = recent.await().getOrNull()?.items.orEmpty().take(RECENT_LIMIT),
             activity = activity.await(),
             previousScrobbles = previousCount?.await()?.getOrNull()?.total,
         )
+    }
+
+    /**
+     * One page of the scrobble history, newest first, for the Recent list.
+     * Only the first page keeps Last.fm's now-playing row; later pages repeat
+     * it at their top, and it would show up again mid-list.
+     */
+    suspend fun recentPage(username: String, page: Int): Result<LastFM.PagedResult<LastFM.RecentTrack>> {
+        val user = username.trim()
+        return api.recent(user, RECENT_PAGE_SIZE, null, null, page).map { result ->
+            if (page <= 1) result else result.copy(items = result.items.filterNot { it.nowPlaying })
+        }
     }
 
     private suspend fun countActivity(
@@ -258,7 +267,7 @@ internal class LastFmStatisticsRepository(
 
     companion object {
         const val CHART_LIMIT = 50
-        const val RECENT_LIMIT = 10
+        const val RECENT_PAGE_SIZE = 50
         private const val ACTIVITY_PARALLELISM = 4
         private const val SECONDS_PER_DAY = 86_400L
     }

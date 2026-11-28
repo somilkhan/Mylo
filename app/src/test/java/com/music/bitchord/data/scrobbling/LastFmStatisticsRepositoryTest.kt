@@ -53,17 +53,37 @@ class LastFmStatisticsRepositoryTest {
     }
 
     @Test
-    fun aFailedChartFailsTheSnapshotButAFailedRecentListOnlyHidesIt() = runBlocking {
+    fun aFailedChartFailsTheSnapshot() = runBlocking {
         val failingChart = LastFmStatisticsRepository(
             FakeApi(failTracks = true), LastFmStatsCache { 0L }, { now }, { "https://api" },
         )
         assertTrue(failingChart.load("zen", LastFmStatsPeriod.MONTH, false).isFailure)
+    }
 
-        val failingRecent = LastFmStatisticsRepository(
+    @Test
+    fun recentPagesAskForTheirPageAndOnlyTheFirstKeepsNowPlaying() = runBlocking {
+        val api = FakeApi()
+        val repository = LastFmStatisticsRepository(api, LastFmStatsCache { 0L }, { now }, { "https://api" })
+
+        val first = repository.recentPage(" zen ", page = 1).getOrThrow()
+        assertEquals(1, api.lastRecentPage)
+        assertEquals(LastFmStatisticsRepository.RECENT_PAGE_SIZE, api.lastRecentLimit)
+        assertTrue(first.items.first().nowPlaying)
+        assertEquals(3, first.totalPages)
+
+        val second = repository.recentPage("zen", page = 2).getOrThrow()
+        assertEquals(2, api.lastRecentPage)
+        assertTrue(second.items.none { it.nowPlaying })
+        assertEquals(1, second.items.size)
+    }
+
+    @Test
+    fun aFailedRecentPageFailsOnItsOwn() = runBlocking {
+        val repository = LastFmStatisticsRepository(
             FakeApi(failRecentList = true), LastFmStatsCache { 0L }, { now }, { "https://api" },
         )
-        val snapshot = failingRecent.load("zen", LastFmStatsPeriod.MONTH, false).getOrThrow()
-        assertTrue(snapshot.recent.isEmpty())
+        assertTrue(repository.recentPage("zen", 1).isFailure)
+        assertTrue(repository.load("zen", LastFmStatsPeriod.MONTH, false).isSuccess)
     }
 
     @Test
@@ -172,11 +192,16 @@ class LastFmStatisticsRepositoryTest {
 
         val windows = java.util.concurrent.ConcurrentLinkedQueue<LongRange>()
 
+        @Volatile var lastRecentPage = 0
+
+        @Volatile var lastRecentLimit = 0
+
         override suspend fun recent(
             username: String,
             limit: Int,
             fromEpochSeconds: Long?,
             toEpochSeconds: Long?,
+            page: Int,
         ): Result<LastFM.PagedResult<LastFM.RecentTrack>> {
             if (fromEpochSeconds != null && toEpochSeconds != null) {
                 windows += fromEpochSeconds..toEpochSeconds
@@ -190,7 +215,13 @@ class LastFmStatisticsRepositoryTest {
                 return Result.success(LastFM.PagedResult(emptyList(), 412, 412L))
             }
             if (failRecentList) return Result.failure(IllegalStateException("offline"))
-            return Result.success(LastFM.PagedResult(listOf(LastFM.RecentTrack("T", "Artist A", null, now())), 1, 1L))
+            lastRecentPage = page
+            lastRecentLimit = limit
+            // Last.fm puts the playing track on top of every page.
+            val playing = LastFM.RecentTrack("Now", "Artist A", null, 0L, nowPlaying = true)
+            return Result.success(
+                LastFM.PagedResult(listOf(playing, LastFM.RecentTrack("T", "Artist A", null, now() - page)), 3, 150L),
+            )
         }
 
         private fun now() = 1_795_000_000L

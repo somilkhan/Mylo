@@ -487,6 +487,7 @@ object LastFM {
         limit: Int = 10,
         fromEpochSeconds: Long? = null,
         toEpochSeconds: Long? = null,
+        page: Int = 1,
     ): Result<PagedResult<RecentTrack>> = statsResult {
         val user = username.trim()
         require(user.isNotEmpty()) { "Last.fm username is missing" }
@@ -497,6 +498,7 @@ object LastFM {
                 put("limit", limit.coerceIn(1, 200).toString())
                 if (fromEpochSeconds != null) put("from", fromEpochSeconds.toString())
                 if (toEpochSeconds != null) put("to", toEpochSeconds.toString())
+                if (page > 1) put("page", page.toString())
             },
         )
         parseLastFmRecentScrobbles(response)
