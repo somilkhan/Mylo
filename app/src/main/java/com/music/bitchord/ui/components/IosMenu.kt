@@ -73,6 +73,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
@@ -410,12 +411,13 @@ fun IosMenuRow(
 
 /**
  * A menu hung off a button rather than lifted out of a list — every ⋮ and ⋯ in
- * the app opens its menu this way. The iOS panel lines its trailing edge up
- * with [anchor]'s and grows out of the corner nearest the button: for one in
- * the lower half of the screen, as the player's ⋯ is, it settles at the bottom
- * and grows from its bottom corner; for one higher up, a row's ⋮ near the top
- * of a list, it hangs down from the button's top and grows from its top
- * corner. With no anchor it takes the bottom end.
+ * the app opens its menu this way. The panel lines its trailing edge up with
+ * [anchor]'s and hangs from the button: under it with an 8dp gap when the
+ * window has room, over it when it does not, growing from the corner nearest
+ * the finger. It never lands further from its button than that — a ⋮ on a row
+ * near the foot of a list opens beside the row, not at the foot of the screen —
+ * and it keeps clear of [bottomClearance], the caller's floating chrome. With
+ * no anchor it takes the bottom end.
  *
  * Drawn in place, over whatever it is composed on top of — the player puts it
  * inside its own sheet, so [backdrop], the player recorded live, can be
@@ -437,6 +439,12 @@ fun <T : Any> IosMenuPopover(
     hazeState: HazeState? = null,
     /** Anchor and overlay use screen-space coordinates when shown in a separate window. */
     screenCoordinates: Boolean = false,
+    /**
+     * Chrome the panel must stay clear of at the foot of the window — the
+     * floating tab bar and the mini player, where the caller has them. Zero
+     * when the page's own safe area is all that is under the panel.
+     */
+    bottomClearance: Dp = 0.dp,
     content: @Composable (T) -> Unit,
 ) {
     var last by remember { mutableStateOf<Pair<T, Rect?>?>(null) }
@@ -582,7 +590,8 @@ fun <T : Any> IosMenuPopover(
         val height = constraints.maxHeight
         val margin = 14.dp.roundToPx()
         val top = insets.getTop(this) + 8.dp.roundToPx()
-        val bottom = height - insets.getBottom(this) - 12.dp.roundToPx()
+        val foot = insets.getBottom(this) + bottomClearance.roundToPx()
+        val bottom = (height - foot - 12.dp.roundToPx()).coerceAtLeast(top)
 
         val scrimPlaceable = measurables[0].measure(Constraints.fixed(width, height))
         val panelWidth = IosMenuWidth.roundToPx().coerceAtMost(width - margin * 2)
@@ -591,12 +600,27 @@ fun <T : Any> IosMenuPopover(
         )
         val shadowPlate = measurables[1].measure(Constraints.fixed(panel.width, panel.height))
         val anchorBounds = menuAnchor?.translate(-overlayOffset)
+        val gap = 8.dp.roundToPx()
+        // The panel's trailing edge lines up with the button's, never past the gutter.
         val right = anchorBounds?.right?.roundToInt() ?: (width - margin)
         val panelX = (right - panel.width)
             .coerceIn(margin, (width - margin - panel.width).coerceAtLeast(margin))
-        val lowest = (bottom - panel.height).coerceAtLeast(top)
-        val hangsDown = anchorBounds != null && anchorBounds.center.y < height / 2f
-        val panelY = if (hangsDown) anchorBounds.top.roundToInt().coerceIn(top, lowest) else lowest
+
+        // Hang off the button itself: under it when the window has room, over it
+        // when it does not, and only clamped after that. This used to pin
+        // anything in the lower half of the window to the foot of the safe area,
+        // so a ⋮ on a row near the bottom opened its menu a screen away from the
+        // finger — and, on Scrobble, on top of the tab bar.
+        val placement = menuPlacement(
+            anchorTop = anchorBounds?.top?.roundToInt(),
+            anchorBottom = anchorBounds?.bottom?.roundToInt(),
+            panelHeight = panel.height,
+            top = top,
+            bottom = bottom,
+            gap = gap,
+        )
+        val hangsDown = placement.hangsDown
+        val panelY = placement.y
 
         val growth: GraphicsLayerScope.() -> Unit = {
             val p = progress.value
@@ -623,4 +647,41 @@ fun <T : Any> IosMenuPopover(
             }
         }
     }
+}
+
+/**
+ * Where an anchored panel lands, in a box running [top]..[bottom].
+ *
+ * Under the anchor when the box has room for [panelHeight] plus [gap], over it
+ * when only that side fits, otherwise on the roomier side, and clamped last.
+ * Without an anchor it takes the bottom end of the box. Pulled out of the
+ * placement pass so the rules can be asserted without a window.
+ */
+internal data class MenuPlacement(val y: Int, val hangsDown: Boolean)
+
+internal fun menuPlacement(
+    anchorTop: Int?,
+    anchorBottom: Int?,
+    panelHeight: Int,
+    top: Int,
+    bottom: Int,
+    gap: Int,
+): MenuPlacement {
+    val below = anchorBottom?.plus(gap)
+    val above = anchorTop?.let { it - gap - panelHeight }
+    val roomBelow = if (below == null) 0 else bottom - below
+    val roomAbove = if (above == null) 0 else above - top
+    val hangsDown = when {
+        below == null || above == null -> true
+        roomBelow >= panelHeight -> true
+        roomAbove >= panelHeight -> false
+        else -> roomBelow >= roomAbove
+    }
+    val lowest = (bottom - panelHeight).coerceAtLeast(top)
+    val y = when {
+        below == null || above == null -> lowest
+        hangsDown -> below.coerceIn(top, lowest)
+        else -> above.coerceIn(top, lowest)
+    }
+    return MenuPlacement(y, hangsDown)
 }

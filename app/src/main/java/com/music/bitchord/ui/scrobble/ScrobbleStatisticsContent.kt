@@ -321,6 +321,7 @@ internal fun ScrobbleStatisticsScreen(
                     onDismiss = { menuOpen = false },
                     backdrop = pageBackdrop,
                     screenCoordinates = true,
+                    bottomClearance = ScrobbleChromeClearance,
                 ) { current ->
                 StatsListMode.entries.forEach { mode ->
                     IosMenuRow(
