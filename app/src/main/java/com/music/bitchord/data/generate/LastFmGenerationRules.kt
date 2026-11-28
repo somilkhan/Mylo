@@ -1,6 +1,5 @@
 package com.music.bitchord.data.generate
 
-import com.music.bitchord.data.stats.ReplayPeriod
 import java.util.Locale
 
 /**
@@ -31,13 +30,6 @@ internal object LastFmGenerationRules {
      * Last.fm has no calendar-year window, so THIS_YEAR uses the closest
      * rolling window ("12month").
      */
-    fun lastFmPeriod(period: ReplayPeriod): String = when (period) {
-        ReplayPeriod.THIS_WEEK -> "7day"
-        ReplayPeriod.THIS_MONTH -> "1month"
-        ReplayPeriod.THIS_YEAR -> "12month"
-        ReplayPeriod.ALL_TIME -> "overall"
-    }
-
     /** Unix-second [from, to] bounds for the recent-listening window ending at [nowMillis]. */
     fun recentWindowSeconds(nowMillis: Long): Pair<Long, Long> {
         val to = nowMillis / 1000L

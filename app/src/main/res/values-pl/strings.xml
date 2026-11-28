@@ -1523,8 +1523,6 @@
     <string name="bit_perfect_status_unavailable">Niedostępne dla tego utworu (%1$s)</string>
     <string name="scrobble_building_mix">Tworzenie miksu</string>
     <string name="scrobble_dismiss">Odrzuć</string>
-    <string name="scrobble_playlist_saved">Playlista zapisana</string>
-    <string name="scrobble_tracks_steps">utworów · kroki co 5</string>
     <string name="scrobble_no_tracks_found">Nie znaleziono utworów</string>
     <string name="scrobble_mixes_subtitle">Twoje wygenerowane i zapisane miksy</string>
     <string name="scrobble_open_generator">Otwórz generator</string>
@@ -1536,15 +1534,7 @@
     <string name="scrobble_reset_cover">Przywróć okładkę</string>
     <string name="scrobble_export_playlist">Eksportuj playlistę</string>
     <string name="scrobble_remove_from_playlist">Usuń z playlisty</string>
-    <string name="scrobble_no_listening_yet">Brak odsłuchań</string>
     <string name="scrobble_open_settings">Otwórz ustawienia</string>
-    <string name="scrobble_save_csv">Zapisz CSV</string>
-    <string name="scrobble_share_csv">Udostępnij CSV</string>
-    <string name="scrobble_save_m3u">Zapisz M3U</string>
-    <string name="scrobble_share_m3u">Udostępnij M3U</string>
-    <string name="scrobble_track_concentration">Koncentracja utworów</string>
-    <string name="scrobble_avg_plays_per_track">Średnio odtworzeń / utwór</string>
-    <string name="scrobble_unique_tracks">Unikalne utwory</string>
     <string name="find_a_playlist">Znajdź playlistę</string>
     <string name="no_playlists_match">Brak playlist pasujących do „%1$s”</string>
     <string name="hide_lyrics_preview">Ukryj tekst</string>
@@ -1700,18 +1690,11 @@
     <string name="replay_year_unmute">Wyłącz wyciszenie historii</string>
     <string name="scrobble_tracks_count">%1$d utworów</string>
     <string name="scrobble_playlists_tracks_summary">%1$d playlist · %2$d utworów</string>
-    <string name="scrobble_created_title">Utworzono: %1$s</string>
-    <string name="scrobble_view_all_tracks">Pokaż wszystkie %1$d utworów</string>
     <string name="scrobble_remove_device_message">%1$s zostanie usunięte z tego urządzenia. Historia odsłuchów nie zostanie zmieniona.</string>
-    <string name="scrobble_created_go_back">Utworzono: %1$s. Wróć, aby ją zobaczyć.</string>
     <string name="scrobble_added_track">Dodano: %1$s</string>
     <string name="scrobble_playlist_missing">Playlista już nie istnieje</string>
     <string name="scrobble_track_already_in_playlist">Utwór jest już na tej playliście</string>
     <string name="scrobble_save_track_failed">Nie udało się zapisać utworu. Spróbuj ponownie.</string>
-    <string name="scrobble_plays_count">%1$s odtworzeń</string>
     <string name="scrobble_choose_format">Wybierz format dla: %1$s.</string>
-    <string name="scrobble_mylo_listening_time">Czas słuchania w Mylo · %1$s</string>
-    <string name="scrobble_not_recorded_yet">Jeszcze nie zapisano</string>
-    <string name="scrobble_percent_summary">%1$s · %2$s</string>
     <string name="scrobble_pinned">Przypięta</string>
 </resources>

@@ -742,7 +742,7 @@ private val StatsListMode.icon: ImageVector
         StatsListMode.TOP_ALBUMS -> SfIcons.Album
     }
 
-private val LastFmStatsPeriod.shortLabel: Int
+internal val LastFmStatsPeriod.shortLabel: Int
     get() = when (this) {
         LastFmStatsPeriod.WEEK -> R.string.scrobble_stats_period_week
         LastFmStatsPeriod.MONTH -> R.string.scrobble_stats_period_month

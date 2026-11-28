@@ -1459,8 +1459,6 @@
     <string name="source_downloads_on">允許下載</string>
     <string name="scrobble_building_mix">正在製作你的混音</string>
     <string name="scrobble_dismiss">關閉</string>
-    <string name="scrobble_playlist_saved">播放清單已儲存</string>
-    <string name="scrobble_tracks_steps">首歌曲 · 步進 5</string>
     <string name="scrobble_no_tracks_found">找不到歌曲</string>
     <string name="scrobble_mixes_subtitle">你產生並儲存的混音</string>
     <string name="scrobble_open_generator">開啟產生器</string>
@@ -1472,15 +1470,7 @@
     <string name="scrobble_reset_cover">重設封面</string>
     <string name="scrobble_export_playlist">匯出播放清單</string>
     <string name="scrobble_remove_from_playlist">從播放清單移除</string>
-    <string name="scrobble_no_listening_yet">還沒有播放紀錄</string>
     <string name="scrobble_open_settings">開啟設定</string>
-    <string name="scrobble_save_csv">儲存 CSV</string>
-    <string name="scrobble_share_csv">分享 CSV</string>
-    <string name="scrobble_save_m3u">儲存 M3U</string>
-    <string name="scrobble_share_m3u">分享 M3U</string>
-    <string name="scrobble_track_concentration">歌曲集中度</string>
-    <string name="scrobble_avg_plays_per_track">平均播放次數 / 首</string>
-    <string name="scrobble_unique_tracks">不重複歌曲</string>
     <string name="find_a_playlist">尋找播放列表</string>
     <string name="no_playlists_match">沒有符合「%1$s」的播放列表</string>
     <string name="hide_lyrics_preview">隱藏歌詞</string>
@@ -1634,18 +1624,11 @@
     <string name="replay_year_unmute">取消靜音此故事</string>
     <string name="scrobble_tracks_count">%1$d 首</string>
     <string name="scrobble_playlists_tracks_summary">%1$d 個播放清單 · %2$d 首</string>
-    <string name="scrobble_created_title">已建立 %1$s</string>
-    <string name="scrobble_view_all_tracks">查看全部 %1$d 首</string>
     <string name="scrobble_remove_device_message">%1$s 將從此裝置中移除。收聽紀錄不受影響。</string>
-    <string name="scrobble_created_go_back">已建立 %1$s。返回即可查看。</string>
     <string name="scrobble_added_track">已加入 %1$s</string>
     <string name="scrobble_playlist_missing">播放清單已不存在</string>
     <string name="scrobble_track_already_in_playlist">此歌曲已在此播放清單中</string>
     <string name="scrobble_save_track_failed">無法儲存歌曲，請再試一次。</string>
-    <string name="scrobble_plays_count">%1$s 次播放</string>
     <string name="scrobble_choose_format">為 %1$s 選擇格式。</string>
-    <string name="scrobble_mylo_listening_time">Mylo 收聽時長 · %1$s</string>
-    <string name="scrobble_not_recorded_yet">尚未記錄</string>
-    <string name="scrobble_percent_summary">%1$s · %2$s</string>
     <string name="scrobble_pinned">已釘選</string>
 </resources>

@@ -3,7 +3,6 @@ package com.music.bitchord.data.generate
 import com.music.bitchord.data.scrobbling.LastFM
 import com.music.bitchord.data.scrobbling.parseLastFmArtistTopTracks
 import com.music.bitchord.data.scrobbling.parseLastFmTagTopTracks
-import com.music.bitchord.data.stats.ReplayPeriod
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -75,14 +74,6 @@ class LastFmGenerationRulesTest {
         val (from, to) = LastFmGenerationRules.recentWindowSeconds(now)
         assertEquals(1_700_000_000L, to)
         assertEquals(1_700_000_000L - 30L * 86_400L, from)
-    }
-
-    @Test
-    fun replayPeriodsMapToLastFmPeriods() {
-        assertEquals("7day", LastFmGenerationRules.lastFmPeriod(ReplayPeriod.THIS_WEEK))
-        assertEquals("1month", LastFmGenerationRules.lastFmPeriod(ReplayPeriod.THIS_MONTH))
-        assertEquals("12month", LastFmGenerationRules.lastFmPeriod(ReplayPeriod.THIS_YEAR))
-        assertEquals("overall", LastFmGenerationRules.lastFmPeriod(ReplayPeriod.ALL_TIME))
     }
 
     @Test

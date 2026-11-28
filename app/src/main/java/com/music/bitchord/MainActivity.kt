@@ -2650,7 +2650,7 @@ private fun BitChordApp(
     // picture, so they cannot disagree. Read while any of them is on screen —
     // which includes the Library tab, since the cards live at the top of it.
     // See [rememberReplayState].
-    val replayOpen = route == AppRoute.Replay || (scrobbleOpen && scrobbleTab == 0) || replayStory != null || showReplayShare ||
+    val replayOpen = route == AppRoute.Replay || replayStory != null || showReplayShare ||
         (selectedTab == TAB_LIBRARY && detail == null && route == null)
     val replayPageOpen = replayEntryId != null || replayStory != null || showReplayShare
     val (replay, setReplayPeriod) = rememberReplayState(replayOpen, replayPageOpen)
@@ -3258,6 +3258,10 @@ private fun BitChordApp(
                                     playFrom(songs, index, QueueSource("Scrobble Playlist", PlaybackSourceType.QUEUE))
                                 },
                                 onTabChange = onScrobbleTab,
+                                onOpenSettings = {
+                                    navigator.pop()
+                                    navigator.push(AppRoute.Settings)
+                                },
                             )
                         } else if (pageRoute == AppRoute.Moods) {
                             MoodGridPage(

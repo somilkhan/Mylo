@@ -15,7 +15,7 @@ import dev.chrisbanes.haze.HazeState
 /**
  * The Scrobble page's Generate and Playlists tabs.
  *
- * The Stats tab is Mylo's own Replay screen, which the caller renders, and
+ * The Stats tab is the Last.fm account's statistics, which the caller renders, and
  * the tab bar is the app's navigation bar, swapped to the Scrobble tabs while
  * this page is open. [tab] is 1 for Generate and 2 for Playlists.
  *
@@ -33,6 +33,7 @@ fun ScrobbleHost(
     contentPadding: PaddingValues,
     onPlaySongs: (List<Song>, Int) -> Unit,
     onTabChange: (Int) -> Unit,
+    onOpenSettings: () -> Unit = {},
 ) {
     val generateViewModel: ScrobbleGenerateViewModel = viewModel()
     val hazeState = remember { HazeState() }
@@ -50,6 +51,7 @@ fun ScrobbleHost(
                     sharedTransitionScope = this@SharedTransitionLayout,
                     animatedVisibilityScope = this@AnimatedVisibility,
                     onOpenPlaylists = { onTabChange(2) },
+                    onOpenSettings = onOpenSettings,
                 )
                 2 -> ScrobblePlaylistsContent(
                     viewModel = generateViewModel,

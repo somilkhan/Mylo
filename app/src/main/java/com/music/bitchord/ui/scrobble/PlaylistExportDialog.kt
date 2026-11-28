@@ -6,33 +6,19 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
@@ -42,11 +28,12 @@ import com.music.bitchord.data.spotify.LocalPlaylistExport
 import com.music.bitchord.ui.components.AlertAction
 import com.music.bitchord.ui.components.AlertRule
 import com.music.bitchord.ui.components.AlertScaffold
+import com.music.bitchord.ui.components.PillSegmentedControl
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
 import java.io.File
 
-/** Export one playlist as CSV or M3U: one format choice, one filled Save, Share and Cancel as text. */
+/** Export one playlist as CSV or M3U: the format as a segmented choice, then Save, Share or Cancel. */
 @Composable
 @OptIn(ExperimentalHazeMaterialsApi::class)
 internal fun ScrobblePlaylistExportDialog(
@@ -64,9 +51,9 @@ internal fun ScrobblePlaylistExportDialog(
             runCatching {
                 context.contentResolver.openOutputStream(uri)?.use {
                     it.write(LocalPlaylistExport.csv(playlist).toByteArray(Charsets.UTF_8))
-                } ?: error("Couldn't open the selected file")
-            }.onSuccess { onMessage("CSV saved") }
-                .onFailure { onMessage(it.message ?: "Couldn't save CSV") }
+                } ?: error(context.getString(R.string.scrobble_export_file_failed))
+            }.onSuccess { onMessage(context.getString(R.string.scrobble_export_csv_saved)) }
+                .onFailure { onMessage(context.getString(R.string.scrobble_export_csv_failed)) }
         }
         onDismiss()
     }
@@ -77,9 +64,9 @@ internal fun ScrobblePlaylistExportDialog(
             runCatching {
                 context.contentResolver.openOutputStream(uri)?.use {
                     it.write(LocalPlaylistExport.m3u(playlist).toByteArray(Charsets.UTF_8))
-                } ?: error("Couldn't open the selected file")
-            }.onSuccess { onMessage("M3U saved") }
-                .onFailure { onMessage(it.message ?: "Couldn't save M3U") }
+                } ?: error(context.getString(R.string.scrobble_export_file_failed))
+            }.onSuccess { onMessage(context.getString(R.string.scrobble_export_m3u_saved)) }
+                .onFailure { onMessage(context.getString(R.string.scrobble_export_m3u_failed)) }
         }
         onDismiss()
     }
@@ -90,19 +77,19 @@ internal fun ScrobblePlaylistExportDialog(
         val mimeType = if (csv) "text/csv" else "audio/x-mpegurl"
         runCatching {
             val directory = File(context.cacheDir, "shared/playlist_exports")
-            if (!directory.exists() && !directory.mkdirs()) error("Couldn't prepare the export file")
+            if (!directory.exists() && !directory.mkdirs()) error(context.getString(R.string.scrobble_export_prepare_failed))
             val file = File(directory, "${playlist.id}-${LocalPlaylistExport.fileName(playlist.title, extension)}")
             file.writeText(content, Charsets.UTF_8)
             val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
             val intent = Intent(Intent.ACTION_SEND).apply {
                 type = mimeType
                 putExtra(Intent.EXTRA_STREAM, uri)
-                clipData = ClipData.newRawUri("Playlist export", uri)
+                clipData = ClipData.newRawUri(playlist.title, uri)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
-            context.startActivity(Intent.createChooser(intent, "Share playlist"))
-        }.onSuccess { onMessage("Ready to share") }
-            .onFailure { onMessage(it.message ?: "Couldn't share playlist") }
+            context.startActivity(Intent.createChooser(intent, context.getString(R.string.scrobble_share_chooser_title)))
+        }.onSuccess { onMessage(context.getString(R.string.scrobble_export_ready)) }
+            .onFailure { onMessage(context.getString(R.string.scrobble_export_share_failed)) }
     }
 
     AlertScaffold(hazeState = hazeState, onDismiss = onDismiss) {
@@ -122,23 +109,15 @@ internal fun ScrobblePlaylistExportDialog(
                 color = MaterialTheme.colorScheme.onSurface,
                 textAlign = TextAlign.Center,
             )
-            Row(
+            PillSegmentedControl(
+                options = listOf(
+                    stringResource(R.string.scrobble_export_format_csv),
+                    stringResource(R.string.scrobble_export_format_m3u),
+                ),
+                selectedIndex = if (csvSelected) 0 else 1,
+                onSelect = { csvSelected = it == 0 },
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                FormatOption(
-                    label = "CSV",
-                    selected = csvSelected,
-                    onSelect = { csvSelected = true },
-                    modifier = Modifier.weight(1f),
-                )
-                FormatOption(
-                    label = "M3U",
-                    selected = !csvSelected,
-                    onSelect = { csvSelected = false },
-                    modifier = Modifier.weight(1f),
-                )
-            }
+            )
         }
         AlertRule()
         AlertAction(
@@ -167,36 +146,5 @@ internal fun ScrobblePlaylistExportDialog(
             contentColor = MaterialTheme.colorScheme.onSurface,
             onClick = onDismiss,
         )
-    }
-}
-
-/** One segment of the format choice. Selection shows a check, not colour alone. */
-@Composable
-private fun FormatOption(
-    label: String,
-    selected: Boolean,
-    onSelect: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val colors = MaterialTheme.colorScheme
-    Surface(
-        modifier = modifier
-            .heightIn(min = 48.dp)
-            .selectable(selected = selected, role = Role.RadioButton, onClick = onSelect),
-        shape = RoundedCornerShape(14.dp),
-        color = if (selected) colors.secondaryContainer else colors.surfaceVariant,
-        contentColor = if (selected) colors.onSecondaryContainer else colors.onSurface,
-    ) {
-        Row(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center,
-        ) {
-            if (selected) {
-                Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(8.dp))
-            }
-            Text(label, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
-        }
     }
 }

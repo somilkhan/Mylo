@@ -2,8 +2,8 @@ package com.music.bitchord.data.generate
 
 import android.content.Context
 import com.music.bitchord.auth.SignedIn
-import com.music.bitchord.data.ListeningHistory
 import com.music.bitchord.data.scrobbling.LastFM
+import com.music.bitchord.data.scrobbling.LastFmStatsPeriod
 import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.data.YtMusicRepository
 import com.music.bitchord.data.innertube.InnertubeParser
@@ -11,10 +11,7 @@ import com.music.bitchord.data.model.SearchFilter
 import com.music.bitchord.data.model.SearchResult
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.spotify.LocalPlaylistStore
-import com.music.bitchord.data.stats.ListeningStats
-import com.music.bitchord.data.stats.ReplayPeriod
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.supervisorScope
@@ -22,7 +19,6 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.withContext
 import java.util.Locale
 
 /** The generator modes, mapped onto Mylo's existing data sources and Last.fm. */
@@ -44,7 +40,8 @@ enum class PlaylistGenerationMode(val storageValue: String) {
 data class PlaylistGenerationRequest(
     val mode: PlaylistGenerationMode,
     val count: Int = 25,
-    val period: ReplayPeriod = ReplayPeriod.ALL_TIME,
+    /** The Last.fm chart window for Top tracks and Top artists mix. */
+    val period: LastFmStatsPeriod = LastFmStatsPeriod.OVERALL,
     val seedTrack: Song? = null,
     val seedArtist: String = "",
     val tag: String = "",
@@ -70,14 +67,18 @@ class PlaylistGenerationRepository(context: Context) {
         val target = request.count.coerceIn(MIN_TRACKS, MAX_TRACKS)
         val raw = when (request.mode) {
             PlaylistGenerationMode.TOP -> {
-                onProgress("Reading your Mylo Replay…")
-                ListeningStats.summary(request.period).songs.map { it.song }
+                val username = lastFmUsernameOrThrow("Top tracks")
+                onProgress("Reading your top tracks on Last.fm…")
+                val top = LastFM.getTopTracks(username, period = request.period.apiValue, limit = 100).getOrThrow()
+                onProgress("Finding those tracks on YouTube Music…")
+                resolveLastFmTracks(top.take(LastFmGenerationRules.MAX_RESOLVE_CANDIDATES))
             }
             PlaylistGenerationMode.RECENT -> {
-                onProgress("Reading your recent listening…")
-                withContext(Dispatchers.IO) {
-                    ListeningHistory.read(appContext).map { it.song }
-                }
+                val username = lastFmUsernameOrThrow("Recent")
+                onProgress("Reading your recent scrobbles…")
+                val recent = lastFmRecentTracks(username, LastFmGenerationRules.MAX_RESOLVE_CANDIDATES)
+                onProgress("Finding those tracks on YouTube Music…")
+                resolveLastFmTracks(recent)
             }
             PlaylistGenerationMode.SIMILAR_TRACKS -> {
                 val seed = request.seedTrack
@@ -144,7 +145,6 @@ class PlaylistGenerationRepository(context: Context) {
                 val seeds = (
                     listOfNotNull(request.seedTrack) +
                         signals.lastFmSeeds.take(4) +
-                        signals.replaySongs.take(4) +
                         signals.recentSongs.take(4) +
                         signals.accountHistory.take(3) +
                         signals.likedSongs.take(3)
@@ -164,7 +164,7 @@ class PlaylistGenerationRepository(context: Context) {
                 PlaylistGenerationRules.weightedBlend(
                     pools = listOf(
                         (discovery + remote.first) to 4,
-                        (signals.likedSongs + signals.accountHistory + signals.lastFmSeeds + signals.recentSongs + signals.replaySongs) to 3,
+                        (signals.likedSongs + signals.accountHistory + signals.lastFmSeeds + signals.recentSongs) to 3,
                         remote.second to 1,
                     ),
                     limit = target,
@@ -176,7 +176,6 @@ class PlaylistGenerationRepository(context: Context) {
                 val signals = loadTasteSignals()
                 val seeds = (
                     signals.lastFmSeeds.take(6) +
-                        signals.replaySongs.take(6) +
                         signals.recentSongs.take(6) +
                         signals.accountHistory.take(4) +
                         signals.likedSongs.take(4)
@@ -200,7 +199,7 @@ class PlaylistGenerationRepository(context: Context) {
                     limit = target,
                     maxPerArtist = 2,
                 )
-                val heard = signals.lastFmSeeds + signals.replaySongs + signals.recentSongs +
+                val heard = signals.lastFmSeeds + signals.recentSongs +
                     signals.accountHistory + signals.likedSongs
                 val fresh = PlaylistGenerationRules.excludeHeard(
                     candidates = candidates,
@@ -386,9 +385,13 @@ class PlaylistGenerationRepository(context: Context) {
         return result
     }
 
+    /**
+     * What the mixes start from: Last.fm's all-time top tracks and the latest
+     * scrobbles, both found on YouTube Music, and when signed in the account's
+     * history and likes. Nothing is read from Mylo's own play log.
+     */
     private data class TasteSignals(
         val lastFmSeeds: List<Song>,
-        val replaySongs: List<Song>,
         val recentSongs: List<Song>,
         val accountHistory: List<Song>,
         val likedSongs: List<Song>,
@@ -396,18 +399,16 @@ class PlaylistGenerationRepository(context: Context) {
 
     private suspend fun loadTasteSignals(): TasteSignals {
         val lastFmSeeds = resolveLastFmTasteSeeds()
-        val replay = try {
-            ListeningStats.summary(ReplayPeriod.ALL_TIME).songs.take(12).map { it.song }
-        } catch (cancellation: CancellationException) {
-            throw cancellation
-        } catch (_: Exception) {
-            emptyList()
-        }
-        val recent = try {
-            withContext(Dispatchers.IO) { ListeningHistory.read(appContext).map { it.song }.take(30) }
-        } catch (cancellation: CancellationException) {
-            throw cancellation
-        } catch (_: Exception) {
+        val username = AppSettings.lastfmUsername.value.trim()
+        val recent = if (username.isNotEmpty() && AppSettings.lastfmEnabled.value && LastFM.isInitialized()) {
+            try {
+                resolveLastFmTracks(lastFmRecentTracks(username, limit = 8))
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Exception) {
+                emptyList()
+            }
+        } else {
             emptyList()
         }
         val (history, liked) = if (SignedIn.state(appContext).value) {
@@ -419,7 +420,17 @@ class PlaylistGenerationRepository(context: Context) {
         } else {
             emptyList<Song>() to emptyList()
         }
-        return TasteSignals(lastFmSeeds, replay, recent, history, liked)
+        return TasteSignals(lastFmSeeds, recent, history, liked)
+    }
+
+    /** The latest distinct scrobbled tracks, newest first, as chart rows to resolve. */
+    private suspend fun lastFmRecentTracks(username: String, limit: Int): List<LastFM.RankedTrack> {
+        val recent = LastFM.getRecentScrobbles(username, limit = 200).getOrThrow().items
+        return recent
+            .filter { it.name.isNotBlank() && it.artist.isNotBlank() }
+            .distinctBy { LastFmGenerationRules.trackKey(it.artist, it.name) }
+            .take(limit)
+            .map { LastFM.RankedTrack(it.name, it.artist, 0L, it.artworkUrl) }
     }
 
     private suspend fun resolveLastFmTasteSeeds(): List<Song> {
@@ -597,11 +608,11 @@ class PlaylistGenerationRepository(context: Context) {
     }
 
     /** Last.fm top artists, their top tracks (at most 3 requests in flight), interleaved and deduped. */
-    private suspend fun topArtistsMixCandidates(period: ReplayPeriod, onProgress: (String) -> Unit): List<Song> {
+    private suspend fun topArtistsMixCandidates(period: LastFmStatsPeriod, onProgress: (String) -> Unit): List<Song> {
         val username = lastFmUsernameOrThrow("Top Artists Mix")
         val artists = LastFM.getTopArtists(
             username,
-            period = LastFmGenerationRules.lastFmPeriod(period),
+            period = period.apiValue,
             limit = LastFmGenerationRules.TOP_ARTIST_COUNT,
         ).getOrThrow().take(LastFmGenerationRules.TOP_ARTIST_COUNT)
         if (artists.isEmpty()) return emptyList()
@@ -699,10 +710,12 @@ class PlaylistGenerationRepository(context: Context) {
     }
 
     private suspend fun neverHeardCandidates(onProgress: (String) -> Unit): List<Song> {
-        onProgress("Checking your listening history…")
-        val heard = heardTracks()
-        val heardIds = heard.mapTo(HashSet()) { it.videoId }
-        val heardKeys = heard.mapTo(HashSet(), PlaylistGenerationRules::trackKey)
+        val username = lastFmUsernameOrThrow("Never heard")
+        onProgress("Checking what you've scrobbled…")
+        val heardKeys = heardTrackKeys(username)
+        val account = if (SignedIn.state(appContext).value) YtMusicRepository.history().getOrNull().orEmpty() else emptyList()
+        val heardIds = account.mapTo(HashSet()) { it.videoId }
+        account.mapTo(heardKeys, PlaylistGenerationRules::trackKey)
         currentCoroutineContext().ensureActive()
         onProgress("Finding music you haven't played…")
         val quickPicks = YtMusicRepository.quickPicks(heardIds).getOrNull().orEmpty()
@@ -715,20 +728,19 @@ class PlaylistGenerationRepository(context: Context) {
     }
 
     /**
-     * The local event log includes two-second skips; Replay adds counted plays.
-     * When signed in, include the account's YouTube Music history as well.
+     * Every track Last.fm knows the account has played that a few requests can
+     * reach: the all-time chart's first pages and the latest scrobbles, as
+     * title-and-artist keys.
      */
-    private suspend fun heardTracks(): List<Song> {
-        val local = withContext(Dispatchers.IO) {
-            ListeningHistory.read(appContext).map { it.song }
+    private suspend fun heardTrackKeys(username: String): HashSet<String> = supervisorScope {
+        val charts = (1..HEARD_CHART_PAGES).map { page ->
+            async { LastFM.getTopTracksPage(username, page = page, limit = 100).getOrNull()?.items.orEmpty() }
         }
-        val replay = ListeningStats.summary(ReplayPeriod.ALL_TIME).songs.map { it.song }
-        val account = if (SignedIn.state(appContext).value) {
-            YtMusicRepository.history().getOrThrow()
-        } else {
-            emptyList()
-        }
-        return local + replay + account
+        val recent = async { LastFM.getRecentScrobbles(username, limit = 200).getOrNull()?.items.orEmpty() }
+        val keys = HashSet<String>()
+        charts.awaitAll().flatten().mapTo(keys) { PlaylistGenerationRules.trackKey(it.name, it.artist) }
+        recent.await().mapTo(keys) { PlaylistGenerationRules.trackKey(it.name, it.artist) }
+        keys
     }
 
     private suspend fun homeSongs(): List<Song> =
@@ -749,6 +761,7 @@ class PlaylistGenerationRepository(context: Context) {
         const val MIN_TRACKS = 5
         private const val MIN_SIMILAR_MIX_SIZE = 20
         const val MAX_TRACKS = 35
+        private const val HEARD_CHART_PAGES = 5
     }
 }
 
@@ -770,7 +783,7 @@ internal object PlaylistGenerationRules {
             .toList()
 
     /**
-     * LastWave's weighted mix curation, adapted to Mylo's local Replay and
+     * LastWave's weighted mix curation, adapted to Mylo's Last.fm and
      * YouTube Music sources. The highest-weight source owns duplicate identity;
      * artist diversity is relaxed only when needed to fill the requested pool.
      */

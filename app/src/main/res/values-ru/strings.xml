@@ -1515,8 +1515,6 @@
     <string name="bit_perfect_status_unavailable">Недоступно для этого трека (%1$s)</string>
     <string name="scrobble_building_mix">Собираем ваш микс</string>
     <string name="scrobble_dismiss">Закрыть</string>
-    <string name="scrobble_playlist_saved">Плейлист сохранён</string>
-    <string name="scrobble_tracks_steps">треков · шаг 5</string>
     <string name="scrobble_no_tracks_found">Треки не найдены</string>
     <string name="scrobble_mixes_subtitle">Ваши созданные и сохранённые миксы</string>
     <string name="scrobble_open_generator">Открыть генератор</string>
@@ -1528,15 +1526,7 @@
     <string name="scrobble_reset_cover">Сбросить обложку</string>
     <string name="scrobble_export_playlist">Экспорт плейлиста</string>
     <string name="scrobble_remove_from_playlist">Удалить из плейлиста</string>
-    <string name="scrobble_no_listening_yet">Пока нет прослушиваний</string>
     <string name="scrobble_open_settings">Открыть настройки</string>
-    <string name="scrobble_save_csv">Сохранить CSV</string>
-    <string name="scrobble_share_csv">Поделиться CSV</string>
-    <string name="scrobble_save_m3u">Сохранить M3U</string>
-    <string name="scrobble_share_m3u">Поделиться M3U</string>
-    <string name="scrobble_track_concentration">Концентрация треков</string>
-    <string name="scrobble_avg_plays_per_track">Ср. прослушиваний / трек</string>
-    <string name="scrobble_unique_tracks">Уникальные треки</string>
     <string name="find_a_playlist">Найти плейлист</string>
     <string name="no_playlists_match">Нет плейлистов по запросу «%1$s»</string>
     <string name="hide_lyrics_preview">Скрыть текст</string>
@@ -1692,18 +1682,11 @@
     <string name="replay_year_unmute">Включить звук истории</string>
     <string name="scrobble_tracks_count">%1$d треков</string>
     <string name="scrobble_playlists_tracks_summary">%1$d плейлистов · %2$d треков</string>
-    <string name="scrobble_created_title">Создано: %1$s</string>
-    <string name="scrobble_view_all_tracks">Показать все треки (%1$d)</string>
     <string name="scrobble_remove_device_message">%1$s будет удалён с этого устройства. История прослушивания не изменится.</string>
-    <string name="scrobble_created_go_back">Создано: %1$s. Вернитесь, чтобы посмотреть.</string>
     <string name="scrobble_added_track">Добавлено: %1$s</string>
     <string name="scrobble_playlist_missing">Плейлист больше не существует</string>
     <string name="scrobble_track_already_in_playlist">Трек уже есть в этом плейлисте</string>
     <string name="scrobble_save_track_failed">Не удалось сохранить трек. Попробуйте ещё раз.</string>
-    <string name="scrobble_plays_count">%1$s прослушиваний</string>
     <string name="scrobble_choose_format">Выберите формат для «%1$s».</string>
-    <string name="scrobble_mylo_listening_time">Время прослушивания в Mylo · %1$s</string>
-    <string name="scrobble_not_recorded_yet">Пока не записано</string>
-    <string name="scrobble_percent_summary">%1$s · %2$s</string>
     <string name="scrobble_pinned">Закреплён</string>
 </resources>
