@@ -1,6 +1,10 @@
 package com.music.bitchord.ui.scrobble
 
 import android.app.Application
+import com.music.bitchord.R
+import com.music.bitchord.data.generate.GenerationAccountSnapshot
+import com.music.bitchord.data.generate.GenerationException
+import com.music.bitchord.data.generate.generationMessage
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.music.bitchord.data.generate.PlaylistGenerationRepository
@@ -51,15 +55,16 @@ class ScrobbleGenerateViewModel(application: Application) : AndroidViewModel(app
     private var generationJob: Job? = null
     private var generationToken = 0L
     private var queueMixOnSave = false
+    private var retryStartMixRequest: PlaylistGenerationRequest? = null
 
     /** Starts a one-tap mix from any global song action without touching playback during discovery. */
     fun startMixWithSong(song: Song) {
         if (!PlaylistGenerationRules.canStartMixWithSong(song)) {
-            _uiState.update { it.copy(error = "This song cannot start a mix. Choose a playable track.") }
+            _uiState.update { it.copy(error = getApplication<Application>().getString(R.string.scrobble_gen_error_song_no_mix)) }
             return
         }
         if (generationJob?.isActive == true) {
-            _uiState.update { it.copy(error = "A playlist is already being generated.") }
+            _uiState.update { it.copy(error = getApplication<Application>().getString(R.string.scrobble_gen_error_already_running)) }
             return
         }
         queueMixOnSave = true
@@ -80,15 +85,16 @@ class ScrobbleGenerateViewModel(application: Application) : AndroidViewModel(app
 
     fun generate(request: PlaylistGenerationRequest) {
         if (generationJob?.isActive == true) return
-        val queueAfterSave = queueMixOnSave
-        // Consumed by this run only: a failed or cancelled Start mix must not
-        // leave the flag set for a later, unrelated generation to pick up.
+        val queueAfterSave = queueMixOnSave || retryStartMixRequest == request
+        // Retain playback intent only for an explicit retry of this exact Start mix.
         queueMixOnSave = false
+        retryStartMixRequest = if (queueAfterSave) request else null
+        val accounts = GenerationAccountSnapshot(getApplication<Application>())
         val token = ++generationToken
         _uiState.update {
             it.copy(
                 isGenerating = true,
-                progress = "Preparing your playlist…",
+                progress = getApplication<Application>().getString(R.string.scrobble_gen_progress_preparing),
                 error = null,
                 savedPlaylist = null,
                 activeRequest = request,
@@ -108,19 +114,17 @@ class ScrobbleGenerateViewModel(application: Application) : AndroidViewModel(app
                         }
                     },
                     commit = { songs ->
-                        // This synchronous commit is reached only after the job is
-                        // confirmed active. Closing the screen cancels before it.
-                        check(generationToken == token) { "Generation was dismissed" }
+                        // Storage may suspend on its mutex/IO; only begin while this run is active.
+                        currentCoroutineContext().ensureActive()
+                        if (generationToken != token) throw CancellationException()
+                        accounts.ensureUnchanged()
                         val title = uniquePlaylistTitle(request, LocalPlaylistStore.playlists.value.map { it.title })
-                        LocalPlaylistStore.savePlaylist(
-                            title = title,
-                            songs = songs,
-                            generationMode = request.mode.storageValue,
-                        )
+                        saveGeneratedPlaylist(title, songs, request.mode.storageValue)
                     },
                 )
                 if (generationToken == token) {
-                    _uiState.update { it.copy(savedPlaylist = playlist) }
+                    retryStartMixRequest = null
+                    _uiState.update { it.copy(savedPlaylist = playlist, error = null) }
                     if (queueAfterSave) {
                         // A Start mix stays on Generate: it queues playback instead of
                         // emitting the saved-playlist handoff that moves to Playlists.
@@ -131,13 +135,13 @@ class ScrobbleGenerateViewModel(application: Application) : AndroidViewModel(app
                 }
             } catch (_: TimeoutCancellationException) {
                 if (generationToken == token) {
-                    _uiState.update { it.copy(error = "Playlist generation timed out. Check your connection and try again.") }
+                    _uiState.update { it.copy(error = getApplication<Application>().getString(R.string.scrobble_gen_error_timeout)) }
                 }
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (error: Exception) {
                 if (generationToken == token) {
-                    _uiState.update { it.copy(error = error.message ?: "Couldn't generate a playlist") }
+                    _uiState.update { it.copy(error = error.generationMessage(getApplication<Application>(), R.string.scrobble_gen_error_generic)) }
                 }
             } finally {
                 if (generationToken == token) {
@@ -153,10 +157,12 @@ class ScrobbleGenerateViewModel(application: Application) : AndroidViewModel(app
         if (generationJob?.isActive == true || source.songs.isEmpty()) return
         val token = ++generationToken
         queueMixOnSave = false
+        retryStartMixRequest = null
+        val accounts = GenerationAccountSnapshot(getApplication<Application>())
         _uiState.update {
             it.copy(
                 isGenerating = true,
-                progress = "Preparing a similar mix…",
+                progress = getApplication<Application>().getString(R.string.scrobble_gen_progress_similar),
                 error = null,
                 savedPlaylist = null,
                 activeRequest = null,
@@ -173,29 +179,27 @@ class ScrobbleGenerateViewModel(application: Application) : AndroidViewModel(app
                     }
                 }
                 currentCoroutineContext().ensureActive()
-                check(generationToken == token) { "Generation was dismissed" }
+                if (generationToken != token) throw CancellationException()
+                accounts.ensureUnchanged()
                 val title = uniquePlaylistTitle(
                     "${source.title} Mix",
                     LocalPlaylistStore.playlists.value.map { it.title },
                 )
-                val playlist = LocalPlaylistStore.savePlaylist(
-                    title = title,
-                    songs = songs,
-                    generationMode = "similar-playlist",
-                )
+                val playlist = saveGeneratedPlaylist(title, songs, "similar-playlist")
+                currentCoroutineContext().ensureActive()
                 if (generationToken == token) {
-                    _uiState.update { it.copy(savedPlaylist = playlist) }
+                    _uiState.update { it.copy(savedPlaylist = playlist, error = null) }
                     _savedPlaylistEvents.emit(playlist)
                 }
             } catch (_: TimeoutCancellationException) {
                 if (generationToken == token) {
-                    _uiState.update { it.copy(error = "Similar playlist generation timed out. Check your connection and try again.") }
+                    _uiState.update { it.copy(error = getApplication<Application>().getString(R.string.scrobble_gen_error_similar_timeout)) }
                 }
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (error: Exception) {
                 if (generationToken == token) {
-                    _uiState.update { it.copy(error = error.message ?: "Couldn't create a similar playlist") }
+                    _uiState.update { it.copy(error = error.generationMessage(getApplication<Application>(), R.string.scrobble_gen_error_similar_generic)) }
                 }
             } finally {
                 if (generationToken == token) {
@@ -209,6 +213,8 @@ class ScrobbleGenerateViewModel(application: Application) : AndroidViewModel(app
     /** Cancels all in-flight generation before the Scrobble surface is dismissed. */
     fun cancelGeneration() {
         queueMixOnSave = false
+        retryStartMixRequest = null
+        _pendingStartMixQueue.value = null
         generationToken++
         generationJob?.cancel()
         generationJob = null
@@ -220,8 +226,18 @@ class ScrobbleGenerateViewModel(application: Application) : AndroidViewModel(app
     }
 
     fun clearResult() {
+        if (_uiState.value.isGenerating) return
         queueMixOnSave = false
+        retryStartMixRequest = null
         _uiState.update { it.copy(savedPlaylist = null, error = null, activeRequest = null) }
+    }
+
+    private suspend fun saveGeneratedPlaylist(title: String, songs: List<Song>, mode: String): LocalPlaylist = try {
+        LocalPlaylistStore.savePlaylist(title = title, songs = songs, generationMode = mode)
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: Exception) {
+        throw GenerationException(R.string.scrobble_gen_error_save)
     }
 
     override fun onCleared() {

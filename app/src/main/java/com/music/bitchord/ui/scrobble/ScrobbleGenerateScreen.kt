@@ -4,6 +4,8 @@ import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
@@ -32,6 +34,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -206,6 +210,12 @@ internal fun GenerateAccounts.blockedReason(mode: PlaylistGenerationMode): Int? 
     else -> null
 }
 
+@StringRes
+internal fun GenerateAccounts.blockedReason(request: PlaylistGenerationRequest): Int? =
+    blockedReason(request.mode) ?: if (
+        (request.excludeLiked || request.excludeLibrary) && !youTubeMusicSignedIn
+    ) R.string.scrobble_gen_sign_in_to_use else null
+
 /** Everything the sheet asks for, for one mode. The seed track is kept only in memory. */
 @Immutable
 internal data class GenerateForm(
@@ -307,16 +317,18 @@ fun ScrobbleGenerateContent(
     var form by rememberSaveable(stateSaver = GenerateForm.Saver) { mutableStateOf(GenerateForm()) }
     var sheetOpen by rememberSaveable { mutableStateOf(false) }
     var search by remember { mutableStateOf(SeedSearch()) }
+    var seedSearchAttempt by remember { mutableStateOf(0) }
 
     val seeded = form.mode == PlaylistGenerationMode.SIMILAR_TRACKS || form.mode == PlaylistGenerationMode.MIX
-    LaunchedEffect(form.seedQuery, form.mode, sheetOpen) {
+    LaunchedEffect(form.seedQuery, form.mode, sheetOpen, seedSearchAttempt, uiState.isGenerating) {
         val query = form.seedQuery.trim()
-        if (!sheetOpen || !seeded || query.length < 2) {
+        if (!sheetOpen || !seeded || query.length < 2 || uiState.isGenerating) {
             search = SeedSearch()
             return@LaunchedEffect
         }
+        // Clear the previous query immediately, including during debounce; it is no longer selectable.
+        search = SeedSearch(searching = true)
         delay(300)
-        search = search.copy(searching = true, failed = false)
         search = try {
             val results = YtMusicRepository.search(query, SearchFilter.SONGS).getOrThrow()
             currentCoroutineContext().ensureActive()
@@ -332,6 +344,7 @@ fun ScrobbleGenerateContent(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {
+            currentCoroutineContext().ensureActive()
             SeedSearch(failed = true)
         }
     }
@@ -354,6 +367,7 @@ fun ScrobbleGenerateContent(
         accounts = accounts,
         contentPadding = contentPadding,
         showStatus = !sheetOpen,
+        reduceMotion = reduceMotion,
         savedModifier = savedModifier,
         onOpenMode = { mode ->
             if (!uiState.isGenerating && accounts.blockedReason(mode) == null) {
@@ -390,7 +404,12 @@ fun ScrobbleGenerateContent(
         ) {
             GenerateSheetContent(
                 form = form,
-                onFormChange = { form = it },
+                onFormChange = { updated ->
+                    if (updated.seedQuery != form.seedQuery) {
+                        search = SeedSearch(searching = updated.seedQuery.trim().length >= 2)
+                    }
+                    form = updated
+                },
                 search = search,
                 currentSong = currentSong,
                 uiState = uiState,
@@ -399,6 +418,8 @@ fun ScrobbleGenerateContent(
                     if (uiState.isGenerating) viewModel.cancelGeneration() else sheetOpen = false
                 },
                 modifier = Modifier.navigationBarsPadding(),
+                blockedReason = accounts.blockedReason(form.toRequest()),
+                onRetrySearch = { seedSearchAttempt++ },
             )
         }
     }
@@ -432,6 +453,7 @@ internal fun GenerateScreen(
     onConnectLastFm: () -> Unit,
     showStatus: Boolean = true,
     savedModifier: Modifier = Modifier,
+    reduceMotion: Boolean = false,
 ) {
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -466,6 +488,7 @@ internal fun GenerateScreen(
                     onDismissError = onDismissError,
                     onOpenPlaylists = onOpenPlaylists,
                     savedModifier = savedModifier,
+                    reduceMotion = reduceMotion,
                 )
                 if (!accounts.lastFmConnected) ConnectLastFmCard(onConnectLastFm)
             }
@@ -505,14 +528,15 @@ private fun GenerateStatus(
     onDismissError: () -> Unit,
     onOpenPlaylists: () -> Unit,
     savedModifier: Modifier,
+    reduceMotion: Boolean,
 ) {
     val generating = visible && uiState.isGenerating
     val error = uiState.error.takeIf { visible && !uiState.isGenerating }
     val saved = uiState.savedPlaylist.takeIf { !uiState.isGenerating }
     AnimatedVisibility(
         visible = generating,
-        enter = fadeIn(tween(180)) + expandVertically(tween(220)),
-        exit = fadeOut(tween(120)) + shrinkVertically(tween(180)),
+        enter = if (reduceMotion) EnterTransition.None else fadeIn(tween(180)) + expandVertically(tween(220)),
+        exit = if (reduceMotion) ExitTransition.None else fadeOut(tween(120)) + shrinkVertically(tween(180)),
     ) {
         ScrobbleStatusCard(
             title = stringResource(R.string.scrobble_building_mix),
@@ -524,8 +548,8 @@ private fun GenerateStatus(
     }
     AnimatedVisibility(
         visible = error != null,
-        enter = fadeIn(tween(180)) + expandVertically(tween(220)),
-        exit = fadeOut(tween(120)) + shrinkVertically(tween(180)),
+        enter = if (reduceMotion) EnterTransition.None else fadeIn(tween(180)) + expandVertically(tween(220)),
+        exit = if (reduceMotion) ExitTransition.None else fadeOut(tween(120)) + shrinkVertically(tween(180)),
     ) {
         ScrobbleStatusCard(
             title = stringResource(R.string.scrobble_gen_failed_title),
@@ -732,6 +756,8 @@ internal fun GenerateSheetContent(
     onGenerate: () -> Unit,
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
+    @StringRes blockedReason: Int? = null,
+    onRetrySearch: () -> Unit = {},
 ) {
     val colors = MaterialTheme.colorScheme
     val info = form.mode.info
@@ -790,6 +816,7 @@ internal fun GenerateSheetContent(
                     search = search,
                     currentSong = currentSong,
                     enabled = !busy,
+                    onRetrySearch = onRetrySearch,
                 )
 
                 PlaylistGenerationMode.SIMILAR_ARTISTS -> Column {
@@ -863,9 +890,9 @@ internal fun GenerateSheetContent(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-            } else if (uiState.error != null) {
+            } else if (blockedReason != null || uiState.error != null) {
                 Text(
-                    uiState.error,
+                    blockedReason?.let { stringResource(it) } ?: uiState.error.orEmpty(),
                     style = MaterialTheme.typography.bodyMedium,
                     color = colors.error,
                 )
@@ -880,7 +907,7 @@ internal fun GenerateSheetContent(
                 ScrobblePrimaryButton(
                     label = stringResource(if (retry) R.string.retry else R.string.scrobble_generate_button),
                     onClick = onGenerate,
-                    enabled = form.complete,
+                    enabled = form.complete && blockedReason == null,
                     busy = busy,
                     modifier = Modifier.weight(1.6f),
                 )
@@ -904,10 +931,10 @@ private fun GenreChip(label: String, selected: Boolean, enabled: Boolean, onClic
     )
     Box(
         Modifier
-            .heightIn(min = 36.dp)
+            .heightIn(min = 48.dp)
             .clip(CircleShape)
             .background(fill)
-            .clickable(enabled = enabled, role = Role.Checkbox, onClick = onClick)
+            .toggleable(value = selected, enabled = enabled, role = Role.Checkbox) { onClick() }
             .padding(horizontal = 14.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -923,6 +950,7 @@ private fun SeedPicker(
     search: SeedSearch,
     currentSong: Song?,
     enabled: Boolean,
+    onRetrySearch: () -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
     Column {
@@ -951,6 +979,14 @@ private fun SeedPicker(
                 style = MaterialTheme.typography.bodySmall,
                 color = if (search.failed) colors.error else colors.onSurfaceVariant,
                 modifier = Modifier.padding(start = 4.dp, top = 8.dp),
+            )
+        }
+        if (search.failed) {
+            Spacer(Modifier.height(8.dp))
+            ScrobbleSecondaryButton(
+                label = stringResource(R.string.retry),
+                onClick = onRetrySearch,
+                enabled = enabled,
             )
         }
         if (candidates.isNotEmpty()) {
@@ -989,7 +1025,7 @@ private fun SeedRow(song: Song, caption: String?, selected: Boolean, enabled: Bo
     Row(
         Modifier
             .fillMaxWidth()
-            .clickable(enabled = enabled, role = Role.RadioButton, onClick = onClick)
+            .selectable(selected = selected, enabled = enabled, role = Role.RadioButton, onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 8.dp)
             .semantics(mergeDescendants = true) { stateDescription = state },
         verticalAlignment = Alignment.CenterVertically,
@@ -1047,7 +1083,7 @@ private fun ToggleRow(label: String, checked: Boolean, enabled: Boolean, onChang
     Row(
         Modifier
             .fillMaxWidth()
-            .clickable(enabled = enabled, role = Role.Switch) { onChange(!checked) }
+            .toggleable(value = checked, enabled = enabled, role = Role.Switch, onValueChange = onChange)
             .heightIn(min = 52.dp)
             .padding(start = 16.dp, end = 12.dp),
         verticalAlignment = Alignment.CenterVertically,

@@ -53,6 +53,30 @@ class GenerateCommitTest {
     }
 
     @Test
+    fun cancellationDuringCommitNeverPublishesSuccess() = runTest {
+        var commits = 0
+        var successes = 0
+        val job = launch {
+            try {
+                generateAndCommit(
+                    generate = { "tracks" },
+                    commit = {
+                        commits++
+                        currentCoroutineContext().cancel()
+                        "saved playlist"
+                    },
+                )
+                successes++
+            } catch (_: CancellationException) {
+                // Durable storage may finish, but dismissal must not start playback/navigation.
+            }
+        }
+        job.join()
+        assertEquals(1, commits)
+        assertEquals(0, successes)
+    }
+
+    @Test
     fun similarPlaylistTitleUsesSourceNameAndAvoidsDuplicates() {
         assertEquals("Focus Mix", uniquePlaylistTitle("Focus Mix", emptyList()))
         assertEquals("Focus Mix (2)", uniquePlaylistTitle("Focus Mix", listOf("focus mix")))

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="scrobble_gen_progress_top">Reading your top tracks on Last.fm…</string>
+    <string name="scrobble_gen_progress_resolving">Finding those tracks on YouTube Music…</string>
+    <string name="scrobble_gen_progress_tag_top">Finding top tracks for %1$s…</string>
+    <string name="scrobble_gen_progress_top_artists">Reading your top artists…</string>
+    <string name="scrobble_gen_progress_mix">Building a mix from your listening…</string>
+    <string name="scrobble_gen_progress_taste_radio">Finding radio from your listening…</string>
+    <string name="scrobble_gen_progress_blending">Blending recommendations and your library…</string>
+    <string name="scrobble_gen_progress_recommendations">Building recommendations from your listening…</string>
+    <string name="scrobble_gen_progress_taste_related">Finding tracks related to your taste…</string>
+    <string name="scrobble_gen_progress_exclusions">Applying your selected library exclusions…</string>
+    <string name="scrobble_gen_progress_playlist_related">Finding artists and tracks related to this playlist…</string>
+    <string name="scrobble_gen_progress_related_pools">Building related-song radio and artist pools…</string>
+    <string name="scrobble_gen_progress_widening">Widening the mix with YouTube Music recommendations…</string>
+    <string name="scrobble_gen_progress_more_artists">Exploring more similar artists…</string>
+    <string name="scrobble_gen_progress_mood_pool">Adding a wider mood and genre discovery pool…</string>
+    <string name="scrobble_gen_progress_seed_related">Finding tracks related to %1$s…</string>
+    <string name="scrobble_gen_progress_expanding">Expanding discovery from related tracks…</string>
+    <string name="scrobble_gen_progress_more_tracks">Looking for more similar tracks…</string>
+    <string name="scrobble_gen_progress_recent_window">Checking what you’ve played in the last 30 days…</string>
+    <string name="scrobble_gen_progress_top_artist_tracks">Loading tracks from %1$d top artists…</string>
+    <string name="scrobble_gen_progress_scrobbled">Checking what you’ve scrobbled…</string>
+    <string name="scrobble_gen_progress_unheard">Finding music you haven’t played…</string>
+    <string name="scrobble_gen_error_artist_not_found">Couldn’t find that artist or similar artists. Try another artist.</string>
+    <string name="scrobble_gen_error_playlist_no_seeds">This playlist has no playable tracks to use as seeds.</string>
+    <string name="scrobble_gen_error_similar_too_small">Not enough new tracks found to build a %1$d-track mix. Try another source playlist.</string>
+    <string name="scrobble_gen_error_no_similar">No similar tracks found for “%1$s”. Try another song.</string>
+    <string name="scrobble_gen_error_account_changed">Your connected account changed. Try generating the playlist again.</string>
+    <string name="scrobble_gen_error_exclusions_unavailable">Couldn’t verify all selected exclusions. Check your connection and try again.</string>
+    <string name="scrobble_gen_error_history_incomplete">Couldn’t verify your complete Last.fm history. Try another mode.</string>
+    <string name="scrobble_gen_error_save">Couldn’t save the playlist. Check device storage and try again.</string>
+</resources>

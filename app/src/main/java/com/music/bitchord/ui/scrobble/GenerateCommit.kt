@@ -13,5 +13,8 @@ internal suspend fun <T, R> generateAndCommit(
 ): R {
     val result = generate()
     currentCoroutineContext().ensureActive()
-    return commit(result)
+    val committed = commit(result)
+    // Durable storage can finish non-cancellably; cancellation still must not start playback/navigation.
+    currentCoroutineContext().ensureActive()
+    return committed
 }
