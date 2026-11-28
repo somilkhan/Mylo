@@ -1,11 +1,15 @@
 package com.music.bitchord.ui.scrobble
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,6 +21,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -27,8 +32,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.MotionDurationScale
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Rect
@@ -37,15 +45,22 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.ui.components.PAGE_GUTTER
+import com.music.bitchord.ui.components.liquidGlassRim
 import java.util.Locale
 
 /*
@@ -56,6 +71,20 @@ import java.util.Locale
  */
 
 internal val ScrobbleCardShape = RoundedCornerShape(24.dp)
+
+/** Host-owned policy; standalone controls still honor the app and system preferences. */
+internal val LocalScrobbleReduceMotion = staticCompositionLocalOf { false }
+
+@Composable
+internal fun scrobbleReduceMotion(requested: Boolean = false): Boolean {
+    val appReduceMotion by AppSettings.reduceAnimation.collectAsStateWithLifecycle()
+    // Compose's Android window recomposer observes the system animator duration scale.
+    val systemMotion = rememberCoroutineScope().coroutineContext[MotionDurationScale]
+    return requested || LocalScrobbleReduceMotion.current || appReduceMotion ||
+        systemMotion?.scaleFactor == 0f
+}
+
+private val ScrobblePressEasing = CubicBezierEasing(0.23f, 1f, 0.32f, 1f)
 
 /** Stats' card: a translucent grey fill and a hairline edge, so it sits on black without a shadow. */
 @Composable
@@ -132,17 +161,24 @@ internal fun ScrobbleHairline(start: Dp = 0.dp) {
 @Composable
 internal fun pressScale(interaction: MutableInteractionSource, pressedScale: Float = 0.97f): Float {
     val pressed by interaction.collectIsPressedAsState()
+    val focused by interaction.collectIsFocusedAsState()
+    // Clickable emits PressInteraction for Enter/D-pad too. Focused controls stay
+    // still, including pointer presses while keyboard/programmatic focus is retained.
+    val noTransform = scrobbleReduceMotion() || focused
     val scale by animateFloatAsState(
-        targetValue = if (pressed) pressedScale else 1f,
-        animationSpec = tween(durationMillis = if (pressed) 90 else 160),
+        targetValue = if (pressed && !noTransform) pressedScale else 1f,
+        animationSpec = if (noTransform) snap() else tween(
+            durationMillis = if (pressed) 90 else 160,
+            easing = ScrobblePressEasing,
+        ),
         label = "press scale",
     )
-    return scale
+    return if (noTransform) 1f else scale
 }
 
 /**
  * The one white pill a page or sheet leads with. [busy] swaps the label for
- * a small spinner without changing the pill's size.
+ * a small spinner without changing the pill's size or accessible name.
  */
 @Composable
 internal fun ScrobblePrimaryButton(
@@ -155,41 +191,59 @@ internal fun ScrobblePrimaryButton(
 ) {
     val colors = MaterialTheme.colorScheme
     val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
     val scale = pressScale(interaction, 0.96f)
+    val actionable = enabled && !busy
     Box(
         modifier = modifier
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            }
-            .heightIn(min = if (compact) 36.dp else 52.dp)
-            .clip(CircleShape)
-            .background(colors.primary)
-            .alpha(if (enabled) 1f else 0.35f)
+            .sizeIn(minWidth = 48.dp, minHeight = if (compact) 48.dp else 52.dp)
             .clickable(
                 interactionSource = interaction,
                 indication = null,
-                enabled = enabled && !busy,
+                enabled = actionable,
                 role = Role.Button,
                 onClick = onClick,
             )
-            .padding(horizontal = if (compact) 16.dp else 24.dp),
+            .semantics(mergeDescendants = true) {
+                if (busy) {
+                    contentDescription = label
+                    progressBarRangeInfo = ProgressBarRangeInfo.Indeterminate
+                }
+            }
+            .padding(vertical = if (compact) 6.dp else 0.dp),
         contentAlignment = Alignment.Center,
+        propagateMinConstraints = true,
     ) {
-        if (busy) {
-            CircularProgressIndicator(
-                color = colors.onPrimary,
-                strokeWidth = 2.dp,
-                modifier = Modifier.size(18.dp),
-            )
-        } else {
+        Box(
+            Modifier
+                .graphicsLayer {
+                    scaleX = if (actionable) scale else 1f
+                    scaleY = if (actionable) scale else 1f
+                }
+                .heightIn(min = if (compact) 36.dp else 52.dp)
+                .clip(CircleShape)
+                .background(colors.primary)
+                .then(if (actionable && pressed) Modifier.liquidGlassRim(CircleShape) else Modifier)
+                .alpha(if (enabled) 1f else 0.35f)
+                .padding(horizontal = if (compact) 16.dp else 24.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            // Keep the real label measured while busy; the parent names the progress action.
             Text(
                 text = label,
                 style = if (compact) MaterialTheme.typography.labelLarge else MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = colors.onPrimary,
                 maxLines = 1,
+                modifier = if (busy) Modifier.alpha(0f).clearAndSetSemantics { } else Modifier,
             )
+            if (busy) {
+                CircularProgressIndicator(
+                    color = colors.onPrimary,
+                    strokeWidth = 2.dp,
+                    modifier = Modifier.size(18.dp).clearAndSetSemantics { },
+                )
+            }
         }
     }
 }
@@ -208,14 +262,7 @@ internal fun ScrobbleSecondaryButton(
     val scale = pressScale(interaction, 0.96f)
     Box(
         modifier = modifier
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            }
-            .heightIn(min = if (compact) 36.dp else 52.dp)
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
-            .alpha(if (enabled) 1f else 0.35f)
+            .sizeIn(minWidth = 48.dp, minHeight = if (compact) 48.dp else 52.dp)
             .clickable(
                 interactionSource = interaction,
                 indication = null,
@@ -223,23 +270,38 @@ internal fun ScrobbleSecondaryButton(
                 role = Role.Button,
                 onClick = onClick,
             )
-            .padding(horizontal = if (compact) 16.dp else 24.dp),
+            .padding(vertical = if (compact) 6.dp else 0.dp),
         contentAlignment = Alignment.Center,
+        propagateMinConstraints = true,
     ) {
-        Text(
-            text = label,
-            style = if (compact) MaterialTheme.typography.labelLarge else MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = contentColor,
-            maxLines = 1,
-        )
+        Box(
+            Modifier
+                .graphicsLayer {
+                    scaleX = if (enabled) scale else 1f
+                    scaleY = if (enabled) scale else 1f
+                }
+                .heightIn(min = if (compact) 36.dp else 52.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
+                .alpha(if (enabled) 1f else 0.35f)
+                .padding(horizontal = if (compact) 16.dp else 24.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = label,
+                style = if (compact) MaterialTheme.typography.labelLarge else MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = contentColor,
+                maxLines = 1,
+            )
+        }
     }
 }
 
 /**
  * A round glyph button for a page's top corner — sort, generate, more. It
- * reports its bounds through [onAnchor] for a menu to hang off, and sinks a
- * little while [active].
+ * reports its stable target bounds through [onAnchor] for a menu to hang off.
+ * [active] is a selected color/rim state, never a persistent transform.
  */
 @Composable
 internal fun ScrobbleIconButton(
@@ -254,11 +316,20 @@ internal fun ScrobbleIconButton(
 ) {
     val colors = MaterialTheme.colorScheme
     val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    val scale by animateFloatAsState(
-        targetValue = if (pressed || active) 0.92f else 1f,
-        animationSpec = tween(durationMillis = if (pressed) 90 else 160),
-        label = "icon button",
+    val scale = pressScale(interaction)
+    val fill by animateColorAsState(
+        targetValue = when {
+            active -> colors.secondaryContainer
+            filled -> colors.surfaceVariant
+            else -> Color.Transparent
+        },
+        animationSpec = tween(180),
+        label = "icon button fill",
+    )
+    val ink by animateColorAsState(
+        targetValue = if (active) colors.onSecondaryContainer else colors.onSurface,
+        animationSpec = tween(180),
+        label = "icon button ink",
     )
     Box(
         modifier = modifier
@@ -271,22 +342,26 @@ internal fun ScrobbleIconButton(
                 role = Role.Button,
                 onClick = onClick,
             )
-            .semantics { contentDescription = description },
+            .semantics {
+                contentDescription = description
+                selected = active
+            },
         contentAlignment = Alignment.Center,
     ) {
         Box(
             Modifier
                 .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
+                    scaleX = if (enabled) scale else 1f
+                    scaleY = if (enabled) scale else 1f
                 }
                 .size(36.dp)
                 .clip(CircleShape)
-                .then(if (filled) Modifier.background(colors.surfaceVariant) else Modifier)
+                .background(fill)
+                .then(if (active && enabled) Modifier.liquidGlassRim(CircleShape) else Modifier)
                 .alpha(if (enabled) 1f else 0.35f),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(icon, contentDescription = null, tint = colors.onSurface, modifier = Modifier.size(16.dp))
+            Icon(icon, contentDescription = null, tint = ink, modifier = Modifier.size(16.dp))
         }
     }
 }

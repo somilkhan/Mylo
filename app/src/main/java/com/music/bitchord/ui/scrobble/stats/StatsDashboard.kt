@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -62,10 +63,10 @@ import com.music.bitchord.R
 import com.music.bitchord.data.scrobbling.LastFmActivityBucket
 import com.music.bitchord.data.scrobbling.LastFmStatsPeriod
 import com.music.bitchord.ui.components.PAGE_GUTTER
-import com.music.bitchord.ui.components.ShimmerBox
 import com.music.bitchord.ui.icons.SfIcons
 import java.text.NumberFormat
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.TextStyle
 import kotlin.math.abs
@@ -100,13 +101,14 @@ internal fun StatsDashboard(
     tracks: Long,
     reduceMotion: Boolean,
     modifier: Modifier = Modifier,
-    collapse: () -> Float = { 0f },
+    collapse: () -> Float = { 1f },
     onExpand: () -> Unit = {},
+    onCollapse: () -> Unit = {},
     onFoldDistance: (Float) -> Unit = {},
 ) {
     val colors = MaterialTheme.colorScheme
     val density = LocalDensity.current
-    val lift = with(density) { 20.dp.toPx() }
+    val lift = if (reduceMotion) 0f else with(density) { 20.dp.toPx() }
     val counted = animatedCount(scrobbles, reduceMotion)
     Layout(
         modifier = modifier
@@ -126,7 +128,7 @@ internal fun StatsDashboard(
             ) {
                 ExpandedDashboard(
                     period, scrobbles, counted, window, previousScrobbles,
-                    activity, perDay, artists, albums, tracks, reduceMotion,
+                    activity, perDay, artists, albums, tracks, reduceMotion, onCollapse,
                 )
             }
             Box(
@@ -136,7 +138,7 @@ internal fun StatsDashboard(
                     translationY = lift * 0.5f * (1f - f)
                 },
             ) {
-                CollapsedDashboard(period, scrobbles, counted, window, previousScrobbles, activity, onExpand)
+                CollapsedDashboard(period, scrobbles, counted, window, previousScrobbles, activity, perDay, artists, albums, tracks, onExpand)
             }
         },
     ) { measurables, constraints ->
@@ -168,6 +170,7 @@ private fun ExpandedDashboard(
     albums: Long,
     tracks: Long,
     reduceMotion: Boolean,
+    onCollapse: () -> Unit,
 ) {
     val format = rememberCountFormat()
     val colors = MaterialTheme.colorScheme
@@ -186,6 +189,9 @@ private fun ExpandedDashboard(
             )
             if (previousScrobbles != null && previousScrobbles > 0L) {
                 ChangeBadge(period, scrobbles, previousScrobbles)
+            }
+            IconButton(onClick = onCollapse, modifier = Modifier.size(48.dp)) {
+                Icon(SfIcons.ChevronRight, contentDescription = stringResource(R.string.close), modifier = Modifier.size(16.dp).rotate(-90f))
             }
         }
         Text(
@@ -211,7 +217,7 @@ private fun ExpandedDashboard(
             modifier = Modifier.padding(horizontal = 20.dp),
         )
 
-        if (activity.size >= 2) {
+        if (activity.size >= 2 && activity.any { it.scrobbles > 0L }) {
             Spacer(Modifier.height(20.dp))
             ActivityChart(period, activity, reduceMotion)
         }
@@ -236,7 +242,7 @@ private fun ExpandedDashboard(
     }
 }
 
-/** The folded card: the figure and its window, a sparkline, and the change. */
+/** Default compact overview: total/comparison, window, four metrics and an explicit detail action. */
 @Composable
 private fun CollapsedDashboard(
     period: LastFmStatsPeriod,
@@ -245,6 +251,10 @@ private fun CollapsedDashboard(
     window: String,
     previousScrobbles: Long?,
     activity: List<LastFmActivityBucket>,
+    perDay: Double?,
+    artists: Long,
+    albums: Long,
+    tracks: Long,
     onExpand: () -> Unit,
 ) {
     val format = rememberCountFormat()
@@ -252,42 +262,59 @@ private fun CollapsedDashboard(
     val label = stringResource(R.string.scrobble_stats_scrobbles)
     val number = format.format(scrobbles)
     val expandLabel = stringResource(R.string.scrobble_stats_show_dashboard)
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(role = Role.Button, onClickLabel = expandLabel, onClick = onExpand)
-            .padding(horizontal = 20.dp, vertical = 12.dp)
-            .semantics(mergeDescendants = true) { contentDescription = "$number $label, $window" },
-        verticalAlignment = Alignment.CenterVertically,
+            .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
-        Column(Modifier.weight(1f)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = format.format(counted),
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontSize = 32.sp, lineHeight = 36.sp, fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = (-0.4).sp, fontFeatureSettings = "tnum",
+                    ),
+                    color = colors.onSurface,
+                    maxLines = 1,
+                    modifier = Modifier.semantics { contentDescription = "$number $label, $window" },
+                )
+                Text(
+                    text = pluralStringResource(R.plurals.scrobble_stats_collapsed_caption, scrobbles.toQuantity(), window),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = colors.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (activity.size >= 2 && activity.any { it.scrobbles > 0L }) {
+                Spacer(Modifier.width(8.dp))
+                Sparkline(activity)
+            }
+            if (previousScrobbles != null && previousScrobbles > 0L) {
+                Spacer(Modifier.width(8.dp))
+                ChangeBadge(period, scrobbles, previousScrobbles, showComparison = false)
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Box(Modifier.fillMaxWidth().height(0.5.dp).background(colors.onSurface.copy(alpha = 0.08f)))
+        Spacer(Modifier.height(8.dp))
+        Row(Modifier.fillMaxWidth()) {
+            if (perDay != null) Metric(rememberRateFormat().format(perDay), stringResource(R.string.scrobble_stats_per_day))
+            Metric(format.format(artists), stringResource(R.string.scrobble_stats_metric_artists))
+            Metric(format.format(albums), stringResource(R.string.scrobble_stats_metric_albums))
+            Metric(format.format(tracks), stringResource(R.string.scrobble_stats_metric_tracks))
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = format.format(counted),
-                style = MaterialTheme.typography.titleLarge.copy(
-                    fontSize = 24.sp,
-                    lineHeight = 28.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = (-0.4).sp,
-                    fontFeatureSettings = "tnum",
-                ),
-                color = colors.onSurface,
-                maxLines = 1,
-            )
-            Text(
-                text = pluralStringResource(R.plurals.scrobble_stats_collapsed_caption, scrobbles.toQuantity(), window),
+                text = expandLabel,
                 style = MaterialTheme.typography.labelMedium,
                 color = colors.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
             )
-        }
-        if (activity.size >= 2) {
-            Spacer(Modifier.width(12.dp))
-            Sparkline(activity)
-        }
-        if (previousScrobbles != null && previousScrobbles > 0L) {
-            Spacer(Modifier.width(12.dp))
-            ChangeBadge(period, scrobbles, previousScrobbles, showComparison = false)
+            Icon(SfIcons.ChevronRight, contentDescription = null, modifier = Modifier.size(14.dp).rotate(90f), tint = colors.onSurfaceVariant)
         }
     }
 }
@@ -440,15 +467,15 @@ private fun ActivityChart(
     val haptics = LocalHapticFeedback.current
     val format = rememberCountFormat()
     val locale = LocalConfiguration.current.locales[0]
-    val zone = remember { ZoneId.systemDefault() }
+    val zone = ZoneId.systemDefault()
 
-    var selected by rememberSaveable(period, buckets.size) { mutableStateOf(-1) }
+    var selected by rememberSaveable(period, buckets) { mutableStateOf(-1) }
     val peak = remember(buckets) { buckets.indices.maxByOrNull { buckets[it].scrobbles } ?: 0 }
     val highest = buckets[peak].scrobbles.coerceAtLeast(1L)
     val shown = if (selected in buckets.indices) selected else peak
 
     val grow = remember { Animatable(if (reduceMotion) 1f else 0f) }
-    LaunchedEffect(buckets) {
+    LaunchedEffect(buckets, reduceMotion) {
         if (reduceMotion) {
             grow.snapTo(1f)
         } else {
@@ -458,22 +485,20 @@ private fun ActivityChart(
     }
 
     fun rangeLabel(bucket: LastFmActivityBucket): String {
-        val start = bucket.startEpochSeconds * 1_000L
-        val end = bucket.endEpochSeconds * 1_000L
+        val dates = activityBucketDates(bucket, zone)
+        // DateUtils treats an end exactly at midnight as exclusive. Format
+        // the actual inclusive calendar dates at noon instead.
+        val start = dates.first.atTime(12, 0).atZone(zone).toInstant().toEpochMilli()
+        val end = dates.second.atTime(12, 0).atZone(zone).toInstant().toEpochMilli()
+        val yearFlag = if (dates.first.year != dates.second.year) DateUtils.FORMAT_SHOW_YEAR else DateUtils.FORMAT_NO_YEAR
         return when {
             period == LastFmStatsPeriod.OVERALL ->
-                Instant.ofEpochSecond(bucket.startEpochSeconds).atZone(zone).year.toString()
-            period == LastFmStatsPeriod.WEEK -> DateUtils.formatDateTime(
-                context,
-                end,
-                DateUtils.FORMAT_SHOW_WEEKDAY or DateUtils.FORMAT_SHOW_DATE or
-                    DateUtils.FORMAT_ABBREV_ALL or DateUtils.FORMAT_NO_YEAR,
-            )
+                dates.first.year.toString()
             else -> DateUtils.formatDateRange(
                 context,
                 start,
                 end,
-                DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_ABBREV_MONTH or DateUtils.FORMAT_NO_YEAR,
+                DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_ABBREV_MONTH or yearFlag,
             )
         }
     }
@@ -566,7 +591,7 @@ private fun ActivityChart(
                 val height = if (bucket.scrobbles == 0L) {
                     minHeight
                 } else {
-                    maxOf(minHeight, size.height * fraction * grow.value)
+                    maxOf(minHeight, size.height * fraction * (if (reduceMotion) 1f else grow.value))
                 }
                 val x = index * (barWidth + gap)
                 drawRoundRect(
@@ -615,19 +640,25 @@ private fun AxisLabels(
     }
     val context = LocalContext.current
     val first = buckets.first()
+    val dates = activityBucketDates(LastFmActivityBucket(first.startEpochSeconds, buckets.last().endEpochSeconds, 0L), zone)
+    val yearFlag = if (dates.first.year != dates.second.year) DateUtils.FORMAT_SHOW_YEAR else DateUtils.FORMAT_NO_YEAR
     val start = if (period == LastFmStatsPeriod.OVERALL) {
         Instant.ofEpochSecond(first.startEpochSeconds).atZone(zone).year.toString()
     } else {
         DateUtils.formatDateTime(
             context,
             first.startEpochSeconds * 1_000L,
-            DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_ABBREV_MONTH or DateUtils.FORMAT_NO_YEAR,
+            DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_ABBREV_MONTH or yearFlag,
         )
     }
-    val end = if (period == LastFmStatsPeriod.OVERALL) {
-        Instant.ofEpochSecond(buckets.last().startEpochSeconds).atZone(zone).year.toString()
-    } else {
-        stringResource(R.string.scrobble_stats_today)
+    val end = when {
+        period == LastFmStatsPeriod.OVERALL ->
+            Instant.ofEpochSecond(buckets.last().startEpochSeconds).atZone(zone).year.toString()
+        dates.second == LocalDate.now(zone) -> stringResource(R.string.scrobble_stats_today)
+        else -> DateUtils.formatDateTime(
+            context, buckets.last().endEpochSeconds * 1_000L,
+            DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_ABBREV_MONTH or yearFlag,
+        )
     }
     Row(Modifier.fillMaxWidth()) {
         Text(start, style = style, color = colors.onSurfaceVariant, modifier = Modifier.weight(1f))
@@ -670,9 +701,9 @@ private val LastFmStatsPeriod.comparison: Int?
         LastFmStatsPeriod.OVERALL -> null
     }
 
-/** A shimmer in the dashboard's shape, so loading doesn't reflow the page. */
+/** Compact loading overview; Recent stays in the initial viewport. */
 @Composable
-internal fun StatsDashboardSkeleton(modifier: Modifier = Modifier) {
+internal fun StatsDashboardSkeleton(modifier: Modifier = Modifier, reduceMotion: Boolean = false) {
     val colors = MaterialTheme.colorScheme
     Column(
         modifier = modifier
@@ -681,37 +712,20 @@ internal fun StatsDashboardSkeleton(modifier: Modifier = Modifier) {
             .fillMaxWidth()
             .background(colors.surfaceVariant.copy(alpha = 0.55f), CardShape)
             .border(0.5.dp, colors.onSurface.copy(alpha = 0.07f), CardShape)
-            .padding(20.dp),
+            .padding(16.dp),
     ) {
-        ShimmerBox(Modifier.width(76.dp).height(12.dp), RoundedCornerShape(50))
-        Spacer(Modifier.height(12.dp))
-        ShimmerBox(Modifier.width(164.dp).height(44.dp), RoundedCornerShape(10.dp))
-        Spacer(Modifier.height(10.dp))
-        ShimmerBox(Modifier.width(112.dp).height(12.dp), RoundedCornerShape(50))
-        Spacer(Modifier.height(24.dp))
-        Row(
-            Modifier.fillMaxWidth().height(ChartHeight),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.Bottom,
-        ) {
-            SkeletonBars.forEach { fraction ->
-                ShimmerBox(
-                    Modifier.weight(1f).height(ChartHeight * fraction),
-                    RoundedCornerShape(6.dp),
-                )
-            }
-        }
-        Spacer(Modifier.height(26.dp))
+        StatsPlaceholder(Modifier.width(132.dp).height(32.dp), RoundedCornerShape(10.dp), reduceMotion)
+        Spacer(Modifier.height(6.dp))
+        StatsPlaceholder(Modifier.width(112.dp).height(12.dp), RoundedCornerShape(50), reduceMotion)
+        Spacer(Modifier.height(16.dp))
         Row(Modifier.fillMaxWidth()) {
             repeat(4) {
                 Column(Modifier.weight(1f)) {
-                    ShimmerBox(Modifier.width(40.dp).height(14.dp), RoundedCornerShape(50))
+                    StatsPlaceholder(Modifier.width(40.dp).height(14.dp), RoundedCornerShape(50), reduceMotion)
                     Spacer(Modifier.height(8.dp))
-                    ShimmerBox(Modifier.width(48.dp).height(10.dp), RoundedCornerShape(50))
+                    StatsPlaceholder(Modifier.width(48.dp).height(10.dp), RoundedCornerShape(50), reduceMotion)
                 }
             }
         }
     }
 }
-
-private val SkeletonBars = listOf(0.35f, 0.55f, 0.42f, 0.8f, 0.6f, 0.3f, 0.7f, 0.5f, 0.9f, 0.45f)

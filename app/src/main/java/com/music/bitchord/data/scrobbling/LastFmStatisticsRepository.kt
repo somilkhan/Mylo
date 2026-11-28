@@ -3,8 +3,11 @@ package com.music.bitchord.data.scrobbling
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import java.security.MessageDigest
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -65,6 +68,8 @@ internal data class LastFmStatsCacheKey(
     val username: String,
     val endpoint: String,
     val period: LastFmStatsPeriod,
+    val configuration: String = "",
+    val zoneId: String = "",
 )
 
 internal data class LastFmStatsCacheEntry(
@@ -142,11 +147,15 @@ internal class LastFmStatisticsRepository(
     private val nowEpochSeconds: () -> Long = { System.currentTimeMillis() / 1_000L },
     private val endpoint: () -> String = { LastFM.currentConfig().endpoint },
     private val zone: () -> ZoneId = { ZoneId.systemDefault() },
+    private val configuration: () -> String = { statsConfigurationFingerprint(LastFM.currentConfig()) },
 ) {
     fun key(username: String, period: LastFmStatsPeriod): LastFmStatsCacheKey {
         val normalized = username.trim().lowercase(Locale.ROOT)
         require(normalized.isNotEmpty()) { "Last.fm username is missing" }
-        return LastFmStatsCacheKey(normalized, endpoint().trim(), period)
+        return LastFmStatsCacheKey(
+            normalized, endpoint().trim(), period, configuration(),
+            if (period == LastFmStatsPeriod.OVERALL) zone().id else "",
+        )
     }
 
     fun cached(key: LastFmStatsCacheKey): LastFmStatsSnapshot? = cache.get(key)?.snapshot
@@ -163,6 +172,10 @@ internal class LastFmStatisticsRepository(
         if (!force && existing != null && cache.isFresh(key)) return Result.success(existing.snapshot)
         return try {
             val snapshot = fetch(username.trim(), period)
+            currentCoroutineContext().ensureActive()
+            // LastFM captures its global config per HTTP call. Never cache a
+            // potentially mixed snapshot if configuration changed during the burst.
+            check(key == key(username, period)) { "Last.fm configuration changed" }
             cache.put(key, snapshot)
             Result.success(snapshot)
         } catch (cancelled: CancellationException) {
@@ -179,7 +192,7 @@ internal class LastFmStatisticsRepository(
         val tracks = async { api.topTracks(username, period.apiValue, CHART_LIMIT) }
         val albums = async { api.topAlbums(username, period.apiValue, CHART_LIMIT) }
         val periodCount = period.days?.let { days ->
-            async { api.recent(username, 1, now - days * SECONDS_PER_DAY) }
+            async { api.recent(username, 1, now - days * SECONDS_PER_DAY, now - 1L) }
         }
         val previousCount = period.days?.let { days ->
             async {
@@ -230,7 +243,11 @@ internal class LastFmStatisticsRepository(
             topArtists = artistPage.items.filter { it.playCount > 0L },
             topTracks = trackPage.items.filter { it.playCount > 0L && it.artist.isNotBlank() },
             topAlbums = albumPage.items.filter { it.playCount > 0L },
-            activity = activity.await(),
+            // Rolling buckets cover precisely the count query. A remote
+            // backfill/deletion can still change totals between HTTP calls.
+            activity = activity.await().takeUnless { buckets ->
+                period.days != null && buckets.sumOf { it.scrobbles } != scrobbles
+            }.orEmpty(),
             previousScrobbles = previousCount?.await()?.getOrNull()?.total,
         )
     }
@@ -240,11 +257,25 @@ internal class LastFmStatisticsRepository(
      * Only the first page keeps Last.fm's now-playing row; later pages repeat
      * it at their top, and it would show up again mid-list.
      */
-    suspend fun recentPage(username: String, page: Int): Result<LastFM.PagedResult<LastFM.RecentTrack>> {
-        val user = username.trim()
-        return api.recent(user, RECENT_PAGE_SIZE, null, null, page).map { result ->
-            if (page <= 1) result else result.copy(items = result.items.filterNot { it.nowPlaying })
+    fun recentCutoff(): Long = nowEpochSeconds()
+
+    suspend fun recentPage(
+        username: String,
+        page: Int,
+        toEpochSeconds: Long? = null,
+    ): Result<LastFM.PagedResult<LastFM.RecentTrack>> = try {
+        val key = key(username, LastFmStatsPeriod.OVERALL)
+        require(page > 0) { "Last.fm page must be positive" }
+        val result = api.recent(username.trim(), RECENT_PAGE_SIZE, null, toEpochSeconds, page)
+        currentCoroutineContext().ensureActive()
+        check(key == key(username, LastFmStatsPeriod.OVERALL)) { "Last.fm configuration changed" }
+        result.map { response ->
+            if (page == 1) response else response.copy(items = response.items.filterNot { it.nowPlaying })
         }
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (error: Exception) {
+        Result.failure(error)
     }
 
     private suspend fun countActivity(
@@ -291,12 +322,13 @@ internal fun activityWindows(
     val days = period.days
     if (days != null) {
         val start = nowEpochSeconds - days * 86_400L
+        val end = nowEpochSeconds - 1L
         val count = period.activityBuckets
-        val width = (nowEpochSeconds - start) / count
+        val width = (end - start + 1L) / count
         return List(count) { index ->
             val from = start + index * width
-            // Last.fm's from/to are both inclusive, so neighbours must not share a second.
-            val to = if (index == count - 1) nowEpochSeconds else from + width - 1
+            // Inclusive second ranges: neighbours must not share a second.
+            val to = if (index == count - 1) end else from + width - 1
             from..to
         }
     }
@@ -310,4 +342,11 @@ internal fun activityWindows(
         val nextYear = LocalDate.of(year + 1, 1, 1).atStartOfDay(zone).toEpochSecond()
         maxOf(yearStart, registeredEpochSeconds)..minOf(nextYear - 1, nowEpochSeconds)
     }
+}
+
+/** Opaque, collision-resistant identity; credentials never appear in cache-key diagnostics. */
+internal fun statsConfigurationFingerprint(config: LastFM.RuntimeConfig): String {
+    val fields = listOf(config.endpoint.trim(), config.apiKey, config.secret, config.sessionKey.orEmpty())
+    val encoded = fields.joinToString("") { "${it.length}:$it" }.toByteArray(Charsets.UTF_8)
+    return MessageDigest.getInstance("SHA-256").digest(encoded).joinToString("") { "%02x".format(it) }
 }

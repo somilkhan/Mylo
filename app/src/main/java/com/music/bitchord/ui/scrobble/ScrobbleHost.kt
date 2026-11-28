@@ -6,6 +6,7 @@ import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -37,36 +38,39 @@ fun ScrobbleHost(
 ) {
     val generateViewModel: ScrobbleGenerateViewModel = viewModel()
     val hazeState = remember { HazeState() }
+    val effectiveReduceMotion = scrobbleReduceMotion(reduceMotion)
 
-    SharedTransitionLayout(modifier = Modifier.fillMaxSize()) {
-        AnimatedVisibility(visible = true) {
-            when (tab) {
-                1 -> ScrobbleGenerateContent(
-                    viewModel = generateViewModel,
-                    currentSong = currentSong,
-                    contentPadding = contentPadding,
-                    highlightedPlaylistId = highlightedPlaylistId,
-                    sharedHandoffFromGenerate = sharedHandoffFromGenerate,
-                    reduceMotion = reduceMotion,
-                    sharedTransitionScope = this@SharedTransitionLayout,
-                    animatedVisibilityScope = this@AnimatedVisibility,
-                    onOpenPlaylists = { onTabChange(2) },
-                    onOpenSettings = onOpenSettings,
-                )
-                2 -> ScrobblePlaylistsContent(
-                    viewModel = generateViewModel,
-                    hazeState = hazeState,
-                    contentPadding = contentPadding,
-                    highlightedPlaylistId = highlightedPlaylistId,
-                    sharedHandoffFromGenerate = sharedHandoffFromGenerate,
-                    reduceMotion = reduceMotion,
-                    sharedTransitionScope = this@SharedTransitionLayout,
-                    animatedVisibilityScope = this@AnimatedVisibility,
-                    currentSong = currentSong,
-                    isPlaying = isPlaying,
-                    onPlaySongs = onPlaySongs,
-                    onOpenGenerator = { onTabChange(1) },
-                )
+    CompositionLocalProvider(LocalScrobbleReduceMotion provides effectiveReduceMotion) {
+        SharedTransitionLayout(modifier = Modifier.fillMaxSize()) {
+            AnimatedVisibility(visible = true) {
+                when (tab) {
+                    1 -> ScrobbleGenerateContent(
+                        viewModel = generateViewModel,
+                        currentSong = currentSong,
+                        contentPadding = contentPadding,
+                        highlightedPlaylistId = highlightedPlaylistId,
+                        sharedHandoffFromGenerate = sharedHandoffFromGenerate,
+                        reduceMotion = effectiveReduceMotion,
+                        sharedTransitionScope = this@SharedTransitionLayout,
+                        animatedVisibilityScope = this@AnimatedVisibility,
+                        onOpenPlaylists = { onTabChange(2) },
+                        onOpenSettings = onOpenSettings,
+                    )
+                    2 -> ScrobblePlaylistsContent(
+                        viewModel = generateViewModel,
+                        hazeState = hazeState,
+                        contentPadding = contentPadding,
+                        highlightedPlaylistId = highlightedPlaylistId,
+                        sharedHandoffFromGenerate = sharedHandoffFromGenerate,
+                        reduceMotion = effectiveReduceMotion,
+                        sharedTransitionScope = this@SharedTransitionLayout,
+                        animatedVisibilityScope = this@AnimatedVisibility,
+                        currentSong = currentSong,
+                        isPlaying = isPlaying,
+                        onPlaySongs = onPlaySongs,
+                        onOpenGenerator = { onTabChange(1) },
+                    )
+                }
             }
         }
     }

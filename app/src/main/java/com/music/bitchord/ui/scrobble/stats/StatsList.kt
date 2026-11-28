@@ -1,6 +1,7 @@
 package com.music.bitchord.ui.scrobble.stats
 
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -46,7 +47,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.music.bitchord.R
 import com.music.bitchord.ui.components.PAGE_GUTTER
-import com.music.bitchord.ui.components.ShimmerBox
 import com.music.bitchord.ui.icons.SfIcons
 
 private val RowArtShape = RoundedCornerShape(8.dp)
@@ -67,9 +67,10 @@ internal fun StatsListHeader(
     onOpenMenu: () -> Unit,
     onAnchor: (Rect) -> Unit,
     modifier: Modifier = Modifier,
+    reduceMotion: Boolean = false,
 ) {
     val colors = MaterialTheme.colorScheme
-    val rule by animateFloatAsState(if (pinned) 1f else 0f, tween(180), label = "list header rule")
+    val rule by animateFloatAsState(if (pinned) 1f else 0f, if (reduceMotion) snap() else tween(180), label = "list header rule")
     Column(modifier.fillMaxWidth().background(colors.background)) {
         Row(
             modifier = Modifier
@@ -87,7 +88,7 @@ internal fun StatsListHeader(
                     .weight(1f)
                     .semantics { heading() },
             )
-            ListModeButton(icon, menuOpen, onOpenMenu, onAnchor)
+            ListModeButton(icon, menuOpen, onOpenMenu, onAnchor, reduceMotion)
         }
         Box(
             Modifier
@@ -105,6 +106,7 @@ private fun ListModeButton(
     menuOpen: Boolean,
     onClick: () -> Unit,
     onAnchor: (Rect) -> Unit,
+    reduceMotion: Boolean,
 ) {
     val colors = MaterialTheme.colorScheme
     val interaction = remember { MutableInteractionSource() }
@@ -112,8 +114,8 @@ private fun ListModeButton(
     // Pressed, and while its menu is up, the button sinks a little — the
     // menu reads as coming out of it.
     val scale by animateFloatAsState(
-        targetValue = if (pressed || menuOpen) 0.94f else 1f,
-        animationSpec = tween(durationMillis = if (pressed) 90 else 160),
+        targetValue = if (!reduceMotion && (pressed || menuOpen)) 0.94f else 1f,
+        animationSpec = if (reduceMotion) snap() else tween(durationMillis = if (pressed) 90 else 160),
         label = "list mode button",
     )
     val label = stringResource(R.string.scrobble_stats_list_change)
@@ -226,10 +228,10 @@ internal fun StatsListRow(
 
 /** A play count at the end of a ranked row: the figure, and "plays" under it. */
 @Composable
-internal fun StatsPlays(plays: Long, busy: Boolean = false) {
+internal fun StatsPlays(plays: Long, busy: Boolean = false, reduceMotion: Boolean = false) {
     Box(Modifier.width(56.dp), contentAlignment = Alignment.CenterEnd) {
         if (busy) {
-            StatsRowSpinner()
+            StatsRowSpinner(reduceMotion)
         } else {
             Column(horizontalAlignment = Alignment.End) {
                 Text(
@@ -254,9 +256,9 @@ internal fun StatsPlays(plays: Long, busy: Boolean = false) {
 
 /** When a recent scrobble was played, or that it is playing now. */
 @Composable
-internal fun StatsWhen(text: String, nowPlaying: Boolean, busy: Boolean = false) {
+internal fun StatsWhen(text: String, nowPlaying: Boolean, busy: Boolean = false, reduceMotion: Boolean = false) {
     when {
-        busy -> StatsRowSpinner()
+        busy -> StatsRowSpinner(reduceMotion)
         nowPlaying -> Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
                 imageVector = SfIcons.GraphicEq,
@@ -282,17 +284,21 @@ internal fun StatsWhen(text: String, nowPlaying: Boolean, busy: Boolean = false)
 }
 
 @Composable
-private fun StatsRowSpinner() {
-    CircularProgressIndicator(
-        modifier = Modifier.size(16.dp),
-        strokeWidth = 2.dp,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
+private fun StatsRowSpinner(reduceMotion: Boolean) {
+    if (reduceMotion) {
+        Icon(SfIcons.Clock, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+    } else {
+        CircularProgressIndicator(
+            modifier = Modifier.size(16.dp),
+            strokeWidth = 2.dp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
 }
 
 /** The end of the loaded history: a spinner while more comes, or a retry. */
 @Composable
-internal fun StatsListFooter(loading: Boolean, failed: Boolean, onRetry: () -> Unit) {
+internal fun StatsListFooter(loading: Boolean, failed: Boolean, onRetry: () -> Unit, reduceMotion: Boolean = false) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -301,7 +307,7 @@ internal fun StatsListFooter(loading: Boolean, failed: Boolean, onRetry: () -> U
         contentAlignment = Alignment.Center,
     ) {
         when {
-            loading -> StatsRowSpinner()
+            loading -> StatsRowSpinner(reduceMotion)
             failed -> Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = stringResource(R.string.scrobble_stats_load_more_failed),
@@ -336,7 +342,7 @@ internal fun StatsListEmpty(text: String) {
 
 /** Rows in the list's shape while its first page loads. */
 @Composable
-internal fun StatsListSkeleton(rows: Int = 6) {
+internal fun StatsListSkeleton(rows: Int = 6, reduceMotion: Boolean = false) {
     Column(Modifier.fillMaxWidth()) {
         repeat(rows) { index ->
             Row(
@@ -345,17 +351,19 @@ internal fun StatsListSkeleton(rows: Int = 6) {
                     .padding(horizontal = PAGE_GUTTER, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                ShimmerBox(Modifier.size(ListArtSize), RowArtShape)
+                StatsPlaceholder(Modifier.size(ListArtSize), RowArtShape, reduceMotion)
                 Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) {
-                    ShimmerBox(
+                    StatsPlaceholder(
                         Modifier.fillMaxWidth(SkeletonWidths[index % SkeletonWidths.size]).height(14.dp),
                         RoundedCornerShape(50),
+                        reduceMotion,
                     )
                     Spacer(Modifier.height(8.dp))
-                    ShimmerBox(
+                    StatsPlaceholder(
                         Modifier.fillMaxWidth(SkeletonWidths[(index + 2) % SkeletonWidths.size] * 0.6f).height(12.dp),
                         RoundedCornerShape(50),
+                        reduceMotion,
                     )
                 }
             }

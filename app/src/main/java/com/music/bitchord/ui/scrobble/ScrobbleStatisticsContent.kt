@@ -6,6 +6,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
@@ -132,9 +133,10 @@ internal fun ScrobbleStatisticsContent(
     val lastFmApiKey by AppSettings.lastfmApiKey.collectAsStateWithLifecycle()
     val lastFmSecret by AppSettings.lastfmSecret.collectAsStateWithLifecycle()
     val lastFmEndpoint by AppSettings.lastfmEndpoint.collectAsStateWithLifecycle()
+    val lastFmSession by AppSettings.lastfmSessionKey.collectAsStateWithLifecycle()
     val reduceMotion by AppSettings.reduceAnimation.collectAsStateWithLifecycle()
 
-    LaunchedEffect(lastFmEnabled, lastFmUsername, lastFmApiKey, lastFmSecret, lastFmEndpoint) {
+    LaunchedEffect(viewModel, lastFmEnabled, lastFmUsername, lastFmApiKey, lastFmSecret, lastFmEndpoint, lastFmSession) {
         viewModel.onScreenOpened()
     }
     DisposableEffect(viewModel) {
@@ -176,9 +178,10 @@ internal fun ScrobbleStatisticsScreen(
     contentPadding: PaddingValues,
     nowMillis: Long = System.currentTimeMillis(),
     reduceMotion: Boolean = false,
-    initialCollapse: Float = 0f,
+    initialCollapse: Float = 1f,
     initialMenuOpen: Boolean = false,
 ) {
+    val effectiveReduceMotion = scrobbleReduceMotion(reduceMotion)
     val scope = rememberCoroutineScope()
     var resolving by remember { mutableStateOf<String?>(null) }
     val play: (String, String) -> Unit = { title, artist ->
@@ -197,10 +200,11 @@ internal fun ScrobbleStatisticsScreen(
     val snapshot = state.snapshot
     val contentAlpha by animateFloatAsState(
         targetValue = if (state.isSwitchingPeriod) 0.45f else 1f,
+        animationSpec = if (effectiveReduceMotion) snap() else spring(),
         label = "stats period switch",
     )
     val listState = rememberLazyListState()
-    val fold = rememberDashboardFold(initialCollapse, reduceMotion)
+    val fold = rememberDashboardFold(initialCollapse, effectiveReduceMotion)
     val dashboard = snapshot?.takeIf { state.connected }
     val hasDashboard = dashboard != null
     LaunchedEffect(hasDashboard) { if (!hasDashboard) fold.reset() }
@@ -211,10 +215,14 @@ internal fun ScrobbleStatisticsScreen(
     var menuOpen by remember { mutableStateOf(initialMenuOpen) }
     var menuAnchor by remember { mutableStateOf<Rect?>(null) }
     LaunchedEffect(state.listMode) {
-        if (listState.firstVisibleItemIndex > 0) listState.scrollToItem(0)
+        if (listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0) listState.scrollToItem(0)
     }
-    if (state.listMode == StatsListMode.RECENT) {
-        LaunchedEffect(listState) {
+    if (state.listMode == StatsListMode.RECENT && state.connected && snapshot != null &&
+        state.recent.canLoadMore && !state.recent.loading && !state.recent.failed
+    ) {
+        // Restart after each completed page, even if the viewport still fits
+        // all loaded rows. A failed page waits for the explicit Retry action.
+        LaunchedEffect(listState, state.recent.page) {
             snapshotFlow {
                 val info = listState.layoutInfo
                 val last = info.visibleItemsInfo.lastOrNull()?.index ?: 0
@@ -247,7 +255,7 @@ internal fun ScrobbleStatisticsScreen(
                         snapshot = dashboard,
                         period = state.snapshotPeriod ?: state.period,
                         nowMillis = nowMillis,
-                        reduceMotion = reduceMotion,
+                        reduceMotion = effectiveReduceMotion,
                         fold = fold,
                         modifier = Modifier.alpha(contentAlpha),
                     )
@@ -276,7 +284,7 @@ internal fun ScrobbleStatisticsScreen(
                                 onAction = actions.onRetry,
                             )
                         }
-                        snapshot == null -> item(key = "skeleton") { StatsSkeleton() }
+                        snapshot == null -> item(key = "skeleton") { StatsSkeleton(reduceMotion = effectiveReduceMotion) }
                         else -> statsList(
                             state = state,
                             snapshot = snapshot,
@@ -285,7 +293,7 @@ internal fun ScrobbleStatisticsScreen(
                             resolving = resolving,
                             onPlay = play,
                             actions = actions,
-                            reduceMotion = reduceMotion,
+                            reduceMotion = effectiveReduceMotion,
                             menuOpen = menuOpen,
                             pinned = { pinned },
                             onOpenMenu = { menuOpen = true },
@@ -333,12 +341,12 @@ internal fun ScrobbleStatisticsScreen(
  * down past the list's top opens it, and a lift between the two settles it.
  */
 @Stable
-private class DashboardFold(
+internal class DashboardFold(
     initial: Float,
     private val scope: CoroutineScope,
-    private val reduceMotion: Boolean,
+    private var reduceMotion: Boolean,
 ) {
-    var fraction by mutableFloatStateOf(initial)
+    var fraction by mutableFloatStateOf(initial.coerceIn(0f, 1f))
         private set
 
     /** The card's open height less its folded one, in px: the scroll it takes to fold. */
@@ -346,26 +354,40 @@ private class DashboardFold(
     private var settling: Job? = null
 
     fun expand() = settle(0f)
+    fun collapse() = settle(1f)
 
     fun reset() {
+        cancel()
+        fraction = 1f
+    }
+
+    fun cancel() {
         settling?.cancel()
-        fraction = 0f
+        settling = null
+    }
+
+    fun setReduceMotion(reduce: Boolean) {
+        if (reduceMotion == reduce) return
+        val wasSettling = settling?.isActive == true
+        cancel()
+        reduceMotion = reduce
+        if (reduce && wasSettling) fraction = if (fraction < 0.5f) 0f else 1f
     }
 
     private fun settle(target: Float, velocity: Float = 0f) {
-        settling?.cancel()
+        cancel()
         if (fraction == target) return
+        if (reduceMotion) {
+            fraction = target
+            return
+        }
         settling = scope.launch {
-            if (reduceMotion) {
-                fraction = target
-            } else {
-                animate(
-                    initialValue = fraction,
-                    targetValue = target,
-                    initialVelocity = velocity,
-                    animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 500f),
-                ) { value, _ -> fraction = value }
-            }
+            animate(
+                initialValue = fraction,
+                targetValue = target,
+                initialVelocity = velocity,
+                animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 500f),
+            ) { value, _ -> fraction = value.coerceIn(0f, 1f) }
         }
     }
 
@@ -386,7 +408,7 @@ private class DashboardFold(
             if (available.y < 0f) Offset(0f, take(available.y)) else Offset.Zero
 
         override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset =
-            if (available.y > 0f && source == NestedScrollSource.UserInput) {
+            if (available.y > 0f && fraction < 1f && source == NestedScrollSource.UserInput) {
                 Offset(0f, take(available.y))
             } else {
                 Offset.Zero
@@ -398,8 +420,6 @@ private class DashboardFold(
                 // otherwise it goes to whichever end it is nearer.
                 val target = if (available.y > 0f || fraction < 0.5f) 0f else 1f
                 settle(target, velocity = if (distance > 0f) -available.y / distance else 0f)
-            } else if (available.y > 0f && fraction > 0f) {
-                settle(0f)
             }
             return Velocity.Zero
         }
@@ -409,7 +429,10 @@ private class DashboardFold(
 @Composable
 private fun rememberDashboardFold(initial: Float, reduceMotion: Boolean): DashboardFold {
     val scope = rememberCoroutineScope()
-    return remember(reduceMotion) { DashboardFold(initial, scope, reduceMotion) }
+    val fold = remember { DashboardFold(initial, scope, reduceMotion) }
+    LaunchedEffect(fold, reduceMotion) { fold.setReduceMotion(reduceMotion) }
+    DisposableEffect(fold) { onDispose { fold.cancel() } }
+    return fold
 }
 
 @Composable
@@ -442,6 +465,7 @@ private fun Dashboard(
         reduceMotion = reduceMotion,
         collapse = { fold.fraction },
         onExpand = fold::expand,
+        onCollapse = fold::collapse,
         onFoldDistance = { fold.distance = it },
         modifier = modifier,
     )
@@ -537,6 +561,7 @@ private fun LazyListScope.statsList(
             pinned = pinned(),
             onOpenMenu = onOpenMenu,
             onAnchor = onAnchor,
+            reduceMotion = reduceMotion,
         )
     }
 
@@ -556,9 +581,9 @@ private fun LazyListScope.statsList(
             val feed = state.recent
             when {
                 !feed.loaded && feed.failed -> item(key = "recent-failed") {
-                    StatsListFooter(loading = false, failed = true, onRetry = actions.onLoadMoreRecent)
+                    StatsListFooter(loading = false, failed = true, onRetry = actions.onLoadMoreRecent, reduceMotion = reduceMotion)
                 }
-                !feed.loaded -> item(key = "recent-skeleton") { StatsListSkeleton() }
+                !feed.loaded -> item(key = "recent-skeleton") { StatsListSkeleton(reduceMotion = reduceMotion) }
                 feed.items.isEmpty() -> item(key = "recent-empty") {
                     StatsListEmpty(stringResource(R.string.scrobble_stats_recent_empty))
                 }
@@ -588,20 +613,21 @@ private fun LazyListScope.statsList(
                                     onClick = { onPlay(track.name, track.artist) },
                                     modifier = itemModifier(),
                                 ) {
-                                    StatsWhen(trailing, track.nowPlaying, busy(track.name, track.artist))
+                                    StatsWhen(trailing, track.nowPlaying, busy(track.name, track.artist), reduceMotion)
                                 }
                             }
                         }
                     }
-                    if (feed.loading || feed.failed || feed.canLoadMore) {
-                        item(key = "recent-footer") {
-                            StatsListFooter(
-                                loading = !feed.failed,
-                                failed = feed.failed,
-                                onRetry = actions.onLoadMoreRecent,
-                            )
-                        }
-                    }
+                }
+            }
+            if (feed.loaded && (feed.loading || feed.failed || feed.canLoadMore)) {
+                item(key = "recent-footer") {
+                    StatsListFooter(
+                        loading = feed.loading,
+                        failed = feed.failed,
+                        onRetry = actions.onLoadMoreRecent,
+                        reduceMotion = reduceMotion,
+                    )
                 }
             }
         }
@@ -627,7 +653,7 @@ private fun LazyListScope.statsList(
                 rank = rank,
                 modifier = modifier,
             ) {
-                StatsPlays(track.playCount, busy(track.name, track.artist))
+                StatsPlays(track.playCount, busy(track.name, track.artist), reduceMotion)
             }
         }
 
@@ -709,9 +735,9 @@ private fun dayLabel(date: LocalDate, today: LocalDate): String {
     val locale = LocalConfiguration.current.locales[0]
     val daysAgo = ChronoUnit.DAYS.between(date, today)
     return when {
-        daysAgo <= 0L -> stringResource(R.string.scrobble_stats_today)
+        daysAgo == 0L -> stringResource(R.string.scrobble_stats_today)
         daysAgo == 1L -> stringResource(R.string.scrobble_stats_yesterday)
-        daysAgo < 7L -> date.dayOfWeek.getDisplayName(TextStyle.FULL_STANDALONE, locale)
+        daysAgo in 2L..6L -> date.dayOfWeek.getDisplayName(TextStyle.FULL_STANDALONE, locale)
         else -> remember(date, locale, today.year) {
             val skeleton = if (date.year == today.year) "MMMMd" else "yMMMMd"
             DateTimeFormatter.ofPattern(DateFormat.getBestDateTimePattern(locale, skeleton), locale).format(date)
@@ -723,7 +749,8 @@ private fun dayLabel(date: LocalDate, today: LocalDate): String {
 @Composable
 private fun timeOfDay(atMillis: Long): String {
     val context = LocalContext.current
-    return remember(atMillis) { DateUtils.formatDateTime(context, atMillis, DateUtils.FORMAT_SHOW_TIME) }
+    val configuration = LocalConfiguration.current
+    return remember(atMillis, context, configuration) { DateUtils.formatDateTime(context, atMillis, DateUtils.FORMAT_SHOW_TIME) }
 }
 
 private val StatsListMode.label: Int

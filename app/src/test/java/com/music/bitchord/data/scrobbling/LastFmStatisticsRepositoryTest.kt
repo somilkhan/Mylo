@@ -18,7 +18,7 @@ class LastFmStatisticsRepositoryTest {
         val snapshot = repository.load(" Zen ", LastFmStatsPeriod.WEEK, force = false).getOrThrow()
 
         assertEquals(now - 7 * 86_400L, api.countFrom)
-        assertEquals(412L, snapshot.scrobbles)
+        assertEquals(168L, snapshot.scrobbles)
         assertEquals(31L, snapshot.artistCount)
         assertEquals(58L, snapshot.albumCount)
         assertEquals(97L, snapshot.trackCount)
@@ -88,7 +88,9 @@ class LastFmStatisticsRepositoryTest {
 
     @Test
     fun cacheKeysSeparateAccountsEndpointsAndPeriods() {
-        val repository = LastFmStatisticsRepository(FakeApi(), LastFmStatsCache { 0L }, { now }, { " https://api " })
+        val repository = LastFmStatisticsRepository(
+            FakeApi(), LastFmStatsCache { 0L }, { now }, { " https://api " }, configuration = { "" },
+        )
         assertEquals(
             LastFmStatsCacheKey("zen", "https://api", LastFmStatsPeriod.YEAR),
             repository.key(" Zen ", LastFmStatsPeriod.YEAR),
@@ -117,9 +119,10 @@ class LastFmStatisticsRepositoryTest {
         val bars = snapshot.activity
         assertEquals(10, bars.size)
         assertEquals(now - 30 * 86_400L, bars.first().startEpochSeconds)
-        assertEquals(now, bars.last().endEpochSeconds)
+        assertEquals(now - 1L, bars.last().endEpochSeconds)
         bars.zipWithNext { a, b -> assertEquals(a.endEpochSeconds + 1, b.startEpochSeconds) }
         assertEquals(30 * 24L, bars.sumOf { it.scrobbles })
+        assertEquals(snapshot.scrobbles, bars.sumOf { it.scrobbles })
         // The previous 30 days end the second before this window starts.
         assertEquals((now - 60 * 86_400L)..(now - 30 * 86_400L - 1), api.windows.first { it.last < now - 30 * 86_400L })
         assertEquals(30 * 24L, snapshot.previousScrobbles)
@@ -132,7 +135,7 @@ class LastFmStatisticsRepositoryTest {
         )
         val snapshot = repository.load("zen", LastFmStatsPeriod.WEEK, false).getOrThrow()
         assertTrue(snapshot.activity.isEmpty())
-        assertEquals(412L, snapshot.scrobbles)
+        assertEquals(168L, snapshot.scrobbles)
     }
 
     @Test
@@ -146,6 +149,42 @@ class LastFmStatisticsRepositoryTest {
         assertEquals(java.time.LocalDate.of(2022, 1, 1).atStartOfDay(zone).toEpochSecond() - 1, years.first().last)
         assertEquals(nowUtc, years.last().last)
         assertTrue(activityWindows(LastFmStatsPeriod.OVERALL, nowUtc, 0L, zone).isEmpty())
+    }
+
+    @Test
+    fun changedConfigurationCannotReuseOrPublishTheOldSnapshot() = runBlocking {
+        var config = "first"
+        val cache = LastFmStatsCache { 0L }
+        val api = object : LastFmStatsApi by FakeApi() {
+            override suspend fun profile(username: String): Result<LastFM.UserStats> {
+                config = "second"
+                return FakeApi().profile(username)
+            }
+        }
+        val repository = LastFmStatisticsRepository(api, cache, { now }, { "https://api" }, configuration = { config })
+        val oldKey = repository.key("zen", LastFmStatsPeriod.MONTH)
+        assertTrue(repository.load("zen", LastFmStatsPeriod.MONTH, false).isFailure)
+        assertNull(repository.cached(oldKey))
+        assertTrue(oldKey != repository.key("zen", LastFmStatsPeriod.MONTH))
+    }
+
+    @Test
+    fun credentialsWithTheSameJvmHashStillHaveDifferentCacheIdentities() {
+        val first = LastFM.RuntimeConfig("https://api", "Aa", "secret", "session")
+        val second = first.copy(apiKey = "BB")
+        assertEquals(first.apiKey.hashCode(), second.apiKey.hashCode())
+        assertTrue(statsConfigurationFingerprint(first) != statsConfigurationFingerprint(second))
+        assertTrue(statsConfigurationFingerprint(first) != statsConfigurationFingerprint(first.copy(sessionKey = "other")))
+    }
+
+    @Test
+    fun everyRollingPeriodHasExactlyItsDurationAndNoSharedSecond() {
+        LastFmStatsPeriod.entries.filter { it.days != null }.forEach { period ->
+            val windows = activityWindows(period, now, 0L, java.time.ZoneId.of("America/New_York"))
+            assertEquals(period.days!! * 86_400L, windows.sumOf { it.last - it.first + 1L })
+            assertEquals(now - 1L, windows.last().last)
+            windows.zipWithNext { left, right -> assertEquals(left.last + 1L, right.first) }
+        }
     }
 
     private fun emptySnapshot() = LastFmStatsSnapshot(
@@ -205,7 +244,10 @@ class LastFmStatisticsRepositoryTest {
         ): Result<LastFM.PagedResult<LastFM.RecentTrack>> {
             if (fromEpochSeconds != null && toEpochSeconds != null) {
                 windows += fromEpochSeconds..toEpochSeconds
-                if (failActivity && toEpochSeconds == now()) return Result.failure(IllegalStateException("429"))
+                if (toEpochSeconds == now() - 1L && fromEpochSeconds <= now() - 7 * 86_400L) countFrom = fromEpochSeconds
+                if (failActivity && toEpochSeconds == now() - 1L && toEpochSeconds - fromEpochSeconds < 2 * 86_400L) {
+                    return Result.failure(IllegalStateException("429"))
+                }
                 // One scrobble per hour of the window, so slices sum to the period.
                 val count = (toEpochSeconds - fromEpochSeconds + 1) / 3_600L
                 return Result.success(LastFM.PagedResult(emptyList(), 1, count))

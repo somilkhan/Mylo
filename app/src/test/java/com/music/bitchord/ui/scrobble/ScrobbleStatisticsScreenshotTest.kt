@@ -16,11 +16,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.dp
 import coil3.annotation.ExperimentalCoilApi
 import coil3.asImage
 import coil3.compose.AsyncImagePreviewHandler
 import coil3.compose.LocalAsyncImagePreviewHandler
+import com.music.bitchord.R
 import com.music.bitchord.data.scrobbling.LastFM
 import com.music.bitchord.data.scrobbling.LastFmStatsPeriod
 import com.music.bitchord.data.scrobbling.LastFmStatsSnapshot
@@ -30,6 +33,7 @@ import com.music.bitchord.ui.AndroidAppUiHost
 import com.music.bitchord.ui.AppUi
 import com.music.bitchord.ui.player.AndroidPlayerHost
 import com.music.bitchord.ui.player.PlayerPlatform
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -42,8 +46,8 @@ import java.io.File
 
 /**
  * Renders the Statistics screen with sample data and writes PNGs to
- * `app/build/screenshots/` for design review. Nothing is asserted beyond
- * the screen composing and drawing without throwing.
+ * `app/build/screenshots/` for design review. The compact-default fixture
+ * also asserts that Recent is visible without a scroll.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -61,7 +65,23 @@ class ScrobbleStatisticsScreenshotTest {
     }
     private val nowSeconds = now / 1000
 
-    @Test fun loaded() = capture("stats_loaded", sampleState())
+    @Test fun loaded() = capture("stats_loaded", sampleState(), assertCompact = true)
+    @Test fun expandedDashboard() = capture("stats_expanded", sampleState(), collapse = 0f)
+    @Test fun lightCompactDefault() = capture("stats_light_compact", sampleState(), darkTheme = false, assertCompact = true)
+    @Test fun failedWithoutSavedData() = capture(
+        "stats_failed", ScrobbleStatisticsUiState(connected = true, username = "somil", failed = true),
+    )
+    @Test fun staleSavedData() = capture("stats_stale", sampleState().copy(failed = true))
+    @Test fun recentPaginationLoading() = capture("stats_recent_paging", sampleState().let {
+        it.copy(recent = it.recent.copy(items = it.recent.items.take(2), totalPages = 3, loading = true))
+    })
+    @Test fun recentPaginationFailed() = capture("stats_recent_page_failed", sampleState().let {
+        it.copy(recent = it.recent.copy(items = it.recent.items.take(2), totalPages = 3, failed = true, failedPage = 2))
+    })
+    @Test fun reducedMotionCompact() = capture("stats_reduced_motion", sampleState(), reduceMotion = true, assertCompact = true)
+    @Test fun reducedMotionLoading() = capture(
+        "stats_reduced_motion_loading", ScrobbleStatisticsUiState(connected = true, username = "somil"), reduceMotion = true,
+    )
 
     @Test fun recentFolded() = capture("stats_recent_folded", sampleState(), collapse = 1f)
 
@@ -98,8 +118,11 @@ class ScrobbleStatisticsScreenshotTest {
     private fun capture(
         name: String,
         state: ScrobbleStatisticsUiState,
-        collapse: Float = 0f,
+        collapse: Float = 1f,
         menuOpen: Boolean = false,
+        darkTheme: Boolean = true,
+        reduceMotion: Boolean = false,
+        assertCompact: Boolean = false,
     ) {
         // Shimmer and the now-playing bars animate forever; drive the clock by hand.
         compose.mainClock.autoAdvance = false
@@ -110,13 +133,14 @@ class ScrobbleStatisticsScreenshotTest {
                     cover(request.data.toString())
                 },
             ) {
-                BitChordTheme(darkTheme = true) {
+                BitChordTheme(darkTheme = darkTheme) {
                     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                         ScrobbleStatisticsScreen(
                             state = state,
                             actions = StatsActions({}, {}, {}, {}, {}, { _, _ -> }, { _, _ -> }),
                             contentPadding = PaddingValues(top = 56.dp, bottom = 120.dp),
                             nowMillis = now,
+                            reduceMotion = reduceMotion,
                             initialCollapse = collapse,
                             initialMenuOpen = menuOpen,
                         )
@@ -125,12 +149,22 @@ class ScrobbleStatisticsScreenshotTest {
             }
         }
         compose.mainClock.advanceTimeBy(1_500)
+        compose.waitForIdle()
+        if (assertCompact) {
+            compose.onNodeWithText(compose.activity.getString(R.string.scrobble_stats_show_dashboard)).assertIsDisplayed()
+            compose.onNodeWithText("Nude").assertIsDisplayed()
+        }
         // captureToImage() waits on a hardware redraw Robolectric never signals; draw the view directly.
         val root = compose.activity.window.decorView
+        assertTrue(root.width > 0 && root.height > 0)
         val bitmap = Bitmap.createBitmap(root.width, root.height, Bitmap.Config.ARGB_8888)
-        root.draw(Canvas(bitmap))
-        val dir = File(System.getProperty("mylo.screenshots") ?: "build/screenshots").apply { mkdirs() }
-        File(dir, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        try {
+            root.draw(Canvas(bitmap))
+            val dir = File(System.getProperty("mylo.screenshots") ?: "build/screenshots").apply { mkdirs() }
+            File(dir, "$name.png").outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+        } finally {
+            bitmap.recycle()
+        }
     }
 
     /** Stand-in cover art: a two-tone diagonal wash seeded from the URL. */

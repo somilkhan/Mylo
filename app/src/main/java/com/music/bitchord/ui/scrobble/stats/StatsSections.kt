@@ -193,16 +193,27 @@ internal fun StatsStaleNotice(onRetry: () -> Unit, modifier: Modifier = Modifier
 
 /** Stands in for the dashboard and the list while the first snapshot loads. */
 @Composable
-internal fun StatsSkeleton(modifier: Modifier = Modifier) {
+internal fun StatsSkeleton(modifier: Modifier = Modifier, reduceMotion: Boolean = false) {
     Column(modifier.fillMaxWidth()) {
-        StatsDashboardSkeleton()
+        StatsDashboardSkeleton(reduceMotion = reduceMotion)
         Spacer(Modifier.height(28.dp))
-        ShimmerBox(
+        StatsPlaceholder(
             Modifier.padding(horizontal = PAGE_GUTTER + 4.dp).width(96.dp).height(18.dp),
             RoundedCornerShape(50),
+            reduceMotion,
         )
         Spacer(Modifier.height(14.dp))
-        StatsListSkeleton()
+        StatsListSkeleton(reduceMotion = reduceMotion)
+    }
+}
+
+/** Same native placeholder geometry, without an infinite sweep when motion is reduced. */
+@Composable
+internal fun StatsPlaceholder(modifier: Modifier, shape: Shape, reduceMotion: Boolean) {
+    if (reduceMotion) {
+        Box(modifier.clip(shape).background(MaterialTheme.colorScheme.surfaceVariant))
+    } else {
+        ShimmerBox(modifier, shape)
     }
 }
 
