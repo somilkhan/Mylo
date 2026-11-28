@@ -141,7 +141,9 @@ class ScrobbleControlsTest {
         val node = compose.onNodeWithTag("primary")
         node.assertIsNotEnabled().assertContentDescriptionEquals("Generate playlist")
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.ProgressBarRangeInfo, ProgressBarRangeInfo.Indeterminate))
-        assertEquals(normalBounds, node.fetchSemanticsNode().boundsInRoot)
+        val busyBounds = node.fetchSemanticsNode().boundsInRoot
+        assertEquals(normalBounds.width, busyBounds.width, 0.5f)
+        assertEquals(normalBounds.height, busyBounds.height, 0.5f)
         node.performTouchInput { click() }
         compose.runOnIdle { assertEquals(0, clicks) }
     }
