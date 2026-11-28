@@ -1,6 +1,7 @@
 package com.music.bitchord.ui.scrobble
 
 import android.content.Intent
+import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -35,8 +36,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -81,18 +84,22 @@ import com.music.bitchord.ui.components.PAGE_GUTTER
 import com.music.bitchord.ui.components.PillTextField
 import com.music.bitchord.ui.components.SearchField
 import com.music.bitchord.ui.components.SongRow
+import com.music.bitchord.ui.components.liquidGlassRim
 import com.music.bitchord.ui.icons.SfIcons
 import com.music.bitchord.ui.screens.LocalPlaylistReleaseHeader
 import com.music.bitchord.ui.scrobble.stats.Artwork
 import com.music.bitchord.ui.scrobble.stats.StatsMessage
 import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 
 @get:StringRes
@@ -105,7 +112,18 @@ internal val LocalPlaylistSortMode.labelRes: Int
         LocalPlaylistSortMode.CUSTOM -> R.string.scrobble_sort_custom
     }
 
-private fun LocalPlaylist.cover(): String? = customCoverUri ?: songs.firstOrNull()?.thumbnailUrl
+private fun LocalPlaylist.cover(): String? = customCoverUri?.takeIf { it.isNotBlank() }
+    ?: songs.firstOrNull { !it.thumbnailUrl.isNullOrBlank() }?.thumbnailUrl
+
+/** A persisted URI grant belongs to the app, not to an individual playlist. */
+private fun releaseUnusedCover(context: android.content.Context, savedUri: String?) {
+    if (savedUri == null || LocalPlaylistStore.playlists.value.any { it.customCoverUri == savedUri }) return
+    runCatching {
+        context.contentResolver.releasePersistableUriPermission(
+            Uri.parse(savedUri), Intent.FLAG_GRANT_READ_URI_PERMISSION,
+        )
+    }
+}
 
 private fun LocalPlaylist.canSeedSimilar(): Boolean = songs.any { it.videoId.isNotBlank() && !it.isVideo }
 
@@ -147,9 +165,15 @@ fun ScrobblePlaylistsContent(
     var deleteTarget by remember { mutableStateOf<LocalPlaylist?>(null) }
     var deleteError by remember { mutableStateOf<String?>(null) }
     var actionError by remember { mutableStateOf<String?>(null) }
+    var renaming by remember { mutableStateOf(false) }
+    var deleting by remember { mutableStateOf(false) }
+    val playlistListState = rememberLazyListState()
 
     val selected = playlists.firstOrNull { it.id == selectedId }
     BackHandler(enabled = selected != null) { selectedId = null }
+    LaunchedEffect(selectedId, playlists, storageError) {
+        if (selectedId != null && selected == null && storageError == null) selectedId = null
+    }
 
     val startRename: (LocalPlaylist) -> Unit = {
         renameText = it.title
@@ -189,8 +213,10 @@ fun ScrobblePlaylistsContent(
                     currentSong = currentSong,
                     isPlaying = isPlaying,
                     contentPadding = contentPadding,
-                    viewModel = viewModel,
                     generationState = generationState,
+                    onCancelGeneration = viewModel::cancelGeneration,
+                    onGenerateSimilar = viewModel::generateSimilar,
+                    reduceMotion = reduceMotion,
                     onBack = { selectedId = null },
                     onPlaySongs = onPlaySongs,
                     onRename = { startRename(open) },
@@ -225,20 +251,24 @@ fun ScrobblePlaylistsContent(
                         }
                     },
                     onMove = { playlist, to ->
+                        val from = playlists.indexOfFirst { it.id == playlist.id }
+                        val direction = (to - from).coerceIn(-1, 1)
                         scope.launch {
-                            actionError = if (LocalPlaylistStore.movePlaylist(playlist.id, to)) null
+                            actionError = if (from >= 0 && LocalPlaylistStore.movePlaylistBy(playlist.id, direction)) null
                             else context.getString(R.string.scrobble_order_save_failed)
                         }
                     },
                     onRename = startRename,
                     onDelete = startDelete,
+                    listState = playlistListState,
+                    hazeState = hazeState,
                 )
             }
         }
     }
 
     renameTarget?.let { target ->
-        AlertScaffold(hazeState = hazeState, onDismiss = { renameTarget = null }) {
+        AlertScaffold(hazeState = hazeState, onDismiss = { if (!renaming) renameTarget = null }) {
             Column(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 19.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -270,17 +300,26 @@ fun ScrobblePlaylistsContent(
                 label = stringResource(R.string.save),
                 contentColor = MaterialTheme.colorScheme.primary,
                 emphasised = true,
+                enabled = !renaming,
                 onClick = {
+                    if (renaming) return@AlertAction
                     val clean = renameText.trim()
                     val duplicate = playlists.any { it.id != target.id && it.title.equals(clean, ignoreCase = true) }
                     when {
                         clean.isBlank() -> renameError = context.getString(R.string.scrobble_rename_empty)
                         duplicate -> renameError = context.getString(R.string.scrobble_rename_duplicate)
-                        else -> scope.launch {
-                            if (LocalPlaylistStore.renamePlaylist(target.id, clean)) {
-                                renameTarget = null
-                            } else {
-                                renameError = context.getString(R.string.scrobble_rename_failed)
+                        else -> {
+                            renaming = true
+                            scope.launch {
+                                try {
+                                    if (LocalPlaylistStore.renamePlaylist(target.id, clean)) {
+                                        renameTarget = null
+                                    } else {
+                                        renameError = context.getString(R.string.scrobble_rename_failed)
+                                    }
+                                } finally {
+                                    renaming = false
+                                }
                             }
                         }
                     }
@@ -291,12 +330,13 @@ fun ScrobblePlaylistsContent(
                 label = stringResource(R.string.cancel),
                 contentColor = MaterialTheme.colorScheme.onSurface,
                 emphasised = false,
+                enabled = !renaming,
                 onClick = { renameTarget = null },
             )
         }
     }
     deleteTarget?.let { target ->
-        AlertScaffold(hazeState = hazeState, onDismiss = { deleteTarget = null; deleteError = null }) {
+        AlertScaffold(hazeState = hazeState, onDismiss = { if (!deleting) { deleteTarget = null; deleteError = null } }) {
             Column(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 19.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -325,24 +365,25 @@ fun ScrobblePlaylistsContent(
                 contentColor = MaterialTheme.colorScheme.error,
                 emphasised = true,
                 destructive = true,
+                enabled = !deleting,
                 onClick = {
+                    if (deleting) return@AlertAction
+                    deleting = true
                     scope.launch {
-                        withContext<Unit>(NonCancellable) {
-                            if (LocalPlaylistStore.deletePlaylist(target.id)) {
-                                target.customCoverUri?.let { savedUri ->
-                                    runCatching {
-                                        context.contentResolver.releasePersistableUriPermission(
-                                            Uri.parse(savedUri),
-                                            Intent.FLAG_GRANT_READ_URI_PERMISSION,
-                                        )
-                                    }
+                        try {
+                            withContext<Unit>(NonCancellable) {
+                                val cover = LocalPlaylistStore.getPlaylist(target.id)?.customCoverUri
+                                if (LocalPlaylistStore.deletePlaylist(target.id)) {
+                                    releaseUnusedCover(context, cover)
+                                    if (selectedId == target.id) selectedId = null
+                                    deleteTarget = null
+                                    deleteError = null
+                                } else {
+                                    deleteError = context.getString(R.string.scrobble_delete_failed)
                                 }
-                                if (selectedId == target.id) selectedId = null
-                                deleteTarget = null
-                                deleteError = null
-                            } else {
-                                deleteError = context.getString(R.string.scrobble_delete_failed)
                             }
+                        } finally {
+                            deleting = false
                         }
                     }
                 },
@@ -352,6 +393,7 @@ fun ScrobblePlaylistsContent(
                 label = stringResource(R.string.cancel),
                 contentColor = MaterialTheme.colorScheme.onSurface,
                 emphasised = false,
+                enabled = !deleting,
                 onClick = { deleteTarget = null; deleteError = null },
             )
         }
@@ -385,6 +427,8 @@ internal fun PlaylistList(
     onMove: (LocalPlaylist, Int) -> Unit,
     onRename: (LocalPlaylist) -> Unit,
     onDelete: (LocalPlaylist) -> Unit,
+    listState: LazyListState = rememberLazyListState(),
+    hazeState: HazeState? = null,
 ) {
     val colors = MaterialTheme.colorScheme
     var sortOpen by remember { mutableStateOf(false) }
@@ -397,7 +441,9 @@ internal fun PlaylistList(
     val canReorder = sortMode == LocalPlaylistSortMode.CUSTOM && query.isBlank()
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
+        state = listState,
+        modifier = Modifier.fillMaxSize()
+            .then(if (hazeState != null) Modifier.hazeSource(hazeState) else Modifier),
         contentPadding = PaddingValues(bottom = contentPadding.calculateBottomPadding() + 32.dp),
     ) {
         item(key = "header") {
@@ -448,7 +494,7 @@ internal fun PlaylistList(
                         when (notice) {
                             "storage" -> ScrobbleStatusCard(
                                 title = stringResource(R.string.scrobble_playlists_storage_error),
-                                body = storageError,
+                                body = null,
                                 icon = SfIcons.ErrorOutline,
                                 iconTint = colors.error,
                                 action = stringResource(R.string.retry),
@@ -564,7 +610,7 @@ internal fun PlaylistList(
         }
     }
 
-    IosMenuPopover(item = sortMode.takeIf { sortOpen }, anchor = sortAnchor, onDismiss = { sortOpen = false }) { current ->
+    IosMenuPopover(item = sortMode.takeIf { sortOpen }, anchor = sortAnchor, onDismiss = { sortOpen = false }, hazeState = hazeState) { current ->
         LocalPlaylistSortMode.entries.forEach { mode ->
             IosMenuRow(
                 label = stringResource(mode.labelRes),
@@ -589,7 +635,14 @@ internal fun PlaylistList(
         }
     }
 
-    IosMenuPopover(item = rowMenu, anchor = rowAnchor, onDismiss = { rowMenu = null }) { menu ->
+    val currentRowMenu = remember(rowMenu, visible) {
+        rowMenu?.let { menu ->
+            visible.firstOrNull { it.id == menu.playlist.id }?.let { current ->
+                RowMenu(current, visible.indexOfFirst { it.id == current.id })
+            }
+        }
+    }
+    IosMenuPopover(item = currentRowMenu, anchor = rowAnchor, onDismiss = { rowMenu = null }, hazeState = hazeState) { menu ->
         val playlist = menu.playlist
         val close = { rowMenu = null }
         IosMenuRow(
@@ -713,18 +766,20 @@ private class TrackMenu(val song: Song, val index: Int)
 
 @OptIn(ExperimentalHazeMaterialsApi::class)
 @Composable
-private fun PlaylistDetail(
+internal fun PlaylistDetail(
     playlist: LocalPlaylist,
     hazeState: HazeState,
     currentSong: Song?,
     isPlaying: Boolean,
     contentPadding: PaddingValues,
-    viewModel: ScrobbleGenerateViewModel,
     generationState: ScrobbleGenerateUiState,
+    onCancelGeneration: () -> Unit,
+    onGenerateSimilar: (LocalPlaylist) -> Unit,
     onBack: () -> Unit,
     onPlaySongs: (List<Song>, Int) -> Unit,
     onRename: () -> Unit,
     onDelete: () -> Unit,
+    reduceMotion: Boolean = false,
 ) {
     val colors = MaterialTheme.colorScheme
     val context = LocalContext.current
@@ -740,39 +795,50 @@ private fun PlaylistDetail(
     var trackMenu by remember(playlist.id) { mutableStateOf<TrackMenu?>(null) }
     var trackAnchor by remember { mutableStateOf<Rect?>(null) }
     var exporting by remember(playlist.id) { mutableStateOf(false) }
+    var coverSaving by remember(playlist.id) { mutableStateOf(false) }
+    var pendingAddIds by remember(playlist.id) { mutableStateOf<Set<String>>(emptySet()) }
+    val trackKeys = remember(playlist.id, playlist.songs) { playlistTrackRowKeys(playlist) }
     val existingIds = remember(playlist.songs) { playlist.songs.mapTo(hashSetOf()) { it.videoId } }
     fun say(@StringRes res: Int, error: Boolean) {
         notice = Notice(context.getString(res), error)
     }
 
+    fun finishAdding() {
+        adding = false
+        addQuery = ""
+        addResults = emptyList()
+        addError = null
+        addLoading = false
+    }
+    BackHandler(enabled = adding && !menuOpen && trackMenu == null && !exporting) { finishAdding() }
+
     val coverPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) {
+        if (uri != null && !coverSaving) {
+            coverSaving = true
             val newUri = uri.toString()
-            val oldUri = playlist.customCoverUri
+            val oldUri = LocalPlaylistStore.getPlaylist(playlist.id)?.customCoverUri
             scope.launch {
                 var saved = false
                 fun releaseNew() {
                     if (!saved && newUri != oldUri) {
-                        runCatching {
-                            context.contentResolver.releasePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                        }
+                        releaseUnusedCover(context, newUri)
                     }
                 }
                 try {
                     if (newUri != oldUri) {
                         context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     }
+                    withContext(Dispatchers.IO) {
+                        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                        context.contentResolver.openInputStream(uri)?.use { stream ->
+                            BitmapFactory.decodeStream(stream, null, bounds)
+                            check(bounds.outWidth > 0 && bounds.outHeight > 0) { "Invalid cover image" }
+                        } ?: error("Unreadable cover")
+                    }
                     withContext<Unit>(NonCancellable) {
                         saved = LocalPlaylistStore.setCustomCover(playlist.id, newUri)
                         if (saved) {
-                            oldUri?.takeIf { it != newUri }?.let { staleUri ->
-                                runCatching {
-                                    context.contentResolver.releasePersistableUriPermission(
-                                        Uri.parse(staleUri),
-                                        Intent.FLAG_GRANT_READ_URI_PERMISSION,
-                                    )
-                                }
-                            }
+                            oldUri?.takeIf { it != newUri }?.let { releaseUnusedCover(context, it) }
                             say(R.string.scrobble_cover_saved, error = false)
                         } else {
                             releaseNew()
@@ -789,6 +855,8 @@ private fun PlaylistDetail(
                 } catch (error: Exception) {
                     releaseNew()
                     say(R.string.scrobble_cover_failed, error = true)
+                } finally {
+                    coverSaving = false
                 }
             }
         }
@@ -802,10 +870,11 @@ private fun PlaylistDetail(
             addLoading = false
             return@LaunchedEffect
         }
-        delay(300)
+        addResults = emptyList()
         addLoading = true
         addError = null
         try {
+            delay(300)
             val response = YtMusicRepository.search(query, SearchFilter.SONGS).getOrThrow()
             currentCoroutineContext().ensureActive()
             addResults = response.mapNotNull { result ->
@@ -821,7 +890,8 @@ private fun PlaylistDetail(
             addResults = emptyList()
             addError = context.getString(R.string.scrobble_gen_error_search)
         } finally {
-            addLoading = false
+            // A cancelled request must not clear its successor's loading state.
+            if (currentCoroutineContext().isActive) addLoading = false
         }
     }
 
@@ -831,7 +901,7 @@ private fun PlaylistDetail(
 
     LazyColumn(
         state = listState,
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().hazeSource(hazeState),
         contentPadding = PaddingValues(
             top = contentPadding.calculateTopPadding(),
             bottom = contentPadding.calculateBottomPadding() + 32.dp,
@@ -845,27 +915,28 @@ private fun PlaylistDetail(
                 ScrobbleIconButton(
                     icon = SfIcons.ArrowBack,
                     description = stringResource(R.string.scrobble_back_to_playlists),
-                    onClick = onBack,
+                    onClick = { if (adding) finishAdding() else onBack() },
                 )
                 Spacer(Modifier.weight(1f))
                 if (currentIndex >= 0) {
                     ScrobbleIconButton(
                         icon = SfIcons.Locate,
                         description = stringResource(R.string.scrobble_locate),
-                        onClick = { scope.launch { listState.animateScrollToItem(TRACKS_OFFSET + currentIndex) } },
+                        onClick = {
+                            scope.launch {
+                                val target = playlistTrackListIndex(currentIndex, adding && addResults.isNotEmpty())
+                                if (reduceMotion) listState.scrollToItem(target) else listState.animateScrollToItem(target)
+                            }
+                        },
                     )
                 }
                 ScrobbleSecondaryButton(
                     label = stringResource(if (adding) R.string.scrobble_add_tracks_done else R.string.scrobble_add_tracks),
                     onClick = {
-                        adding = !adding
-                        if (!adding) {
-                            addQuery = ""
-                            addResults = emptyList()
-                        }
+                        if (adding) finishAdding() else adding = true
                     },
                     compact = true,
-                    modifier = Modifier.padding(horizontal = 4.dp),
+                    modifier = Modifier.padding(horizontal = 4.dp).liquidGlassRim(CircleShape),
                 )
                 ScrobbleIconButton(
                     icon = SfIcons.More,
@@ -905,7 +976,7 @@ private fun PlaylistDetail(
                         body = generationState.progress.ifBlank { stringResource(R.string.scrobble_gen_loading_fallback) },
                         busy = true,
                         action = stringResource(R.string.cancel),
-                        onAction = viewModel::cancelGeneration,
+                        onAction = onCancelGeneration,
                         modifier = Modifier.padding(top = 8.dp),
                     )
                 } else {
@@ -933,7 +1004,9 @@ private fun PlaylistDetail(
                             query = addQuery,
                             onQueryChange = {
                                 addQuery = it
+                                addResults = emptyList()
                                 addError = null
+                                addLoading = it.trim().length >= 2
                             },
                             onSubmit = {},
                             placeholder = stringResource(R.string.scrobble_search_youtube_placeholder),
@@ -970,16 +1043,24 @@ private fun PlaylistDetail(
                         AddResultRow(
                             song = song,
                             added = song.videoId in existingIds,
+                            busy = song.videoId in pendingAddIds,
                             onAdd = {
-                                scope.launch {
-                                    val added = LocalPlaylistStore.addSongIfAbsent(playlist.id, song)
-                                    val current = LocalPlaylistStore.getPlaylist(playlist.id)
-                                    notice = when {
-                                        added -> Notice(context.getString(R.string.scrobble_added_track, song.title), false)
-                                        current == null -> Notice(context.getString(R.string.scrobble_playlist_missing), true)
-                                        current.songs.any { it.videoId == song.videoId } ->
-                                            Notice(context.getString(R.string.scrobble_track_already_in_playlist), false)
-                                        else -> Notice(context.getString(R.string.scrobble_save_track_failed), true)
+                                if (song.videoId !in pendingAddIds) {
+                                    pendingAddIds = pendingAddIds + song.videoId
+                                    scope.launch {
+                                        try {
+                                            val added = LocalPlaylistStore.addSongIfAbsent(playlist.id, song)
+                                            val current = LocalPlaylistStore.getPlaylist(playlist.id)
+                                            notice = when {
+                                                added -> Notice(context.getString(R.string.scrobble_added_track, song.title), false)
+                                                current == null -> Notice(context.getString(R.string.scrobble_playlist_missing), true)
+                                                current.songs.any { it.videoId == song.videoId } ->
+                                                    Notice(context.getString(R.string.scrobble_track_already_in_playlist), false)
+                                                else -> Notice(context.getString(R.string.scrobble_save_track_failed), true)
+                                            }
+                                        } finally {
+                                            pendingAddIds = pendingAddIds - song.videoId
+                                        }
                                     }
                                 }
                             },
@@ -1000,7 +1081,7 @@ private fun PlaylistDetail(
                 )
             }
         } else {
-            itemsIndexed(playlist.songs, key = { _, song -> "${playlist.id}-${song.videoId}" }) { index, song ->
+            itemsIndexed(playlist.songs, key = { index, _ -> trackKeys[index] }) { index, song ->
                 val isCurrent = currentId != null && song.videoId == currentId
                 var anchor by remember { mutableStateOf<Rect?>(null) }
                 Box(Modifier.onGloballyPositioned { anchor = it.boundsInWindow() }) {
@@ -1020,32 +1101,40 @@ private fun PlaylistDetail(
         }
     }
 
-    IosMenuPopover(item = playlist.takeIf { menuOpen }, anchor = menuAnchor, onDismiss = { menuOpen = false }) { current ->
+    IosMenuPopover(item = playlist.takeIf { menuOpen }, anchor = menuAnchor, onDismiss = { menuOpen = false }, hazeState = hazeState) { current ->
         val close = { menuOpen = false }
         IosMenuRow(
             label = stringResource(R.string.scrobble_change_cover),
             icon = SfIcons.Photo,
-            onClick = { close(); coverPicker.launch(arrayOf("image/*")) },
+            enabled = !coverSaving,
+            onClick = {
+                close()
+                runCatching { coverPicker.launch(arrayOf("image/*")) }
+                    .onFailure { say(R.string.scrobble_cover_failed, error = true) }
+            },
         )
         if (current.customCoverUri != null) {
             IosMenuRow(
                 label = stringResource(R.string.scrobble_reset_cover),
                 icon = SfIcons.Revert,
+                enabled = !coverSaving,
                 onClick = {
                     close()
-                    val oldUri = current.customCoverUri
-                    scope.launch {
-                        withContext<Unit>(NonCancellable) {
-                            if (LocalPlaylistStore.setCustomCover(current.id, null)) {
-                                runCatching {
-                                    context.contentResolver.releasePersistableUriPermission(
-                                        Uri.parse(oldUri),
-                                        Intent.FLAG_GRANT_READ_URI_PERMISSION,
-                                    )
+                    if (!coverSaving) {
+                        coverSaving = true
+                        scope.launch {
+                            try {
+                                withContext<Unit>(NonCancellable) {
+                                    val oldUri = LocalPlaylistStore.getPlaylist(current.id)?.customCoverUri
+                                    if (LocalPlaylistStore.setCustomCover(current.id, null)) {
+                                        releaseUnusedCover(context, oldUri)
+                                        say(R.string.scrobble_cover_reset, error = false)
+                                    } else {
+                                        say(R.string.scrobble_cover_reset_failed, error = true)
+                                    }
                                 }
-                                say(R.string.scrobble_cover_reset, error = false)
-                            } else {
-                                say(R.string.scrobble_cover_reset_failed, error = true)
+                            } finally {
+                                coverSaving = false
                             }
                         }
                     }
@@ -1057,7 +1146,7 @@ private fun PlaylistDetail(
             label = stringResource(R.string.scrobble_generate_similar),
             icon = SfIcons.AutoAwesome,
             enabled = !generationState.isGenerating && current.canSeedSimilar(),
-            onClick = { close(); viewModel.generateSimilar(current) },
+            onClick = { close(); onGenerateSimilar(current) },
         )
         IosMenuRow(
             label = stringResource(R.string.scrobble_export_playlist),
@@ -1079,7 +1168,7 @@ private fun PlaylistDetail(
         )
     }
 
-    IosMenuPopover(item = trackMenu, anchor = trackAnchor, onDismiss = { trackMenu = null }) { menu ->
+    IosMenuPopover(item = trackMenu, anchor = trackAnchor, onDismiss = { trackMenu = null }, hazeState = hazeState) { menu ->
         val close = { trackMenu = null }
         IosMenuRow(
             label = stringResource(R.string.scrobble_move_up),
@@ -1130,6 +1219,7 @@ private fun PlaylistDetail(
             hazeState = hazeState,
             onDismiss = { exporting = false },
             onMessage = { notice = Notice(it, error = false) },
+            onError = { notice = Notice(it, error = true) },
         )
     }
 }
@@ -1137,8 +1227,21 @@ private fun PlaylistDetail(
 /** The bar, the header, and the status block come before the first track. */
 private const val TRACKS_OFFSET = 3
 
+internal fun playlistTrackListIndex(trackIndex: Int, hasAddResults: Boolean): Int =
+    TRACKS_OFFSET + trackIndex + if (hasAddResults) 1 else 0
+
+/** Imported playlists may legitimately contain the same track more than once. */
+internal fun playlistTrackRowKeys(playlist: LocalPlaylist): List<String> {
+    val occurrences = mutableMapOf<String, Int>()
+    return playlist.songs.map { song ->
+        val occurrence = occurrences.getOrDefault(song.videoId, 0)
+        occurrences[song.videoId] = occurrence + 1
+        "${playlist.id}-${song.videoId}-$occurrence"
+    }
+}
+
 @Composable
-private fun AddResultRow(song: Song, added: Boolean, onAdd: () -> Unit) {
+private fun AddResultRow(song: Song, added: Boolean, busy: Boolean, onAdd: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     Row(
         Modifier
@@ -1166,6 +1269,7 @@ private fun AddResultRow(song: Song, added: Boolean, onAdd: () -> Unit) {
             ScrobblePrimaryButton(
                 label = stringResource(R.string.scrobble_add_track),
                 onClick = onAdd,
+                busy = busy,
                 compact = true,
             )
         }

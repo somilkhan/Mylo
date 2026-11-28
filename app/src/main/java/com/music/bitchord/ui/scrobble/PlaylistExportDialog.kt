@@ -2,6 +2,7 @@ package com.music.bitchord.ui.scrobble
 
 import android.content.ClipData
 import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -13,6 +14,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -31,9 +34,14 @@ import com.music.bitchord.ui.components.AlertScaffold
 import com.music.bitchord.ui.components.PillSegmentedControl
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.UUID
 
-/** Export one playlist as CSV or M3U: the format as a segmented choice, then Save, Share or Cancel. */
+/** Export one playlist as CSV or M3U using the app's shared alert and segmented controls. */
 @Composable
 @OptIn(ExperimentalHazeMaterialsApi::class)
 internal fun ScrobblePlaylistExportDialog(
@@ -41,58 +49,87 @@ internal fun ScrobblePlaylistExportDialog(
     hazeState: HazeState,
     onDismiss: () -> Unit,
     onMessage: (String) -> Unit,
+    onError: (String) -> Unit = onMessage,
 ) {
     val context = LocalContext.current
-    var csvSelected by rememberSaveable { mutableStateOf(true) }
-    val csvSaveLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("text/csv"),
-    ) { uri ->
-        if (uri != null) {
-            runCatching {
-                context.contentResolver.openOutputStream(uri)?.use {
-                    it.write(LocalPlaylistExport.csv(playlist).toByteArray(Charsets.UTF_8))
-                } ?: error(context.getString(R.string.scrobble_export_file_failed))
-            }.onSuccess { onMessage(context.getString(R.string.scrobble_export_csv_saved)) }
-                .onFailure { onMessage(context.getString(R.string.scrobble_export_csv_failed)) }
+    val scope = rememberCoroutineScope()
+    var csvSelected by rememberSaveable(playlist.id) { mutableStateOf(true) }
+    var busy by remember(playlist.id) { mutableStateOf(false) }
+    var pendingPlaylist by remember(playlist.id) { mutableStateOf<LocalPlaylist?>(null) }
+
+    fun save(uri: Uri?, csv: Boolean) {
+        if (uri == null) {
+            busy = false
+            pendingPlaylist = null
+            onDismiss()
+            return
         }
-        onDismiss()
+        val snapshot = pendingPlaylist ?: playlist
+        scope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    val content = if (csv) LocalPlaylistExport.csv(snapshot) else LocalPlaylistExport.m3u(snapshot)
+                    context.contentResolver.openOutputStream(uri, "wt")?.use {
+                        it.write(content.toByteArray(Charsets.UTF_8))
+                    } ?: error("No output stream")
+                }
+                onMessage(context.getString(if (csv) R.string.scrobble_export_csv_saved else R.string.scrobble_export_m3u_saved))
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                onError(context.getString(if (csv) R.string.scrobble_export_csv_failed else R.string.scrobble_export_m3u_failed))
+            } finally {
+                busy = false
+                pendingPlaylist = null
+                onDismiss()
+            }
+        }
     }
-    val m3uSaveLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("audio/x-mpegurl"),
-    ) { uri ->
-        if (uri != null) {
-            runCatching {
-                context.contentResolver.openOutputStream(uri)?.use {
-                    it.write(LocalPlaylistExport.m3u(playlist).toByteArray(Charsets.UTF_8))
-                } ?: error(context.getString(R.string.scrobble_export_file_failed))
-            }.onSuccess { onMessage(context.getString(R.string.scrobble_export_m3u_saved)) }
-                .onFailure { onMessage(context.getString(R.string.scrobble_export_m3u_failed)) }
-        }
-        onDismiss()
+
+    val csvSaveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
+        save(uri, csv = true)
+    }
+    val m3uSaveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("audio/x-mpegurl")) { uri ->
+        save(uri, csv = false)
     }
 
     fun share(csv: Boolean) {
-        val content = if (csv) LocalPlaylistExport.csv(playlist) else LocalPlaylistExport.m3u(playlist)
-        val extension = if (csv) "csv" else "m3u"
-        val mimeType = if (csv) "text/csv" else "audio/x-mpegurl"
-        runCatching {
-            val directory = File(context.cacheDir, "shared/playlist_exports")
-            if (!directory.exists() && !directory.mkdirs()) error(context.getString(R.string.scrobble_export_prepare_failed))
-            val file = File(directory, "${playlist.id}-${LocalPlaylistExport.fileName(playlist.title, extension)}")
-            file.writeText(content, Charsets.UTF_8)
-            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-            val intent = Intent(Intent.ACTION_SEND).apply {
-                type = mimeType
-                putExtra(Intent.EXTRA_STREAM, uri)
-                clipData = ClipData.newRawUri(playlist.title, uri)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        if (busy) return
+        busy = true
+        val snapshot = playlist
+        scope.launch {
+            try {
+                val uri = withContext(Dispatchers.IO) {
+                    val content = if (csv) LocalPlaylistExport.csv(snapshot) else LocalPlaylistExport.m3u(snapshot)
+                    val extension = if (csv) "csv" else "m3u"
+                    val directory = File(context.cacheDir, "shared/playlist_exports")
+                    check(directory.isDirectory || directory.mkdirs()) { "Couldn't prepare export directory" }
+                    // Playlist IDs can come from imported data: never use them as path components.
+                    val safeId = UUID.nameUUIDFromBytes(snapshot.id.toByteArray(Charsets.UTF_8))
+                    val file = File(directory, "$safeId-${LocalPlaylistExport.fileName(snapshot.title, extension)}")
+                    file.writeText(content, Charsets.UTF_8)
+                    FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                }
+                val intent = Intent(Intent.ACTION_SEND).apply {
+                    type = if (csv) "text/csv" else "audio/x-mpegurl"
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    clipData = ClipData.newRawUri(snapshot.title, uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                context.startActivity(Intent.createChooser(intent, context.getString(R.string.scrobble_share_chooser_title)))
+                onMessage(context.getString(R.string.scrobble_export_ready))
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                onError(context.getString(R.string.scrobble_export_share_failed))
+            } finally {
+                busy = false
+                onDismiss()
             }
-            context.startActivity(Intent.createChooser(intent, context.getString(R.string.scrobble_share_chooser_title)))
-        }.onSuccess { onMessage(context.getString(R.string.scrobble_export_ready)) }
-            .onFailure { onMessage(context.getString(R.string.scrobble_export_share_failed)) }
+        }
     }
 
-    AlertScaffold(hazeState = hazeState, onDismiss = onDismiss) {
+    AlertScaffold(hazeState = hazeState, onDismiss = { if (!busy) onDismiss() }) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -115,7 +152,7 @@ internal fun ScrobblePlaylistExportDialog(
                     stringResource(R.string.scrobble_export_format_m3u),
                 ),
                 selectedIndex = if (csvSelected) 0 else 1,
-                onSelect = { csvSelected = it == 0 },
+                onSelect = { if (!busy) csvSelected = it == 0 },
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
             )
         }
@@ -124,11 +161,23 @@ internal fun ScrobblePlaylistExportDialog(
             label = stringResource(R.string.save),
             emphasised = true,
             contentColor = MaterialTheme.colorScheme.primary,
+            enabled = !busy,
             onClick = {
-                if (csvSelected) {
-                    csvSaveLauncher.launch(LocalPlaylistExport.fileName(playlist.title, "csv"))
-                } else {
-                    m3uSaveLauncher.launch(LocalPlaylistExport.fileName(playlist.title, "m3u"))
+                if (!busy) {
+                    busy = true
+                    pendingPlaylist = playlist
+                    try {
+                        if (csvSelected) {
+                            csvSaveLauncher.launch(LocalPlaylistExport.fileName(playlist.title, "csv"))
+                        } else {
+                            m3uSaveLauncher.launch(LocalPlaylistExport.fileName(playlist.title, "m3u"))
+                        }
+                    } catch (_: Exception) {
+                        busy = false
+                        pendingPlaylist = null
+                        onError(context.getString(if (csvSelected) R.string.scrobble_export_csv_failed else R.string.scrobble_export_m3u_failed))
+                        onDismiss()
+                    }
                 }
             },
         )
@@ -137,13 +186,15 @@ internal fun ScrobblePlaylistExportDialog(
             label = stringResource(R.string.share),
             emphasised = false,
             contentColor = MaterialTheme.colorScheme.onSurface,
-            onClick = { share(csvSelected); onDismiss() },
+            enabled = !busy,
+            onClick = { share(csvSelected) },
         )
         AlertRule()
         AlertAction(
             label = stringResource(R.string.cancel),
             emphasised = false,
             contentColor = MaterialTheme.colorScheme.onSurface,
+            enabled = !busy,
             onClick = onDismiss,
         )
     }

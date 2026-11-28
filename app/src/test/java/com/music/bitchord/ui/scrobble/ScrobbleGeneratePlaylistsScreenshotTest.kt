@@ -26,11 +26,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.dp
 import coil3.annotation.ExperimentalCoilApi
 import coil3.asImage
 import coil3.compose.AsyncImagePreviewHandler
 import coil3.compose.LocalAsyncImagePreviewHandler
+import com.music.bitchord.R
 import com.music.bitchord.data.generate.PlaylistGenerationMode
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.scrobbling.LastFmStatsPeriod
@@ -41,6 +47,9 @@ import com.music.bitchord.ui.AppUi
 import com.music.bitchord.ui.player.AndroidPlayerHost
 import com.music.bitchord.ui.player.PlayerPlatform
 import com.music.bitchord.ui.theme.BitChordTheme
+import dev.chrisbanes.haze.HazeState
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -53,7 +62,7 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
 /**
- * Draws Generate, its sheet, and Playlists with sample data into
+ * Draws the real Generate, its sheet, playlist list and detail composables with sample data into
  * `app/build/screenshots/` for design review.
  */
 @RunWith(RobolectricTestRunner::class)
@@ -134,6 +143,82 @@ class ScrobbleGeneratePlaylistsScreenshotTest {
 
     @Test fun playlistsEmpty() = capture("playlists_empty") { list(emptyList()) }
 
+    private val detailPlaylist = LocalPlaylist("detail", "Late night rotation", songs, generationMode = "top")
+    private fun text(res: Int): String = compose.activity.getString(res)
+
+    @Test fun playlistDetail() = capture("playlist_detail", verify = {
+        compose.onNodeWithText(detailPlaylist.title).assertIsDisplayed()
+        compose.onNodeWithContentDescription(text(R.string.scrobble_back_to_playlists)).assertIsDisplayed()
+        compose.onNodeWithText(text(R.string.play)).assertIsDisplayed()
+        compose.onNodeWithText(songs.first().title).performScrollTo().assertIsDisplayed()
+    }) { detail(detailPlaylist, currentSong = songs[1], isPlaying = true) }
+
+    @Test fun playlistDetailLight() = capture("playlist_detail_light", darkTheme = false, verify = {
+        compose.onNodeWithText(detailPlaylist.title).assertIsDisplayed()
+    }) { detail(detailPlaylist) }
+
+    @Test fun playlistDetailEmpty() = capture("playlist_detail_empty", verify = {
+        compose.onNodeWithText(text(R.string.scrobble_playlist_empty)).performScrollTo().assertIsDisplayed()
+    }) { detail(detailPlaylist.copy(songs = emptyList())) }
+
+    @Test fun playlistDetailDuplicateTracks() = capture("playlist_detail_duplicates", verify = {
+        compose.onNodeWithText(detailPlaylist.title).assertIsDisplayed()
+    }) { detail(detailPlaylist.copy(songs = listOf(songs[0], songs[1], songs[0]))) }
+
+    @Test fun playlistDetailMenu() = capture("playlist_detail_menu", verify = {
+        compose.onNodeWithContentDescription(compose.activity.getString(R.string.scrobble_more_options, detailPlaylist.title)).performClick()
+        compose.mainClock.advanceTimeBy(600)
+        compose.onNodeWithText(text(R.string.scrobble_change_cover)).assertIsDisplayed()
+        compose.onNodeWithText(text(R.string.scrobble_export_playlist)).assertIsDisplayed()
+    }) { detail(detailPlaylist) }
+
+    @Test fun playlistDetailExport() = capture("playlist_detail_export", verify = {
+        compose.onNodeWithContentDescription(compose.activity.getString(R.string.scrobble_more_options, detailPlaylist.title)).performClick()
+        compose.mainClock.advanceTimeBy(600)
+        compose.onNodeWithText(text(R.string.scrobble_export_playlist)).performClick()
+        compose.mainClock.advanceTimeBy(600)
+        compose.onNodeWithText(text(R.string.scrobble_export_format_csv)).assertIsDisplayed()
+        compose.onNodeWithText(text(R.string.scrobble_export_format_m3u)).assertIsDisplayed()
+    }) { detail(detailPlaylist) }
+
+    @Test fun playlistDetailAddBackStaysOnDetail() = capture("playlist_detail_add_tracks", verify = {
+        compose.onNodeWithText(text(R.string.scrobble_add_tracks)).performClick()
+        compose.mainClock.advanceTimeBy(600)
+        compose.onNodeWithText(text(R.string.scrobble_search_youtube_placeholder)).performScrollTo().assertIsDisplayed()
+        compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+        compose.mainClock.advanceTimeBy(600)
+        compose.onNodeWithText(detailPlaylist.title).performScrollTo().assertIsDisplayed()
+    }) { detail(detailPlaylist) }
+
+    @Test fun playlistDetailPlayAndBackCallbacks() {
+        var played: Pair<List<Song>, Int>? = null
+        var backed = false
+        capture("playlist_detail_callbacks", verify = {
+            compose.onNodeWithText(text(R.string.play)).performClick()
+            assertEquals(songs to 0, played)
+            compose.onNodeWithContentDescription(text(R.string.scrobble_back_to_playlists)).performClick()
+            assertTrue(backed)
+        }) {
+            detail(detailPlaylist, onPlay = { tracks, index -> played = tracks to index }, onBack = { backed = true })
+        }
+    }
+
+    @Composable
+    private fun detail(
+        playlist: LocalPlaylist,
+        currentSong: Song? = null,
+        isPlaying: Boolean = false,
+        onPlay: (List<Song>, Int) -> Unit = { _, _ -> },
+        onBack: () -> Unit = {},
+    ) {
+        PlaylistDetail(
+            playlist = playlist, hazeState = HazeState(), currentSong = currentSong,
+            isPlaying = isPlaying, contentPadding = padding, generationState = ScrobbleGenerateUiState(),
+            onCancelGeneration = {}, onGenerateSimilar = {}, onBack = onBack,
+            onPlaySongs = onPlay, onRename = {}, onDelete = {}, reduceMotion = true,
+        )
+    }
+
     @Composable
     private fun page(state: ScrobbleGenerateUiState, accounts: GenerateAccounts) {
         GenerateScreen(
@@ -189,24 +274,36 @@ class ScrobbleGeneratePlaylistsScreenshotTest {
     }
 
     @OptIn(ExperimentalCoilApi::class)
-    private fun capture(name: String, content: @Composable () -> Unit) {
+    private fun capture(
+        name: String,
+        darkTheme: Boolean = true,
+        verify: () -> Unit = {},
+        content: @Composable () -> Unit,
+    ) {
         compose.mainClock.autoAdvance = false
         compose.setContent {
             CompositionLocalProvider(
                 LocalInspectionMode provides true,
                 LocalAsyncImagePreviewHandler provides AsyncImagePreviewHandler { request -> cover(request.data.toString()) },
             ) {
-                BitChordTheme(darkTheme = true) {
+                BitChordTheme(darkTheme = darkTheme) {
                     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) { content() }
                 }
             }
         }
         compose.mainClock.advanceTimeBy(1_500)
+        compose.waitForIdle()
+        verify()
+        compose.waitForIdle()
         val root = compose.activity.window.decorView
+        assertTrue("The real activity must be measured before capture", root.width > 0 && root.height > 0)
         val bitmap = Bitmap.createBitmap(root.width, root.height, Bitmap.Config.ARGB_8888)
         root.draw(Canvas(bitmap))
         val dir = File(System.getProperty("mylo.screenshots") ?: "build/screenshots").apply { mkdirs() }
-        File(dir, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        val output = File(dir, "$name.png")
+        output.outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+        assertTrue("The real composable screenshot must be written", output.length() > 0)
+        bitmap.recycle()
     }
 
     private fun cover(seed: String): coil3.Image {
