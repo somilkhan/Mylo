@@ -34,6 +34,8 @@ Every current non-English locale has the completed scrobble catalogue in a dedic
 
 The fresh continuation confirmed the Android failure on the exact baseline: Check run `46097428907` completed 1,455 tests with 17 failures and one skip. Six Stats **plural** keys were missing from all 19 locale folders; the old lead XML validator checked only strings. The additive correction supplies 114 plural resources, without exemptions or replacement of existing copy. All 19 folders pass XML/key/duplicate-name/string-and-plural printf checks. Read `docs/audits/SCROBBLE_LOCALIZATION.md` for the root cause and current evidence. Android Gradle verification is pending at this checkpoint; do not call static resource checks an Android unit-test pass.
 
+Locale checkpoint `bd5a4fb6397944903ab6fca36b59db62b591d4ca` is pushed. Actual AAPT2 compilation of all production resources passed, as did dependency resolution. The focused Gradle test is running. The next focused integration unit masks the secondary Settings password field, removes raw Last.fm sign-in diagnostics, preserves cancellation before account success, and retains real screenshot/JUnit artifacts in existing CI. Signing configuration/scripts are untouched. Its static diff and workflow checks pass; read `docs/audits/SCROBBLE_INTEGRATION.md`. No device/provider behavior is asserted verified.
+
 This continuation's sandbox is ARM64 and newly provisioned: JDK 17 is `/usr/lib/jvm/java-17-openjdk-arm64`, SDK is `/home/ubuntu/Android/Sdk`. The prior handoff's amd64 JDK path and installed-tool claims describe its old sandbox, not this one. Stable CI signing remains unchanged.
 
 ## Validation evidence and exact limits

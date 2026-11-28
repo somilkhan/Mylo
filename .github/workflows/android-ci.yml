@@ -104,6 +104,19 @@ jobs:
         if: always()
         run: ./gradlew --no-daemon --stacktrace :app:testDevDebugUnitTest
 
+      - name: Upload Android test and Scrobble screenshot evidence
+        if: always() && steps.test_android.outcome != 'skipped'
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-test-evidence
+          path: |
+            app/build/test-results/testDevDebugUnitTest/
+            app/build/reports/tests/testDevDebugUnitTest/
+            app/build/screenshots/*.png
+          if-no-files-found: warn
+          retention-days: 3
+
       - name: Upload debug APKs
         id: upload_apks
         if: ((github.event_name == 'workflow_dispatch' && inputs.build_apks) || (github.event_name == 'issue_comment' && github.event.issue.pull_request && github.event.comment.body == '/build-apk' && github.event.comment.user.login == 'somilkhan')) && steps.build_apks.outcome == 'success'

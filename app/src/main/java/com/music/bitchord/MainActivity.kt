@@ -158,8 +158,11 @@ import com.music.bitchord.data.model.withoutVideos
 import com.music.bitchord.data.model.UserPlaylist
 import com.music.bitchord.data.model.EntityType
 import com.music.bitchord.data.model.SearchHistoryEntity
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import com.music.bitchord.data.model.durationMillis
 import com.music.bitchord.data.scrobbling.LastFM
@@ -6187,6 +6190,7 @@ private fun BitChordApp(
                 error = lastfmError,
                 loading = lastfmLoading,
                 onSignIn = {
+                    if (lastfmLoading) return@LastfmLoginAlert
                     lastfmLoading = true
                     lastfmError = null
                     scope.launch {
@@ -6195,20 +6199,18 @@ private fun BitChordApp(
                                 apiKey = AppSettings.lastfmApiKey.value,
                                 secret = AppSettings.lastfmSecret.value,
                             )
-                            LastFM.getMobileSession(usernameInput.trim(), passwordInput)
-                                .onSuccess { auth ->
-                                    AppSettings.setLastfmSessionKey(auth.session.key)
-                                    AppSettings.setLastfmUsername(auth.session.name)
-                                    AppSettings.setLastfmEnabled(true)
-                                    // Stats reloads now that there is a Last.fm account to read.
-                                    scrobbleStatisticsViewModel.onLastFmConnected()
-                                    showLastfmLogin = false
-                                }
-                                .onFailure { e ->
-                                    lastfmError = e.message ?: context.getString(R.string.login_failed)
-                                }
-                        } catch (e: Exception) {
-                            lastfmError = e.message ?: context.getString(R.string.login_failed)
+                            val auth = LastFM.getMobileSession(usernameInput.trim(), passwordInput).getOrThrow()
+                            currentCoroutineContext().ensureActive()
+                            AppSettings.setLastfmSessionKey(auth.session.key)
+                            AppSettings.setLastfmUsername(auth.session.name)
+                            AppSettings.setLastfmEnabled(true)
+                            // Stats reloads now that there is a Last.fm account to read.
+                            scrobbleStatisticsViewModel.onLastFmConnected()
+                            showLastfmLogin = false
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                            lastfmError = context.getString(R.string.login_failed)
                         } finally {
                             lastfmLoading = false
                         }
