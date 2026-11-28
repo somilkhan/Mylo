@@ -27,10 +27,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.dp
 import coil3.annotation.ExperimentalCoilApi
 import coil3.asImage
@@ -62,7 +60,7 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
 /**
- * Draws the real Generate, its sheet, playlist list and detail composables with sample data into
+ * Draws the real Generate, its sheet and playlist list with sample data into
  * `app/build/screenshots/` for design review.
  */
 @RunWith(RobolectricTestRunner::class)
@@ -144,86 +142,15 @@ class ScrobbleGeneratePlaylistsScreenshotTest {
     @Test fun playlistsEmpty() = capture("playlists_empty") { list(emptyList()) }
 
     private val detailPlaylist = LocalPlaylist("detail", "Late night rotation", songs, generationMode = "top")
-    private fun text(res: Int): String = compose.activity.getString(res)
 
-    @Test fun playlistDetail() = capture("playlist_detail", verify = {
-        compose.onNodeWithText(detailPlaylist.title).assertIsDisplayed()
-        compose.onNodeWithContentDescription(text(R.string.scrobble_back_to_playlists)).assertIsDisplayed()
-        compose.onNodeWithText(text(R.string.play)).assertIsDisplayed()
-        compose.onNodeWithText(songs.first().title).performScrollTo().assertIsDisplayed()
-    }) { detail(detailPlaylist, currentSong = songs[1], isPlaying = true) }
-
-    @Test fun playlistDetailLight() = capture("playlist_detail_light", darkTheme = false, verify = {
-        compose.onNodeWithText(detailPlaylist.title).assertIsDisplayed()
-    }) { detail(detailPlaylist) }
-
-    @Test fun playlistDetailEmpty() = capture("playlist_detail_empty", verify = {
-        compose.onNodeWithText(text(R.string.scrobble_playlist_empty)).performScrollTo().assertIsDisplayed()
-    }) { detail(detailPlaylist.copy(songs = emptyList())) }
-
-    @Test fun playlistDetailDuplicateTracks() = capture("playlist_detail_duplicates", verify = {
-        compose.onNodeWithText(detailPlaylist.title).assertIsDisplayed()
-    }) { detail(detailPlaylist.copy(songs = listOf(songs[0], songs[1], songs[0]))) }
-
-    @Test fun playlistDetailMenu() = capture("playlist_detail_menu", verify = {
-        compose.onNodeWithContentDescription(compose.activity.getString(R.string.scrobble_more_options, detailPlaylist.title)).performClick()
-        compose.mainClock.advanceTimeBy(600)
-        compose.onNodeWithText(text(R.string.scrobble_change_cover)).assertIsDisplayed()
-        compose.onNodeWithText(text(R.string.scrobble_export_playlist)).assertIsDisplayed()
-    }) { detail(detailPlaylist) }
-
-    @Test fun playlistDetailExport() = capture("playlist_detail_export", verify = {
-        compose.onNodeWithContentDescription(compose.activity.getString(R.string.scrobble_more_options, detailPlaylist.title)).performClick()
-        compose.mainClock.advanceTimeBy(600)
-        compose.onNodeWithText(text(R.string.scrobble_export_playlist)).performClick()
-        compose.mainClock.advanceTimeBy(600)
-        compose.onNodeWithText(text(R.string.scrobble_export_format_csv)).assertIsDisplayed()
-        compose.onNodeWithText(text(R.string.scrobble_export_format_m3u)).assertIsDisplayed()
-    }) { detail(detailPlaylist) }
-
-    @Test fun playlistDetailAddBackStaysOnDetail() = capture("playlist_detail_add_tracks", verify = {
-        // Adding is entered from the playlist's own ⋮, beside the page's other
-        // actions, rather than from a pill in the bar.
-        compose.onNodeWithContentDescription(
-            compose.activity.getString(R.string.scrobble_more_options, detailPlaylist.title),
-        ).performClick()
-        compose.mainClock.advanceTimeBy(600)
-        compose.onNodeWithText(text(R.string.scrobble_add_tracks)).performClick()
-        compose.mainClock.advanceTimeBy(600)
-        compose.onNodeWithText(text(R.string.scrobble_search_youtube_placeholder)).performScrollTo().assertIsDisplayed()
-        compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
-        compose.mainClock.advanceTimeBy(600)
-        compose.onNodeWithText(detailPlaylist.title).performScrollTo().assertIsDisplayed()
-    }) { detail(detailPlaylist) }
-
-    @Test fun playlistDetailPlayAndBackCallbacks() {
-        var played: Pair<List<Song>, Int>? = null
-        var backed = false
-        capture("playlist_detail_callbacks", verify = {
-            compose.onNodeWithText(text(R.string.play)).performClick()
-            assertEquals(songs to 0, played)
-            compose.onNodeWithContentDescription(text(R.string.scrobble_back_to_playlists)).performClick()
-            assertTrue(backed)
-        }) {
-            detail(detailPlaylist, onPlay = { tracks, index -> played = tracks to index }, onBack = { backed = true })
-        }
+    @Test fun playlistOpenDelegatesToNativeDetail() = capture("playlist_native_open", verify = {
+        compose.onNodeWithText(detailPlaylist.title).performClick()
+        assertEquals(detailPlaylist, openedPlaylist)
+    }) {
+        list(listOf(detailPlaylist), onOpen = { openedPlaylist = it })
     }
 
-    @Composable
-    private fun detail(
-        playlist: LocalPlaylist,
-        currentSong: Song? = null,
-        isPlaying: Boolean = false,
-        onPlay: (List<Song>, Int) -> Unit = { _, _ -> },
-        onBack: () -> Unit = {},
-    ) {
-        PlaylistDetail(
-            playlist = playlist, hazeState = HazeState(), currentSong = currentSong,
-            isPlaying = isPlaying, contentPadding = padding, generationState = ScrobbleGenerateUiState(),
-            onCancelGeneration = {}, onGenerateSimilar = {}, onBack = onBack,
-            onPlaySongs = onPlay, onRename = {}, onDelete = {}, reduceMotion = true,
-        )
-    }
+    private var openedPlaylist: LocalPlaylist? = null
 
     @Composable
     private fun page(state: ScrobbleGenerateUiState, accounts: GenerateAccounts) {
@@ -262,7 +189,7 @@ class ScrobbleGeneratePlaylistsScreenshotTest {
 
     @OptIn(ExperimentalSharedTransitionApi::class)
     @Composable
-    private fun list(playlists: List<LocalPlaylist>) {
+    private fun list(playlists: List<LocalPlaylist>, onOpen: (LocalPlaylist) -> Unit = {}) {
         SharedTransitionLayout {
             AnimatedVisibility(visible = true) {
                 PlaylistList(
@@ -271,7 +198,7 @@ class ScrobbleGeneratePlaylistsScreenshotTest {
                     sortMode = LocalPlaylistSortMode.NEWEST, onSortMode = {}, contentPadding = padding,
                     highlightedPlaylistId = null, sharedHandoffFromGenerate = false, reduceMotion = true,
                     sharedTransitionScope = this@SharedTransitionLayout, animatedVisibilityScope = this,
-                    onRetryStorage = {}, onOpen = {}, onPlay = {}, onGenerateSimilar = {},
+                    onRetryStorage = {}, onOpen = onOpen, onPlay = {}, onGenerateSimilar = {},
                     onCancelGeneration = {}, onOpenGenerator = {}, onPin = {}, onMove = { _, _ -> },
                     onRename = {}, onDelete = {},
                 )
