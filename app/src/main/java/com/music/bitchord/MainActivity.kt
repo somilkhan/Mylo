@@ -895,7 +895,14 @@ private fun BitChordApp(
     val route = visibleEntry?.route
     // Scrobble mode: while its page is open the bars show its three tabs
     // in place of Home, Explore, Library and Search, and the FAB closes it.
-    val scrobbleOpen = route == AppRoute.Scrobble
+    // A native release opened from Scrobble is still inside the Scrobble
+    // experience. Its detail page sits above the route in the interleaved
+    // navigator, so [route] is null while that release is visible.
+    val scrobblePlaylistDetailOpen = route == null &&
+        navigator.contains(AppRoute.Scrobble) &&
+        scrobbleNativePlaylistId != null &&
+        detailStack.any { it.browseId == scrobbleNativePlaylistId }
+    val scrobbleOpen = route == AppRoute.Scrobble || scrobblePlaylistDetailOpen
     val activeNavBarScroll = if (scrobbleOpen) scrobbleNavBarScroll else navBarScroll
     val scrobbleStatsLabel = stringResource(R.string.scrobble_tab_stats)
     val scrobbleGenerateLabel = stringResource(R.string.scrobble_tab_generate)
@@ -3058,9 +3065,18 @@ private fun BitChordApp(
     val goBack: () -> Unit = {
         // A native playlist opened from Scrobble sits above the Scrobble route.
         // Close that release first so Back returns to the same playlist list.
-        if (scrobbleOpen && scrobbleNativePlaylistId != null && detail?.browseId == scrobbleNativePlaylistId) {
+        if (
+            scrobbleOpen &&
+            scrobbleNativePlaylistId != null &&
+            detailStack.any { it.browseId == scrobbleNativePlaylistId } &&
+            detail != null
+        ) {
+            // A release opened from the native playlist (for example an artist
+            // or album) closes first; the playlist itself closes only when it
+            // is the detail currently on top. Both steps stay inside Scrobble.
+            val closingPlaylist = detail.browseId == scrobbleNativePlaylistId
             viewModel.closeDetail()
-            scrobbleNativePlaylistId = null
+            if (closingPlaylist) scrobbleNativePlaylistId = null
         } else if (scrobbleOpen && scrobbleTab != 0) {
             // Scrobble's Generate or Playlists tab steps back to Stats first.
             scrobbleTab = 0
