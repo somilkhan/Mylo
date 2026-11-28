@@ -135,7 +135,7 @@ jobs:
           retention-days: 3
 
       - name: Report APK artifact upload failure
-        if: always() && ((github.event_name == 'workflow_dispatch' && inputs.build_apks) || (github.event_name == 'issue_comment' && github.event.comment.body == '/build-apk' && github.event.comment.user.login == 'somilkhan') && steps.build_apks.outcome == 'success' && steps.upload_apks.outcome == 'failure'
+        if: always() && ((github.event_name == 'workflow_dispatch' && inputs.build_apks) || (github.event_name == 'issue_comment' && github.event.issue.pull_request && github.event.comment.body == '/build-apk' && github.event.comment.user.login == 'somilkhan')) && steps.build_apks.outcome == 'success' && steps.upload_apks.outcome == 'failure'
         shell: bash
         run: |
           echo "::warning::Android build succeeded, but GitHub could not store the APK artifacts. Check repository Actions artifact storage quota."
