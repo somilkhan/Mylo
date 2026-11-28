@@ -3219,6 +3219,7 @@ private fun BitChordApp(
                                 state = historyState,
                                 listState = historyListState,
                                 currentSong = player.song,
+                                isPlaying = player.isPlaying,
                                 onSongClick = { songs, index ->
                                     playFrom(songs, index, QueueSource(historyLabel, PlaybackSourceType.HISTORY))
                                 },
@@ -3253,7 +3254,6 @@ private fun BitChordApp(
                                 highlightedPlaylistId = scrobbleHandoffPlaylistId,
                                 sharedHandoffFromGenerate = scrobbleHandoffFromGenerate,
                                 currentSong = player.song,
-                                isPlaying = player.isPlaying,
                                 reduceMotion = reducePlayerMotion,
                                 contentPadding = listPadding,
                                 pageBackdrop = pageBackdrop,
