@@ -46,6 +46,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -155,6 +156,7 @@ fun ScrobblePlaylistsContent(
     isPlaying: Boolean,
     onPlaySongs: (List<Song>, Int) -> Unit,
     onOpenGenerator: () -> Unit,
+    onPlaylistDetailChanged: (Boolean) -> Unit = {},
 ) {
     val playlists by LocalPlaylistStore.playlists.collectAsStateWithLifecycle()
     val storageError by LocalPlaylistStore.loadError.collectAsStateWithLifecycle()
@@ -175,6 +177,10 @@ fun ScrobblePlaylistsContent(
     val playlistListState = rememberLazyListState()
 
     val selected = playlists.firstOrNull { it.id == selectedId }
+    LaunchedEffect(selectedId) { onPlaylistDetailChanged(selectedId != null) }
+    DisposableEffect(Unit) {
+        onDispose { onPlaylistDetailChanged(false) }
+    }
     BackHandler(enabled = selected != null) { selectedId = null }
     LaunchedEffect(selectedId, playlists, storageError) {
         if (selectedId != null && selected == null && storageError == null) selectedId = null
